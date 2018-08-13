@@ -477,6 +477,7 @@ class KSAllElectron:
             self.d_enl[nl] = abs(eps - self.enl[nl])
             d_enl_max = max(d_enl_max, self.d_enl[nl])
             self.enl[nl] = eps
+
             if self.verbose:
                 line = '-- state %s, %i eigensolver iterations, e=%9.5f, de=%9.5f' % \
                        (nl, it, self.enl[nl], self.d_enl[nl])
@@ -624,12 +625,11 @@ class KSAllElectron:
         """ Get list of valence orbitals, e.g. ['2s','2p'] """
         return self.valence
 
-    '''
     def get_symbol(self):
         """ Return atom's chemical symbol. """
         return self.symbol
 
-
+    '''
     def get_comment(self):
         """ One-line comment, e.g. 'H, charge=0, quadratic, r0=4' """
         comment='%s xc=%s charge=%.1f conf:%s' %(self.symbol,self.xc,float(self.charge),self.confinement_potential.get_comment())
