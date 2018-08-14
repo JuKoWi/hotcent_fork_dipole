@@ -1,14 +1,12 @@
 import numpy as np
 
-# TODO: units!
-
 class PowerConfinement():
     def __init__(self, r0=1., s=2):
         self.r0 = r0
         self.s = s
 
     def __call__(self, r):
-        return (self.r0 / r) ** self.s
+        return (r / self.r0) ** self.s
 
 
 class WoodsSaxonConfinement():
