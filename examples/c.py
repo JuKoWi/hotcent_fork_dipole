@@ -1,7 +1,7 @@
 import os
 from hotcent.atom import KSAllElectron
 from hotcent.slako import SlaterKosterTable
-from hotcent.confinement import PowerConfinement #, WoodsSaxonConfinement
+from hotcent.confinement import PowerConfinement
 from ase.data import covalent_radii, atomic_numbers
 from ase.units import Bohr, Hartree
 
@@ -16,7 +16,7 @@ else:
     r0 = 1.85 * covalent_radii[atomic_numbers[element]] / Bohr
     atom = KSAllElectron(element,
                          confinement=PowerConfinement(r0=r0, s=2),
-                         configuration={'2s':2, '2p':2},
+                         configuration='[He] 2s2 2p2',
                          valence=['2s', '2p'],
                          )
     atom.run()

@@ -48,7 +48,7 @@ class KSAllElectron:
         Parameters:
         -----------
         symbol:         chemical symbol
-        configuration:  e.g. {'2s':2,'2p':2}.
+        configuration:  e.g. '[He] 2s2 2p2'    
         valence:        valence orbitals, e.g. ['2s','2p']. 
         confinements:   confinement potentials (see hotcent.confinement)
         etol:           sp energy tolerance for eigensolver (Hartree)
@@ -99,7 +99,24 @@ class KSAllElectron:
         #self.nel=sum(self.occu.values())
         #self.charge=nel_neutral-self.nel
      
-        self.configuration = configuration
+        noble_conf = {'He':{'1s':2}}
+        noble_conf['Ne'] = dict({'2s':2, '2p':6}, **noble_conf['He'])
+        noble_conf['Ar'] = dict({'3s':2, '3p':6}, **noble_conf['Ne'])
+        noble_conf['Kr'] = dict({'3d':10, '4s':2, '4p':6}, **noble_conf['Ar'])
+        noble_conf['Xe'] = dict({'4d':10, '5s':2, '5p':6}, **noble_conf['Kr'])
+        noble_conf['Rn'] = dict({'4f':14, '5d':10, '6s':2, '6p':6},
+                                **noble_conf['Xe'])
+
+        self.configuration = {}
+        for term in configuration.split():
+            if term[0] == '[' and term[-1] == ']':
+                core = term[1:-1]
+                assert core in noble_conf, "[Core] config is not noble gas!"
+                conf = noble_conf[core]
+            else:
+                conf = {term[:2]: int(term[2:])}
+            self.configuration.update(conf)
+
         self.nel = sum(self.configuration.values())
         self.charge = self.Z - self.nel
 
