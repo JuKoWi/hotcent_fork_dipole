@@ -28,5 +28,5 @@ rmax = rmin + (N - 1) * dr
 sk = SlaterKosterTable(atom, atom)
 sk.run(rmin, rmax, N)
 sk.write('%s-%s_no_repulsion.par' % (element, element))
-#sk.write('Au-Au_no_repulsion.skf')
+sk.write('%s-%s_no_repulsion.skf' % (element, element))
 sk.plot()

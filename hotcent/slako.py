@@ -3,6 +3,7 @@ from __future__ import division, print_function
 import sys
 import numpy as np
 from math import sin, cos, tan, sqrt
+from ase.data import atomic_numbers, atomic_masses
 
 class SlaterKosterTable:
     def __init__(self, ela, elb, txt=None):#, timing=False):
@@ -66,26 +67,86 @@ class SlaterKosterTable:
     def write(self, filename=None):
         """ Use symbol1-symbol2.par as default. """
         self.smooth_tails()
-        if filename == None: 
-            fn = '%s-%s.par' % (self.ela.get_symbol(), self.elb.get_symbol())
-        else: 
-            fn = filename
 
-        with open(fn, 'w') as f:
-            #print('slako_comment=', file=f)
-            #print(self.get_comment(), '\n\n', file=f)
-            for p, (e1, e2) in enumerate(self.pairs):
-                print('%s-%s_table=' % (e1.get_symbol(), e2.get_symbol()), file=f)
-                for i, R in enumerate(self.Rgrid):
-                    print('%.6e' % R, end=' ', file=f)
-                    for t in range(20):
-                        x = self.tables[p][i, t]
-                        if abs(x) < 1e-90:
-                            print('0.', end=' ', file=f)
-                        else:
-                            print('%.6e' % x, end=' ', file=f)
-                    print(file=f)
-                print('\n\n', file=f)
+        el1, el2 = self.ela.get_symbol(), self.elb.get_symbol()
+        fn = '%s-%s.par' % (el1, el2) if filename is None else filename
+        ext = fn[-4:]
+        assert ext in ['.par', '.skf'], "Unknown format: %s (-> .par or .skf)" % ext
+
+        with open(fn, 'w') as handle:
+            if ext == '.par':
+                self._write_par(handle)
+            elif ext == '.skf':
+                self._write_skf(handle)
+
+
+    def _write_skf(self, handle):
+        """ Write to SKF file format; this function
+        is an adaptation of hotbit.io.hbskf 
+        """
+        grid_dist = self.Rgrid[1] - self.Rgrid[0]
+        grid_npts = sum([len(self.tables[p]) for p in range(len(self.pairs))])
+        grid_npts += int(self.Rgrid[0] / (self.Rgrid[1] - self.Rgrid[0]))
+        print("%.12f, %d" % (grid_dist, grid_npts), file=handle)
+
+        el1, el2 = self.ela.get_symbol(), self.elb.get_symbol()
+        if el1 == el2:
+            print("E_d   E_p   E_s   SPE   U_d   U_p   U_s   f_d    f_p   f_s",
+                  file=handle)
+
+        m = atomic_masses[atomic_numbers[el1]]
+        print("%.3f, 19*0.0" % m, file=handle)
+
+        # Integral table containing the DFTB Hamiltonian
+
+        if self.Rgrid[0] != 0:
+            n = int(self.Rgrid[0] / (self.Rgrid[1] - self.Rgrid[0]))
+            for i in range(n):
+                print('%d*0.0,' % len(self.tables[0][0]), file=handle)
+
+        ct, theader = 0, ''
+        for p in range(len(self.pairs)):
+            for i in range(len(self.tables[p])):
+                line = ''
+
+                for j in range(len(self.tables[p][i])):
+                    if self.tables[p][i, j] == 0:
+                        ct += 1
+                        theader = str(ct) + '*0.0 '
+                    else:
+                        ct = 0
+                        line += theader
+                        theader = ''
+                        line += '{0: 1.12e}  '.format(self.tables[p][i, j])
+
+                if theader != '':
+                    ct = 0
+                    line += theader
+                    theader = ''
+                    line += '{0: 1.12e}  '.format(self.tables[p][i, j])
+
+                print(line, file=handle)
+
+
+    def _write_par(self, handle):
+        #print('slako_comment=', file=f)
+        #print(self.get_comment(), '\n\n', file=f)
+        for p, (e1, e2) in enumerate(self.pairs):
+            line = '%s-%s_table=' % (e1.get_symbol(), e2.get_symbol())
+            print(line, file=handle)
+
+            for i, R in enumerate(self.Rgrid):
+                print('%.6e' % R, end=' ', file=handle)
+
+                for t in range(20):
+                    x = self.tables[p][i, t]
+                    if abs(x) < 1e-90:
+                        print('0.', end=' ', file=handle)
+                    else:
+                        print('%.6e' % x, end=' ', file=handle)
+                print(file=handle)
+
+            print('\n\n', file=handle)
     
     
     def plot(self, filename=None):
@@ -158,16 +219,6 @@ class SlaterKosterTable:
             file = filename
         pl.savefig(file)            
     
-    '''
-    def get_comment(self):
-        """ Get comments concerning parametrization. """        
-        return self.comment
-        
-        
-    def set_comment(self,comment):
-        """ Add optional one-liner comment for documenting the parametrization. """
-        self.comment+='\n'+comment
-    ''' 
         
     def get_range(self, fractional_limit):
         """ Define ranges for the atoms: largest r such that Rnl(r)<limit. """
@@ -433,7 +484,7 @@ class SlaterKosterTable:
         grid = np.array(grid)
         area = np.array(area)
         grid2 = grid.copy()
-        grid2[:, 1] =- grid[:, 1]
+        grid2[:, 1] = -grid[:, 1]
         shift = np.zeros_like(grid)
         shift[:, 1] = 2 * h
         grid = np.concatenate((grid, grid2 + shift))
