@@ -5,13 +5,16 @@ from hotcent.confinement import PowerConfinement #, WoodsSaxonConfinement
 from ase.data import covalent_radii, atomic_numbers
 from ase.units import Bohr, Hartree
 
+element = 'C'
+
 # Get KS all-electron ground state of confined atom:
-elmfile = 'C.elm'
+elmfile = '%s.elm' % element
+
 if os.path.exists(elmfile):
     atom.read(elmfile)
 else:
-    r0 = 1.85 * covalent_radii[atomic_numbers['C']] / Bohr
-    atom = KSAllElectron('C',
+    r0 = 1.85 * covalent_radii[atomic_numbers[element]] / Bohr
+    atom = KSAllElectron(element,
                          confinement=PowerConfinement(r0=r0, s=2),
                          configuration={'2s':2, '2p':2},
                          valence=['2s', '2p'],
@@ -19,12 +22,11 @@ else:
     atom.run()
     #atom.write(elmfile)
 
-#exit()
 # Compute Slater-Koster integrals:
 rmin, dr, N = 0.5, 0.05, 250
 rmax = rmin + (N - 1) * dr
 sk = SlaterKosterTable(atom, atom)
 sk.run(rmin, rmax, N)
-sk.write('Au-Au_no_repulsion.par')
+sk.write('%s-%s_no_repulsion.par' % (element, element))
 #sk.write('Au-Au_no_repulsion.skf')
 sk.plot()
