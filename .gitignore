@@ -1,2 +1,6 @@
 *.pyc
 *~
+examples/*.pdf
+examples/*.skf
+examples/*.par
+examples/*.txt
