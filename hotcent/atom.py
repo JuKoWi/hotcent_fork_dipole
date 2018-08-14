@@ -1,48 +1,41 @@
 from __future__ import division, print_function
 
-import numpy as np
-from scipy.integrate import odeint
-from scipy.interpolate import splrep, splev
-#from box.data import data
-from copy import copy
-#from box.interpolation import Function, SplineFunction
-from hotcent.interpolation import Function, SplineFunction
-import sys
 import os
-#from box.timing import Timer
-from time import asctime
-import math
+import sys
 import pickle
 import collections
+from copy import copy
+import numpy as np
+from math import sqrt, pi, log
+from scipy.integrate import odeint
+from scipy.interpolate import splrep, splev
 from ase.data import atomic_numbers
 from ase.units import Bohr
+from hotcent.interpolation import Function, SplineFunction
 try:
     import pylab as pl
 except:
     pl = None
 
-array = np.array
-sqrt = math.sqrt
-pi = math.pi
-log = math.log
 
 class KSAllElectron:
-    def __init__(self,symbol,
-                      configuration={},
-                      valence=[],
-                      confinement=None,
-                      xc='PW92',
-                      convergence={'density':1E-7, 'energies':1E-7},
-                      scalarrel=False,
-                      rmax=100.0,
-                      nodegpts=500,
-                      mix=0.2,
-                      itmax=200,
-                      timing=False,
-                      verbose=False,
-                      txt=None,
-                      restart=None,
-                      write=None):
+    def __init__(self,
+                 symbol,
+                 configuration={},
+                 valence=[],
+                 confinement=None,
+                 xc='PW92',
+                 convergence={'density':1E-7, 'energies':1E-7},
+                 scalarrel=False,
+                 rmax=100.0,
+                 nodegpts=500,
+                 mix=0.2,
+                 itmax=200,
+                 timing=False,
+                 verbose=False,
+                 txt=None,
+                 restart=None,
+                 write=None):
         """
         Make Kohn-Sham all-electron calculation for given atom.
 
@@ -178,7 +171,7 @@ class KSAllElectron:
             #self.bs_energy += self.occu[nl] * self.enl[nl]
             self.bs_energy += self.configuration[nl] * self.enl[nl]
 
-        self.exc = array([self.xcf.exc(self.dens[i]) for i in range(self.N)])
+        self.exc =np.array([self.xcf.exc(self.dens[i]) for i in range(self.N)])
         self.Hartree_energy = self.grid.integrate(self.Hartree * self.dens, use_dV=True) / 2
         self.vxc_energy = self.grid.integrate(self.vxc * self.dens, use_dV=True)
         self.exc_energy = self.grid.integrate(self.exc * self.dens, use_dV=True)
@@ -268,7 +261,7 @@ class KSAllElectron:
     def calculate_veff(self):
         """ Calculate effective potential. """
         #self.timer.start('veff')
-        self.vxc = array([self.xcf.vxc(self.dens[i]) for i in range(self.N)])
+        self.vxc =np.array([self.xcf.vxc(self.dens[i]) for i in range(self.N)])
         #self.timer.stop('veff')
         return self.nucl + self.Hartree + self.vxc + self.conf
 
@@ -296,8 +289,8 @@ class KSAllElectron:
                     dens = pickle.load(f)
                 v = splrep(rgrid, veff)
                 d = splrep(rgrid, dens)
-                self.veff = array([splev(r,v) for r in self.rgrid])
-                self.dens = array([splev(r,d) for r in self.rgrid])
+                self.veff =np.array([splev(r,v) for r in self.rgrid])
+                self.dens =np.array([splev(r,d) for r in self.rgrid])
                 done = True
             except IOError:
                 print("Could not open restart file, " \
@@ -323,8 +316,8 @@ class KSAllElectron:
         N = self.grid.get_N()
 
         # make confinement and nuclear potentials; intitial guess for veff
-        self.conf = array([self.confinement(r) for r in self.rgrid])
-        self.nucl = array([self.V_nuclear(r) for r in self.rgrid])
+        self.conf = np.array([self.confinement(r) for r in self.rgrid])
+        self.nucl = np.array([self.V_nuclear(r) for r in self.rgrid])
         self.get_veff_and_dens()
         self.calculate_Hartree_potential()
         #self.Hartree=np.zeros((N,))
@@ -333,7 +326,7 @@ class KSAllElectron:
             self.veff = self.mix * self.calculate_veff() + (1 - self.mix) * self.veff
             if self.scalarrel:
                 veff = SplineFunction(self.rgrid, self.veff)
-                self.dveff = array([veff(r, der=1) for r in self.rgrid])
+                self.dveff = np.array([veff(r, der=1) for r in self.rgrid])
             d_enl_max, itmax = self.solve_eigenstates(it)
 
             dens0 = self.dens.copy()
@@ -497,7 +490,7 @@ class KSAllElectron:
             c1 = -1. * np.ones(self.N)
         else:
             # from Paolo Giannozzi: Notes on pseudopotential generation
-            ScR_mass = array([1 + 0.5*(eps - V) / c ** 2 for V in self.veff])
+            ScR_mass = np.array([1 + 0.5*(eps - V) / c ** 2 for V in self.veff])
             c0 = -l * (l + 1) - 2 * ScR_mass * self.rgrid ** 2 * (self.veff - eps)
             c0 -= self.dveff * self.rgrid / (2 * ScR_mass * c ** 2)
             c1 = self.rgrid * self.dveff / (2 * ScR_mass * c ** 2) - 1
