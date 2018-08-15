@@ -21,9 +21,10 @@ except:
 class KSAllElectron:
     def __init__(self,
                  symbol,
-                 configuration={},
+                 configuration='',
                  valence=[],
                  confinement=None,
+                 wf_confinement={},
                  xc='PW92',
                  convergence={'density':1E-7, 'energies':1E-7},
                  scalarrel=False,
@@ -50,7 +51,7 @@ class KSAllElectron:
         symbol:         chemical symbol
         configuration:  e.g. '[He] 2s2 2p2'    
         valence:        valence orbitals, e.g. ['2s','2p']. 
-        confinements:   confinement potentials (see hotcent.confinement)
+        confinement:    confinement potential (see hotcent.confinement)
         etol:           sp energy tolerance for eigensolver (Hartree)
         convergence:    convergence criterion dictionary
                         * density: max change for integrated |n_old-n_new|
@@ -72,6 +73,7 @@ class KSAllElectron:
         self.symbol = symbol
         self.valence = valence
         self.confinement = confinement
+        self.wf_confinement = wf_confinement
         self.xc = xc
         self.convergence = convergence
         self.scalarrel = scalarrel
@@ -108,10 +110,11 @@ class KSAllElectron:
                                 **noble_conf['Xe'])
 
         self.configuration = {}
+        assert len(configuration) > 0, "Specify the electronic configuration!"
         for term in configuration.split():
             if term[0] == '[' and term[-1] == ']':
                 core = term[1:-1]
-                assert core in noble_conf, "[Core] config is not noble gas!"
+                assert core in noble_conf, "[Core] config is not a noble gas!"
                 conf = noble_conf[core]
             else:
                 conf = {term[:2]: int(term[2:])}
@@ -317,8 +320,42 @@ class KSAllElectron:
             self.veff = self.nucl + self.conf
             self.dens = self.guess_density()
 
-
     def run(self):
+        val = self.get_valence_orbitals()
+        eps = {}
+
+        confinement = self.confinement
+        for nl, wf_confinement in self.wf_confinement.iteritems():
+            assert nl in val, "Confinement: %s not in %s" % (nl, str(val))
+            self.confinement = wf_confinement
+            self._run()
+            self.Rnl_fct[nl] = Function('spline', self.rgrid, self.Rnlg[nl])
+            self.unl_fct[nl] = Function('spline', self.rgrid, self.unlg[nl])
+            eps[nl] = self.enl[nl]
+
+        self.confinement = confinement 
+        self._run()
+        #for n, l, nl in self.list_states():
+        for nl in val:
+            if nl in self.wf_confinement:
+                # eigenvalue got overriden by self.solve_eigenstates()
+                self.enl[nl] = eps[nl]
+            else:
+                self.Rnl_fct[nl] = Function('spline', self.rgrid, self.Rnlg[nl])
+                self.unl_fct[nl] = Function('spline', self.rgrid, self.unlg[nl])
+
+        if self.write != None:
+            with open(self.write, 'w') as f:
+                pickle.dump(self.rgrid, f)
+                pickle.dump(self.veff, f)
+                pickle.dump(self.dens, f)
+
+        self.txt.flush()
+        self.solved = True
+        #self.timer.summary()
+
+
+    def _run(self):
         """
         Solve the self-consistent potential.
         """
@@ -371,6 +408,8 @@ class KSAllElectron:
         line = '%9.4f electrons, should be %9.4f' % \
                (self.grid.integrate(self.dens, use_dV=True), self.nel)
         print(line, file=self.txt)
+
+        '''
         for n, l, nl in self.list_states():
             self.Rnl_fct[nl] = Function('spline', self.rgrid, self.Rnlg[nl])
             self.unl_fct[nl] = Function('spline', self.rgrid, self.unlg[nl])
@@ -384,7 +423,8 @@ class KSAllElectron:
                 pickle.dump(self.rgrid, f)
                 pickle.dump(self.veff, f)
                 pickle.dump(self.dens, f)
-
+        '''
+        #self.timer.stop('solve ground state')
 
     def solve_eigenstates(self, iteration, itmax=100):
         """

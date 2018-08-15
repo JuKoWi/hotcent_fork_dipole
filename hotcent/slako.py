@@ -47,7 +47,8 @@ class SlaterKosterTable:
         print('Slater-Koster table construction for %2s and %2s' % \
               (ela.get_symbol(), elb.get_symbol()), file=self.txt)
         print('************************************************', file=self.txt)
-        
+        self.txt.flush()
+ 
     #def __del__(self):
     #    self.timer.summary()
         
@@ -267,6 +268,7 @@ class SlaterKosterTable:
             self.tables = [np.zeros((N, 20)), np.zeros((N, 20))]
         
         print('Start making table...', file=self.txt)
+        self.txt.flush()
 
         for Ri, R in enumerate(Rgrid):
             if R > 2 * self.wf_range: 
@@ -276,7 +278,8 @@ class SlaterKosterTable:
 
             if  Ri == N - 1 or N // 10 == 0 or np.mod(Ri, N // 10) == 0:                    
                 print('R=%8.2f, %i grid points ...' % (R, len(grid)), file=self.txt)
-
+                self.txt.flush()
+ 
             for p, (e1, e2) in enumerate(self.pairs):
                 selected = select_integrals(e1, e2) 
                 if Ri == 0:
@@ -286,6 +289,7 @@ class SlaterKosterTable:
                     for s in selected: 
                         print(s[0], end=' ', file=self.txt)
                     print(file=self.txt) 
+                    self.txt.flush()
                 
                 S, H, H2 = self.calculate_mels(selected, e1, e2, R, grid, areas)
                 self.Hmax = max(self.Hmax, max(abs(H)))
@@ -343,6 +347,7 @@ class SlaterKosterTable:
             gphi[i, :] = g(t1, t2)
             v1[i] = e1.effective_potential(r1) - e1.confinement(r1) 
             v2[i] = e2.effective_potential(r2) - e2.confinement(r2) 
+
         #self.timer.stop('prelude')                             
         
         # calculate all selected integrals
