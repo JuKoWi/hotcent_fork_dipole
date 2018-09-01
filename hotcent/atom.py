@@ -12,6 +12,7 @@ from scipy.interpolate import splrep, splev
 from ase.data import atomic_numbers
 from ase.units import Bohr
 from hotcent.interpolation import Function, SplineFunction
+from hotcent.timing import Timer
 try:
     import pylab as pl
 except:
@@ -83,8 +84,8 @@ class KSAllElectron:
         self.nodegpts = nodegpts
         self.mix = mix
         self.timing = timing
-        #self.timer=Timer('KSAllElectron',txt=self.txt,enabled=self.timing)
-        #self.timer.start('init')
+        self.timer = Timer('KSAllElectron', txt=self.txt, enabled=self.timing)
+        self.timer.start('init')
         self.restart = restart
         self.write = write
 
@@ -155,7 +156,7 @@ class KSAllElectron:
         self.xgrid = np.linspace(0, np.log(self.rmax / self.rmin), self.N)
         self.rgrid = self.rmin * np.exp(self.xgrid)
         self.grid = RadialGrid(self.rgrid)
-        #self.timer.stop('init')
+        self.timer.stop('init')
         #print(self.get_comment(), file=self.txt)
         self.solved=False
 
@@ -185,7 +186,7 @@ class KSAllElectron:
         """
         Calculate energy contributions.
         """
-        #self.timer.start('energies')
+        self.timer.start('energies')
         self.bs_energy = 0.0
         for n, l, nl in self.list_states():
             #self.bs_energy += self.occu[nl] * self.enl[nl]
@@ -222,12 +223,12 @@ class KSAllElectron:
             print('exchange + corr energy: %.15f' % self.exc_energy, file=self.txt)
             print('----------------------------', file=self.txt)
             print('total energy:           %.15f\n\n' % self.total_energy, file=self.txt)
-        #self.timer.stop('energies')
+        self.timer.stop('energies')
 
 
     def calculate_density(self):
         """ Calculate the radial electron density.; sum_nl |Rnl(r)|**2/(4*pi) """
-        #self.timer.start('density')
+        self.timer.start('density')
         dens= np.zeros_like(self.rgrid)
         for n,l,nl in self.list_states():
             #dens += self.occu[nl] * (self.unlg[nl] ** 2)
@@ -240,7 +241,7 @@ class KSAllElectron:
 
         dens = dens / (4 * np.pi * self.rgrid **2)
 
-        #self.timer.stop('density')
+        self.timer.stop('density')
         return dens
 
 
@@ -252,7 +253,7 @@ class KSAllElectron:
         If you can think of how to improve this, please tell me!
 
         """
-        #self.timer.start('Hartree')
+        self.timer.start('Hartree')
         dV = self.grid.get_dvolumes()
         r, r0 = self.rgrid, self.grid.get_r0grid()
         N = self.N
@@ -271,7 +272,7 @@ class KSAllElectron:
         for i in range(N):
             Hartree[i] = lo[i] / r[i] + hi[i]
         self.Hartree = Hartree
-        #self.timer.stop('Hartree')
+        self.timer.stop('Hartree')
 
 
     def V_nuclear(self,r):
@@ -280,9 +281,9 @@ class KSAllElectron:
 
     def calculate_veff(self):
         """ Calculate effective potential. """
-        #self.timer.start('veff')
+        self.timer.start('veff')
         self.vxc =np.array([self.xcf.vxc(self.dens[i]) for i in range(self.N)])
-        #self.timer.stop('veff')
+        self.timer.stop('veff')
         return self.nucl + self.Hartree + self.vxc + self.conf
 
 
@@ -350,16 +351,15 @@ class KSAllElectron:
                 pickle.dump(self.veff, f)
                 pickle.dump(self.dens, f)
 
-        self.txt.flush()
         self.solved = True
-        #self.timer.summary()
-
+        self.timer.summary()
+        self.txt.flush()
 
     def _run(self):
         """
         Solve the self-consistent potential.
         """
-        #self.timer.start('solve ground state')
+        self.timer.start('solve ground state')
         print('\nStart iteration...', file=self.txt)
         self.enl = {}
         self.d_enl = {}
@@ -398,8 +398,8 @@ class KSAllElectron:
                 print(line, file=self.txt)
 
             if it == self.itmax - 1:
-                #if self.timing:
-                #    self.timer.summary()
+                if self.timing:
+                    self.timer.summary()
                 raise RuntimeError('Density not converged in %i iterations' % (it + 1))
             self.txt.flush()
 
@@ -413,8 +413,8 @@ class KSAllElectron:
         for n, l, nl in self.list_states():
             self.Rnl_fct[nl] = Function('spline', self.rgrid, self.Rnlg[nl])
             self.unl_fct[nl] = Function('spline', self.rgrid, self.unlg[nl])
-        #self.timer.stop('solve ground state')
-        #self.timer.summary()
+        self.timer.stop('solve ground state')
+        self.timer.summary()
         self.txt.flush()
         self.solved = True
 
@@ -424,7 +424,8 @@ class KSAllElectron:
                 pickle.dump(self.veff, f)
                 pickle.dump(self.dens, f)
         '''
-        #self.timer.stop('solve ground state')
+        self.timer.stop('solve ground state')
+        
 
     def solve_eigenstates(self, iteration, itmax=100):
         """
@@ -437,7 +438,7 @@ class KSAllElectron:
 
         u''(x) - u'(x) + c0(x(r))*u(r) = 0
         """
-        #self.timer.start('eigenstates')
+        self.timer.start('eigenstates')
 
         rgrid = self.rgrid
         xgrid = self.xgrid
@@ -535,7 +536,7 @@ class KSAllElectron:
 
             assert nodes == nodes_nl
             assert u[1] > 0.0
-        #self.timer.stop('eigenstates')
+        self.timer.stop('eigenstates')
         return d_enl_max, itmax
 
 

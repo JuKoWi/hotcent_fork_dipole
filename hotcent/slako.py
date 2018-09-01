@@ -4,9 +4,10 @@ import sys
 import numpy as np
 from math import sin, cos, tan, sqrt
 from ase.data import atomic_numbers, atomic_masses
+from hotcent.timing import Timer
 
 class SlaterKosterTable:
-    def __init__(self, ela, elb, txt=None):#, timing=False):
+    def __init__(self, ela, elb, txt=None, timing=False):
         """ Construct Slater-Koster table for given elements.
                 
         parameters:
@@ -18,7 +19,7 @@ class SlaterKosterTable:
         """
         self.ela = ela
         self.elb = elb
-        #self.timing = timing
+        self.timing = timing
 
         if txt == None:
             self.txt = sys.stdout
@@ -40,7 +41,7 @@ class SlaterKosterTable:
             self.pairs = [(ela, elb)]
             self.elements = [ela]
 
-        #self.timer=Timer('SlaterKosterTable',txt=self.txt,enabled=timing)
+        self.timer=Timer('SlaterKosterTable',txt=self.txt,enabled=timing)
                                         
         print('\n\n\n\n', file=self.txt)                                        
         print('************************************************', file=self.txt)
@@ -49,8 +50,8 @@ class SlaterKosterTable:
         print('************************************************', file=self.txt)
         self.txt.flush()
  
-    #def __del__(self):
-    #    self.timer.summary()
+    def __del__(self):
+        self.timer.summary()
         
         
     def get_table(self):
@@ -223,7 +224,7 @@ class SlaterKosterTable:
         
     def get_range(self, fractional_limit):
         """ Define ranges for the atoms: largest r such that Rnl(r)<limit. """
-        #self.timer.start('define ranges')
+        self.timer.start('define ranges')
         wf_range = 0.
 
         for el in self.elements:
@@ -235,7 +236,7 @@ class SlaterKosterTable:
             raise AssertionError('Wave function range >20 Bohr. Decrease wflimit?')
 
         return wf_range
-        #self.timer.stop('define ranges')        
+        self.timer.stop('define ranges')        
         
         
     def run(self, R1, R2, N, ntheta=150, nr=50, wflimit=1e-7):
@@ -254,7 +255,7 @@ class SlaterKosterTable:
         if R1 < 1e-3:
             raise AssertionError('For stability; use R1 >~ 1e-3')
 
-        #self.timer.start('calculate tables')   
+        self.timer.start('calculate tables')   
         self.wf_range = self.get_range(wflimit)        
         Rgrid = np.linspace(R1, R2, N)
         self.N = N
@@ -300,7 +301,7 @@ class SlaterKosterTable:
         print('Maximum value for H=%.2g' % self.Hmax, file=self.txt)
         print('Maximum error for H=%.2g' % self.dH, file=self.txt)        
         print('     Relative error=%.2g %%' % (self.dH / self.Hmax * 100), file=self.txt)
-        #self.timer.stop('calculate tables')  
+        self.timer.stop('calculate tables')  
         #self.comment+='\n'+asctime()
         self.txt.flush()
                
@@ -332,11 +333,11 @@ class SlaterKosterTable:
             = e1*S + <R1|Veff2-Conf1-Conf2|R2> 
             -> H and H2 can be compared and error estimated
         """
-        #self.timer.start('calculate_mels')
+        self.timer.start('calculate_mels')
         Sl, Hl, H2l = np.zeros(10), np.zeros(10), np.zeros(10)
         
         # common for all integrals (not wf-dependent parts)
-        #self.timer.start('prelude')
+        self.timer.start('prelude')
         N = len(grid)
         gphi, radii, v1, v2 = np.zeros((N, 10)), np.zeros((N, 2)), np.zeros(N), np.zeros(N)
 
@@ -348,7 +349,7 @@ class SlaterKosterTable:
             v1[i] = e1.effective_potential(r1) - e1.confinement(r1) 
             v2[i] = e2.effective_potential(r2) - e2.confinement(r2) 
 
-        #self.timer.stop('prelude')                             
+        self.timer.stop('prelude')                             
         
         # calculate all selected integrals
         for integral, nl1, nl2 in selected:           
@@ -373,7 +374,7 @@ class SlaterKosterTable:
             Hl[index] = H
             H2l[index] = H2
             
-        #self.timer.stop('calculate_mels')
+        self.timer.stop('calculate_mels')
         return Sl, Hl, H2l
         
         
@@ -423,7 +424,7 @@ class SlaterKosterTable:
          |---------
          
         """ 
-        #self.timer.start('make grid')
+        self.timer.start('make grid')
         rmin, rmax = (1e-7, self.wf_range)
         max_range = self.wf_range
         h = Rz / 2
@@ -484,7 +485,7 @@ class SlaterKosterTable:
                     grid.append([d, z])
                     area.append(A)
                                                
-        #self.timer.start('symmetrize')                                               
+        self.timer.start('symmetrize')                                               
         # calculate the polar centered on atom 2 by mirroring the other grid                                               
         grid = np.array(grid)
         area = np.array(area)
@@ -494,7 +495,7 @@ class SlaterKosterTable:
         shift[:, 1] = 2 * h
         grid = np.concatenate((grid, grid2 + shift))
         area = np.concatenate((area, area))
-        #self.timer.stop('symmetrize')
+        self.timer.stop('symmetrize')
                 
         if view:
             import pylab as pl
@@ -502,7 +503,7 @@ class SlaterKosterTable:
             pl.scatter(grid[:, 0], grid[:, 1], s=10 * area / max(area))
             pl.show()
             
-        #self.timer.stop('make grid')            
+        self.timer.stop('make grid')            
         return grid, area
         
         
