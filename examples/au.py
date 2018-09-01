@@ -21,6 +21,7 @@ else:
                          wf_confinement=wf_conf,
                          configuration='[Xe] 4f14 5d10 6s1 6p0',
                          valence=['5d', '6s', '6p'],
+                         scalarrel=True,
                          )
     atom.run()
     #atom.write(elmfile)
