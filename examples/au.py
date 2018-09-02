@@ -32,7 +32,7 @@ for nl in ['5d', '6s', '6p']:
 # Compute Slater-Koster integrals:
 rmin, dr, N = 0.5, 0.05, 380
 rmax = rmin + (N - 1) * dr
-sk = SlaterKosterTable(atom, atom)
+sk = SlaterKosterTable(atom, atom, timing=True)
 sk.run(rmin, rmax, N)
 sk.write('Au-Au_no_repulsion.par')
 sk.write('Au-Au_no_repulsion.skf')
