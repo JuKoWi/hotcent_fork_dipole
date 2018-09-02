@@ -1,24 +1,16 @@
 from __future__ import print_function
-
 import numpy as np
-#from box import mix
 from scipy.linalg import norm
-from scipy.optimize import fminbound
-from scipy.optimize import brentq
-from scipy.interpolate import splprep
-from scipy.interpolate import splrep
-from scipy.interpolate import splev
-from scipy.interpolate import splint
+from scipy.optimize import fminbound, brentq
+from scipy.interpolate import splprep, splrep, splev, splint
 try:
     import pylab as pl
 except:
     pass
-vec=np.array
-linspace=np.linspace
 
 
 class SplineFunction:
-    def __init__(self,x,y,k=3,s=0,name=None):
+    def __init__(self, x, y, k=3, s=0, name=None):
         """ Simple B-spline function; order k is cubic by default.
 
         Parameters:
@@ -30,17 +22,17 @@ class SplineFunction:
         name: name of the function
 
         """
-        if s==-1:
-            s=len(x)-np.sqrt(2.0*len(x))
-        self.tck=splrep(x,y,s=s,k=k)
-        self.x=x
-        self.y=y
-        self.a=x[0]
-        self.b=x[-1]
-        self.M=len(y)
+        if s == -1:
+            s = len(x) - np.sqrt(2. * len(x))
+        self.tck=splrep(x, y, s=s, k=k)
+        self.x = x
+        self.y = y
+        self.a = x[0]
+        self.b = x[-1]
+        self.M = len(y)
         self.name=name
 
-    def __call__(self,x,der=0):
+    def __call__(self, x, der=0):
         """ Return der'th derivative of f(x)
 
         Return zero if x beyond the original grid range.
@@ -55,7 +47,7 @@ class SplineFunction:
                             )
         else:
             if x < self.x[0] or x > self.x[-1]:
-                return 0.0
+                return 0.
             else:
                 return splev(x, self.tck, der=der)
 
@@ -64,103 +56,97 @@ class SplineFunction:
         return self.name
 
     def get_range(self):
-        return (self.x[0],self.x[-1])
+        return (self.x[0], self.x[-1])
 
     def limits(self):
         return self.get_range()
 
-    def solve(self,y,a=None,b=None):
-        """ Solve x for f(x)=y, where x in [a,b]. """
-        if a==None: a=self.x[0]
-        if b==None: b=self.x[-1]
-        assert a<b
-        return brentq(lambda x:self(x)-y,a=a,b=b)
+    def solve(self, y, a=None, b=None):
+        """ Solve x for f(x)=y, where x in [a, b]. """
+        if a is None:
+            a = self.x[0]
+        if b is None:
+            b = self.x[-1]
+        assert a < b
+        return brentq(lambda x: self(x) - y, a=a, b=b)
 
-    def integrate(self,a,b):
+    def integrate(self, a, b):
         """
-        Integrate given function within [a,b]
+        Integrate given function within [a, b]
         """
-        return splint(a,b,self.tck)
+        return splint(a, b, self.tck)
 
-    def plot(self,return_pylab=False,der=0,filename=None):
+    def plot(self, return_pylab=False, der=0, filename=None):
         """
         Plot the function with matplolib
         """
-        p=pl
-        p.clf()
-        from numpy import linspace
-        X=linspace(self.a,self.b,self.M*10)
-        Y=[self(x,der=der) for x in X]
-        p.plot(X,Y)
-        if der==0:
-            p.scatter(self.x,self.y)
-        f1=SplineFunction(self.x,self.y,k=1)
-        p.plot(X,[f1(x,der=der) for x in X])
+        pl.clf()
+        X = np.linspace(self.a, self.b, self.M * 10)
+        Y = [self(x, der=der) for x in X]
+        pl.plot(X, Y)
+        if der == 0:
+            pl.scatter(self.x, self.y)
+        f1 = SplineFunction(self.x, self.y, k=1)
+        pl.plot(X, [f1(x, der=der) for x in X])
         if return_pylab:
-            return p
-        elif filename!=None:
-            p.savefig(filename)
+            return pl
+        elif filename is not None:
+            pl.savefig(filename)
         else:
-            p.show()
-        p.close()
+            pl.show()
+        pl.close()
 
     def max_deviation_from_linear(self):
         """
         For given spline (default cubic), return maximum difference
         wrt linear (k=0) interpolation.
         """
-        from numpy import array,linspace,abs
-        min_dx=min( array(self.x[1:])-array(self.x[0:-1]) )
-        M=10*(self.b-self.a)/min_dx
-        X=linspace(self.a,self.b,M)
-        f1=SplineFunction(self.x,self.y,k=1)
-        return max( array([abs(f1(x)-self(x)) for x in X]) )
+        min_dx = np.min(np.array(self.x[1:]) - np.array(self.x[0:-1]))
+        M = 10 * (self.b - self.a) / min_dx
+        X = np.linspace(self.a, self.b, M)
+        f1 = SplineFunction(self.x, self.y, k=1)
+        return max([f1(x) - self(x) for x in X])
 
     def smoothness(self):
         """
         Return a measure for the ''smoothness'' of interpolation.
 
-        It is measured by max_deviation_from_linear/average|dy|.
+        It is measured by max_deviation_from_linear / average|dy|.
         Smooth interpolations should have <<1.
         If ~1, then interpolation deviates as much as is the variations
         in y and interpolation is not smooth.
         """
-        from numpy import abs,average,array
-        avg=average( abs(array(self.y[1:])-array(self.y[0:-1])) )
-        return self.max_deviation_from_linear()/avg
-
+        avg = np.average(np.abs(np.array(self.y[1:]) - np.array(self.y[0:-1])))
+        return self.max_deviation_from_linear() / avg
 
 
 class Function:
-
-    def __init__(self,mode,*args,**kwargs):
-        if mode is 'spline':
-            self.f=SplineFunction(*args,**kwargs)
-        elif mode is 'string':
+    def __init__(self, mode, *args, **kwargs):
+        if mode == 'spline':
+            self.f = SplineFunction(*args, **kwargs)
+        elif mode == 'string':
             raise NotImplementedError('todo')
-            self.args=args
-            self.kwargs=kwargs
-        #elif mode is 'fastspline':
-        #    self.f=FastSplineFunction(*args,**kwargs)
+            self.args = args
+            self.kwargs = kwargs
         else:
             raise NotImplementedError('todo')
 
-    def __call__(self,x,der=0):
-        return self.f(x,der)
+    def __call__(self, x, der=0):
+        return self.f(x, der)
 
-    def plot(self,der=0,a=None,b=None,npoints=1000,filename=None,return_pylab=False):
+    def plot(self, der=0, a=None, b=None, npoints=1000, filename=None, 
+             return_pylab=False):
         """ Plot the function with matplolib. """
-        import pylab as pl
-        from numpy import linspace
-        a0,b0=self.f.get_range()
-        lower=[a0,a][a!=None]
-        upper=[b0,b][b!=None]
-        X=linspace(lower,upper,npoints)
-        Y=[self(x,der=der) for x in X]
-        pl.plot(X,Y)
+        pl.clf()
+        a0, b0 = self.f.get_range()
+        lower=[a0, a][a is not None]
+        upper=[b0, b][b is not None]
+        X = np.linspace(lower, upper, npoints)
+        Y = [self(x, der=der) for x in X]
+        pl.plot(X, Y)
         if return_pylab:
             return pl
-        elif filename!=None:
+        elif filename is not None:
             pl.savefig(filename)
         else:
             pl.show()

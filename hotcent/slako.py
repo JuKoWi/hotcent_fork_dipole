@@ -49,6 +49,7 @@ class SlaterKosterTable:
               (ela.get_symbol(), elb.get_symbol()), file=self.txt)
         print('************************************************', file=self.txt)
         self.txt.flush()
+
  
     def __del__(self):
         self.timer.summary()
@@ -505,7 +506,6 @@ class SlaterKosterTable:
             
         self.timer.stop('make grid')            
         return grid, area
-        
         
         
         
