@@ -338,16 +338,21 @@ class SlaterKosterTable:
         
         # common for all integrals (not wf-dependent parts)
         self.timer.start('prelude')
-        N = len(grid)
-        gphi, radii, v1, v2 = np.zeros((N, 10)), np.zeros((N, 2)), np.zeros(N), np.zeros(N)
 
-        for i, (d, z) in enumerate(grid):
-            r1, r2 = sqrt(d ** 2 + z ** 2), sqrt(d ** 2 + (R - z) ** 2)
-            t1, t2 = np.arccos(z / r1), np.arccos((z - R) / r2)
-            radii[i, :] = [r1, r2]
-            gphi[i, :] = g(t1, t2)
-            v1[i] = e1.effective_potential(r1) - e1.confinement(r1) 
-            v2[i] = e2.effective_potential(r2) - e2.confinement(r2) 
+        N = len(grid)
+        r1 = np.sqrt(grid[:N, 0] ** 2 + grid[:N, 1] ** 2)
+        r2 = np.sqrt(grid[:N, 0] ** 2 + (R - grid[:N, 1]) ** 2)
+        t1 = np.arccos(grid[:N, 1] / r1)
+        t2 = np.arccos((grid[:N, 1] - R) / r2)
+        radii = np.array([r1, r2]).T
+        gphi = g(t1, t2).T
+        v1 = e1.effective_potential(r1) - e1.confinement(r1)
+        v2 = e2.effective_potential(r2) - e2.confinement(r2)
+
+        assert np.shape(gphi) == (N, 10)
+        assert np.shape(radii) == (N, 2)
+        assert np.shape(v1) == (N,)
+        assert np.shape(v2) == (N,)
 
         self.timer.stop('prelude')                             
         
@@ -357,17 +362,18 @@ class SlaterKosterTable:
             S, H, H2 = 0., 0., 0.
             l2 = angular_momentum[nl2[1]]
 
-            for i, dA in enumerate(area):            
-                r1, r2 = radii[i, :]
-                d, z = grid[i]
-                aux = gphi[i, index] * dA * d
-                
-                Rnl1, Rnl2 = e1.Rnl(r1, nl1), e2.Rnl(r2, nl2)
-                ddunl2 = e2.unl(r2, nl2, der=2)
+            nA = len(area)
+            r1 = radii[:nA, 0]
+            r2 = radii[:nA, 1]
+            d, z = grid[:nA, 0], grid[:nA, 1]
+            aux = gphi[:nA, index] * area * d
+            Rnl1 = e1.Rnl(r1, nl1)
+            Rnl2 = e2. Rnl(r2, nl2)
+            ddunl2 = e2.unl(r2, nl2, der=2)
 
-                S += Rnl1 * Rnl2 * aux 
-                H += Rnl1 * (-0.5 * ddunl2 / r2 + (v1[i] + v2[i] + l2 * (l2 + 1) / (2 * r2 ** 2)) * Rnl2) * aux
-                H2 += Rnl1 * Rnl2 * aux * (v2[i] - e1.confinement(r1))
+            S = np.sum(Rnl1 * Rnl2 * aux)
+            H = np.sum(Rnl1 * (-0.5* ddunl2 / r2 + (v1 + v2 + l2 * (l2 + 1) / (2 * r2 ** 2)) * Rnl2) * aux)
+            H2 = np.sum(Rnl1 * Rnl2 * aux * (v2 - e1.confinement(r1)))
 
             H2 += e1.get_epsilon(nl1) * S 
             Sl[index] = S
@@ -554,17 +560,17 @@ def g(t1, t2):
     and t2=theta2 (atom at z=Rz). These dependencies
     come after integrating analytically over phi.
     """
-    c1, c2, s1, s2 = cos(t1), cos(t2), sin(t1), sin(t2)   
+    c1, c2, s1, s2 = np.cos(t1), np.cos(t2), np.sin(t1), np.sin(t2)   
     return np.array([5. / 8 * (3 * c1 ** 2 - 1) * (3 * c2 ** 2 - 1),\
                      15. / 4 * s1 * c1 * s2 * c2,\
                      15. / 16 * s1 ** 2 * s2 ** 2,\
-                     sqrt(15.) / 4 * c1 * (3 * c2 ** 2 - 1),\
-                     sqrt(45.) / 4 * s1 * s2 * c2,\
+                     np.sqrt(15.) / 4 * c1 * (3 * c2 ** 2 - 1),\
+                     np.sqrt(45.) / 4 * s1 * s2 * c2,\
                      3. / 2 * c1 * c2,\
                      3. / 4 * s1 * s2,\
-                     sqrt(5.) / 4 * (3 * c2 ** 2 - 1),\
-                     sqrt(3.) / 2 * c2,\
-                     0.5])
+                     np.sqrt(5.) / 4 * (3 * c2 ** 2 - 1),\
+                     np.sqrt(3.) / 2 * c2,\
+                     0.5*np.ones_like(t1)])
 
 
 def tail_smoothening(x, y):
