@@ -58,7 +58,12 @@ class KSAllElectron:
         symbol:         chemical symbol
         configuration:  e.g. '[He] 2s2 2p2'    
         valence:        valence orbitals, e.g. ['2s','2p']. 
-        confinement:    confinement potential (see hotcent.confinement)
+        confinement:    confinement potential for the electron density 
+                        (see hotcent.confinement)
+        wf_confinement: dictionary with confinement potentials for the
+                        valence orbitals. If empty, the same confinement
+                        potential is used as for the electron density
+                        (see the 'confinement' parameter).
         etol:           sp energy tolerance for eigensolver (Hartree)
         convergence:    convergence criterion dictionary
                         * density: max change for integrated |n_old-n_new|
