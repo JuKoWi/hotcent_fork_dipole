@@ -13,7 +13,6 @@ import collections
 from copy import copy
 import numpy as np
 from math import sqrt, pi, log
-from scipy.integrate import odeint
 from scipy.interpolate import splrep, splev
 from ase.data import atomic_numbers
 from ase.units import Bohr
@@ -45,12 +44,13 @@ class KSAllElectron:
                  restart=None,
                  write=None):
         """
-        Make Kohn-Sham all-electron calculation for given atom.
+        Run Kohn-Sham all-electron calculation for a given atom.
 
         Examples:
         ---------
-        atom=KSAllElectron('C')
-        atom=KSAllElectron('C',confinement={'mode':'quadratic','r0':1.234})
+        atom = KSAllElectron('C')
+        from hotcent.confinement import PowerConfinement
+        atom = KSAllElectron('C', confinement=PowerConfinement(r0=3., s=2))
         atom.run()
 
         Parameters:
@@ -95,18 +95,8 @@ class KSAllElectron:
         self.restart = restart
         self.write = write
 
-        # element data
-        #self.data=copy( data[self.symbol] )
-        #self.Z=self.data['Z']
         self.Z = atomic_numbers[self.symbol]
         assert len(self.valence) > 0
-
-        #self.occu = copy( data[self.symbol]['configuration'] )
-        #nel_neutral = self.Z
-        #assert sum(self.occu.values()) == nel_neutral
-        #self.occu.update( configuration )
-        #self.nel=sum(self.occu.values())
-        #self.charge=nel_neutral-self.nel
      
         noble_conf = {'He':{'1s':2}}
         noble_conf['Ne'] = dict({'2s':2, '2p':6}, **noble_conf['He'])
@@ -195,7 +185,6 @@ class KSAllElectron:
         self.timer.start('energies')
         self.bs_energy = 0.0
         for n, l, nl in self.list_states():
-            #self.bs_energy += self.occu[nl] * self.enl[nl]
             self.bs_energy += self.configuration[nl] * self.enl[nl]
 
         self.exc =np.array([self.xcf.exc(self.dens[i]) for i in range(self.N)])
@@ -216,7 +205,6 @@ class KSAllElectron:
 
             print('\nvalence orbital energies', file=self.txt)
             print('--------------------------', file=self.txt)
-            #for nl in data[self.symbol]['valence_orbitals']:
             for nl in self.configuration:
                 print('%s, energy %.15f' % (nl, self.enl[nl]), file=self.txt)
 
@@ -237,7 +225,6 @@ class KSAllElectron:
         self.timer.start('density')
         dens= np.zeros_like(self.rgrid)
         for n,l,nl in self.list_states():
-            #dens += self.occu[nl] * (self.unlg[nl] ** 2)
             dens += self.configuration[nl] * (self.unlg[nl] ** 2)
 
         nel = self.grid.integrate(dens)
@@ -257,7 +244,6 @@ class KSAllElectron:
 
         Everything is very sensitive to the way this is calculated.
         If you can think of how to improve this, please tell me!
-
         """
         self.timer.start('Hartree')
         dV = self.grid.get_dvolumes()
@@ -298,7 +284,6 @@ class KSAllElectron:
         r2 = 0.02 * self.Z # radius at which density has dropped to half; improve this!
         dens = np.exp(-self.rgrid / (r2 / np.log(2)))
         dens = dens / self.grid.integrate(dens, use_dV=True) * self.nel
-        #pl.plot(self.rgrid,dens)
         return dens
 
 
@@ -342,7 +327,6 @@ class KSAllElectron:
 
         self.confinement = confinement 
         self._run()
-        #for n, l, nl in self.list_states():
         for nl in val:
             if nl in self.wf_confinement:
                 # eigenvalue got overriden by self.solve_eigenstates()
@@ -380,7 +364,6 @@ class KSAllElectron:
         self.nucl = np.array([self.V_nuclear(r) for r in self.rgrid])
         self.get_veff_and_dens()
         self.calculate_Hartree_potential()
-        #self.Hartree=np.zeros((N,))
 
         for it in range(self.itmax):
             self.veff = self.mix * self.calculate_veff() + (1 - self.mix) * self.veff
@@ -415,21 +398,6 @@ class KSAllElectron:
                (self.grid.integrate(self.dens, use_dV=True), self.nel)
         print(line, file=self.txt)
 
-        '''
-        for n, l, nl in self.list_states():
-            self.Rnl_fct[nl] = Function('spline', self.rgrid, self.Rnlg[nl])
-            self.unl_fct[nl] = Function('spline', self.rgrid, self.unlg[nl])
-        self.timer.stop('solve ground state')
-        self.timer.summary()
-        self.txt.flush()
-        self.solved = True
-
-        if self.write != None:
-            with open(self.write, 'w') as f:
-                pickle.dump(self.rgrid, f)
-                pickle.dump(self.veff, f)
-                pickle.dump(self.dens, f)
-        '''
         self.timer.stop('solve ground state')
         
 
@@ -568,11 +536,10 @@ class KSAllElectron:
         """
         if pl == None:
             raise AssertionError('pylab could not be imported')
-        #rmax = data[self.symbol]['R_cov'] / 0.529XXX * 3
         rmax = covalent_radii[self.Z] / Bohr * 3
         ri = np.where(self.rgrid < rmax)[0][-1]
         states = len(self.list_states())
-        p = np.ceil(np.sqrt(states))  # p**2>=states subplots
+        p = np.ceil(np.sqrt(states))  # p**2 >= states subplots
         
         fig = pl.figure()        
         i = 1
@@ -682,16 +649,11 @@ class KSAllElectron:
         """ Get list of valence orbitals, e.g. ['2s','2p'] """
         return self.valence
 
+
     def get_symbol(self):
         """ Return atom's chemical symbol. """
         return self.symbol
 
-    '''
-    def get_comment(self):
-        """ One-line comment, e.g. 'H, charge=0, quadratic, r0=4' """
-        comment='%s xc=%s charge=%.1f conf:%s' %(self.symbol,self.xc,float(self.charge),self.confinement_potential.get_comment())
-        return comment
-    '''
 
     def get_valence_energies(self):
         """ Return list of valence energies, e.g. ['2s','2p'] --> [-39.2134,-36.9412] """
@@ -858,43 +820,6 @@ class RadialGrid:
             return ((f[0:self.N - 1] + f[1:self.N]) * self.dV).sum() * 0.5
         else:
             return ((f[0:self.N - 1] + f[1:self.N]) * self.dr).sum() * 0.5
-
-
-'''
-class ConfinementPotential:
-    def __init__(self,mode,**kwargs):
-        self.mode=mode
-        if mode=='none':
-            self.f=self.none #lambda r:0.0
-            self.comment='none'
-        elif mode=='quadratic':
-            self.r0=kwargs['r0']
-            self.f=self.quadratic #lambda r:(r/self.r0)**2
-            self.comment='quadratic r0=%.3f' %self.r0
-        elif mode=='general':
-            self.r0=kwargs['r0']
-            self.s=kwargs['s']
-            self.f=self.general #lambda r:(r/self.r0)**s
-            self.comment='general r0=%.3f s=%.3f' %(self.r0, self.s)
-        else:
-            raise NotImplementedError('implement new confinements')
-
-    def get_comment(self):
-        return self.comment
-
-    def none(self,r):
-        return 0.0
-      
-    def quadratic(self,r):
-        return (r/self.r0)**2
-
-    def general(self,r):
-        return (r/self.r0)**self.s
-
-    def __call__(self,r):
-        return self.f(r)
-'''
-
 
 
 class XC_PW92:
