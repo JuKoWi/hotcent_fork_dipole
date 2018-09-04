@@ -1,3 +1,10 @@
+""" Definition of spline functions used by the
+KSAllelectron class.
+
+The code below draws heavily from the Hotbit code 
+written by Pekka Koskinen (https://github.com/pekkosk/
+hotbit/blob/master/box/interpolation.py).
+"""
 from __future__ import print_function
 import numpy as np
 from scipy.linalg import norm

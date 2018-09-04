@@ -1,3 +1,11 @@
+""" Definition of the Timer class used for
+timing summaries.
+
+The code below draws heavily from the Hotbit code 
+written by Pekka Koskinen (https://github.com/pekkosk/
+hotbit/blob/master/box/timing.py).
+"""
+
 from __future__ import print_function
 from time import time, asctime
 import numpy as np

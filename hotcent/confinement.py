@@ -1,3 +1,4 @@
+""" Definition of confinement potentials """
 import numpy as np
 
 class PowerConfinement():

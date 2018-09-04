@@ -1,5 +1,12 @@
-from __future__ import division, print_function
+""" Defintion of the SlaterKosterTable class (and
+supporting methods) for calculating Slater-Koster
+integrals.
 
+The code below draws heavily from the Hotbit code 
+written by Pekka Koskinen (https://github.com/pekkosk/
+hotbit/blob/master/hotbit/parametrization/slako.py).
+"""
+from __future__ import division, print_function
 import sys
 import numpy as np
 from math import sin, cos, tan, sqrt
