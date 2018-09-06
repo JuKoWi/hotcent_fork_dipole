@@ -442,67 +442,98 @@ class SlaterKosterTable:
         rmin, rmax = (1e-7, self.wf_range)
         max_range = self.wf_range
         h = Rz / 2
+
         T = np.linspace(0, 1, nt) ** p * np.pi
         R = rmin + np.linspace(0, 1, nr) ** q * (rmax - rmin)
-        
-        grid = []
-        area = []
+
+        area = np.array([])
+        d = np.array([])
+        z = np.array([])
+
         # first calculate grid for polar centered on atom 1:
         # the z=h-like starts cutting full elements starting from point (1)
-        for j in range(nt - 1):
-            for i in range(nr - 1):
-                # corners of area element
-                d1, z1 = R[i + 1] * sin(T[j]), R[i + 1] * cos(T[j])
-                d2, z2 = R[i] * sin(T[j]), R[i] * cos(T[j])
-                d3, z3 = R[i] * sin(T[j + 1]), R[i] * cos(T[j + 1])
-                d4, z4 = R[i + 1] * sin(T[j + 1]), R[i + 1] * cos(T[j + 1])
-                A0 = (R[i + 1] ** 2 - R[i] ** 2) * (T[j + 1] - T[j]) / 2
-                
-                if z1 <= h:
-                    # area fully inside region
-                    r0 = 0.5 * (R[i] + R[i + 1])
-                    t0 = 0.5 * (T[j] + T[j + 1])
-                    A = A0
-                elif z1 > h and z2 <= h and z4 <= h:
-                    # corner 1 outside region
-                    Th = np.arccos(h / R[i + 1])
-                    r0 = 0.5 * (R[i] + R[i + 1])
-                    t0 = 0.5 * (Th + T[j + 1])
-                    A = A0
-                    A -= 0.5*R[i + 1] ** 2 * (Th - T[j]) - 0.5 * h ** 2 * (tan(Th) - tan(T[j])) 
-                elif z1 > h and z2 > h and z3 <= h and z4 <= h:
-                    # corners 1 and 2 outside region
-                    Th1 = np.arccos(h / R[i])
-                    Th2 = np.arccos(h / R[i + 1])
-                    r0 = 0.5 * (R[i] + R[i + 1])
-                    t0 = 0.5 * (Th2 + T[j + 1])
-                    A = A0
-                    A -= A0 * (Th1 - T[j])/(T[j + 1] - T[j])
-                    A -= 0.5 * R[i + 1] ** 2 * (Th2 - Th1) - 0.5 * h ** 2 *(tan(Th2) - tan(Th1))
-                elif z1 > h and z2 > h and z4 > h and z3 <= h:
-                    # only corner 3 inside region
-                    Th = np.arccos(h / R[i])
-                    r0 = 0.5 * (R[i] + h / cos(T[j + 1]))
-                    t0 = 0.5 * (Th + T[j + 1])
-                    A = 0.5 * h ** 2 * (tan(T[j + 1]) - tan(Th)) - 0.5 * R[i] ** 2 * (T[j + 1] - Th)
-                elif z1 > h and z4 > h and z2 <= h and z3 <= h:
-                    # corners 1 and 4 outside region
-                    r0 = 0.5 * (R[i] + h / cos(T[j + 1]))
-                    t0 = 0.5 * (T[j] + T[j + 1])
-                    A = 0.5 * h ** 2 * (tan(T[j + 1]) - tan(T[j])) - 0.5 * R[i] ** 2 * (T[j + 1] - T[j])
-                elif z3 > h:
-                    A = -1
-                else:
-                    raise RuntimeError('Illegal coordinates.')
-                d, z = (r0 * sin(t0), r0 * cos(t0))
-                if A > 0 and sqrt(d ** 2 + z ** 2) < max_range and sqrt(d ** 2 + (Rz - z ) ** 2) < max_range:
-                    grid.append([d, z])
-                    area.append(A)
-                                               
+        Tj0 = T[:nt - 1]
+        Tj1 = T[1: nt]
+
+        for i in range(nr - 1):
+            # corners of area element
+            d1 = R[i + 1] * np.sin(Tj0)
+            z1 = R[i + 1] * np.cos(Tj0)
+            d2 = R[i] * np.sin(Tj0)
+            z2 = R[i] * np.cos(Tj0)
+            d3 = R[i] * np.sin(Tj1)
+            z3 = R[i] * np.cos(Tj1)
+            d4 = R[i + 1] * np.sin(Tj1)
+            z4 = R[i + 1] * np.cos(Tj1)
+
+            cond_list = [z1 <= h,  # area fully inside region 
+                 (z1 > h) * (z2 <= h) * (z4 <= h),  # corner 1 outside region
+                 (z1 > h) * (z2 > h) * (z3 <= h) * (z4 <= h),  # 1 & 2 outside
+                 (z1 > h) * (z2 > h) * (z3 <= h) * (z4 > h),  # only 3 inside    
+                 (z1 > h) * (z2 <= h) * (z3 <= h) * (z4 > h),  # 1 & 4 outside
+                 (z1 > h) * (z3 > h) * ~((z2 <= h) * (z4 > h))]        
+
+            r0_list = [0.5 * (R[i] + R[i + 1]),
+                       0.5 * (R[i] + R[i + 1]),
+                       0.5 * (R[i] + R[i + 1]),
+                       lambda x: 0.5 * (R[i] + h / np.cos(x)),
+                       lambda x: 0.5 * (R[i] + h / np.cos(x)),
+                       0,
+                       np.nan]
+            r0 = np.piecewise(Tj1, cond_list, r0_list)
+
+            Th0 = np.arccos(h / R[i])
+            Th1 = np.arccos(h / R[i + 1])
+
+            t0_list = [lambda x: 0.5 * x,
+                       0.5 * Th1,
+                       0.5 * Th1,
+                       0.5 * Th0,
+                       lambda x: 0.5 * x,
+                       0,
+                       np.nan]
+            t0 = 0.5 * Tj1
+            t0 += np.piecewise(Tj0, cond_list, t0_list)
+           
+            rr = 0.5 * (R[i + 1] ** 2 - R[i] ** 2)
+            A_list0 = [lambda x: rr * -x,
+                       lambda x: rr * -x - 0.5 * R[i + 1] ** 2 * (Th1 - x) \
+                                 + 0.5 * h ** 2 * (tan(Th1) - np.tan(x)),
+                       lambda x: rr * -x - (rr * -x + 0.5 * R[i + 1] ** 2 \
+                                 * (Th1 - Th0)),
+                       0.,
+                       lambda x: 0.5 * h ** 2 * -np.tan(x) \
+                                 - 0.5 * R[i] ** 2 * -x,
+                       -1,
+                       np.nan]
+            A = np.piecewise(Tj0, cond_list, A_list0)
+
+            A_list1 = [lambda x: rr * x,
+                       lambda x: rr * x,
+                       lambda x: rr * x - (rr * Th0 - 0.5 * h ** 2 \
+                                 * (tan(Th1) - tan(Th0))),
+                       lambda x: 0.5 * h ** 2 * (np.tan(x) - tan(Th0)) \
+                                 - 0.5 * R[i] ** 2 * (x - Th0),
+                       lambda x: 0.5 * h ** 2 * np.tan(x) \
+                                 - 0.5 * R[i] ** 2 * x,
+                       0, 
+                       np.nan]
+            A += np.piecewise(Tj1, cond_list, A_list1)
+
+            dd = r0 * np.sin(t0) 
+            zz = r0 * np.cos(t0)
+            select = np.sqrt(dd ** 2 + zz ** 2) < max_range
+            select *= np.sqrt(dd ** 2 + (Rz - zz) ** 2) < max_range
+            select *= A > 0
+            area = np.hstack((area, A[select]))
+            d = np.hstack((d, dd[select]))
+            z = np.hstack((z, zz[select]))
+
+        grid = np.array([d, z]).T
+
         self.timer.start('symmetrize')                                               
-        # calculate the polar centered on atom 2 by mirroring the other grid                                               
-        grid = np.array(grid)
-        area = np.array(area)
+        # calculate the polar centered on atom 2 by mirroring the other grid  
+
         grid2 = grid.copy()
         grid2[:, 1] = -grid[:, 1]
         shift = np.zeros_like(grid)
