@@ -279,7 +279,7 @@ class KSAllElectron:
     def calculate_veff(self):
         """ Calculate effective potential. """
         self.timer.start('veff')
-        self.vxc =np.array([self.xcf.vxc(self.dens[i]) for i in range(self.N)])
+        self.vxc = self.xcf.vxc(self.dens)
         self.timer.stop('veff')
         return self.nucl + self.Hartree + self.vxc + self.conf
 
@@ -841,10 +841,12 @@ class XC_PW92:
 
     def exc(self, n, der=0):
         """ Exchange-correlation with electron density n. """
-        if n < self.small:
-            return 0.0
-        else:
-            return self.e_x(n, der=der) + self.e_corr(n, der=der)
+        e = self.e_x(n, der=der) + self.e_corr(n, der=der)
+        if type(e) != np.float64:
+            e[n < self.small] = 0.
+        elif n < self.small:
+            e = 0.
+        return e
 
     def e_x(self, n, der=0):
         """ Exchange. """
@@ -857,23 +859,20 @@ class XC_PW92:
         """ Correlation energy. """
         rs = (3. / (4 * pi * n)) ** (1. / 3)
         aux = 2 * self.c0 
-        aux *= self.b1 * sqrt(rs) + self.b2 * rs + self.b3 * rs ** (3. / 2) + self.b4 * rs ** 2
+        aux *= self.b1 * np.sqrt(rs) + self.b2 * rs + self.b3 * rs ** (3. / 2) + self.b4 * rs ** 2
         if der == 0:
-            return -2 * self.c0 * (1 + self.a1 * rs) * log(1 + aux ** -1)
+            return -2 * self.c0 * (1 + self.a1 * rs) * np.log(1 + aux ** -1)
         elif der == 1:
-            return (-2 * self.c0 * self.a1 * log(1 + aux ** -1) \
+            return (-2 * self.c0 * self.a1 * np.log(1 + aux ** -1) \
                     -2 * self.c0 * (1 + self.a1 * rs) * (1 + aux ** -1) ** -1 * (-aux ** -2) \
-                   * 2 * self.c0 * (self.b1 / (2 * sqrt(rs)) + self.b2 + 3 * self.b3 * sqrt(rs) / 2 \
+                   * 2 * self.c0 * (self.b1 / (2 * np.sqrt(rs)) + self.b2 + 3 * self.b3 * np.sqrt(rs) / 2 \
                    + 2 * self.b4 * rs)) * (-(4 * pi * n **2 *rs **2) ** -1)
 
     def vxc(self, n):
         """ Exchange-correlation potential (functional derivative of exc). """
-        eps = 1e-9 * n
-        if n < self.small:    # maxime: eps isn't used here?
-            return 0.0
-        else:
-            return self.exc(n) + n * self.exc(n, der=1)
-
+        v = self.exc(n) + n * self.exc(n, der=1)
+        v[n < self.small] = 0.
+        return v
 
 angular_momenta = ['s', 'p', 'd', 'f', 'g', 'h', 'i', 'j', 'k', 'l']
 def orbit_transform(nl, string):
