@@ -22,6 +22,7 @@ else:
                          configuration='[Xe] 4f14 5d10 6s1 6p0',
                          valence=['5d', '6s', '6p'],
                          scalarrel=True,
+                         timing=True,
                          )
     atom.run()
     #atom.write(elmfile)
