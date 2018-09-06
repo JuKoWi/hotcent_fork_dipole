@@ -527,7 +527,7 @@ class KSAllElectron:
             c1 = -1. * np.ones(self.N)
         else:
             # from Paolo Giannozzi: Notes on pseudopotential generation
-            ScR_mass = np.array([1 + 0.5*(eps - V) / c ** 2 for V in self.veff])
+            ScR_mass = 1 + 0.5 * (eps - self.veff) / c ** 2
             c0 = -l * (l + 1) - 2 * ScR_mass * self.rgrid ** 2 * (self.veff - eps)
             c0 -= self.dveff * self.rgrid / (2 * ScR_mass * c ** 2)
             c1 = self.rgrid * self.dveff / (2 * ScR_mass * c ** 2) - 1
@@ -716,8 +716,8 @@ def shoot(u, dx, c2, c1, c0, N):
 
     in equispaced grid (spacing dx) using simple finite difference formulas
 
-    u'(i)=(u(i+1)-u(i-1))/(2*dx) and
-    u''(i)=(u(i+1)-2*u(i)+u(i-1))/dx**2
+    u'(i) = (u(i+1) - u(i-1)) / (2*dx) and
+    u''(i) = (u(i+1) - 2*u(i) + u(i-1)) / dx**2
 
     u[0:2] *has already been set* according to boundary conditions.
 
@@ -735,15 +735,15 @@ def shoot(u, dx, c2, c1, c0, N):
     u[-1] = 1.0
     u[-2] = u[-1] * f0[-1] / fm[-1]
     all_negative = np.all(c0 < 0)
-    for i in range(N-2 ,0, -1):
-        u[i-1] = (-fp[i] * u[i + 1] - f0[i] * u[i]) / fm[i]
+    for i in range(N - 2 , 0, -1):
+        u[i - 1] = (-fp[i] * u[i + 1] - f0[i] * u[i]) / fm[i]
         if abs(u[i - 1]) > 1e10: 
             u[i - 1:] *= 1e-10  # numerical stability
         if c0[i] > 0:
             ctp = i
             break
         if all_negative and i == N // 2:
-            ctp = N// 2
+            ctp = N // 2
             break
 
     utp = u[ctp]
