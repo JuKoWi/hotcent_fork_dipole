@@ -32,7 +32,7 @@ class KSAllElectron:
                  confinement=None,
                  wf_confinement={},
                  xc='PW92',
-                 convergence={'density':1E-7, 'energies':1E-7},
+                 convergence={'density':1e-7, 'energies':1e-7},
                  scalarrel=False,
                  rmax=100.0,
                  nodegpts=500,
@@ -148,7 +148,7 @@ class KSAllElectron:
         self.rmin = 1e-2 / self.Z
         self.rmax = rmax
         self.N = (maxnodes + 1) * self.nodegpts
-        self.rmin, self.rmax, self.N = (1E-2 / self.Z, rmax, (maxnodes + 1) * self.nodegpts)
+        self.rmin, self.rmax, self.N = (1e-2 / self.Z, rmax, (maxnodes + 1) * self.nodegpts)
 
         if self.scalarrel:
             print('Using scalar relativistic corrections.', file=self.txt)
@@ -192,7 +192,7 @@ class KSAllElectron:
         for n, l, nl in self.list_states():
             self.bs_energy += self.configuration[nl] * self.enl[nl]
 
-        self.exc =np.array([self.xcf.exc(self.dens[i]) for i in range(self.N)])
+        self.exc = np.array([self.xcf.exc(self.dens[i]) for i in range(self.N)])
         self.Hartree_energy = self.grid.integrate(self.Hartree * self.dens, use_dV=True) / 2
         self.vxc_energy = self.grid.integrate(self.vxc * self.dens, use_dV=True)
         self.exc_energy = self.grid.integrate(self.exc * self.dens, use_dV=True)
