@@ -14,7 +14,7 @@ from copy import copy
 import numpy as np
 from math import sqrt, pi, log
 from scipy.interpolate import splrep, splev
-from ase.data import atomic_numbers
+from ase.data import atomic_numbers, covalent_radii
 from ase.units import Bohr
 from hotcent.interpolation import Function, SplineFunction
 from hotcent.timing import Timer
