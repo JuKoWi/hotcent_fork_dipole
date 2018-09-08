@@ -52,28 +52,25 @@ class SlaterKosterTable:
         self.timer = Timer('SlaterKosterTable', txt=self.txt, enabled=timing)
                                         
         print('\n\n\n\n', file=self.txt)                                        
-        print('************************************************', file=self.txt)
+        print('***********************************************', file=self.txt)
         print('Slater-Koster table construction for %2s and %2s' % \
               (ela.get_symbol(), elb.get_symbol()), file=self.txt)
-        print('************************************************', file=self.txt)
+        print('***********************************************', file=self.txt)
         self.txt.flush()
 
- 
     def __del__(self):
         self.timer.summary()
-        
         
     def get_table(self):
         """ Return tables. """
         return self.Rgrid, self.tables        
                 
-                
     def smooth_tails(self):
         """ Smooth the behaviour of tables near cutoff. """
         for p in range(self.nel):
             for i in range(20):
-                self.tables[p][:, i] = tail_smoothening(self.Rgrid, self.tables[p][:, i])                
-        
+                self.tables[p][:, i] = tail_smoothening(self.Rgrid,
+                                                        self.tables[p][:, i])                
         
     def write(self, filename=None):
         """ Use symbol1-symbol2.par as default. """
@@ -82,14 +79,14 @@ class SlaterKosterTable:
         el1, el2 = self.ela.get_symbol(), self.elb.get_symbol()
         fn = '%s-%s.par' % (el1, el2) if filename is None else filename
         ext = fn[-4:]
-        assert ext in ['.par', '.skf'], "Unknown format: %s (-> .par or .skf)" % ext
+        assert ext in ['.par', '.skf'], \
+               "Unknown format: %s (-> choose .par or .skf)" % ext
 
         with open(fn, 'w') as handle:
             if ext == '.par':
                 self._write_par(handle)
             elif ext == '.skf':
                 self._write_skf(handle)
-
 
     def _write_skf(self, handle):
         """ Write to SKF file format; this function
@@ -138,7 +135,6 @@ class SlaterKosterTable:
 
                 print(line, file=handle)
 
-
     def _write_par(self, handle):
         #print('slako_comment=', file=f)
         #print(self.get_comment(), '\n\n', file=f)
@@ -158,7 +154,6 @@ class SlaterKosterTable:
                 print(file=handle)
 
             print('\n\n', file=handle)
-    
     
     def plot(self, filename=None):
         """ Plot the Slater-Koster table with matplotlib. 
@@ -196,15 +191,18 @@ class SlaterKosterTable:
                     alpha = 0.2
 
                 if np.all(abs(self.tables[p][:, i]) < 1e-10):
-                    ax.text(0.03, 0.02 + p * 0.15, 'No %s integrals for <%s|%s>' % \
-                            (name, s1, s2), transform=ax.transAxes, size=10)
+                    ax.text(0.03, 0.02 + p * 0.15, 
+                            'No %s integrals for <%s|%s>' % (name, s1, s2), 
+                            transform=ax.transAxes, size=10)
                     if not ax.is_last_row():
                         pl.xticks([], [])
                     if not ax.is_first_col():
                         pl.yticks([], [])
                 else:
-                    pl.plot(self.Rgrid, self.tables[p][:, i] , c='r', ls=s, lw=lw, alpha=alpha)
-                    pl.plot(self.Rgrid, self.tables[p][:, i + 10], c='b', ls=s, lw=lw, alpha=alpha)
+                    pl.plot(self.Rgrid, self.tables[p][:, i] , c='r', 
+                            ls=s, lw=lw, alpha=alpha)
+                    pl.plot(self.Rgrid, self.tables[p][:, i + 10], c='b', 
+                            ls=s, lw=lw, alpha=alpha)
                     pl.axhline(0, c='k', ls='--')
                     pl.title(name, position=(0.9, 0.8)) 
 
@@ -223,30 +221,28 @@ class SlaterKosterTable:
         pl.figtext(0.34, 0.95, 'S', color='b', size=20)
         pl.figtext(0.38, 0.95, ' Slater-Koster tables', size=20)
         e1, e2 = self.ela.get_symbol(), self.elb.get_symbol()
-        pl.figtext(0.3, 0.92, '(thin solid: <%s|%s>, wide dashed: <%s|%s>)' % (e1, e2, e2, e1), size=10)
+        pl.figtext(0.3, 0.92, '(thin solid: <%s|%s>, wide dashed: <%s|%s>)' \
+                   % (e1, e2, e2, e1), size=10)
         
-        file = '%s-%s_slako.pdf' % (e1, e2)
-        if filename != None:
-            file = filename
-        pl.savefig(file)            
+        if filename is None:
+            filename = '%s-%s_slako.pdf' % (e1, e2)
+        pl.savefig(filename)            
     
-        
     def get_range(self, fractional_limit):
         """ Define ranges for the atoms: largest r such that Rnl(r)<limit. """
         self.timer.start('define ranges')
         wf_range = 0.
 
         for el in self.elements:
-            r = max([el.get_wf_range(nl, fractional_limit) for nl in el.get_valence_orbitals()])
-            print('wf range for %s=%10.5f' % (el.get_symbol(), r), file=self.txt)
+            r = max([el.get_wf_range(nl, fractional_limit) 
+                     for nl in el.get_valence_orbitals()])
+            print('wf range for %s=%10.5f' % (el.get_symbol(), r), 
+                  file=self.txt)
             wf_range = max(r, wf_range)
 
-        if wf_range > 20:
-            raise AssertionError('Wave function range >20 Bohr. Decrease wflimit?')
-
-        return wf_range
+        assert wf_range < 20, 'Wave function range >20 Bohr. Decrease wflimit?'
         self.timer.stop('define ranges')        
-        
+        return wf_range
         
     def run(self, R1, R2, N, ntheta=150, nr=50, wflimit=1e-7, 
             superposition='potential'):
@@ -255,9 +251,12 @@ class SlaterKosterTable:
         parameters:
         ------------
         R1, R2, N: make table from R1 to R2 with N points
-        ntheta: number of angular divisions in polar grid. (more dense towards bonding region)
-        nr:     number of radial divisions in polar grid. (more dense towards origins)
-                with p=q=2 (powers in polar grid) ntheta~3*nr is optimum (with fixed grid size)
+        ntheta: number of angular divisions in polar grid
+                (more dense towards bonding region).
+        nr:     number of radial divisions in polar grid
+                (more dense towards origins).
+                with p=q=2 (powers in polar grid) ntheta~3*nr is 
+                optimal (with fixed grid size)
                 with ntheta=150, nr=50 you get~1E-4 accuracy for H-elements
                 (beyond that, gain is slow with increasing grid size)
         wflimit: use max range for wfs such that at R(rmax)<wflimit*max(R(r))
@@ -265,9 +264,7 @@ class SlaterKosterTable:
                 superposition or potential superposition approach for the 
                 Hamiltonian integrals. 
         """
-        if R1 < 1e-3:
-            raise AssertionError('For stability; use R1 >~ 1e-3')
-
+        assert R1 >= 1e-3, 'For stability; use R1 >~ 1e-3'
         assert superposition in ['density', 'potential']
 
         self.timer.start('calculate tables')   
@@ -293,18 +290,20 @@ class SlaterKosterTable:
             grid, areas = self.make_grid(R, nt=ntheta, nr=nr)
 
             if  Ri == N - 1 or N // 10 == 0 or np.mod(Ri, N // 10) == 0:                    
-                print('R=%8.2f, %i grid points ...' % (R, len(grid)), file=self.txt)
+                print('R=%8.2f, %i grid points ...' % (R, len(grid)),
+                      file=self.txt)
                 self.txt.flush()
  
             for p, (e1, e2) in enumerate(self.pairs):
                 selected = select_integrals(e1, e2) 
                 if Ri == 0:
                     print('R=%8.2f %s-%s, %i grid points, ' % \
-                          (R, e1.get_symbol(), e2.get_symbol(), len(grid)), end=' ', file=self.txt)
-                    print('integrals:', end=' ', file=self.txt) 
-                    for s in selected: 
+                          (R, e1.get_symbol(), e2.get_symbol(), len(grid)),
+                          end=' ', file=self.txt)
+                    print('integrals:', end=' ', file=self.txt)
+                    for s in selected:
                         print(s[0], end=' ', file=self.txt)
-                    print(file=self.txt) 
+                    print(file=self.txt)
                     self.txt.flush()
                 
                 S, H, H2 = self.calculate_mels(selected, e1, e2, R, grid,
@@ -324,7 +323,6 @@ class SlaterKosterTable:
         self.timer.stop('calculate tables')  
         #self.comment+='\n'+asctime()
         self.txt.flush()
-
                
     def calculate_mels(self, selected, e1, e2, R, grid, area, 
                        superposition='potential'):
@@ -343,12 +341,19 @@ class SlaterKosterTable:
     
         return:
         -------
-        List of H,S and H2 for selected integrals. H2 is calculated using different
-        technique and can be used for error estimation.
+        List of H,S and H2 for selected integrals. In the potential
+        superposition scheme, H2 is calculated using a different technique
+        and can be used for error estimation. This is not available
+        for the density superposition scheme, where simply H2=0 is returned.
         
         S: simply R1*R2*angle-part
-        H: operate (derivate) R2 <R1|t+Veff1+Veff2-Conf1-Conf2|R2>
-        H2: operate with full h2 and hence use eigenvalue of |R2> with full Veff2
+
+        H: operate (derivate) R2 <R1|t+Veff-Conf1-Conf2|R2>.
+           With potential superposition: Veff = Veff1 + Veff2
+           With density superposition: Veff = Vxc(n1 + n2)  (XC=PW92)
+
+        H2: operate with full h2 and hence use eigenvalue of |R2> 
+            with full Veff2:
               <R1|(t1+Veff1)+Veff2-Conf1-Conf2|R2> 
             = <R1|h1+Veff2-Conf1-Conf2|R2> (operate with h1 on left)
             = <R1|e1+Veff2-Conf1-Conf2|R2> 
@@ -419,7 +424,6 @@ class SlaterKosterTable:
         self.timer.stop('calculate_mels')
         return Sl, Hl, H2l
         
-        
     def make_grid(self, Rz, nt, nr, p=2, q=2, view=False):
         """
         Construct a double-polar grid.
@@ -429,10 +433,10 @@ class SlaterKosterTable:
         Rz: element 1 is at origin, element 2 at z=Rz
         nt: number of theta grid points
         nr: number of radial grid points
-        p: power describing the angular distribution of grid points (larger puts more weight 
-           towards theta=0)
-        q: power describing the radial disribution of grid points (larger puts more weight
-           towards centers)   
+        p: power describing the angular distribution of grid points 
+           (larger puts more weight towards theta=0)
+        q: power describing the radial disribution of grid points 
+           (larger puts more weight towards centers)   
         view: view the distribution of grid points with pylab.
           
         Plane at R/2 divides two polar grids.
@@ -580,8 +584,8 @@ class SlaterKosterTable:
         return grid, area
         
         
-        
-integrals = ['dds', 'ddp', 'ddd', 'pds', 'pdp', 'pps', 'ppp', 'sds', 'sps', 'sss']
+integrals = ['dds', 'ddp', 'ddd', 'pds', 'pdp', 'pps', 'ppp', 
+             'sds', 'sps', 'sss']
 angular_momentum = {'s':0, 'p':1, 'd':2}
 
 
@@ -604,7 +608,8 @@ def select_orbitals(val1, val2, integral):
         
         
 def select_integrals(e1, e2):
-    """ Return list of integrals (integral,nl1,nl2) to be done for element pair e1,e2. """
+    """ Return list of integrals (integral,nl1,nl2) 
+    to be done for element pair e1, e2. """
     selected = []
     val1, val2 = e1.get_valence_orbitals(), e2.get_valence_orbitals()
 
@@ -668,13 +673,15 @@ def tail_smoothening(x, y):
     if k < N/4:
         for i in range(N):
             print(x[i], y[i])
-        raise RuntimeError('Problem with tail smoothening: requires too large tail.')
+        msg = 'Problem with tail smoothening: requires too large tail.'
+        raise RuntimeError(msg)
 
     if k == N - 3:
         y[-1] = 0.
         return y
     else:
-        # g(x)=c2*(xmax-x)**m + c3*(xmax-x)**(m+1) goes through (xk,yk),(xk+1,yk+1) and (xmax,0)
+        # g(x)=c2*(xmax-x)**m + c3*(xmax-x)**(m+1) goes through 
+        # (xk,yk),(xk+1,yk+1) and (xmax,0)
         # Try different m if g(x) should change sign (this we do not want)
         sgn = np.sign(y[k])
         for m in range(2, 10):
@@ -692,5 +699,6 @@ def tail_smoothening(x, y):
                 break
 
             if m == 9:
-                raise RuntimeError('Problems with function smoothening; need for new algorithm?')
+                msg = 'Problems with smoothening; need for new algorithm?'
+                raise RuntimeError(msg)
     return y
