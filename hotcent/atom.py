@@ -228,7 +228,7 @@ class KSAllElectron:
     def calculate_density(self):
         """ Calculate the radial electron density.; sum_nl |Rnl(r)|**2/(4*pi) """
         self.timer.start('density')
-        dens= np.zeros_like(self.rgrid)
+        dens = np.zeros_like(self.rgrid)
         for n,l,nl in self.list_states():
             dens += self.configuration[nl] * (self.unlg[nl] ** 2)
 
@@ -541,6 +541,7 @@ class KSAllElectron:
         """
         if pl == None:
             raise AssertionError('pylab could not be imported')
+
         rmax = covalent_radii[self.Z] / Bohr * 3
         ri = np.where(self.rgrid < rmax)[0][-1]
         states = len(self.list_states())
@@ -593,6 +594,60 @@ class KSAllElectron:
         if filename is not None:
             file = filename
         pl.savefig(file)
+
+
+    def plot_density(self, filename=None):
+        """ Plot the electron density with matplotlib.
+        
+        filename:  output file name + extension (extension used in matplotlib)
+        """
+        if pl == None:
+            raise AssertionError('pylab could not be imported')
+
+        rmax = covalent_radii[self.Z] / Bohr * 3
+        ri = np.where(self.rgrid < rmax)[0][-1]
+
+        pl.clf()
+        core_dens = 0
+        colors = ['red', 'green', 'blue']
+        for n, l, nl in self.list_states():
+            dens = (self.unlg[nl] / self.rgrid) ** 2 / (4 * np.pi)
+            label = r'n$_\mathrm{%s}$' % nl
+
+            if self.configuration[nl] > 0:
+                dens *= self.configuration[nl]
+                ls = '-'
+            else:
+                ls = '--' 
+                label += r'$^*$'
+
+            if nl in self.valence:
+                pl.semilogy(self.rgrid[:ri], dens[:ri], ls, color=colors[l],
+                            label=label)
+            else:
+                core_dens += dens
+
+        if np.max(core_dens) > 0:
+            pl.semilogy(self.rgrid[:ri], core_dens[:ri], color='gray', 
+                        label=r'n$_\mathrm{core}$')
+
+        pl.semilogy(self.rgrid[:ri], self.dens[:ri], 'k-',
+                    label=r'n$_\mathrm{tot}$')
+
+        ymax = np.exp(np.ceil(np.log(np.max(self.dens))))        
+        pl.ylim([1e-7, ymax])
+
+        pl.xlabel('r (Bohr)')
+        pl.grid()
+
+        s = '' if self.confinement is None else '(confined)'
+        pl.figtext(0.4, 0.95, r'Density for %s %s' % (self.symbol, s))
+
+        pl.legend(loc='upper right', ncol=2)
+
+        if filename is None:
+            filename = '%s_density.pdf' % self.symbol
+        pl.savefig(filename)
 
 
     def get_wf_range(self, nl, fractional_limit=1E-7):
