@@ -49,12 +49,14 @@ grid, areas = sk.make_grid(R, nt=nt, nr=nr)
 
 S, H, H2 = sk.calculate_mels([('sss', '2s', '1s')], atom1, atom2,
                              R, grid, areas)
+
 print('B-H sps S  | %s' % check(S[9], -0.34627316, eps))
-print('B-H sps H  | %s' % check(H[9], 0.29069921, eps))
-print('B-H sps H2 | %s' % check(H2[9], 0.29077550, eps))
+print('B-H sps H  | %s' % check(H[9], 0.29069894, eps))
+print('B-H sps H2 | %s' % check(H2[9], 0.29077536, eps))
 
 S, H, H2 = sk.calculate_mels([('sps', '1s', '2p')], atom2, atom1, 
                              R, grid, areas)
+
 print('H-B sps S  | %s' % check(S[8], -0.47147340, eps))
-print('H-B sps H  | %s' % check(H[8], 0.33033299, eps))
-print('H-B sps H2 | %s' % check(H2[8], 0.33028900, eps))
+print('H-B sps H  | %s' % check(H[8], 0.33033262, eps))
+print('H-B sps H2 | %s' % check(H2[8], 0.33028882, eps))
