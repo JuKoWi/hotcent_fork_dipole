@@ -342,6 +342,8 @@ class KSAllElectron:
             self.Rnl_fct[nl] = Function('spline', self.rgrid, self.Rnlg[nl])
             self.unl_fct[nl] = Function('spline', self.rgrid, self.unlg[nl])
 
+        self.veff = self.calculate_veff()
+
         if self.write != None:
             with open(self.write, 'w') as f:
                 pickle.dump(self.rgrid, f)
@@ -351,6 +353,7 @@ class KSAllElectron:
         self.solved = True
         self.timer.summary()
         self.txt.flush()
+
 
     def _run(self):
         """
@@ -517,6 +520,7 @@ class KSAllElectron:
 
             assert nodes == nodes_nl
             assert u[1] > 0.0
+
         self.timer.stop('eigenstates')
         return d_enl_max, itmax
 
@@ -585,7 +589,6 @@ class KSAllElectron:
                 pl.ylabel(r'$R_{nl}(r)$', size=8)
             i += 1
         
-
         file = '%s_KSAllElectron.pdf' % self.symbol
         #pl.rc('figure.subplot',wspace=0.0,hspace=0.0)
         fig.subplots_adjust(hspace=0.2, wspace=0.1)
