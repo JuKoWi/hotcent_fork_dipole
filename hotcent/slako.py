@@ -12,6 +12,7 @@ import numpy as np
 from math import sin, cos, tan, sqrt
 from ase.data import atomic_numbers, atomic_masses
 from hotcent.timing import Timer
+from hotcent.atom import XC_PW92
 
 class SlaterKosterTable:
     def __init__(self, ela, elb, txt=None, timing=False):
@@ -48,7 +49,7 @@ class SlaterKosterTable:
             self.pairs = [(ela, elb)]
             self.elements = [ela]
 
-        self.timer=Timer('SlaterKosterTable',txt=self.txt,enabled=timing)
+        self.timer = Timer('SlaterKosterTable', txt=self.txt, enabled=timing)
                                         
         print('\n\n\n\n', file=self.txt)                                        
         print('************************************************', file=self.txt)
@@ -247,7 +248,8 @@ class SlaterKosterTable:
         self.timer.stop('define ranges')        
         
         
-    def run(self, R1, R2, N, ntheta=150, nr=50, wflimit=1e-7):
+    def run(self, R1, R2, N, ntheta=150, nr=50, wflimit=1e-7, 
+            superposition='potential'):
         """ Calculate the Slater-Koster table. 
          
         parameters:
@@ -259,9 +261,14 @@ class SlaterKosterTable:
                 with ntheta=150, nr=50 you get~1E-4 accuracy for H-elements
                 (beyond that, gain is slow with increasing grid size)
         wflimit: use max range for wfs such that at R(rmax)<wflimit*max(R(r))
+        superposition: 'density' or 'potential': whether to use the density
+                superposition or potential superposition approach for the 
+                Hamiltonian integrals. 
         """
         if R1 < 1e-3:
             raise AssertionError('For stability; use R1 >~ 1e-3')
+
+        assert superposition in ['density', 'potential']
 
         self.timer.start('calculate tables')   
         self.wf_range = self.get_range(wflimit)        
@@ -300,21 +307,27 @@ class SlaterKosterTable:
                     print(file=self.txt) 
                     self.txt.flush()
                 
-                S, H, H2 = self.calculate_mels(selected, e1, e2, R, grid, areas)
+                S, H, H2 = self.calculate_mels(selected, e1, e2, R, grid,
+                                               areas, 
+                                               superposition=superposition)
                 self.Hmax = max(self.Hmax, max(abs(H)))
                 self.dH = max(self.dH, max(abs(H - H2)))
                 self.tables[p][Ri, :10] = H
                 self.tables[p][Ri, 10:] = S
-        
-        print('Maximum value for H=%.2g' % self.Hmax, file=self.txt)
-        print('Maximum error for H=%.2g' % self.dH, file=self.txt)        
-        print('     Relative error=%.2g %%' % (self.dH / self.Hmax * 100), file=self.txt)
+
+        if superposition == 'potential':        
+            print('Maximum value for H=%.2g' % self.Hmax, file=self.txt)
+            print('Maximum error for H=%.2g' % self.dH, file=self.txt)        
+            print('     Relative error=%.2g %%' % (self.dH / self.Hmax * 100),
+                  file=self.txt)
+
         self.timer.stop('calculate tables')  
         #self.comment+='\n'+asctime()
         self.txt.flush()
+
                
-     
-    def calculate_mels(self, selected, e1, e2, R, grid, area):
+    def calculate_mels(self, selected, e1, e2, R, grid, area, 
+                       superposition='potential'):
         """ 
         Perform integration for selected H and S integrals.
          
@@ -326,7 +339,8 @@ class SlaterKosterTable:
         R: e1 is at origin, e2 at z=R
         grid: list of grid points on (d,z)-plane
         area: d-z areas of the grid points.
-        
+        superposition: 'density' or 'potential' superposition scheme
+    
         return:
         -------
         List of H,S and H2 for selected integrals. H2 is calculated using different
@@ -354,13 +368,21 @@ class SlaterKosterTable:
         t2 = np.arccos((grid[:N, 1] - R) / r2)
         radii = np.array([r1, r2]).T
         gphi = g(t1, t2).T
-        v1 = e1.effective_potential(r1) - e1.confinement(r1)
-        v2 = e2.effective_potential(r2) - e2.confinement(r2)
+
+        if superposition == 'potential':
+            v1 = e1.effective_potential(r1) - e1.confinement(r1)
+            v2 = e2.effective_potential(r2) - e2.confinement(r2)
+            veff = v1 + v2
+        elif superposition == 'density':
+            xc = XC_PW92()
+            n = e2.electron_density(r1) + e2.electron_density(r2)
+            veff = xc.vxc(n)
+            veff += e1.V_nuclear(r1) + e1.hartree_potential(r1)
+            veff += e2.V_nuclear(r2) + e2.hartree_potential(r2)
 
         assert np.shape(gphi) == (N, 10)
         assert np.shape(radii) == (N, 2)
-        assert np.shape(v1) == (N,)
-        assert np.shape(v2) == (N,)
+        assert np.shape(veff) == (N,)
 
         self.timer.stop('prelude')                             
         
@@ -380,10 +402,16 @@ class SlaterKosterTable:
             ddunl2 = e2.unl(r2, nl2, der=2)
 
             S = np.sum(Rnl1 * Rnl2 * aux)
-            H = np.sum(Rnl1 * (-0.5* ddunl2 / r2 + (v1 + v2 + l2 * (l2 + 1) / (2 * r2 ** 2)) * Rnl2) * aux)
-            H2 = np.sum(Rnl1 * Rnl2 * aux * (v2 - e1.confinement(r1)))
+            
+            H = np.sum(Rnl1 * (-0.5* ddunl2 / r2 + (veff + \
+                       l2 * (l2 + 1) / (2 * r2 ** 2)) * Rnl2) * aux)
+            
+            if superposition == 'potential':
+                H2 = np.sum(Rnl1 * Rnl2 * aux * (v2 - e1.confinement(r1)))
+                H2 += e1.get_epsilon(nl1) * S
+            elif superposition == 'density':
+                H2 = 0
 
-            H2 += e1.get_epsilon(nl1) * S 
             Sl[index] = S
             Hl[index] = H
             H2l[index] = H2

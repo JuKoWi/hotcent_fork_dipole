@@ -142,6 +142,8 @@ class KSAllElectron:
         self.unl_fct = {}
         self.Rnl_fct = {}
         self.veff_fct = None
+        self.dens_fct = None
+        self.vhar_fct = None
         self.total_energy = 0.0
 
         maxnodes = max( [n - l - 1 for n, l, nl in self.list_states()] )
@@ -181,7 +183,6 @@ class KSAllElectron:
         print('*******************************************', file=self.txt)
         print('Kohn-Sham all-electron calculation for %2s ' % self.symbol, file=self.txt)
         print('*******************************************', file=self.txt)
-
 
     def calculate_energies(self,echo=False):
         """
@@ -224,7 +225,6 @@ class KSAllElectron:
             print('total energy:           %.15f\n\n' % self.total_energy, file=self.txt)
         self.timer.stop('energies')
 
-
     def calculate_density(self):
         """ Calculate the radial electron density.; sum_nl |Rnl(r)|**2/(4*pi) """
         self.timer.start('density')
@@ -241,7 +241,6 @@ class KSAllElectron:
 
         self.timer.stop('density')
         return dens
-
 
     def calculate_Hartree_potential(self):
         """
@@ -271,10 +270,8 @@ class KSAllElectron:
         self.Hartree = Hartree
         self.timer.stop('Hartree')
 
-
     def V_nuclear(self,r):
         return -self.Z / r
-
 
     def calculate_veff(self):
         """ Calculate effective potential. """
@@ -283,14 +280,12 @@ class KSAllElectron:
         self.timer.stop('veff')
         return self.nucl + self.Hartree + self.vxc + self.conf
 
-
     def guess_density(self):
         """ Guess initial density. """
         r2 = 0.02 * self.Z # radius at which density has dropped to half; improve this!
         dens = np.exp(-self.rgrid / (r2 / np.log(2)))
         dens = dens / self.grid.integrate(dens, use_dV=True) * self.nel
         return dens
-
 
     def get_veff_and_dens(self):
         """ Construct effective potential and electron density. If restart
@@ -354,7 +349,6 @@ class KSAllElectron:
         self.timer.summary()
         self.txt.flush()
 
-
     def _run(self):
         """
         Solve the self-consistent potential.
@@ -410,7 +404,6 @@ class KSAllElectron:
 
         self.timer.stop('solve ground state')
         
-
     def solve_eigenstates(self, iteration, itmax=100):
         """
         Solve the eigenstates for given effective potential.
@@ -524,7 +517,6 @@ class KSAllElectron:
         self.timer.stop('eigenstates')
         return d_enl_max, itmax
 
-
     def construct_coefficients(self, l, eps):
         c = 137.036
         c2 = np.ones(self.N)
@@ -538,7 +530,6 @@ class KSAllElectron:
             c0 -= self.dveff * self.rgrid / (2 * ScR_mass * c ** 2)
             c1 = self.rgrid * self.dveff / (2 * ScR_mass * c ** 2) - 1
         return c0, c1, c2
-
 
     def plot_Rnl(self, filename=None):
         """ Plot radial wave functions with matplotlib.
@@ -600,7 +591,6 @@ class KSAllElectron:
             file = filename
         pl.savefig(file)
 
-
     def plot_density(self, filename=None):
         """ Plot the electron density with matplotlib.
         
@@ -654,14 +644,12 @@ class KSAllElectron:
             filename = '%s_density.pdf' % self.symbol
         pl.savefig(filename)
 
-
     def get_wf_range(self, nl, fractional_limit=1E-7):
         """ Return the maximum r for which |R(r)|<fractional_limit*max(|R(r)|) """
         wfmax = max(abs(self.Rnlg[nl]))
         for r, wf in zip(self.rgrid[-1::-1], self.Rnlg[nl][-1::-1]):
             if abs(wf) > fractional_limit * wfmax:
                 return r
-
 
     def list_states(self):
         """ List all potential states {(n,l,'nl')}. """
@@ -674,10 +662,8 @@ class KSAllElectron:
                     states.append((n, l, nl))
         return states
 
-
     def get_energy(self):
         return self.total_energy
-
 
     def get_epsilon(self, nl):
         """ get_eigenvalue('2p') or get_eigenvalue((2,1)) """
@@ -686,46 +672,50 @@ class KSAllElectron:
             raise AssertionError('run calculations first.')
         return self.enl[nls]
 
-
     def effective_potential(self, r, der=0):
         """ Return effective potential at r or its derivatives. """
-        if self.veff_fct == None:
+        if self.veff_fct is None:
             self.veff_fct = Function('spline', self.rgrid, self.veff)
         return self.veff_fct(r, der=der)
 
+    def electron_density(self, r):
+        """ Return the all-electron density at r. """
+        if self.dens_fct is None:
+            self.dens_fct = Function('spline', self.rgrid, self.dens)
+        return self.dens_fct(r)
+
+    def hartree_potential(self, r):
+        """ Return the Hartree potential at r. """
+        if self.vhar_fct is None:
+            self.vhar_fct = Function('spline', self.rgrid, self.Hartree)
+        return self.vhar_fct(r)
 
     def get_radial_density(self):
         return self.rgrid, self.dens
-
 
     def Rnl(self, r, nl, der=0):
         """ Rnl(r,'2p') or Rnl(r,(2,1))"""
         nls = orbit_transform(nl, string=True)
         return self.Rnl_fct[nls](r, der=der)
 
-
     def unl(self, r, nl, der=0):
         """ unl(r,'2p')=Rnl(r,'2p')/r or unl(r,(2,1))..."""
         nls = orbit_transform(nl, string=True)
         return self.unl_fct[nls](r, der=der)
 
-
     def get_valence_orbitals(self):
         """ Get list of valence orbitals, e.g. ['2s','2p'] """
         return self.valence
 
-
     def get_symbol(self):
         """ Return atom's chemical symbol. """
         return self.symbol
-
 
     def get_valence_energies(self):
         """ Return list of valence energies, e.g. ['2s','2p'] --> [-39.2134,-36.9412] """
         if not self.solved:
             raise AssertionError('run calculations first.')
         return [(nl, self.enl[nl]) for nl in self.valence]
-
 
     def write_unl(self, filename, only_valence=True, step=20):
         """ Append functions unl=Rnl*r, V_effective, V_confinement into file.
@@ -933,6 +923,7 @@ class XC_PW92:
         v = self.exc(n) + n * self.exc(n, der=1)
         v[n < self.small] = 0.
         return v
+
 
 angular_momenta = ['s', 'p', 'd', 'f', 'g', 'h', 'i', 'j', 'k', 'l']
 def orbit_transform(nl, string):
