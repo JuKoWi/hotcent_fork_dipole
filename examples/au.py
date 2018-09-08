@@ -1,3 +1,6 @@
+""" This example aims to reproduce the Au-Au 
+Slater-Koster table generation procedure by
+Fihey and coworkers (doi:10.1002/jcc.24046). """
 import os
 from hotcent.atom import KSAllElectron
 from hotcent.slako import SlaterKosterTable
@@ -35,7 +38,7 @@ for nl in ['5d', '6s', '6p']:
 rmin, dr, N = 0.5, 0.05, 380
 rmax = rmin + (N - 1) * dr
 sk = SlaterKosterTable(atom, atom, timing=True)
-sk.run(rmin, rmax, N)
+sk.run(rmin, rmax, N, superposition='density')
 sk.write('Au-Au_no_repulsion.par')
 sk.write('Au-Au_no_repulsion.skf')
 sk.plot()
