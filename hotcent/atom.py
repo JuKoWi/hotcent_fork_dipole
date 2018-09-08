@@ -319,26 +319,28 @@ class KSAllElectron:
 
     def run(self):
         val = self.get_valence_orbitals()
-        eps = {}
+        enl = {}
+        Rnlg = {}
+        unlg = {}
 
         confinement = self.confinement
         for nl, wf_confinement in self.wf_confinement.iteritems():
             assert nl in val, "Confinement: %s not in %s" % (nl, str(val))
             self.confinement = wf_confinement
             self._run()
-            self.Rnl_fct[nl] = Function('spline', self.rgrid, self.Rnlg[nl])
-            self.unl_fct[nl] = Function('spline', self.rgrid, self.unlg[nl])
-            eps[nl] = self.enl[nl]
+            Rnlg[nl] = self.Rnlg[nl].copy()
+            unlg[nl] = self.unlg[nl].copy()
+            enl[nl] = self.enl[nl]
 
         self.confinement = confinement 
         self._run()
+
+        self.Rnlg.update(Rnlg)
+        self.unlg.update(unlg)
+        self.enl.update(enl)
         for nl in val:
-            if nl in self.wf_confinement:
-                # eigenvalue got overriden by self.solve_eigenstates()
-                self.enl[nl] = eps[nl]
-            else:
-                self.Rnl_fct[nl] = Function('spline', self.rgrid, self.Rnlg[nl])
-                self.unl_fct[nl] = Function('spline', self.rgrid, self.unlg[nl])
+            self.Rnl_fct[nl] = Function('spline', self.rgrid, self.Rnlg[nl])
+            self.unl_fct[nl] = Function('spline', self.rgrid, self.unlg[nl])
 
         if self.write != None:
             with open(self.write, 'w') as f:
