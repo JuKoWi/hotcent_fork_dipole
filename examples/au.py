@@ -15,7 +15,7 @@ else:
     wf_conf = {'5d': PowerConfinement(r0=6.50, s=2),
                '6s': PowerConfinement(r0=6.50, s=2),
                '6p': PowerConfinement(r0=4.51, s=2),
-              }
+               }
     atom = KSAllElectron(element,
                          confinement=conf,
                          wf_confinement=wf_conf,
@@ -25,6 +25,7 @@ else:
                          timing=True,
                          )
     atom.run()
+    atom.plot_density()
     #atom.write(elmfile)
 
 for nl in ['5d', '6s', '6p']:
