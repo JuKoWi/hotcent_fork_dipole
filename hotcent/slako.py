@@ -305,7 +305,10 @@ class SlaterKosterTable:
                         print(s[0], end=' ', file=self.txt)
                     print(file=self.txt)
                     self.txt.flush()
-                
+               
+                if len(grid) == 0:
+                    continue
+ 
                 S, H, H2 = self.calculate_mels(selected, e1, e2, R, grid,
                                                areas, 
                                                superposition=superposition)
