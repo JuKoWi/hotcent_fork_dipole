@@ -1,6 +1,6 @@
 from __future__ import print_function
 import os
-from hotcent.atom import KSAllElectron
+from hotcent.atom_hotcent import HotcentAE
 from hotcent.slako import SlaterKosterTable
 from hotcent.confinement import PowerConfinement
 
@@ -13,12 +13,12 @@ txt = os.devnull
 eps = 1e-7
 
 # Check confined boron atom
-atom1 = KSAllElectron('B',
-                      confinement=PowerConfinement(r0=2.9, s=2),
-                      configuration='[He] 2s2 2p1',
-                      valence=['2s', '2p'],
-                      txt=txt,
-                      )
+atom1 = HotcentAE('B',
+                  confinement=PowerConfinement(r0=2.9, s=2),
+                  configuration='[He] 2s2 2p1',
+                  valence=['2s', '2p'],
+                  txt=txt,
+                  )
 atom1.run()
 ener = atom1.get_energy()
 print('B -- Etot  | %s' % check(ener, -23.079723850586106, eps))
@@ -28,12 +28,12 @@ e_2p = atom1.get_epsilon('2p')
 print('B -- E_2p  | %s' % check(e_2p, 0.47362603289831301, eps))
 
 # Check confined hydrogen atom
-atom2 = KSAllElectron('H',
-                      confinement=PowerConfinement(r0=1.1, s=2),
-                      configuration='1s1',
-                      valence=['1s'],
-                      txt=txt,
-                      )
+atom2 = HotcentAE('H',
+                  confinement=PowerConfinement(r0=1.1, s=2),
+                  configuration='1s1',
+                  valence=['1s'],
+                  txt=txt,
+                  )
 atom2.run()
 ener = atom2.get_energy()
 print('H -- Etot  | %s' % check(ener, 0.58885808402033557, eps))

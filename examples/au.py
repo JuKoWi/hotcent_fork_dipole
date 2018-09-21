@@ -2,7 +2,7 @@
 Slater-Koster table generation procedure by
 Fihey and coworkers (doi:10.1002/jcc.24046). """
 import os
-from hotcent.atom import KSAllElectron
+from hotcent.atom_hotcent import HotcentAE
 from hotcent.slako import SlaterKosterTable
 from hotcent.confinement import PowerConfinement 
 
@@ -19,14 +19,14 @@ else:
                '6s': PowerConfinement(r0=6.50, s=2),
                '6p': PowerConfinement(r0=4.51, s=2),
                }
-    atom = KSAllElectron(element,
-                         confinement=conf,
-                         wf_confinement=wf_conf,
-                         configuration='[Xe] 4f14 5d10 6s1 6p0',
-                         valence=['5d', '6s', '6p'],
-                         scalarrel=True,
-                         timing=True,
-                         )
+    atom = HotcentAE(element,
+                     confinement=conf,
+                     wf_confinement=wf_conf,
+                     configuration='[Xe] 4f14 5d10 6s1 6p0',
+                     valence=['5d', '6s', '6p'],
+                     scalarrel=True,
+                     timing=True,
+                     )
     atom.run()
     atom.plot_density()
     #atom.write(elmfile)
