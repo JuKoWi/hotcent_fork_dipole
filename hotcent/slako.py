@@ -12,7 +12,7 @@ import numpy as np
 from math import sin, cos, tan, sqrt
 from ase.data import atomic_numbers, atomic_masses
 from hotcent.timing import Timer
-from hotcent.atom import XC_PW92
+from hotcent.atom_hotcent import XC_PW92
 
 class SlaterKosterTable:
     def __init__(self, ela, elb, txt=None, timing=False):
