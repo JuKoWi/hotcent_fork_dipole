@@ -2,74 +2,343 @@
 calculations with the GPAW atomic DFT code.
 """
 from __future__ import print_function
+import os
+import tempfile
 import pickle
+from math import pi, log
+import numpy as np
 from hotcent.atom import AllElectron
+from hotcent.interpolation import Function, SplineFunction
+from gpaw.xc import XC
+from gpaw.utilities import hartree
+from gpaw.atom.radialgd import AERadialGridDescriptor
 from gpaw.atom.all_electron import AllElectron as GPAWAllElectron
-try:
-    import pylab as pl
-except:
-    pl = None
 
+tempdir = tempfile.gettempdir()
 
 class GPAWAE(AllElectron, GPAWAllElectron):
-    def __init__(self, symbol, **kwargs):
+    def __init__(self, symbol, dump=None, **kwargs):
         """
         Run Kohn-Sham all-electron calculation for a given atom 
         using the atomic DFT calculator in GPAW.
         """
+        kwargs['nodegpts'] = 150   ## fix later
         AllElectron.__init__(self, symbol, **kwargs)
 
         config = kwargs['configuration']
         config = config.replace('[', '').replace(']', '')
         config = ','.join(config.split())
  
-        GPAWAllElectron.__init__(self, xcname=kwargs['xcname'], 
-                                 configuration=config,
-                                 scalarrel=kwargs['scalarrel'], 
-                                 gpernode=kwargs['nodegpts']) 
+        GPAWAllElectron.__init__(self, symbol, xcname=self.xcname,
+                                 configuration=config, 
+                                 scalarrel=self.scalarrel,
+                                 gpernode=self.nodegpts,
+                                 txt=self.txt, nofiles=True) 
 
+        self.dump = dump
         self.timer.stop('init')
 
-    def run(self):
+    def get_orbital_index(self, nl):
+        for index, (n, l) in enumerate(zip(self.n_j, self.l_j)):
+            if str(n) + 'spdfgh'[l] == nl:
+                break
+        else:
+            msg = "GPAW atom hasn't got %s orbitals for %s" % (nl, self.symbol)
+            raise ValueError(msg)
+        return index 
+
+    def run(self, use_restart_file=False):
         self.timer.start('run')
 
-        GPAWAllElectron.run(self)
+        valence = self.get_valence_orbitals()
+        self.enl = {}
+        self.Rnlg = {}
+        self.unlg = {}
 
-        val = self.get_valence_orbitals()
-        enl = {}
-        Rnlg = {}
-        unlg = {}
+        GPAWAllElectron.run(self, use_restart_file=use_restart_file)
 
-        if self.confinement is not None:
-            # run with confinement potential for the density
+        if self.confinement is None:
+            vconf = np.zeros_like(self.r)
+        else:
+            vconf = self.confinement(self.r)
 
-        confinement = self.confinement
-        for nl, wf_confinement in self.wf_confinement.items():
-            assert nl in val, "Confinement: %s not in %s" % (nl, str(val))
-            self.confinement = wf_confinement
-            GPAWAllElectron.solve_confined(j, rcut, vconf=vconf)
+        self.run_confined(vconf, use_restart_file=use_restart_file)
 
-            Rnlg[nl] = self.Rnlg[nl].copy()
-            unlg[nl] = self.unlg[nl].copy()
-            enl[nl] = self.enl[nl]
+        self.rgrid = self.r.copy()
+        self.veff = self.vr.copy() / self.r - vconf
+        self.dens = self.calculate_density()
 
-        self.Rnlg.update(Rnlg)
-        self.unlg.update(unlg)
-        self.enl.update(enl)
-        for nl in val:
-            self.Rnl_fct[nl] = Function('spline', self.rgrid, self.Rnlg[nl])
-            self.unl_fct[nl] = Function('spline', self.rgrid, self.unlg[nl])
-
-        self.veff = self.calculate_veff()
-
-        if self.write != None:
-            with open(self.write, 'w') as f:
+        if self.dump is not None:
+            with open(self.dump, 'w') as f:
                 pickle.dump(self.rgrid, f)
                 pickle.dump(self.veff, f)
                 pickle.dump(self.dens, f)
 
+        for nl in valence:
+            if nl not in self.wf_confinement:
+                index = self.get_orbital_index(nl)
+                self.unlg[nl] = self.u_j[index].copy()
+                self.enl[nl] = self.e_j[index]
+                self.Rnlg[nl] = self.unlg[nl] / self.r
+                self.Rnl_fct[nl] = Function('spline', self.rgrid, self.Rnlg[nl])
+                self.unl_fct[nl] = Function('spline', self.rgrid, self.unlg[nl])
+        
+        for nl in valence:
+            if nl not in self.wf_confinement:
+                continue
+
+            vconf = self.wf_confinement[nl](self.r)
+            index = self.get_orbital_index(nl)
+            u, e = GPAWAllElectron.solve_confined(self, index, self.rmax, 
+                                                  vconf=vconf)
+            self.unlg[nl] = u
+            self.enl[nl] = e
+            self.Rnlg[nl] = u / self.r
+            self.Rnl_fct[nl] = Function('spline', self.rgrid, self.Rnlg[nl])
+            self.unl_fct[nl] = Function('spline', self.rgrid, self.unlg[nl])
+
         self.solved = True
         self.timer.stop('run')
-
         self.timer.summary()
         self.txt.flush()
+
+    def run_confined(self, vconf, use_restart_file=True):
+        """ Silly modification of the original run()
+            method to do SCF for a confined atom """
+        t = self.text
+        N = self.N
+        beta = self.beta
+        t(N, 'radial gridpoints.')
+        self.rgd = AERadialGridDescriptor(beta / N, 1.0 / N, N)
+        g = np.arange(N, dtype=float)
+        self.r = self.rgd.r_g
+        self.dr = self.rgd.dr_g
+        self.d2gdr2 = self.rgd.d2gdr2()
+
+        # Number of orbitals:
+        nj = len(self.n_j)
+
+        # Radial wave functions multiplied by radius:
+        self.u_j = np.zeros((nj, self.N))
+
+        # Effective potential multiplied by radius:
+        self.vr = np.zeros(N)
+
+        # Add confinement potential:
+        if vconf is not None:
+            self.vr += vconf * self.r 
+
+        # Electron density:
+        self.n = np.zeros(N)
+
+        # Always spinpaired nspins=1
+        self.xc = XC(self.xcname)
+
+        # Initialize for non-local functionals
+        if self.xc.type == 'GLLB':
+            self.xc.pass_stuff_1d(self)
+            self.xc.initialize_1d()
+            
+        n_j = self.n_j
+        l_j = self.l_j
+        f_j = self.f_j
+        e_j = self.e_j
+        
+        Z = self.Z    # nuclear charge
+        r = self.r    # radial coordinate
+        dr = self.dr  # dr/dg
+        n = self.n    # electron density
+        vr = self.vr  # effective potential multiplied by r
+
+        vHr = np.zeros(self.N)
+        self.vXC = np.zeros(self.N)
+
+        restartfile = '%s/%s.restart' % (tempdir, self.symbol)
+        if self.xc.type == 'GLLB' or not use_restart_file:
+            # Do not start from initial guess when doing
+            # non local XC!
+            # This is because we need wavefunctions as well
+            # on the first iteration.
+            fd = None
+        else:
+            try:
+                fd = open(restartfile, 'rb')
+            except IOError:
+                fd = None
+            else:
+                try:
+                    n[:] = pickle.load(fd)
+                except (ValueError, IndexError):
+                    fd = None
+                else:
+                    norm = np.dot(n * r**2, dr) * 4 * pi
+                    if abs(norm - sum(f_j)) > 0.01:
+                        fd = None
+                    else:
+                        t('Using old density for initial guess.')
+                        n *= sum(f_j) / norm
+
+        if fd is None:
+            self.initialize_wave_functions()
+            n[:] = self.calculate_density()
+
+        bar = '|------------------------------------------------|'
+        t(bar)
+        
+        niter = 0
+        nitermax = 117
+        qOK = log(1e-10)
+        mix = 0.4
+        
+        # orbital_free needs more iterations and coefficient
+        if self.orbital_free:
+            mix = 0.01
+            nitermax = 2000
+            e_j[0] /= self.tw_coeff
+            if Z > 10 : #help convergence for third row elements
+                mix = 0.002
+                nitermax = 10000
+            
+        vrold = None
+        
+        while True:
+            # calculate hartree potential
+            hartree(0, n * r * dr, r, vHr)
+
+            # add potential from nuclear point charge (v = -Z / r)
+            vHr -= Z
+
+            # calculated exchange correlation potential and energy
+            self.vXC[:] = 0.0
+
+            if self.xc.type == 'GLLB':
+                # Update the potential to self.vXC an the energy to self.Exc
+                Exc = self.xc.get_xc_potential_and_energy_1d(self.vXC)
+            else:
+                Exc = self.xc.calculate_spherical(self.rgd,
+                                                  n.reshape((1, -1)),
+                                                  self.vXC.reshape((1, -1)))
+
+            # calculate new total Kohn-Sham effective potential and
+            # admix with old version
+
+            if vconf is None:
+                vr[:] = (vHr + self.vXC * r)
+            else:
+	        vr[:] = (vHr + self.vXC * r + vconf * r)
+
+            if self.orbital_free:
+                vr /= self.tw_coeff
+
+            if niter > 0:
+                vr[:] = mix * vr + (1 - mix) * vrold
+            vrold = vr.copy()
+
+            # solve Kohn-Sham equation and determine the density change
+            self.solve()
+            dn = self.calculate_density() - n
+            n += dn
+
+            # estimate error from the square of the density change integrated
+            q = log(np.sum((r * dn)**2))
+
+            # print progress bar
+            if niter == 0:
+                q0 = q
+                b0 = 0
+            else:
+                b = int((q0 - q) / (q0 - qOK) * 50)
+                if b > b0:
+                    self.txt.write(bar[b0:min(b, 50)])
+                    self.txt.flush()
+                    b0 = b
+
+            # check if converged and break loop if so
+            if q < qOK:
+                self.txt.write(bar[b0:])
+                self.txt.flush()
+                break
+
+            niter += 1
+            if niter > nitermax:
+                raise RuntimeError('Did not converge!')
+
+        tau = self.calculate_kinetic_energy_density()
+
+        t()
+        t('Converged in %d iteration%s.' % (niter, 's'[:niter != 1]))
+
+        try:
+            fd = open(restartfile, 'wb')
+        except IOError:
+            pass
+        else:
+            pickle.dump(n, fd)
+            try:
+                os.chmod(restartfile, 0o666)
+            except OSError:
+                pass
+
+        Ekin = 0
+        
+        for f, e in zip(f_j, e_j):
+            Ekin += f * e
+
+        e_coulomb = 2 * pi * np.dot(n * r * (vHr - Z), dr)
+        Ekin += -4 * pi * np.dot(n * vr * r, dr)
+
+        if self.orbital_free:
+        #e and vr are not scaled back
+        #instead Ekin is scaled for total energy (printed and inside setup)
+            Ekin *= self.tw_coeff
+            t()
+            t('Lambda:{0}'.format(self.tw_coeff))
+            t('Correct eigenvalue:{0}'.format(e_j[0]*self.tw_coeff))
+            t()
+
+        t()
+        t('Energy contributions:')
+        t('-------------------------')
+        t('Kinetic:   %+13.6f' % Ekin)
+        t('XC:        %+13.6f' % Exc)
+        t('Potential: %+13.6f' % e_coulomb)
+        t('-------------------------')
+        t('Total:     %+13.6f' % (Ekin + Exc + e_coulomb))
+        self.ETotal = Ekin + Exc + e_coulomb
+        t()
+
+        t('state      eigenvalue         ekin         rmax')
+        t('-----------------------------------------------')
+        for m, l, f, e, u in zip(n_j, l_j, f_j, e_j, self.u_j):
+            # Find kinetic energy:
+            k = e - np.sum((np.where(abs(u) < 1e-160, 0, u)**2 *  # XXXNumeric!
+                            vr * dr)[1:] / r[1:])
+
+            # Find outermost maximum:
+            g = self.N - 4
+            while u[g - 1] >= u[g]:
+                g -= 1
+            x = r[g - 1:g + 2]
+            y = u[g - 1:g + 2]
+            A = np.transpose(np.array([x**i for i in range(3)]))
+            c, b, a = np.linalg.solve(A, y)
+            assert a < 0.0
+            rmax = -0.5 * b / a
+
+            s = 'spdf'[l]
+            t('%d%s^%-4.1f: %12.6f %12.6f %12.3f' % (m, s, f, e, k, rmax))
+        t('-----------------------------------------------')
+        t('(units: Bohr and Hartree)')
+
+        for m, l, u in zip(n_j, l_j, self.u_j):
+            self.write(u, 'ae', n=m, l=l)
+
+        self.write(n, 'n')
+        self.write(vr, 'vr')
+        self.write(vHr, 'vHr')
+        self.write(self.vXC, 'vXC')
+        self.write(tau, 'tau')
+
+        self.Ekin = Ekin
+        self.e_coulomb = e_coulomb
+        self.Exc = Exc

@@ -61,8 +61,10 @@ class HotcentAE(AllElectron):
         self.itmax = itmax
         self.write = write
         self.restart = restart
+        
+        self.set_output(self.txt)
 
-        if self.xcname == 'PW92':
+        if self.xcname in ['PW92', 'LDA']:
             self.xcf = XC_PW92()
         else:
             raise NotImplementedError('Not implemented XC functional: %s' %xc)
@@ -80,6 +82,18 @@ class HotcentAE(AllElectron):
         self.grid = RadialGrid(self.rgrid)
 
         self.timer.stop('init')
+
+    def set_output(self, txt):
+        """ Set output channel and give greetings. """
+        if txt == '-':
+            self.txt = open(os.devnull,'w')
+        elif txt == None:
+            self.txt = sys.stdout
+        else:
+            self.txt = open(txt, 'a')
+        print('*******************************************', file=self.txt)
+        print('Kohn-Sham all-electron calculation for %2s ' % self.symbol, file=self.txt)
+        print('*******************************************', file=self.txt)
 
     def calculate_energies(self, echo=False):
         """

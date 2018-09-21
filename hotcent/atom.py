@@ -6,8 +6,6 @@ written by Pekka Koskinen (https://github.com/pekkosk/
 hotbit/blob/master/hotbit/parametrization/atom.py).
 """
 from __future__ import division, print_function
-import os
-import sys
 import pickle
 import collections
 from copy import copy
@@ -29,7 +27,7 @@ class AllElectron:
                  valence=[],
                  confinement=None,
                  wf_confinement={},
-                 xcname='PW92',
+                 xcname='LDA',
                  scalarrel=False,
                  rmax=100.0,
                  nodegpts=500,
@@ -67,7 +65,7 @@ class AllElectron:
         self.nodegpts = nodegpts
         self.timing = timing
         self.verbose = verbose
-        self.set_output(txt)
+        self.txt = txt
 
         self.timer = Timer('AllElectron', txt=self.txt, enabled=self.timing)
         self.timer.start('init')
@@ -125,22 +123,10 @@ class AllElectron:
         d.pop('out')
         return d
 
-    def set_output(self,txt):
-        """ Set output channel and give greetings. """
-        if txt == '-':
-            self.txt = open(os.devnull,'w')
-        elif txt == None:
-            self.txt = sys.stdout
-        else:
-            self.txt = open(txt, 'a')
-        print('*******************************************', file=self.txt)
-        print('Kohn-Sham all-electron calculation for %2s ' % self.symbol, file=self.txt)
-        print('*******************************************', file=self.txt)
-
     def V_nuclear(self,r):
         return -self.Z / r
 
-    def run(self):
+    def run(self, **kwargs):
         raise NotImplementedError('Child class must implement run() method!')
         
     def plot_Rnl(self, filename=None):
@@ -256,13 +242,6 @@ class AllElectron:
             filename = '%s_density.pdf' % self.symbol
         pl.savefig(filename)
 
-    def get_wf_range(self, nl, fractional_limit=1E-7):
-        """ Return the maximum r for which |R(r)|<fractional_limit*max(|R(r)|) """
-        wfmax = max(abs(self.Rnlg[nl]))
-        for r, wf in zip(self.rgrid[-1::-1], self.Rnlg[nl][-1::-1]):
-            if abs(wf) > fractional_limit * wfmax:
-                return r
-
     def list_states(self):
         """ List all potential states {(n,l,'nl')}. """
         states = []
@@ -273,6 +252,13 @@ class AllElectron:
                 if nl in self.configuration:
                     states.append((n, l, nl))
         return states
+
+    def get_wf_range(self, nl, fractional_limit=1e-7):
+        """ Return the maximum r for which |R(r)|<fractional_limit*max(|R(r)|) """
+        wfmax = max(abs(self.Rnlg[nl]))
+        for r, wf in zip(self.rgrid[-1::-1], self.Rnlg[nl][-1::-1]):
+            if abs(wf) > fractional_limit * wfmax:
+                return r
 
     def get_energy(self):
         return self.total_energy
