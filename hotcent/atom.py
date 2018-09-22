@@ -29,6 +29,8 @@ class AllElectron:
                  wf_confinement={},
                  xcname='LDA',
                  scalarrel=False,
+                 mix=0.2,
+                 maxiter=200,
                  rmax=100.0,
                  nodegpts=500,
                  timing=False,
@@ -48,7 +50,9 @@ class AllElectron:
                         (see the 'confinement' parameter).
         xcname:         Name of the XC functional
         scalarrel:      Use scalar relativistic corrections
-        rmax:           radial cutoff
+        mix:            effective potential mixing constant
+        maxiter:          maximum number of iterations for self-consistency.
+        rmax:           radial cutoff in Bohr
         nodegpts:       total number of grid points is nodegpts times the max number
                         of antinodes for all orbitals
         timing:         output of timing summary
@@ -61,6 +65,8 @@ class AllElectron:
         self.wf_confinement = wf_confinement
         self.xcname = xcname
         self.scalarrel = scalarrel
+        self.mix = mix
+        self.maxiter = maxiter
         self.rmax = rmax
         self.nodegpts = nodegpts
         self.timing = timing
@@ -111,9 +117,6 @@ class AllElectron:
 
         self.maxl = 9
         self.maxn = 9
-
-        if self.scalarrel:
-            print('Using scalar relativistic corrections.', file=self.txt)
 
         self.solved = False
 
@@ -208,6 +211,9 @@ class AllElectron:
         core_dens = 0
         colors = ['red', 'green', 'blue']
         for n, l, nl in self.list_states():
+            if nl not in self.unlg:
+                continue
+
             dens = (self.unlg[nl] / self.rgrid) ** 2 / (4 * np.pi)
             label = r'n$_\mathrm{%s}$' % nl
 

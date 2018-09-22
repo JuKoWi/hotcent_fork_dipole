@@ -14,6 +14,7 @@ from gpaw.atom.radialgd import AERadialGridDescriptor
 from gpaw.atom.all_electron import AllElectron as GPAWAllElectron
 from gpaw.atom.all_electron import shoot, tempdir
 
+
 class GPAWAE(AllElectron, GPAWAllElectron):
     def __init__(self, symbol, **kwargs):
         """ 
@@ -54,6 +55,8 @@ class GPAWAE(AllElectron, GPAWAllElectron):
         self.unlg = {}
 
         GPAWAllElectron.run(self, use_restart_file=use_restart_file)
+        u_j = self.u_j.copy()
+        e_j = [e for e in self.e_j]
 
         if self.confinement is None:
             vconf = np.zeros_like(self.r)
@@ -67,6 +70,8 @@ class GPAWAE(AllElectron, GPAWAllElectron):
         self.veff[0] = self.veff[1]
         self.dens = self.calculate_density()
         self.total_energy = self.ETotal 
+        self.Hartree = self.vHr.copy() / self.rgrid
+        self.Hartree[0] = self.Hartree[1]
 
         nl_1st = [nl for nl in valence if nl not in self.wf_confinement]
         nl_2nd = [nl for nl in valence if nl in self.wf_confinement]
@@ -74,6 +79,8 @@ class GPAWAE(AllElectron, GPAWAllElectron):
         for nl in nl_1st + nl_2nd:
             if nl in self.wf_confinement:
                 vconf = self.wf_confinement[nl](self.rgrid)
+                self.u_j = u_j.copy()
+                self.e_j = [e for e in e_j]
                 self.run_confined(vconf, use_restart_file=use_restart_file)
 
             index = self.get_orbital_index(nl)
@@ -113,8 +120,8 @@ class GPAWAE(AllElectron, GPAWAllElectron):
         self.vr = np.zeros(N)
 
         # Add confinement potential:
-        if vconf is not None:
-            self.vr += vconf * self.r 
+        if vconf is not None:  # mod
+            self.vr += vconf * self.r  # mod
 
         # Electron density:
         self.n = np.zeros(N)
@@ -174,9 +181,9 @@ class GPAWAE(AllElectron, GPAWAllElectron):
         t(bar)
         
         niter = 0
-        nitermax = 117
         qOK = log(1e-10)
-        mix = 0.4
+        mix = self.mix  # mod
+        nitermax = self.maxiter  # mod
         
         # orbital_free needs more iterations and coefficient
         if self.orbital_free:
@@ -210,10 +217,10 @@ class GPAWAE(AllElectron, GPAWAllElectron):
             # calculate new total Kohn-Sham effective potential and
             # admix with old version
 
-            if vconf is None:
+            if vconf is None:  # mod
                 vr[:] = (vHr + self.vXC * r)
-            else:
-	        vr[:] = (vHr + self.vXC * r + vconf * r)
+            else:  # mod
+	        vr[:] = (vHr + self.vXC * r + vconf * r)  # mod
 
             if self.orbital_free:
                 vr /= self.tw_coeff
@@ -267,13 +274,15 @@ class GPAWAE(AllElectron, GPAWAllElectron):
             except OSError:
                 pass
 
+        # <mods>
         Eeig = 0        
         for f, e in zip(f_j, e_j):
             Eeig += f * e
 
         hartree(0, n * r * dr, r, vHr)
         Ehar = 2 * pi * np.dot(n * r * vHr, dr)
-
+        self.vHr = vHr
+        
         Evxc = 4 * pi * np.dot(n * self.vXC * r * r, dr)
 
         Etot = Eeig - Ehar + Exc - Evxc
@@ -289,6 +298,7 @@ class GPAWAE(AllElectron, GPAWAllElectron):
         t('Total:     %+13.6f' % Etot)
         self.ETotal = Etot
         t()
+        # </mods>
 
         t('state      eigenvalue         ekin         rmax')
         t('-----------------------------------------------')
@@ -348,6 +358,7 @@ class GPAWAE(AllElectron, GPAWAllElectron):
             delta = -0.2 * e
             nn, A = shoot(u, l, vr, e, self.r2dvdr, r, dr, c10, c2,
                           self.scalarrel)
+
             # adjust eigenenergy until u has the correct number of nodes
             while nn != nodes:
                 diff = np.sign(nn - nodes)
@@ -363,7 +374,7 @@ class GPAWAE(AllElectron, GPAWAllElectron):
                 norm = np.dot(np.where(abs(u) < 1e-160, 0, u)**2, dr)
                 u *= 1.0 / sqrt(norm)
                 de = 0.5 * A / norm
-                e -= de
+                e -= de  # mod 
                 nn, A = shoot(u, l, vr, e, self.r2dvdr, r, dr, c10, c2,
                               self.scalarrel)
             self.e_j[j] = e

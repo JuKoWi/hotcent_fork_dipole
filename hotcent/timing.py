@@ -7,6 +7,7 @@ hotbit/blob/master/box/timing.py).
 """
 
 from __future__ import print_function
+import sys
 from time import time, asctime
 import numpy as np
 
@@ -200,15 +201,27 @@ class Timer:
         dict = {}
         dt, txt, self.dict = self.get_summary(total, total, dict)
 
-        print('\nTiming:', file=self.txt)
-        print('            label                    time     calls    %sub  %covered   %tot', file=self.txt)
-        print('-' * 79, file=self.txt)
-        print(txt, end=' ', file=self.txt)
-        print('-' * 79, file=self.txt)
-        print('total time %12.3f seconds      %s' % (total, self.human_readable_time(total)), file=self.txt)
-        print(asctime(), file=self.txt)
+        if type(self.txt) == str:
+            if self.txt == '-':
+                f = sys.stdout
+            else:
+                f = open(self.txt, 'a')
+        else:
+            f = self.txt
+
+        print('\nTiming:', file=f)
+        print('            label                    time     calls    %sub  %covered   %tot', file=f)
+        print('-' * 79, file=f)
+        print(txt, end=' ', file=f)
+        print('-' * 79, file=f)
+        print('total time %12.3f seconds      %s' % (total, self.human_readable_time(total)), file=f)
+        print(asctime(), file=f)
         self.smry = True
-        self.txt.flush()
+
+        if type(self.txt) == str and self.txt != '-':
+            f.close()
+        else:
+            f.flush()
 
     def human_readable_time(self, seconds):
         seconds = int(round(seconds))

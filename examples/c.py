@@ -1,9 +1,17 @@
 import os
+import sys
 from hotcent.atom_hotcent import HotcentAE
 from hotcent.slako import SlaterKosterTable
 from hotcent.confinement import PowerConfinement
 from ase.data import covalent_radii, atomic_numbers
 from ase.units import Bohr, Hartree
+
+code = sys.argv[1].lower()
+
+if code == 'hotcent':
+    from hotcent.atom_hotcent import HotcentAE as AE
+elif code == 'gpaw':
+    from hotcent.atom_gpaw import GPAWAE as AE
 
 element = 'C'
 
@@ -14,12 +22,12 @@ if os.path.exists(elmfile):
     atom.read(elmfile)
 else:
     r0 = 1.85 * covalent_radii[atomic_numbers[element]] / Bohr
-    atom = HotcentAE(element,
-                     confinement=PowerConfinement(r0=r0, s=2),
-                     configuration='[He] 2s2 2p2',
-                     valence=['2s', '2p'],
-                     timing=True,
-                     )
+    atom = AE(element,
+              confinement=PowerConfinement(r0=r0, s=2),
+              configuration='[He] 2s2 2p2',
+              valence=['2s', '2p'],
+              timing=True,
+              )
     atom.run()
     #atom.write(elmfile)
 

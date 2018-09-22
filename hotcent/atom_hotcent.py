@@ -27,8 +27,6 @@ class HotcentAE(AllElectron):
     def __init__(self,
                  symbol,
                  convergence={'density':1e-7, 'energies':1e-7},
-                 mix=0.2,
-                 itmax=200,
                  restart=None,
                  write=None,
                  **kwargs):
@@ -47,8 +45,6 @@ class HotcentAE(AllElectron):
         convergence:    convergence criterion dictionary
                         * density: max change for integrated |n_old-n_new|
                         * energies: max change in single-particle energy (Hartree)
-        mix:            effective potential mixing constant
-        itmax:          maximum number of iterations for self-consistency.
         write:          filename: save rgrid, effective potential and
                         density to a file for further calculations.
         restart:        filename: make an initial guess for effective
@@ -57,8 +53,6 @@ class HotcentAE(AllElectron):
         AllElectron.__init__(self, symbol, **kwargs)
 
         self.convergence = convergence
-        self.mix = mix
-        self.itmax = itmax
         self.write = write
         self.restart = restart
         
@@ -68,6 +62,10 @@ class HotcentAE(AllElectron):
             self.xcf = XC_PW92()
         else:
             raise NotImplementedError('Not implemented XC functional: %s' %xc)
+
+        if self.scalarrel:
+            print('Using scalar relativistic corrections.', file=self.txt)
+
 
         maxnodes = max( [n - l - 1 for n, l, nl in self.list_states()] )
         self.rmin = 1e-2 / self.Z
@@ -278,7 +276,7 @@ class HotcentAE(AllElectron):
         self.get_veff_and_dens()
         self.calculate_Hartree_potential()
 
-        for it in range(self.itmax):
+        for it in range(self.maxiter):
             self.veff = self.mix * self.calculate_veff() + (1 - self.mix) * self.veff
             if self.scalarrel:
                 veff = SplineFunction(self.rgrid, self.veff)
@@ -299,7 +297,7 @@ class HotcentAE(AllElectron):
                 
                 print(line, file=self.txt)
 
-            if it == self.itmax - 1:
+            if it == self.maxiter - 1:
                 if self.timing:
                     self.timer.summary()
                 raise RuntimeError('Density not converged in %i iterations' % (it + 1))
