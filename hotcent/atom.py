@@ -109,6 +109,9 @@ class AllElectron:
         self.vhar_fct = None
         self.total_energy = 0.0
 
+        self.maxl = 9
+        self.maxn = 9
+
         if self.scalarrel:
             print('Using scalar relativistic corrections.', file=self.txt)
 
@@ -148,24 +151,25 @@ class AllElectron:
         for n, l, nl in self.list_states():
             ax = pl.subplot(2 * p, p, i)
             pl.plot(self.Rnlg[nl])
-            pl.yticks([], [])
+            #pl.yticks([], [])
             pl.xticks(size=5)
             
             # annotate
             c = 'k'
             if nl in self.valence: 
                 c = 'r'
-            pl.text(0.5, 0.4, r'$R_{%s}(r)$' % nl, transform=ax.transAxes, size=15, color=c)
+            pl.text(0.5, 0.4, r'$R_{%s}(r)$' % nl, transform=ax.transAxes, 
+                    size=15, color=c)
             if ax.is_first_col():
                 pl.ylabel(r'$R_{nl}(r)$', size=8)
-            i+=1
+            i += 1
             
         # as a function of radius
         i = p ** 2 + 1
         for n, l, nl in self.list_states():
             ax = pl.subplot(2 * p, p, i)
             pl.plot(self.rgrid[:ri], self.Rnlg[nl][:ri])
-            pl.yticks([], [])
+            #pl.yticks([], [])
             pl.xticks(size=5)
             if ax.is_last_row():
                 pl.xlabel('r (Bohr)', size=8)
@@ -255,7 +259,8 @@ class AllElectron:
 
     def get_wf_range(self, nl, fractional_limit=1e-7):
         """ Return the maximum r for which |R(r)|<fractional_limit*max(|R(r)|) """
-        wfmax = max(abs(self.Rnlg[nl]))
+        #wfmax = max(abs(self.Rnlg[nl]))
+        wfmax = np.nanmax(np.abs(self.Rnlg[nl]))
         for r, wf in zip(self.rgrid[-1::-1], self.Rnlg[nl][-1::-1]):
             if abs(wf) > fractional_limit * wfmax:
                 return r

@@ -3,26 +3,25 @@ calculations with the GPAW atomic DFT code.
 """
 from __future__ import print_function
 import os
-import tempfile
 import pickle
-from math import pi, log
+from math import sqrt, pi, log
 import numpy as np
 from hotcent.atom import AllElectron
-from hotcent.interpolation import Function, SplineFunction
+from hotcent.interpolation import Function
 from gpaw.xc import XC
 from gpaw.utilities import hartree
 from gpaw.atom.radialgd import AERadialGridDescriptor
 from gpaw.atom.all_electron import AllElectron as GPAWAllElectron
-
-tempdir = tempfile.gettempdir()
+from gpaw.atom.all_electron import shoot, tempdir
 
 class GPAWAE(AllElectron, GPAWAllElectron):
-    def __init__(self, symbol, dump=None, **kwargs):
-        """
+    def __init__(self, symbol, **kwargs):
+        """ 
         Run Kohn-Sham all-electron calculation for a given atom 
         using the atomic DFT calculator in GPAW.
+
+        Parameters: see parent AllElectron class
         """
-        kwargs['nodegpts'] = 150   ## fix later
         AllElectron.__init__(self, symbol, **kwargs)
 
         config = kwargs['configuration']
@@ -35,7 +34,6 @@ class GPAWAE(AllElectron, GPAWAllElectron):
                                  gpernode=self.nodegpts,
                                  txt=self.txt, nofiles=True) 
 
-        self.dump = dump
         self.timer.stop('init')
 
     def get_orbital_index(self, nl):
@@ -43,7 +41,7 @@ class GPAWAE(AllElectron, GPAWAllElectron):
             if str(n) + 'spdfgh'[l] == nl:
                 break
         else:
-            msg = "GPAW atom hasn't got %s orbitals for %s" % (nl, self.symbol)
+            msg = "GPAW atom ain't got %s orbitals for %s" % (nl, self.symbol)
             raise ValueError(msg)
         return index 
 
@@ -65,35 +63,24 @@ class GPAWAE(AllElectron, GPAWAllElectron):
         self.run_confined(vconf, use_restart_file=use_restart_file)
 
         self.rgrid = self.r.copy()
-        self.veff = self.vr.copy() / self.r - vconf
+        self.veff = self.vr.copy() / self.rgrid
+        self.veff[0] = self.veff[1]
         self.dens = self.calculate_density()
+        self.total_energy = self.ETotal 
 
-        if self.dump is not None:
-            with open(self.dump, 'w') as f:
-                pickle.dump(self.rgrid, f)
-                pickle.dump(self.veff, f)
-                pickle.dump(self.dens, f)
+        nl_1st = [nl for nl in valence if nl not in self.wf_confinement]
+        nl_2nd = [nl for nl in valence if nl in self.wf_confinement]
 
-        for nl in valence:
-            if nl not in self.wf_confinement:
-                index = self.get_orbital_index(nl)
-                self.unlg[nl] = self.u_j[index].copy()
-                self.enl[nl] = self.e_j[index]
-                self.Rnlg[nl] = self.unlg[nl] / self.r
-                self.Rnl_fct[nl] = Function('spline', self.rgrid, self.Rnlg[nl])
-                self.unl_fct[nl] = Function('spline', self.rgrid, self.unlg[nl])
-        
-        for nl in valence:
-            if nl not in self.wf_confinement:
-                continue
+        for nl in nl_1st + nl_2nd:
+            if nl in self.wf_confinement:
+                vconf = self.wf_confinement[nl](self.rgrid)
+                self.run_confined(vconf, use_restart_file=use_restart_file)
 
-            vconf = self.wf_confinement[nl](self.r)
             index = self.get_orbital_index(nl)
-            u, e = GPAWAllElectron.solve_confined(self, index, self.rmax, 
-                                                  vconf=vconf)
-            self.unlg[nl] = u
-            self.enl[nl] = e
-            self.Rnlg[nl] = u / self.r
+            self.unlg[nl] = self.u_j[index].copy()
+            self.enl[nl] = self.e_j[index]
+            self.Rnlg[nl] = self.unlg[nl] / self.rgrid
+            self.Rnlg[nl][0] = self.Rnlg[nl][1]
             self.Rnl_fct[nl] = Function('spline', self.rgrid, self.Rnlg[nl])
             self.unl_fct[nl] = Function('spline', self.rgrid, self.unlg[nl])
 
@@ -103,8 +90,9 @@ class GPAWAE(AllElectron, GPAWAllElectron):
         self.txt.flush()
 
     def run_confined(self, vconf, use_restart_file=True):
-        """ Silly modification of the original run()
-            method to do SCF for a confined atom """
+        """ Minor modification of the parent run()
+        method to do full SCF for a confined atom 
+        """
         t = self.text
         N = self.N
         beta = self.beta
@@ -235,7 +223,7 @@ class GPAWAE(AllElectron, GPAWAllElectron):
             vrold = vr.copy()
 
             # solve Kohn-Sham equation and determine the density change
-            self.solve()
+            self.solve_confined()
             dn = self.calculate_density() - n
             n += dn
 
@@ -279,32 +267,27 @@ class GPAWAE(AllElectron, GPAWAllElectron):
             except OSError:
                 pass
 
-        Ekin = 0
-        
+        Eeig = 0        
         for f, e in zip(f_j, e_j):
-            Ekin += f * e
+            Eeig += f * e
 
-        e_coulomb = 2 * pi * np.dot(n * r * (vHr - Z), dr)
-        Ekin += -4 * pi * np.dot(n * vr * r, dr)
+        hartree(0, n * r * dr, r, vHr)
+        Ehar = 2 * pi * np.dot(n * r * vHr, dr)
 
-        if self.orbital_free:
-        #e and vr are not scaled back
-        #instead Ekin is scaled for total energy (printed and inside setup)
-            Ekin *= self.tw_coeff
-            t()
-            t('Lambda:{0}'.format(self.tw_coeff))
-            t('Correct eigenvalue:{0}'.format(e_j[0]*self.tw_coeff))
-            t()
+        Evxc = 4 * pi * np.dot(n * self.vXC * r * r, dr)
+
+        Etot = Eeig - Ehar + Exc - Evxc
 
         t()
         t('Energy contributions:')
         t('-------------------------')
-        t('Kinetic:   %+13.6f' % Ekin)
-        t('XC:        %+13.6f' % Exc)
-        t('Potential: %+13.6f' % e_coulomb)
+        t('E_eig:  %+13.6f' % Eeig)
+        t('E_har:  %+13.6f' % Ehar)
+        t('E_xc:   %+13.6f' % Exc)
+        t('E_vxc:  %+13.6f' % Evxc)
         t('-------------------------')
-        t('Total:     %+13.6f' % (Ekin + Exc + e_coulomb))
-        self.ETotal = Ekin + Exc + e_coulomb
+        t('Total:     %+13.6f' % Etot)
+        self.ETotal = Etot
         t()
 
         t('state      eigenvalue         ekin         rmax')
@@ -339,6 +322,49 @@ class GPAWAE(AllElectron, GPAWAllElectron):
         self.write(self.vXC, 'vXC')
         self.write(tau, 'tau')
 
-        self.Ekin = Ekin
-        self.e_coulomb = e_coulomb
-        self.Exc = Exc
+    def solve_confined(self):
+        """ Minor modification of Parent solve() method
+        to deal with confined atoms 
+        """
+        r = self.r
+        dr = self.dr
+        vr = self.vr
+
+        c2 = -(r / dr)**2
+        c10 = -self.d2gdr2 * r**2  # first part of c1 vector
+
+        if self.scalarrel:
+            self.r2dvdr = np.zeros(self.N)
+            self.rgd.derivative(vr, self.r2dvdr)
+            self.r2dvdr *= r
+            self.r2dvdr -= vr
+        else:
+            self.r2dvdr = None
+
+        # solve for each quantum state separately
+        for j, (n, l, e, u) in enumerate(zip(self.n_j, self.l_j,
+                                             self.e_j, self.u_j)):
+            nodes = n - l - 1  # analytically expected number of nodes
+            delta = -0.2 * e
+            nn, A = shoot(u, l, vr, e, self.r2dvdr, r, dr, c10, c2,
+                          self.scalarrel)
+            # adjust eigenenergy until u has the correct number of nodes
+            while nn != nodes:
+                diff = np.sign(nn - nodes)
+                while diff == np.sign(nn - nodes):
+                    e -= diff * delta
+                    nn, A = shoot(u, l, vr, e, self.r2dvdr, r, dr, c10, c2,
+                                  self.scalarrel)
+                delta /= 2
+
+            # adjust eigenenergy until u is smooth at the turning point
+            de = 1.0
+            while abs(de) > 1e-9:
+                norm = np.dot(np.where(abs(u) < 1e-160, 0, u)**2, dr)
+                u *= 1.0 / sqrt(norm)
+                de = 0.5 * A / norm
+                e -= de
+                nn, A = shoot(u, l, vr, e, self.r2dvdr, r, dr, c10, c2,
+                              self.scalarrel)
+            self.e_j[j] = e
+            u *= 1.0 / sqrt(np.dot(np.where(abs(u) < 1e-160, 0, u)**2, dr))

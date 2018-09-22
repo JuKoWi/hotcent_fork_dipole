@@ -406,7 +406,7 @@ class SlaterKosterTable:
             d, z = grid[:nA, 0], grid[:nA, 1]
             aux = gphi[:nA, index] * area * d
             Rnl1 = e1.Rnl(r1, nl1)
-            Rnl2 = e2. Rnl(r2, nl2)
+            Rnl2 = e2.Rnl(r2, nl2)
             ddunl2 = e2.unl(r2, nl2, der=2)
 
             S = np.sum(Rnl1 * Rnl2 * aux)

@@ -69,9 +69,6 @@ class HotcentAE(AllElectron):
         else:
             raise NotImplementedError('Not implemented XC functional: %s' %xc)
 
-        self.maxl = 9
-        self.maxn = 9
-
         maxnodes = max( [n - l - 1 for n, l, nl in self.list_states()] )
         self.rmin = 1e-2 / self.Z
         self.N = (maxnodes + 1) * self.nodegpts
@@ -273,7 +270,10 @@ class HotcentAE(AllElectron):
         N = self.grid.get_N()
 
         # make confinement and nuclear potentials; intitial guess for veff
-        self.conf = np.array([self.confinement(r) for r in self.rgrid])
+        if self.confinement is None:
+            self.conf = np.zeros_like(self.rgrid)
+        else:
+            self.conf = np.array([self.confinement(r) for r in self.rgrid])
         self.nucl = np.array([self.V_nuclear(r) for r in self.rgrid])
         self.get_veff_and_dens()
         self.calculate_Hartree_potential()
@@ -337,9 +337,9 @@ class HotcentAE(AllElectron):
 
         for n, l, nl in self.list_states():
             nodes_nl = n - l - 1
+
             if iteration == 0:
                 eps = -1.0 * self.Z **2 / n**2
-
             else:
                 eps = self.enl[nl]
 
