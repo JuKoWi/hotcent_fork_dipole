@@ -8,11 +8,17 @@ hotbit/blob/master/hotbit/parametrization/slako.py).
 """
 from __future__ import division, print_function
 import sys
-import numpy as np
 from math import sin, cos, tan, sqrt
+import numpy as np
+from scipy.interpolate import SmoothBivariateSpline
 from ase.data import atomic_numbers, atomic_masses
 from hotcent.timing import Timer
 from hotcent.atom_hotcent import XC_PW92
+try:
+    from gpaw.xc.gga import PurePythonGGAKernel
+except:
+    print('Warning: could not import from GPAW')
+
 
 class SlaterKosterTable:
     def __init__(self, ela, elb, txt=None, timing=False):
@@ -245,7 +251,7 @@ class SlaterKosterTable:
         return wf_range
         
     def run(self, R1, R2, N, ntheta=150, nr=50, wflimit=1e-7, 
-            superposition='potential'):
+            superposition='potential', xc='LDA'):
         """ Calculate the Slater-Koster table. 
          
         parameters:
@@ -263,9 +269,16 @@ class SlaterKosterTable:
         superposition: 'density' or 'potential': whether to use the density
                 superposition or potential superposition approach for the 
                 Hamiltonian integrals. 
+        xc:     name of the exchange-correlation functional to be used
+                in calculating the effective potential in the density
+                superposition scheme. Allowed values:
+                'LDA' and 'PW92': the local density approximation
+                'PBE', 'PBEsol' and 'RPBE': different GGA functionals
+                For the GGAs the GPAW module needs to be accessible.
         """
         assert R1 >= 1e-3, 'For stability; use R1 >~ 1e-3'
         assert superposition in ['density', 'potential']
+        assert xc in ['LDA', 'PW92', 'PBE', 'PBEsol', 'RPBE']
 
         self.timer.start('calculate tables')   
         self.wf_range = self.get_range(wflimit)        
@@ -310,7 +323,7 @@ class SlaterKosterTable:
                     continue
  
                 S, H, H2 = self.calculate_mels(selected, e1, e2, R, grid,
-                                               areas, 
+                                               areas, xc=xc,
                                                superposition=superposition)
                 self.Hmax = max(self.Hmax, max(abs(H)))
                 self.dH = max(self.dH, max(abs(H - H2)))
@@ -328,7 +341,7 @@ class SlaterKosterTable:
         self.txt.flush()
                
     def calculate_mels(self, selected, e1, e2, R, grid, area, 
-                       superposition='potential'):
+                       superposition='potential', xc='LDA'):
         """ 
         Perform integration for selected H and S integrals.
          
@@ -341,7 +354,9 @@ class SlaterKosterTable:
         grid: list of grid points on (d,z)-plane
         area: d-z areas of the grid points.
         superposition: 'density' or 'potential' superposition scheme
-    
+        xc: 'LDA', 'PW92', 'PBE', 'PBEsol' or 'RPBE': the exchange-
+            correlation functional in the density superposition scheme.
+
         return:
         -------
         List of H,S and H2 for selected integrals. In the potential
@@ -370,10 +385,12 @@ class SlaterKosterTable:
         self.timer.start('prelude')
 
         N = len(grid)
-        r1 = np.sqrt(grid[:N, 0] ** 2 + grid[:N, 1] ** 2)
-        r2 = np.sqrt(grid[:N, 0] ** 2 + (R - grid[:N, 1]) ** 2)
-        t1 = np.arccos(grid[:N, 1] / r1)
-        t2 = np.arccos((grid[:N, 1] - R) / r2)
+        x = grid[:N, 0]
+        y = grid[:N, 1]
+        r1 = np.sqrt(x ** 2 + y ** 2)
+        r2 = np.sqrt(x ** 2 + (R - y) ** 2)
+        t1 = np.arccos(y / r1)
+        t2 = np.arccos((y - R) / r2)
         radii = np.array([r1, r2]).T
         gphi = g(t1, t2).T
 
@@ -382,11 +399,32 @@ class SlaterKosterTable:
             v2 = e2.effective_potential(r2) - e2.confinement(r2)
             veff = v1 + v2
         elif superposition == 'density':
-            xc = XC_PW92()
             n = e2.electron_density(r1) + e2.electron_density(r2)
-            veff = xc.vxc(n)
-            veff += e1.V_nuclear(r1) + e1.hartree_potential(r1)
+            veff = e1.V_nuclear(r1) + e1.hartree_potential(r1)
             veff += e2.V_nuclear(r2) + e2.hartree_potential(r2)
+            if xc in ['LDA', 'PW92']:
+                XC = XC_PW92()
+                veff += XC.vxc(n)
+            elif xc in ['PBE', 'PBEsol', 'RPBE']:
+                XC = PurePythonGGAKernel('py%s' % xc)
+                grad_x = e1.electron_density(r1, der=1) * np.sin(t1)
+                grad_x += e2.electron_density(r2, der=1) * np.sin(t2)
+                grad_y = e1.electron_density(r1, der=1) * np.cos(t1)
+                grad_y += e2.electron_density(r2, der=1) * np.cos(t2)
+                sigma = np.sqrt([grad_x ** 2 + grad_y ** 2]) ** 2
+                dens = np.array([n])
+                dedn = np.zeros_like(dens)
+                exc = np.zeros_like(dens)
+                dedsigma = np.zeros_like(dens)
+                XC.calculate(exc, dens, dedn, sigma, dedsigma)
+                veff += dedn[0]
+                # add gradient corrections to vxc
+                splx = SmoothBivariateSpline(x, y, dedsigma * grad_x)
+                sply = SmoothBivariateSpline(x, y, dedsigma * grad_y)
+                veff += -2. * splx(x, y, dx=1, dy=0, grid=False)
+                veff += -2. * sply(x, y, dx=0, dy=1, grid=False)
+            else:
+                raise ValueError('Cannot handle XC-functional %s' % xc)
 
         assert np.shape(gphi) == (N, 10)
         assert np.shape(radii) == (N, 2)

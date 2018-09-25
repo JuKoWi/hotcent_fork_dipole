@@ -35,14 +35,11 @@ else:
     atom.plot_density()
     #atom.write(elmfile)
 
-for nl in ['5d', '6s', '6p']:
-    print nl, 'eigenvalue: %.5f' % atom.get_epsilon(nl)
-
 # Compute Slater-Koster integrals:
-rmin, dr, N = 0.4, 0.02, 900  #0.5, 0.05, 380
+rmin, dr, N = 0.4, 0.02, 900  
 rmax = rmin + (N - 1) * dr
 sk = SlaterKosterTable(atom, atom, timing=True)
-sk.run(rmin, rmax, N, superposition='density')
+sk.run(rmin, rmax, N, superposition='density', xc='PBE')
 sk.write('Au-Au_no_repulsion.par')
 sk.write('Au-Au_no_repulsion.skf')
 sk.plot()

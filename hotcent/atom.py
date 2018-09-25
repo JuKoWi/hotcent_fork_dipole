@@ -287,11 +287,11 @@ class AllElectron:
             self.veff_fct = Function('spline', self.rgrid, self.veff)
         return self.veff_fct(r, der=der)
 
-    def electron_density(self, r):
+    def electron_density(self, r, der=0):
         """ Return the all-electron density at r. """
         if self.dens_fct is None:
             self.dens_fct = Function('spline', self.rgrid, self.dens)
-        return self.dens_fct(r)
+        return self.dens_fct(r, der=der)
 
     def hartree_potential(self, r):
         """ Return the Hartree potential at r. """
