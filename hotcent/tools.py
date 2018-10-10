@@ -68,7 +68,7 @@ class SlaterKosterGenerator:
         self.superposition = superposition
         self.rmin = rmin
         self.dr = dr
-        self.N = N
+        self.N = N  # eiter int or dict
         self.verbose = verbose
 
     def run(self, initial_guess={}, rhobeg=0.2, tol=1e-2, maxiter=1000):
@@ -200,10 +200,22 @@ class SlaterKosterGenerator:
 
         for i, el1 in enumerate(self.elements):
             for j, el2 in enumerate(self.elements):
-                rmax = self.rmin + (self.N - 1) * self.dr
+
+                if isinstance(self.N, dict):
+                    keys = [el1.symbol + '-' + el2.symbol,
+                            el2.symbol + '-' + el1.symbol,
+                            'default']
+                    for key in keys:
+                        if key in self.N:
+                            N = self.N[key]
+                            break
+                else:
+                    N = self.N
+
+                rmax = self.rmin + (N - 1) * self.dr
                 sk = SlaterKosterTable(atoms[i], atoms[j], timing=False,
                                        txt='hotcent.out')
-                sk.run(self.rmin, rmax, self.N, xc=self.xc,
+                sk.run(self.rmin, rmax, N, xc=self.xc,
                        superposition=self.superposition)
 
                 filename = '%s-%s.skf' % (el1.symbol, el2.symbol)
