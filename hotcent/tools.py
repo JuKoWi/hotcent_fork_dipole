@@ -131,11 +131,18 @@ class SlaterKosterGenerator:
 
     def calculate_bandstructure(self, atoms=None, kpts_path={}, kpts=None, 
                                 plot=False, filename='bandstructure.png',
-                                emax=10., emin=-10.):
+                                emax=10., emin=-10., ref='vbm'):
+        assert ref in ['vbm', 'fermi']
         calc = self.DftbPlusCalc(atoms=atoms, kpts=kpts)
         atoms.set_calculator(calc)
         etot = atoms.get_potential_energy()
+
         efermi = calc.get_fermi_level()
+        if ref == 'vbm':
+            occupied = calc.results['eigenvalues'] < efermi
+            eref = np.max(calc.results['eigenvalues'][occupied])
+        else:
+            eref = efermi
 
         calc = self.DftbPlusCalc(atoms=atoms, kpts=kpts_path,
                                  Hamiltonian_MaxSCCIterations=1, 
@@ -144,7 +151,7 @@ class SlaterKosterGenerator:
         atoms.set_calculator(calc)
         etot = atoms.get_potential_energy()
 
-        calc.results['fermi_levels'] = np.array([efermi])
+        calc.results['fermi_levels'] = np.array([eref])
 
         bs = calc.band_structure()
         if plot:
