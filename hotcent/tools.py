@@ -139,9 +139,11 @@ class SlaterKosterGenerator:
 
         calc = self.DftbPlusCalc(atoms=atoms, kpts=kpts_path,
                                  Hamiltonian_MaxSCCIterations=1, 
-                                 Hamiltonian_ReadInitialCharges='Yes')
+                                 Hamiltonian_ReadInitialCharges='Yes',
+                                 Hamiltonian_SCCTolerance='1e3')
         atoms.set_calculator(calc)
         etot = atoms.get_potential_energy()
+
         calc.results['fermi_levels'] = np.array([efermi])
 
         bs = calc.band_structure()
