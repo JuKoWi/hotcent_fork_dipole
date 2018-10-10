@@ -9,12 +9,16 @@ from ase.io import read
 from ase.units import Bohr
 from ase.data import covalent_radii, atomic_numbers
 try:
+    import matplotlib
+    matplotlib.use('agg')
+except ImportError:
+    print('Warning: could not import matplotlib')
+try:
     from hotcent.atom_gpaw import GPAWAE as AE
 except ImportError:
     from hotcent.atom_hotcent import HotcentAE as AE
 from hotcent.slako import SlaterKosterTable
 from hotcent.confinement import PowerConfinement 
-
 
 class Element:
     def __init__(self, symbol, configuration=None, valence=[], eigenvalues_spd=[],
