@@ -99,7 +99,8 @@ class SlaterKosterTable:
         is an adaptation of hotbit.io.hbskf 
         """
         grid_dist = self.Rgrid[1] - self.Rgrid[0]
-        grid_npts = sum([len(self.tables[p]) for p in range(len(self.pairs))])
+        index = 0  # for the "self.ela-self.elb" SKF table
+        grid_npts = len(self.tables[index])
         grid_npts += int(self.Rgrid[0] / (self.Rgrid[1] - self.Rgrid[0]))
         print("%.12f, %d" % (grid_dist, grid_npts), file=handle)
 
@@ -119,27 +120,26 @@ class SlaterKosterTable:
                 print('%d*0.0,' % len(self.tables[0][0]), file=handle)
 
         ct, theader = 0, ''
-        for p in range(len(self.pairs)):
-            for i in range(len(self.tables[p])):
-                line = ''
+        for i in range(len(self.tables[index])):
+            line = ''
 
-                for j in range(len(self.tables[p][i])):
-                    if self.tables[p][i, j] == 0:
-                        ct += 1
-                        theader = str(ct) + '*0.0 '
-                    else:
-                        ct = 0
-                        line += theader
-                        theader = ''
-                        line += '{0: 1.12e}  '.format(self.tables[p][i, j])
-
-                if theader != '':
+            for j in range(len(self.tables[index][i])):
+                if self.tables[index][i, j] == 0:
+                    ct += 1
+                    theader = str(ct) + '*0.0 '
+                else:
                     ct = 0
                     line += theader
                     theader = ''
-                    line += '{0: 1.12e}  '.format(self.tables[p][i, j])
+                    line += '{0: 1.12e}  '.format(self.tables[index][i, j])
 
-                print(line, file=handle)
+            if theader != '':
+                ct = 0
+                line += theader
+                theader = ''
+                line += '{0: 1.12e}  '.format(self.tables[index][i, j])
+
+            print(line, file=handle)
 
     def _write_par(self, handle):
         #print('slako_comment=', file=f)
