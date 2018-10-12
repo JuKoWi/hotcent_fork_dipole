@@ -3,11 +3,14 @@ fit band structures calculated with e.g. DFT. '''
 from __future__ import print_function
 import os
 import sys
+import copy
 import numpy as np
 from scipy.optimize import minimize
 from ase.io import read
 from ase.units import Bohr
 from ase.data import covalent_radii, atomic_numbers
+from ase.dft.band_structure import BandStructure as BS
+from ase.calculators.calculator import kpts2ndarray
 try:
     import matplotlib
     matplotlib.use('agg')
@@ -19,6 +22,7 @@ except ImportError:
     from hotcent.atom_hotcent import HotcentAE as AE
 from hotcent.slako import SlaterKosterTable
 from hotcent.confinement import PowerConfinement 
+
 
 class Element:
     def __init__(self, symbol, configuration=None, valence=[], eigenvalues_spd=[],
@@ -32,29 +36,49 @@ class Element:
         self.occupations_spd = occupations_spd
 
 
-class BandStructure:
-    # make this inherit from ase.dft.band_structure.BandStructure?
-    def __init__(self, atoms=None, eigenvalues=None, kpts_path={}, kpts=None,
-                 nsemicore=0, weight=1., kBT=1.5, nspin=1):
+class BandStructure(BS):
+    def __init__(self, atoms=None, energies=None, kpts={}, kpts_scf=None,
+                 nsemicore=0, weight=1., kBT=1.5, nspin=1, xcoord=None,
+                 xticks=None, xticklabels=None):
+        # Eigenenergies assumed to be already
+        # appropriately referenced
         if isinstance(atoms, str):
             self.atoms = read(atoms)
         else:
             self.atoms = atoms
 
-        if isinstance(eigenvalues, str):
-            if eigenvalues.endswith('.npy'):
-                self.eigenvalues = np.load(eigenvalues)
+        if isinstance(energies, str):
+            if energies.endswith('.npy'):
+                energies = np.load(energies)
             else:
-                self.eigenvalues = np.loadtxt(eigenvalues)
+                energies = np.loadtxt(energies)
         else:
-            self.eigenvalues = eigenvalues
+            energies = energies
 
-        self.kpts_path = kpts_path
-        self.kpts = kpts
+        cell = self.atoms.get_cell()
+        kpts = kpts2ndarray(kpts, atoms=self.atoms)
+        BS.__init__(self, cell, kpts, energies, reference=0.0)
+
+        self.kpts_scf = kpts_scf
         self.nsemicore = nsemicore
         self.weight = weight
         self.kBT = kBT
         self.nspin = nspin
+        self.xcoord = xcoord
+        self.xticks = xticks
+        self.xticklabels = xticklabels
+
+    def get_labels(self):
+        try:
+            return BS.get_labels(self)
+        except ValueError:
+            # ASE doesn't recognize the crystal structure,
+            # in which case you should have passed on the
+            # appropriate coordinates, ticks, and labels
+            assert self.xcoord is not None
+            assert self.xticks is not None
+            assert self.xticklabels is not None
+            return self.xcoord, self.xticks, self.xticklabels
 
 
 class SlaterKosterGenerator:
@@ -105,11 +129,9 @@ class SlaterKosterGenerator:
 
         residual = 0.
         for bs_dft in self.bandstructures:
-            bs_dftb = self.calculate_bandstructure(atoms=bs_dft.atoms,
-                                                   kpts_path=bs_dft.kpts_path,
-                                                   kpts=bs_dft.kpts)
-            shape_dft = np.shape(bs_dft.eigenvalues)
-            shape_dftb = np.shape(bs_dftb.eigenvalues)
+            bs_dftb = self.calculate_bandstructure(bs_dft)
+            shape_dft = np.shape(bs_dft.energies)
+            shape_dftb = np.shape(bs_dftb.energies)
 
             assert shape_dft[0] == shape_dftb[0], [shape_dft, shape_dftb]
             assert shape_dft[1] == shape_dftb[1], [shape_dft, shape_dftb]
@@ -117,9 +139,9 @@ class SlaterKosterGenerator:
             nskip = bs_dft.nsemicore / 2
             imin = min(shape_dft[2] - nskip, shape_dftb[2])
 
-            diffs = bs_dft.eigenvalues[:, :, nskip:nskip + imin] - \
-                    bs_dftb.eigenvalues[:, :, :imin]
-            logw = -1. * np.abs(bs_dft.eigenvalues[:, :, nskip:nskip + imin])
+            diffs = bs_dft.energies[:, :, nskip:nskip + imin] - \
+                    bs_dftb.energies[:, :, :imin]
+            logw = -1. * np.abs(bs_dft.energies[:, :, nskip:nskip + imin])
             logw /= bs_dft.kBT
             residual += ((bs_dft.weight * np.exp(logw) * diffs) ** 2).sum()
 
@@ -129,37 +151,38 @@ class SlaterKosterGenerator:
 
         return residual
 
-    def calculate_bandstructure(self, atoms=None, kpts_path={}, kpts=None, 
-                                plot=False, filename='bandstructure.png',
-                                emax=10., emin=-10., ref='vbm'):
-        assert ref in ['vbm', 'fermi']
-        calc = self.DftbPlusCalc(atoms=atoms, kpts=kpts)
+    def calculate_bandstructure(self, bs, ref='vbm'):
+        atoms = bs.atoms.copy()
+        calc = self.DftbPlusCalc(atoms=atoms, kpts=bs.kpts_scf)
         atoms.set_calculator(calc)
         etot = atoms.get_potential_energy()
 
         efermi = calc.get_fermi_level()
-        if ref == 'vbm':
+        if ref.lower() == 'vbm':
             occupied = calc.results['eigenvalues'] < efermi
             eref = np.max(calc.results['eigenvalues'][occupied])
-        else:
+        elif ref.lower() == 'fermi':
             eref = efermi
+        else:
+            msg = 'Reference "%s" should be either "vbm" or "fermi"' % ref
+            raise ValueError(msg)
 
-        calc = self.DftbPlusCalc(atoms=atoms, kpts=kpts_path,
-                                 Hamiltonian_MaxSCCIterations=1, 
+        calc = self.DftbPlusCalc(atoms=atoms, kpts=bs.kpts,
+                                 Hamiltonian_MaxSCCIterations=1,
                                  Hamiltonian_ReadInitialCharges='Yes',
                                  Hamiltonian_SCCTolerance='1e3')
         atoms.set_calculator(calc)
         etot = atoms.get_potential_energy()
 
-        calc.results['fermi_levels'] = np.array([eref])
-
-        bs = calc.band_structure()
-        if plot:
-            bs.plot(filename=filename, show=False, emax=emax, emin=emin)
-
-        eigenvalues = bs.energies.copy() - efermi
-        return BandStructure(atoms=atoms, kpts=kpts, kpts_path=kpts_path,
-                             eigenvalues=eigenvalues)
+        bs_new = copy.deepcopy(bs)
+        bs_new.kpts = calc.get_ibz_k_points()
+        bs_new.energies = []
+        for s in range(calc.get_number_of_spins()):
+            bs_new.energies.append([calc.get_eigenvalues(kpt=k, spin=s)
+                                    for k in range(len(bs_new.kpts))])
+        bs_new.energies = np.array(bs_new.energies)
+        bs_new.energies -= eref
+        return bs_new
 
     def generate_skf(self, rconf):
         atoms = []
