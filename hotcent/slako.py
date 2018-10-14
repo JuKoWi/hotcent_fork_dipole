@@ -320,13 +320,13 @@ class SlaterKosterTable:
                     self.txt.flush()
                
                 if len(grid) == 0:
-                    continue
- 
-                S, H, H2 = self.calculate_mels(selected, e1, e2, R, grid,
-                                               areas, xc=xc,
-                                               superposition=superposition)
-                self.Hmax = max(self.Hmax, max(abs(H)))
-                self.dH = max(self.dH, max(abs(H - H2)))
+                    S, H, H2 = [1e-16] * 3
+                else:
+                    S, H, H2 = self.calculate_mels(selected, e1, e2, R, grid,
+                                                   areas, xc=xc,
+                                                   superposition=superposition)
+                    self.Hmax = max(self.Hmax, max(abs(H)))
+                    self.dH = max(self.dH, max(abs(H - H2)))
                 self.tables[p][Ri, :10] = H
                 self.tables[p][Ri, 10:] = S
 
