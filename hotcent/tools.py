@@ -16,10 +16,12 @@ try:
     matplotlib.use('agg')
 except ImportError:
     print('Warning: could not import matplotlib')
+from hotcent.atom_hotcent import HotcentAE
 try:
-    from hotcent.atom_gpaw import GPAWAE as AE
+    from hotcent.atom_gpaw import GPAWAE
+    have_gpaw = True
 except ImportError:
-    from hotcent.atom_hotcent import HotcentAE as AE
+    have_gpaw = False
 from hotcent.slako import SlaterKosterTable
 from hotcent.confinement import PowerConfinement, WoodsSaxonConfinement
 
@@ -84,7 +86,7 @@ class BandStructure(BS):
 class SlaterKosterGenerator:
     def __init__(self, elements, bandstructures, DftbPlusCalc=None, 
                  xc='PBE', superposition='density', rmin=0.4, dr=0.02, 
-                 N=900, verbose=True):
+                 N=900, ae='gpaw', verbose=True):
         self.elements = elements
         self.bandstructures = bandstructures
         self.DftbPlusCalc = DftbPlusCalc
@@ -93,6 +95,9 @@ class SlaterKosterGenerator:
         self.rmin = rmin
         self.dr = dr
         self.N = N  # eiter int or dict
+        self.ae = ae.lower()
+        assert self.ae in ['gpaw', 'hotcent'], 'AE: choose GPAW or Hotcent'
+        assert have_gpaw if self.ae == 'gpaw' else True, 'GPAW not available'
         self.verbose = verbose
 
     def parse_confinement_dict(self, conf):
@@ -258,6 +263,7 @@ class SlaterKosterGenerator:
             conf = vconf['%s_n' % el.symbol]
             wf_conf = {nl: vconf['%s_%s' % (el.symbol, nl)]
                        for nl in el.valence}
+            AE = GPAWAE if self.ae == 'gpaw' else HotcentAE
             atom = AE(el.symbol,
                       confinement=conf,
                       wf_confinement=wf_conf,
