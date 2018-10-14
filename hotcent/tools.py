@@ -220,8 +220,8 @@ class SlaterKosterGenerator:
 
         efermi = calc.get_fermi_level()
         if ref.lower() == 'vbm':
-            occupied = calc.results['eigenvalues'] < efermi
-            eref = np.max(calc.results['eigenvalues'][occupied])
+            eig = np.array(calc.results['eigenvalues'])
+            eref = np.max(eig[eig < efermi])
         elif ref.lower() == 'fermi':
             eref = efermi
         else:
