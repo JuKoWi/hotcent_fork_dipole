@@ -61,7 +61,7 @@ class HotcentAE(AllElectron):
         if self.xcname in ['PW92', 'LDA']:
             self.xcf = XC_PW92()
         else:
-            raise NotImplementedError('Not implemented XC functional: %s' %xc)
+            raise NotImplementedError('XC not implemented: %s' % xcname)
 
         if self.scalarrel:
             print('Using scalar relativistic corrections.', file=self.txt)
