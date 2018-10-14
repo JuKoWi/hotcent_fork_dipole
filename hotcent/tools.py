@@ -21,7 +21,7 @@ try:
 except ImportError:
     from hotcent.atom_hotcent import HotcentAE as AE
 from hotcent.slako import SlaterKosterTable
-from hotcent.confinement import PowerConfinement 
+from hotcent.confinement import PowerConfinement, WoodsSaxonConfinement
 
 
 class Element:
@@ -95,33 +95,89 @@ class SlaterKosterGenerator:
         self.N = N  # eiter int or dict
         self.verbose = verbose
 
+    def parse_confinement_dict(self, conf):
+        self.var_param = []
+        self.fix_param = []
+        for targets in sorted(conf):
+            for param in sorted(conf[targets]):
+                label = targets + '.' + param
+                item = (label, conf[targets][param])
+                if label.endswith('_guess'):
+                    self.var_param.append(item)
+                else:
+                    self.fix_param.append(item)
+
+    def get_vpar_dict(self, opt_param):
+        vpar = {}
+        assert len(opt_param) == len(self.var_param)
+        for i, (label, value) in enumerate(self.var_param + self.fix_param):
+            targets = label.split('.')[0].split(',')
+            par = label.split('.')[1].split('_guess')[0]
+            val = opt_param[i] if i < len(opt_param) else value
+            for x in targets:
+                if x in vpar:
+                    vpar[x][par] = val
+                else:
+                    vpar[x] = {par: val}
+        return vpar
+
+    def get_vconf_dict(self, vpar):
+        vconf = {}
+        for targets, pardict in vpar.items():
+            kwargs = {k.split('_guess')[0]:v for k, v in pardict.items()}
+            is_pow = np.all([kw in ['s', 'r0'] for kw in kwargs])
+            is_sax = np.all([kw in ['w', 'a', 'r0'] for kw in kwargs])
+            if is_pow and not is_sax:
+                conf = PowerConfinement(**kwargs)
+            elif is_sax and not is_pow:
+                conf = WoodsSaxonConfinement(**kwargs)
+            else:
+                msg = 'Bad Vconf keywords: ' + ' '.join(sorted(kwargs))
+                raise ValueError(msg)
+
+            for key in targets.split(','):
+                assert key not in vconf, 'Multiple definition of %s conf' % key
+                vconf[key] = conf
+        return vconf
+
     def run(self, initial_guess={}, rhobeg=0.2, tol=1e-2, maxiter=1000):
-        # maybe add "autofill" option here later
         if not initial_guess:
             initial_guess = self.make_initial_guess()
-        self.keys = sorted(initial_guess)
-        rconf0 = [initial_guess[k] for k in self.keys]
-        result = minimize(self._residual, rconf0, method='COBYLA', tol=tol, 
-                          options={'rhobeg':rhobeg, 'maxiter':maxiter})
-        return {self.keys[i]:result.x[i] for i in range(len(self.keys))}
+        self.parse_confinement_dict(initial_guess)
 
-    def make_initial_guess(self, factor=1.85):
+        opt_param = [val for label, val in self.var_param]
+        if self.verbose:
+            print('PARAM:' + ' '.join([label for label, val in self.var_param]))
+            sys.stdout.flush()
+
+        result = minimize(self._residual, opt_param, method='COBYLA', tol=tol,
+                          options={'rhobeg':rhobeg, 'maxiter':maxiter})
+
+        return self.get_vpar_dict(result.x)
+
+    def make_initial_guess(self, factor=1.85, orbital_dependent=True):
         initial_guess = {}
         for el in self.elements:
             rcov = covalent_radii[atomic_numbers[el.symbol]]
-            for nl in el.valence + ['n']:
-                key = '%s_%s' % (el.symbol, nl)
-                initial_guess[key] = factor * rcov / Bohr
+            r0 = factor * rcov / Bohr
+            if orbital_dependent:
+                for nl in el.valence + ['n']:
+                    key = '%s_%s' % (el.symbol, nl)
+                    initial_guess[key] = {'s':2, 'r0_guess':r0}
+            else:
+                key = ','.join([el.symbol + '_' + nl for nl in el.valence])
+                initial_guess[key] = {'s':2, 'r0_guess':r0}
+                initial_guess[el.symbol + '_n]'] = {'s':2, 'r0_guess':r0}
         return initial_guess
 
-    def _residual(self, rconf):
+    def _residual(self, opt_param):
         if self.verbose:
-            print('RCONF:', rconf)
+            print('PARAM:', opt_param)
             sys.stdout.flush()
 
         try:
-            self.generate_skf(rconf)
-        except (ValueError, AssertionError, RuntimeError) as err:
+            self.generate_skf(opt_param)
+        except (ValueError, AssertionError, RuntimeError, IndexError) as err:
             if self.verbose:
                 print(err.message)
                 sys.stdout.flush()
@@ -184,28 +240,24 @@ class SlaterKosterGenerator:
         bs_new.energies -= eref
         return bs_new
 
-    def generate_skf(self, rconf):
+    def generate_skf(self, arg):
+        if isinstance(arg, dict):
+            vpar = arg
+        else:
+            vpar = self.get_vpar_dict(arg)
+
+        if self.verbose:
+            print('VPAR:', vpar)
+
+        vconf = self.get_vconf_dict(vpar)
+
         atoms = []
+        keys = sorted(vconf)
 
         for i, el in enumerate(self.elements):
-            key = el.symbol + '_n'
-            if isinstance(rconf, dict):
-                 r0 = rconf[key]
-            else:
-                 index = self.keys.index(key)
-                 r0 = rconf[index] 
-            conf = PowerConfinement(r0=r0, s=2)
-
-            wf_conf = {}
-            for nl in el.valence:
-                key = el.symbol + '_%s' % nl
-                if isinstance(rconf, dict):
-                    r0 = rconf[key]
-                else:
-                    index = self.keys.index(key)
-                    r0 = rconf[index]
-                wf_conf[nl] = PowerConfinement(r0=r0, s=2)
-
+            conf = vconf['%s_n' % el.symbol]
+            wf_conf = {nl: vconf['%s_%s' % (el.symbol, nl)]
+                       for nl in el.valence}
             atom = AE(el.symbol,
                       confinement=conf,
                       wf_confinement=wf_conf,
