@@ -152,7 +152,9 @@ class SlaterKosterGenerator:
 
         opt_param = [val for label, val in self.var_param]
         if self.verbose:
-            print('PARAM:' + ' '.join([label for label, val in self.var_param]))
+            print('PARAM labels:')
+            print(' '.join([label.split('_guess')[0]
+                            for label, val in self.var_param]))
             sys.stdout.flush()
 
         result = minimize(self._residual, opt_param, method='COBYLA', tol=tol,
@@ -252,8 +254,9 @@ class SlaterKosterGenerator:
             vpar = self.get_vpar_dict(arg)
 
         if self.verbose:
-            print('VPAR:', vpar)
-
+            print('VPAR:')
+            for key in sorted(vpar):
+                print('\'' + key + '\':' + str(vpar[key]))
         vconf = self.get_vconf_dict(vpar)
 
         atoms = []
