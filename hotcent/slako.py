@@ -78,13 +78,21 @@ class SlaterKosterTable:
                 self.tables[p][:, i] = tail_smoothening(self.Rgrid,
                                                         self.tables[p][:, i])                
         
-    def write(self, filename=None):
-        """ Use symbol1-symbol2.par as default. """
-        self.smooth_tails()
+    def write(self, filename=None, pair=None):
+        """ Use symbol1-symbol2.par as default.
 
-        el1, el2 = self.ela.get_symbol(), self.elb.get_symbol()
-        fn = '%s-%s.par' % (el1, el2) if filename is None else filename
+        filename: str with name of file to write to
+
+        pair: either (symbol_a, symbol_b) or (symbol_b, symbol_a)
+              to select which table to write in the SKF format
+        """
+        if pair is None:
+            pair = (self.ela.get_symbol(), self.elb.get_symbol())
+
+        fn = '%s-%s.skf' % pair if filename is None else filename
+
         ext = fn[-4:]
+
         assert ext in ['.par', '.skf'], \
                "Unknown format: %s (-> choose .par or .skf)" % ext
 
@@ -92,14 +100,23 @@ class SlaterKosterTable:
             if ext == '.par':
                 self._write_par(handle)
             elif ext == '.skf':
-                self._write_skf(handle)
+                self._write_skf(handle, pair=pair)
 
-    def _write_skf(self, handle):
+    def _write_skf(self, handle, pair):
         """ Write to SKF file format; this function
         is an adaptation of hotbit.io.hbskf 
         """
+        symbols = (self.ela.get_symbol(), self.elb.get_symbol())
+        if pair == symbols:
+             index = 0
+        elif pair == symbols[::-1]:
+             index = 1
+        else:
+             msg = 'Requested ' + str(pair) + ' pair, but this calculator '
+             msg += 'is restricted to the %s-%s pair.' % symbols
+             raise ValueError(msg)
+
         grid_dist = self.Rgrid[1] - self.Rgrid[0]
-        index = 0  # for the "self.ela-self.elb" SKF table
         grid_npts = len(self.tables[index])
         grid_npts += int(self.Rgrid[0] / (self.Rgrid[1] - self.Rgrid[0]))
         print("%.12f, %d" % (grid_dist, grid_npts), file=handle)
@@ -109,7 +126,7 @@ class SlaterKosterTable:
             print("E_d   E_p   E_s   SPE   U_d   U_p   U_s   f_d    f_p   f_s",
                   file=handle)
 
-        m = atomic_masses[atomic_numbers[el1]]
+        m = atomic_masses[atomic_numbers[symbols[index]]]
         print("%.3f, 19*0.0" % m, file=handle)
 
         # Integral table containing the DFTB Hamiltonian
@@ -336,6 +353,7 @@ class SlaterKosterTable:
             print('     Relative error=%.2g %%' % (self.dH / self.Hmax * 100),
                   file=self.txt)
 
+        self.smooth_tails()
         self.timer.stop('calculate tables')  
         #self.comment+='\n'+asctime()
         self.txt.flush()
