@@ -170,11 +170,11 @@ class SlaterKosterGenerator:
             if orbital_dependent:
                 for nl in el.valence + ['n']:
                     key = '%s_%s' % (el.symbol, nl)
-                    initial_guess[key] = {'s':2, 'r0_guess':r0}
+                    initial_guess[key] = {'s_guess':2, 'r0_guess':r0}
             else:
                 key = ','.join([el.symbol + '_' + nl for nl in el.valence])
-                initial_guess[key] = {'s':2, 'r0_guess':r0}
-                initial_guess[el.symbol + '_n]'] = {'s':2, 'r0_guess':r0}
+                initial_guess[key] = {'s_guess':2, 'r0_guess':r0}
+                initial_guess[el.symbol + '_n]'] = {'s_guess':2, 'r0_guess':r0}
         return initial_guess
 
     def _residual(self, opt_param):
