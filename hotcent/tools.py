@@ -178,17 +178,34 @@ class SlaterKosterGenerator:
         return initial_guess
 
     def _residual(self, opt_param):
+        """
+        Returns the total residual for the generated band structures
+        compared to the reference band structures.
+
+        args:
+
+        opt_param: the (internally defined) list of parameters used
+                   in setting up the confinement potentials (and hence
+                   Slater-Koster tables).
+                   If the relevant set of SKF files has already been
+                   created, setting opt_param to None will result in
+                   just recalculating the band structures and the total
+                   residual, without re-generating the SK tables.
+                   In this way, one can then also quickly optimize the
+                   eigenvalues and Hubbard values.
+        """
         if self.verbose:
             print('PARAM:', opt_param)
             sys.stdout.flush()
 
-        try:
-            self.generate_skf(opt_param)
-        except (ValueError, AssertionError, RuntimeError, IndexError) as err:
-            if self.verbose:
-                print(err.message)
-                sys.stdout.flush()
-            return 1e23
+        if opt_param is not None:
+            try:
+                self.generate_skf(opt_param)
+            except (ValueError, AssertionError, RuntimeError, IndexError) as e:
+                if self.verbose:
+                    print(e.message)
+                    sys.stdout.flush()
+                return 1e23
 
         residual = 0.
         for bs_dft in self.bandstructures:
