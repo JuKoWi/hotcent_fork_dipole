@@ -145,7 +145,8 @@ class SlaterKosterGenerator:
                 vconf[key] = conf
         return vconf
 
-    def run(self, initial_guess={}, rhobeg=0.2, tol=1e-2, maxiter=1000):
+    def run(self, initial_guess={}, rhobeg=0.2, tol=1e-2, maxiter=1000,
+            callback=None):
         if not initial_guess:
             initial_guess = self.make_initial_guess()
         self.parse_confinement_dict(initial_guess)
@@ -157,8 +158,9 @@ class SlaterKosterGenerator:
                             for label, val in self.var_param]))
             sys.stdout.flush()
 
-        result = minimize(self._residual, opt_param, method='COBYLA', tol=tol,
-                          options={'rhobeg':rhobeg, 'maxiter':maxiter})
+        result = minimize(self._residual, opt_param, args=(callback,),
+                          method='COBYLA', tol=tol, options={'rhobeg':rhobeg,
+                          'maxiter':maxiter})
 
         return self.get_vpar_dict(result.x)
 
@@ -177,7 +179,7 @@ class SlaterKosterGenerator:
                 initial_guess[el.symbol + '_n]'] = {'s_guess':2, 'r0_guess':r0}
         return initial_guess
 
-    def _residual(self, opt_param):
+    def _residual(self, opt_param, callback):
         """
         Returns the total residual for the generated band structures
         compared to the reference band structures.
@@ -224,6 +226,9 @@ class SlaterKosterGenerator:
             logw = -1. * np.abs(bs_dft.energies[:, :, nskip:nskip + imin])
             logw /= bs_dft.kBT
             residual += ((bs_dft.weight * np.exp(logw) * diffs) ** 2).sum()
+
+        if callback is not None:
+            residual = callback()
 
         if self.verbose:
             print('RESIDUAL:', residual)
