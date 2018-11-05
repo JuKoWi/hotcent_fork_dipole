@@ -112,12 +112,14 @@ class SlaterKosterGenerator:
                 else:
                     self.fix_param.append(item)
 
-    def get_vpar_dict(self, opt_param):
+    def get_vpar_dict(self, opt_param, keep_suffix=True):
         vpar = {}
         assert len(opt_param) == len(self.var_param)
         for i, (label, value) in enumerate(self.var_param + self.fix_param):
             targets = label.split('.')[0].split(',')
-            par = label.split('.')[1].split('_guess')[0]
+            par = label.split('.')[1]
+            if not keep_suffix:
+                par = par.split('_')[0]
             val = opt_param[i] if i < len(opt_param) else value
             for x in targets:
                 if x in vpar:
@@ -162,7 +164,7 @@ class SlaterKosterGenerator:
                           method='COBYLA', tol=tol, options={'rhobeg':rhobeg,
                           'maxiter':maxiter})
 
-        return self.get_vpar_dict(result.x)
+        return self.get_vpar_dict(result.x, keep_suffix=True)
 
     def make_initial_guess(self, factor=1.85, orbital_dependent=True):
         initial_guess = {}
@@ -273,7 +275,7 @@ class SlaterKosterGenerator:
         if isinstance(arg, dict):
             vpar = arg
         else:
-            vpar = self.get_vpar_dict(arg)
+            vpar = self.get_vpar_dict(arg, keep_suffix=False)
 
         if self.verbose:
             print('VPAR:')
