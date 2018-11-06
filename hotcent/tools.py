@@ -205,9 +205,10 @@ class SlaterKosterGenerator:
         if opt_param is not None:
             try:
                 self.generate_skf(opt_param)
-            except (ValueError, AssertionError, RuntimeError, IndexError) as e:
+            except (ValueError, AssertionError, RuntimeError, IndexError,
+                    TypeError) as err:
                 if self.verbose:
-                    print(e.message)
+                    print(err.message)
                     sys.stdout.flush()
                 return 1e23
 
