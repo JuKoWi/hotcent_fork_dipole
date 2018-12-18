@@ -337,7 +337,7 @@ class SlaterKosterTable:
                     self.txt.flush()
                
                 if len(grid) == 0:
-                    S, H, H2 = [1e-16] * 3
+                    S, H, H2 = 0., 0., 0.
                 else:
                     S, H, H2 = self.calculate_mels(selected, e1, e2, R, grid,
                                                    areas, xc=xc,
@@ -720,8 +720,16 @@ def tail_smoothening(x, y):
     if np.all(abs(y) < 1e-10):
         return y
 
-    N = len(x)
-    xmax = x[-1]
+    Nzero = 0
+    for i in range(len(y) - 1, 1, -1):
+        if abs(y[i]) < 1e-60:
+            Nzero += 1
+        else:
+            break
+
+    N = len(y) - Nzero
+    y = y[:N]
+    xmax = x[:N][-1]
 
     for i in range(N - 3, 1, -1):
         x0i = x[i] - y[i] / ((y[i + 1] - y[i]) /(x[i + 1] - x[i]))
@@ -737,6 +745,7 @@ def tail_smoothening(x, y):
 
     if k == N - 3:
         y[-1] = 0.
+        y = np.append(y, np.zeros(Nzero))
         return y
     else:
         # g(x)=c2*(xmax-x)**m + c3*(xmax-x)**(m+1) goes through 
@@ -755,9 +764,11 @@ def tail_smoothening(x, y):
             y[-1] = 0.  # once more explicitly            
 
             if np.all(y[k:] * sgn >= 0):
+                y = np.append(y, np.zeros(Nzero))
                 break
 
             if m == 9:
                 msg = 'Problems with smoothening; need for new algorithm?'
                 raise RuntimeError(msg)
+
     return y
