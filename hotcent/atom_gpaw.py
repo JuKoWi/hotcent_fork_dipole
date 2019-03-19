@@ -220,7 +220,7 @@ class GPAWAE(AllElectron, GPAWAllElectron):
             if vconf is None:  # mod
                 vr[:] = (vHr + self.vXC * r)
             else:  # mod
-	        vr[:] = (vHr + self.vXC * r + vconf * r)  # mod
+                vr[:] = (vHr + self.vXC * r + vconf * r)  # mod
 
             if self.orbital_free:
                 vr /= self.tw_coeff
