@@ -2,7 +2,13 @@
 
 Calculating one- and two-center Slater-Koster integrals,
 based on parts of the [Hotbit](https://github.com/pekkosk/hotbit/) 
-code.
+code. The development of Hotcent was started as part of the
+following study: 
+
+M. Van den Bossche, J. Chem. Phys. A. **2019**, XX (X), pp XXX-XXX
+(doi_).
+
+.. _doi: https://dx.doi.org/10.1021/acs.jpca.9b00927
 
 
 ## Features
@@ -22,7 +28,11 @@ schemes are available.
 * With regards to exchange-correlation functionals, the PW92
 (LDA) functional is natively available, and other functionals
 can be applied through integration with the 
-[GPAW](https://wiki.fysik.dtu.dk/gpaw/) code.
+[GPAW](https://wiki.fysik.dtu.dk/gpaw/) code. In the potential
+superposition scheme, it should be possible to use any of the 
+functionals available through GPAW (and LibXC). When applying
+the density superposition scheme, only the pure Python functionals
+in GPAW can be used at present (i.e. LDA, PBE, PBEsol, and RPBE).
 
 
 ## Installation
@@ -32,6 +42,5 @@ can be applied through integration with the
 * Clone / download the Hotcent repository and update the `$PYTHONPATH` 
 accordingly.
 
-* If you want to use functionals other than LDA, Python must be able 
-to import from the GPAW module. The GPAW C-code does not need to 
-be compiled, and the PAW datasets are not needed either.
+* If you want to use functionals other than LDA, the GPAW code must
+be installed. 
