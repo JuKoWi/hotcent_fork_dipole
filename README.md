@@ -6,9 +6,7 @@ code. The development of Hotcent was started as part of the
 following study: 
 
 M. Van den Bossche, J. Chem. Phys. A. **2019**, XX (X), pp XXX-XXX
-(doi_).
-
-.. _doi: https://dx.doi.org/10.1021/acs.jpca.9b00927
+[(doi)](https://dx.doi.org/10.1021/acs.jpca.9b00927).
 
 
 ## Features
