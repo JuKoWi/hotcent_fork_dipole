@@ -223,7 +223,7 @@ class HotcentAE(AllElectron):
         unlg = {}
 
         confinement = self.confinement
-        for nl, wf_confinement in self.wf_confinement.iteritems():
+        for nl, wf_confinement in self.wf_confinement.items():
             assert nl in val, "Confinement: %s not in %s" % (nl, str(val))
             self.confinement = wf_confinement
             self._run()
