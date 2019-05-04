@@ -15,9 +15,11 @@ from ase.data import atomic_numbers, atomic_masses
 from hotcent.timing import Timer
 from hotcent.atom_hotcent import XC_PW92
 try:
-    from gpaw.xc.gga import PurePythonGGAKernel
+    from gpaw.xc import XC
+    has_gpaw = True
 except:
     print('Warning: could not import from GPAW')
+    has_gpaw = False
 
 
 class SlaterKosterTable:
@@ -288,14 +290,22 @@ class SlaterKosterTable:
                 Hamiltonian integrals. 
         xc:     name of the exchange-correlation functional to be used
                 in calculating the effective potential in the density
-                superposition scheme. Allowed values:
-                'LDA' and 'PW92': the local density approximation
-                'PBE', 'PBEsol' and 'RPBE': different GGA functionals
-                For the GGAs the GPAW module needs to be accessible.
+                superposition scheme. If the GPAW module is available,
+                any LDA or GGA (but not hybrid or MGGA) functional available
+                via GPAW can be specified, in the same syntax as the GPAW
+                calculator. Native GGA functionals in GPAW include, at present,
+                PBE, revPBE, RPBE, and PW91 (see gpaw/xc/kernel.py) and some
+                pure-python implementations of them ('pyPBE', 'pyPBEsol',
+                'pyRPBE'). Many more (LDA/GGA) functionals can be used if
+                GPAW has been linked to LibXC (e.g. for using the N12
+                functional, set xc='XC_GGA_X_N12+XC_GGA_C_N12').
+                If GPAW is not available, only the local density
+                approximation 'PW92' (alias: 'LDA') can be chosen.
         """
         assert R1 >= 1e-3, 'For stability; use R1 >~ 1e-3'
         assert superposition in ['density', 'potential']
-        assert xc in ['LDA', 'PW92', 'PBE', 'PBEsol', 'RPBE']
+        if not has_gpaw:
+            assert xc in ['LDA', 'PW92']
 
         self.timer.start('calculate tables')   
         self.wf_range = self.get_range(wflimit)        
@@ -372,8 +382,7 @@ class SlaterKosterTable:
         grid: list of grid points on (d,z)-plane
         area: d-z areas of the grid points.
         superposition: 'density' or 'potential' superposition scheme
-        xc: 'LDA', 'PW92', 'PBE', 'PBEsol' or 'RPBE': the exchange-
-            correlation functional in the density superposition scheme.
+        xc: exchange-correlation functional (see description in self.run())
 
         return:
         -------
@@ -420,11 +429,11 @@ class SlaterKosterTable:
             n = e2.electron_density(r1) + e2.electron_density(r2)
             veff = e1.V_nuclear(r1) + e1.hartree_potential(r1)
             veff += e2.V_nuclear(r2) + e2.hartree_potential(r2)
-            if xc in ['LDA', 'PW92']:
-                XC = XC_PW92()
-                veff += XC.vxc(n)
-            elif xc in ['PBE', 'PBEsol', 'RPBE']:
-                XC = PurePythonGGAKernel('py%s' % xc)
+            if not has_gpaw:
+                assert xc in ['LDA', 'PW92']
+                func = XC_PW92()
+                veff += func.vxc(n)
+            else:
                 grad_x = e1.electron_density(r1, der=1) * np.sin(t1)
                 grad_x += e2.electron_density(r2, der=1) * np.sin(t2)
                 grad_y = e1.electron_density(r1, der=1) * np.cos(t1)
@@ -434,15 +443,14 @@ class SlaterKosterTable:
                 dedn = np.zeros_like(dens)
                 exc = np.zeros_like(dens)
                 dedsigma = np.zeros_like(dens)
-                XC.calculate(exc, dens, dedn, sigma, dedsigma)
+                func = XC(xc)
+                func.kernel.calculate(exc, dens, dedn, sigma, dedsigma)
                 veff += dedn[0]
                 # add gradient corrections to vxc
                 splx = SmoothBivariateSpline(x, y, dedsigma * grad_x)
                 sply = SmoothBivariateSpline(x, y, dedsigma * grad_y)
                 veff += -2. * splx(x, y, dx=1, dy=0, grid=False)
                 veff += -2. * sply(x, y, dx=0, dy=1, grid=False)
-            else:
-                raise ValueError('Cannot handle XC-functional %s' % xc)
 
         assert np.shape(gphi) == (N, 10)
         assert np.shape(radii) == (N, 2)

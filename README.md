@@ -28,9 +28,9 @@ schemes are available.
 can be applied through integration with the 
 [GPAW](https://wiki.fysik.dtu.dk/gpaw/) code. In the potential
 superposition scheme, it should be possible to use any of the 
-functionals available through GPAW (and LibXC). When applying
-the density superposition scheme, only the pure Python functionals
-in GPAW can be used at present (i.e. LDA, PBE, PBEsol, and RPBE).
+functionals available through GPAW (and LibXC if GPAW has been
+linked to it). When applying the density superposition scheme,
+the choice is currently restricted to LDA- and GGA-type functionals.
 
 
 ## Installation
