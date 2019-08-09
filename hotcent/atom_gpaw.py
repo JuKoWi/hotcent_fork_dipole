@@ -11,8 +11,8 @@ from hotcent.interpolation import Function
 from gpaw.xc import XC
 from gpaw.utilities import hartree
 from gpaw.atom.radialgd import AERadialGridDescriptor
-from gpaw.atom.all_electron import AllElectron as GPAWAllElectron
-from gpaw.atom.all_electron import shoot, tempdir
+from all_electron import AllElectron as GPAWAllElectron
+from all_electron import shoot, tempdir
 
 
 class GPAWAE(AllElectron, GPAWAllElectron):
@@ -127,7 +127,10 @@ class GPAWAE(AllElectron, GPAWAllElectron):
         self.n = np.zeros(N)
 
         # Always spinpaired nspins=1
-        self.xc = XC(self.xcname)
+        if type(self.xcname) == str:
+            self.xc = XC(self.xcname)
+        else:
+            self.xc = self.xcname
 
         # Initialize for non-local functionals
         if self.xc.type == 'GLLB':

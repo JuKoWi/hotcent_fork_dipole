@@ -31,6 +31,8 @@ superposition scheme, it should be possible to use any of the
 functionals available through GPAW (and LibXC if GPAW has been
 linked to it). When applying the density superposition scheme,
 the choice is currently restricted to LDA- and GGA-type functionals.
+LibXC functionals can now also be accessed via the PyLibXC module
+(see hotcent.pylibxc_interface).
 
 
 ## Installation

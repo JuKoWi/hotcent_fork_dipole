@@ -443,7 +443,10 @@ class SlaterKosterTable:
                 dedn = np.zeros_like(dens)
                 exc = np.zeros_like(dens)
                 dedsigma = np.zeros_like(dens)
-                func = XC(xc)
+                if type(xc) == str:
+                    func = XC(xc)
+                else:
+                    func = xc
                 func.kernel.calculate(exc, dens, dedn, sigma, dedsigma)
                 veff += dedn[0]
                 # add gradient corrections to vxc
