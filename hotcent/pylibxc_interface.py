@@ -36,11 +36,6 @@ you can get away with the regular LibXC syntax
 in GPAW:
 
 >>> xc =  'XC_GGA_X_B88+XC_GGA_C_LYP'
-
-Note that you'd still need to use this PyLibXC 
-interface in the Slater-Koster integration if
-you want to use something else than LDA/PBE/
-PBEsol/RPBE in the density superposition scheme.
 """
 
 from __future__ import print_function

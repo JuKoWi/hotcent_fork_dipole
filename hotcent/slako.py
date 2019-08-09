@@ -299,7 +299,8 @@ class SlaterKosterTable:
                 'pyRPBE'). Many more (LDA/GGA) functionals can be used if
                 GPAW has been linked to LibXC (e.g. for using the N12
                 functional, set xc='XC_GGA_X_N12+XC_GGA_C_N12').
-                If GPAW is not available, only the local density
+                Also the PyLibXC module can be used (see pylibxc_interface.py).
+                If GPAW or PyLibXC is not available, only the local density
                 approximation 'PW92' (alias: 'LDA') can be chosen.
         """
         assert R1 >= 1e-3, 'For stability; use R1 >~ 1e-3'
