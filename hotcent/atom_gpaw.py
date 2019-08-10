@@ -11,8 +11,8 @@ from hotcent.interpolation import Function
 from gpaw.xc import XC
 from gpaw.utilities import hartree
 from gpaw.atom.radialgd import AERadialGridDescriptor
-from all_electron import AllElectron as GPAWAllElectron
-from all_electron import shoot, tempdir
+from gpaw.all_electron import AllElectron as GPAWAllElectron
+from gpaw.all_electron import shoot, tempdir
 
 
 class GPAWAE(AllElectron, GPAWAllElectron):
