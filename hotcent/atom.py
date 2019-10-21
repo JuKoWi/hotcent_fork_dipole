@@ -95,7 +95,7 @@ class AllElectron:
                 assert core in noble_conf, "[Core] config is not a noble gas!"
                 conf = noble_conf[core]
             else:
-                conf = {term[:2]: int(term[2:])}
+                conf = {term[:2]: float(term[2:])}
             self.configuration.update(conf)
 
         self.nel = sum(self.configuration.values())
