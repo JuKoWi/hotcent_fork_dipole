@@ -1,6 +1,5 @@
 import os
 import sys
-from hotcent.atom_hotcent import HotcentAE
 from hotcent.slako import SlaterKosterTable
 from hotcent.confinement import PowerConfinement
 from ase.data import covalent_radii, atomic_numbers
@@ -16,20 +15,14 @@ elif code == 'gpaw':
 element = 'C'
 
 # Get KS all-electron ground state of confined atom:
-elmfile = '%s.elm' % element
-
-if os.path.exists(elmfile):
-    atom.read(elmfile)
-else:
-    r0 = 1.85 * covalent_radii[atomic_numbers[element]] / Bohr
-    atom = AE(element,
-              confinement=PowerConfinement(r0=r0, s=2),
-              configuration='[He] 2s2 2p2',
-              valence=['2s', '2p'],
-              timing=True,
-              )
-    atom.run()
-    #atom.write(elmfile)
+r0 = 1.85 * covalent_radii[atomic_numbers[element]] / Bohr
+atom = AE(element,
+          confinement=PowerConfinement(r0=r0, s=2),
+          configuration='[He] 2s2 2p2',
+          valence=['2s', '2p'],
+          timing=True,
+          )
+atom.run()
 
 # Compute Slater-Koster integrals:
 rmin, dr, N = 0.5, 0.05, 250
