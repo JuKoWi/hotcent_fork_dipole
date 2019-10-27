@@ -86,12 +86,20 @@ class GPAWAE(AllElectron, GPAWAllElectron):
             u_j = self.u_j.copy()
             e_j = [e for e in self.e_j]
 
+        # Note: since the grid in GPAW-AllElectron starts at exactly 0,
+        # there are cases where we need to take the limit for r->0.
+
         self.rgrid = self.r.copy()
-        self.rgrid[0] = 0.1 * self.rgrid[1]
+        self.rgrid[0] = 1.
+        delta = (0. - self.rgrid[1]) / (self.rgrid[2] - self.rgrid[1])
         self.veff = self.vr.copy() / self.rgrid
+        self.veff[0] = self.veff[1] + delta * (self.veff[2] - self.veff[1])
         self.dens = self.calculate_density()
         self.total_energy = self.ETotal 
         self.Hartree = self.vHr.copy() / self.rgrid
+        self.Hartree[0] = self.Hartree[1]
+        self.Hartree[0] += delta * (self.Hartree[2] - self.Hartree[1])
+        self.rgrid[0] = 0.
 
         for n, l, nl in self.list_states():
             if nl in self.wf_confinement:
@@ -106,9 +114,13 @@ class GPAWAE(AllElectron, GPAWAllElectron):
                 self.run_confined(vconf, use_restart_file=use_restart_file)
 
             index = self.get_orbital_index(nl)
+            self.rgrid[0] = 1.
             self.unlg[nl] = self.u_j[index].copy()
             self.enl[nl] = self.e_j[index]
             self.Rnlg[nl] = self.unlg[nl] / self.rgrid
+            self.Rnlg[nl][0] = self.Rnlg[nl][1]
+            self.Rnlg[nl][0] += delta * (self.Rnlg[nl][2] - self.Rnlg[nl][1])
+            self.rgrid[0] = 0.
             self.Rnl_fct[nl] = Function('spline', self.rgrid, self.Rnlg[nl])
             self.unl_fct[nl] = Function('spline', self.rgrid, self.unlg[nl])
 
