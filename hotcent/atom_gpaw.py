@@ -54,16 +54,20 @@ class GPAWAE(AllElectron, GPAWAllElectron):
         self.Rnlg = {}
         self.unlg = {}
 
-        GPAWAllElectron.run(self, use_restart_file=use_restart_file)
-        u_j = self.u_j.copy()
-        e_j = [e for e in self.e_j]
-
         if self.confinement is None:
-            vconf = np.zeros_like(self.r)
+            vconf = 0.
         else:
+            # First, a run without any confinement
+            GPAWAllElectron.run(self, use_restart_file=use_restart_file)
+            u_j = self.u_j.copy()
+            e_j = [e for e in self.e_j]
             vconf = self.confinement(self.r)
 
         self.run_confined(vconf, use_restart_file=use_restart_file)
+
+        if self.confinement is None:
+            u_j = self.u_j.copy()
+            e_j = [e for e in self.e_j]
 
         self.rgrid = self.r.copy()
         self.veff = self.vr.copy() / self.rgrid
