@@ -141,7 +141,7 @@ class AllElectron:
         
         filename:  output file name + extension (extension used in matplotlib)
         """
-        if pl == None:
+        if pl is None:
             raise AssertionError('pylab could not be imported')
 
         rmax = covalent_radii[self.Z] / Bohr * 3
@@ -155,7 +155,6 @@ class AllElectron:
         for n, l, nl in self.list_states():
             ax = pl.subplot(2 * p, p, i)
             pl.plot(self.Rnlg[nl])
-            #pl.yticks([], [])
             pl.xticks(size=5)
             
             # annotate
@@ -173,7 +172,6 @@ class AllElectron:
         for n, l, nl in self.list_states():
             ax = pl.subplot(2 * p, p, i)
             pl.plot(self.rgrid[:ri], self.Rnlg[nl][:ri])
-            #pl.yticks([], [])
             pl.xticks(size=5)
             if ax.is_last_row():
                 pl.xlabel('r (Bohr)', size=8)
@@ -181,28 +179,27 @@ class AllElectron:
             c = 'k'
             if nl in self.valence: 
                 c='r'
-            pl.text(0.5, 0.4, r'$R_{%s}(r)$' % nl, transform=ax.transAxes, size=15, color=c)
+            pl.text(0.5, 0.4, r'$R_{%s}(r)$' % nl, transform=ax.transAxes,
+                    size=15, color=c)
             if ax.is_first_col():
                 pl.ylabel(r'$R_{nl}(r)$', size=8)
             i += 1
         
-        file = '%s_KSAllElectron.pdf' % self.symbol
-        #pl.rc('figure.subplot',wspace=0.0,hspace=0.0)
         fig.subplots_adjust(hspace=0.2, wspace=0.1)
-        s = ''
-        if self.confinement != None:
-            s = '(confined)'
-        pl.figtext(0.4, 0.95, r'$R_{nl}(r)$ for %s-%s %s' % (self.symbol, self.symbol, s))
-        if filename is not None:
-            file = filename
-        pl.savefig(file)
+        s = '' if self.confinement is None else ' (confined)'
+        pl.figtext(0.4, 0.95, r'$R_{nl}(r)$ for %s%s' % (self.symbol, s))
+
+        if filename is None:
+            filename = '%s_KSAllElectron.pdf' % self.symbol
+        pl.savefig(filename)
+        pl.clf()
 
     def plot_density(self, filename=None):
         """ Plot the electron density with matplotlib.
         
         filename:  output file name + extension (extension used in matplotlib)
         """
-        if pl == None:
+        if pl is None:
             raise AssertionError('pylab could not be imported')
 
         rmax = covalent_radii[self.Z] / Bohr * 3
@@ -244,14 +241,15 @@ class AllElectron:
         pl.xlabel('r (Bohr)')
         pl.grid()
 
-        s = '' if self.confinement is None else '(confined)'
-        pl.figtext(0.4, 0.95, r'Density for %s %s' % (self.symbol, s))
+        s = '' if self.confinement is None else ' (confined)'
+        pl.figtext(0.4, 0.95, r'Density for %s%s' % (self.symbol, s))
 
         pl.legend(loc='upper right', ncol=2)
 
         if filename is None:
             filename = '%s_density.pdf' % self.symbol
         pl.savefig(filename)
+        pl.clf()
 
     def list_states(self):
         """ List all potential states {(n,l,'nl')}. """
