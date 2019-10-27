@@ -23,6 +23,8 @@ atom = AE(element,
           timing=True,
           )
 atom.run()
+atom.plot_Rnl(only_valence=False)
+atom.plot_density()
 
 # Compute Slater-Koster integrals:
 rmin, dr, N = 0.5, 0.05, 250

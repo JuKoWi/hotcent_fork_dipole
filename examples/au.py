@@ -27,6 +27,7 @@ atom = GPAWAE(element,
               txt='-',
               )
 atom.run()
+atom.plot_Rnl()
 atom.plot_density()
 
 # Compute Slater-Koster integrals:

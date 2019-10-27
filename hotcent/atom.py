@@ -142,7 +142,7 @@ class AllElectron:
         """ Plot radial wave functions with matplotlib.
         
         filename:  output file name + extension (extension used in matplotlib)
-                   default = <Element>_KSAllElectron.pdf
+                   default = <Element>_Rnl.pdf
         only_valence: whether to only plot the valence states or all of them
         """
         if pl is None:
@@ -155,59 +155,68 @@ class AllElectron:
             states = self.valence
         else:
             states = [x[2] for x in self.list_states()]
-        Nstates = len(states)
 
-        p = np.ceil(np.sqrt(Nstates))  # p**2 >= states subplots
-        
-        fig = pl.figure()        
+        p = np.ceil(np.sqrt(len(states)))
+        q = 2 * p - 1 if len(states) % 2 == 0 else 2 * p
+
+        fig = pl.figure()
         i = 1
         # as a function of grid points
         for nl in states:
-            ax = pl.subplot(2 * p, p, i)
+            ax = pl.subplot(q, p, i)
             pl.plot(self.Rnlg[nl])
             pl.xticks(size=5)
-            
+            pl.grid(ls='--')
+
             # annotate
             c = 'k'
-            if nl in self.valence: 
+            if nl in self.valence:
                 c = 'r'
-            pl.text(0.5, 0.4, r'$R_{%s}(r)$' % nl, transform=ax.transAxes, 
+            pl.text(0.5, 0.4, r'$R_{%s}(i)$' % nl, transform=ax.transAxes,
                     size=15, color=c)
             if ax.is_first_col():
-                pl.ylabel(r'$R_{nl}(r)$', size=8)
+                pl.ylabel(r'$R_{nl}(i)$', size=8)
             i += 1
             
         # as a function of radius
         i = p ** 2 + 1
         for nl in states:
-            ax = pl.subplot(2 * p, p, i)
+            ax = pl.subplot(q, p, i)
             pl.plot(self.rgrid[:ri], self.Rnlg[nl][:ri])
             pl.xticks(size=5)
-            if ax.is_last_row():
-                pl.xlabel('r (Bohr)', size=8)
+            pl.grid(ls='--')
 
+            # annotate
             c = 'k'
             if nl in self.valence: 
-                c='r'
+                c = 'r'
             pl.text(0.5, 0.4, r'$R_{%s}(r)$' % nl, transform=ax.transAxes,
                     size=15, color=c)
             if ax.is_first_col():
                 pl.ylabel(r'$R_{nl}(r)$', size=8)
+            if ax.is_last_row():
+                pl.xlabel('r (Bohr)', size=8)
             i += 1
-        
-        fig.subplots_adjust(hspace=0.2, wspace=0.1)
-        s = '' if self.confinement is None else ' (confined)'
-        pl.figtext(0.4, 0.95, r'$R_{nl}(r)$ for %s%s' % (self.symbol, s))
+
+        fig.subplots_adjust(hspace=0.2, wspace=0.2)
+        pl.figtext(0.4, 0.95, r'$R_{nl}(r)$ for %s' % self.symbol)
 
         if filename is None:
-            filename = '%s_KSAllElectron.pdf' % self.symbol
+            filename = '%s_Rnl.pdf' % self.symbol
         pl.savefig(filename)
         pl.clf()
 
     def plot_density(self, filename=None):
-        """ Plot the electron density with matplotlib.
-        
+        """ Plot the electron density and valence orbital densities.
+
+        Note that the plotted electron density (rho_0) generally does
+        not correspond to the sum of the valence orbital densities in
+        the valence region. For this to be the case, the orbital densities
+        would need to be multiplied by their occupation numbers, and
+        the same confinement potential would need to be applied throughout.
+
         filename:  output file name + extension (extension used in matplotlib)
+                   default = <Element>_rho.pdf
         """
         if pl is None:
             raise AssertionError('pylab could not be imported')
@@ -215,49 +224,34 @@ class AllElectron:
         rmax = covalent_radii[self.Z] / Bohr * 3
         ri = np.where(self.rgrid < rmax)[0][-1]
 
-        pl.clf()
         core_dens = 0
-        colors = ['red', 'green', 'blue']
+        colors = ['red', 'green', 'blue']  # s, p , d
         for n, l, nl in self.list_states():
-            if nl not in self.unlg:
+            if nl not in self.valence:
                 continue
 
-            dens = (self.unlg[nl] / self.rgrid) ** 2 / (4 * np.pi)
-            label = r'n$_\mathrm{%s}$' % nl
+            dens = self.Rnlg[nl] ** 2 / (4 * np.pi)
+            occupied = self.configuration[nl] > 0
+            suffix = '' if occupied else '*'
+            ls = '-' if occupied else '--'
+            label = r'$|R_\mathrm{%s%s}(r) / \sqrt{4\pi}|^2$' % (nl, suffix)
 
-            if self.configuration[nl] > 0:
-                dens *= self.configuration[nl]
-                ls = '-'
-            else:
-                ls = '--' 
-                label += r'$^*$'
+            pl.semilogy(self.rgrid[:ri], dens[:ri], ls=ls, color=colors[l],
+                        label=label)
 
-            if nl in self.valence:
-                pl.semilogy(self.rgrid[:ri], dens[:ri], ls, color=colors[l],
-                            label=label)
-            else:
-                core_dens += dens
+        dens = self.dens[:ri]
+        pl.semilogy(self.rgrid[:ri], dens, 'k-', label=r'$\rho_0(r)$')
 
-        if np.max(core_dens) > 0:
-            pl.semilogy(self.rgrid[:ri], core_dens[:ri], color='gray', 
-                        label=r'n$_\mathrm{core}$')
-
-        pl.semilogy(self.rgrid[:ri], self.dens[:ri], 'k-',
-                    label=r'n$_\mathrm{tot}$')
-
-        ymax = np.exp(np.ceil(np.log(np.max(self.dens))))        
+        ymax = np.exp(np.ceil(np.log(np.max(dens))))
         pl.ylim([1e-7, ymax])
-
         pl.xlabel('r (Bohr)')
-        pl.grid()
-
-        s = '' if self.confinement is None else ' (confined)'
-        pl.figtext(0.4, 0.95, r'Density for %s%s' % (self.symbol, s))
-
+        pl.grid(ls='--')
         pl.legend(loc='upper right', ncol=2)
+        pl.figtext(0.4, 0.95, 'Electron and orbital densities for %s' \
+                   % self.symbol)
 
         if filename is None:
-            filename = '%s_density.pdf' % self.symbol
+            filename = '%s_rho.pdf' % self.symbol
         pl.savefig(filename)
         pl.clf()
 
