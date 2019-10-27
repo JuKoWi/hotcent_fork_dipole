@@ -8,6 +8,7 @@ from math import sqrt, pi, log
 import numpy as np
 from hotcent.atom import AllElectron
 from hotcent.interpolation import Function
+from hotcent.confinement import ZeroConfinement
 from gpaw.xc import XC
 from gpaw.utilities import hartree
 from gpaw.atom.radialgd import AERadialGridDescriptor
@@ -53,15 +54,31 @@ class GPAWAE(AllElectron, GPAWAllElectron):
         self.enl = {}
         self.Rnlg = {}
         self.unlg = {}
+        bar = '=' * 50
 
         if self.confinement is None:
-            vconf = 0.
+            vconf = ZeroConfinement()
         else:
-            # First, a run without any confinement
+            print(bar, file=self.txt)
+            print('Initial run without any confinement', file=self.txt)
+            print('for pre-converging orbitals and eigenvalues', file=self.txt)
+            print(bar, file=self.txt)
+
             GPAWAllElectron.run(self, use_restart_file=use_restart_file)
+
             u_j = self.u_j.copy()
             e_j = [e for e in self.e_j]
-            vconf = self.confinement(self.r)
+            vconf = self.confinement
+
+        print(bar, file=self.txt)
+        print('Applying %s' % vconf, file=self.txt)
+        print('to get the confined electron density', file=self.txt)
+        nl_0 = [nl for nl in valence if nl not in self.wf_confinement]
+        if len(nl_0) > 0:
+            print('as well as the confined %s orbital%s' % \
+                  (' and '.join(nl_0), 's' if len(nl_0) > 1 else ''),
+                  file=self.txt)
+        print(bar, file=self.txt)
 
         self.run_confined(vconf, use_restart_file=use_restart_file)
 
@@ -77,12 +94,14 @@ class GPAWAE(AllElectron, GPAWAllElectron):
         self.Hartree = self.vHr.copy() / self.rgrid
         self.Hartree[0] = self.Hartree[1]
 
-        nl_1st = [nl for nl in valence if nl not in self.wf_confinement]
-        nl_2nd = [nl for nl in valence if nl in self.wf_confinement]
-
-        for nl in nl_1st + nl_2nd:
+        for nl in valence:
             if nl in self.wf_confinement:
-                vconf = self.wf_confinement[nl](self.rgrid)
+                vconf = self.wf_confinement[nl]
+                if vconf is None:
+                    vconf = ZeroConfinement()
+                print('%s\nApplying %s' % (bar, vconf), file=self.txt)
+                print('to get a confined %s orbital' % nl, file=self.txt)
+                print(bar, file=self.txt)
                 self.u_j = u_j.copy()
                 self.e_j = [e for e in e_j]
                 self.run_confined(vconf, use_restart_file=use_restart_file)
@@ -102,7 +121,10 @@ class GPAWAE(AllElectron, GPAWAllElectron):
 
     def run_confined(self, vconf, use_restart_file=True):
         """ Minor modification of the parent run()
-        method to do full SCF for a confined atom 
+        method to do full SCF for a confined atom.
+
+        Note: vconf should be a callable function
+              (not something array-like)
         """
         t = self.text
         N = self.N
@@ -124,8 +146,7 @@ class GPAWAE(AllElectron, GPAWAllElectron):
         self.vr = np.zeros(N)
 
         # Add confinement potential:
-        if vconf is not None:  # mod
-            self.vr += vconf * self.r  # mod
+        self.vr += vconf(self.r) * self.r  # mod
 
         # Electron density:
         self.n = np.zeros(N)
@@ -224,10 +245,7 @@ class GPAWAE(AllElectron, GPAWAllElectron):
             # calculate new total Kohn-Sham effective potential and
             # admix with old version
 
-            if vconf is None:  # mod
-                vr[:] = (vHr + self.vXC * r)
-            else:  # mod
-                vr[:] = (vHr + self.vXC * r + vconf * r)  # mod
+            vr[:] = (vHr + self.vXC * r + vconf(r) * r)  # mod
 
             if self.orbital_free:
                 vr /= self.tw_coeff

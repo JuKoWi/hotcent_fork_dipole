@@ -17,6 +17,7 @@ from ase.data import atomic_numbers, covalent_radii
 from ase.units import Bohr
 from hotcent.interpolation import Function, SplineFunction
 from hotcent.atom import AllElectron
+from hotcent.confinement import ZeroConfinement
 try:
     import pylab as pl
 except:
@@ -221,17 +222,40 @@ class HotcentAE(AllElectron):
         enl = {}
         Rnlg = {}
         unlg = {}
-
+        bar = '=' * 50
         confinement = self.confinement
+
         for nl, wf_confinement in self.wf_confinement.items():
-            assert nl in val, "Confinement: %s not in %s" % (nl, str(val))
+            assert nl in val, 'Confinement %s not in %s' % (nl, str(val))
             self.confinement = wf_confinement
+            if self.confinement is None:
+                self.confinement = ZeroConfinement()
+
+            print(bar, file=self.txt)
+            print('Applying %s' % self.confinement, file=self.txt)
+            print('to get a confined %s orbital' % nl, file=self.txt)
+            print(bar, file=self.txt)
+
             self._run()
+
             Rnlg[nl] = self.Rnlg[nl].copy()
             unlg[nl] = self.unlg[nl].copy()
             enl[nl] = self.enl[nl]
 
-        self.confinement = confinement 
+        self.confinement = confinement
+        if self.confinement is None:
+            self.confinement = ZeroConfinement()
+
+        print(bar, file=self.txt)
+        print('Applying %s' % self.confinement, file=self.txt)
+        print('to get the confined electron density', file=self.txt)
+        nl_0 = [nl for nl in val if nl not in self.wf_confinement]
+        if len(nl_0) > 0:
+            print('as well as the confined %s orbital%s' % \
+                  (' and '.join(nl_0), 's' if len(nl_0) > 1 else ''),
+                  file=self.txt)
+        print(bar, file=self.txt)
+
         self._run()
 
         self.Rnlg.update(Rnlg)
@@ -268,10 +292,7 @@ class HotcentAE(AllElectron):
         N = self.grid.get_N()
 
         # make confinement and nuclear potentials; intitial guess for veff
-        if self.confinement is None:
-            self.conf = np.zeros_like(self.rgrid)
-        else:
-            self.conf = np.array([self.confinement(r) for r in self.rgrid])
+        self.conf = np.array([self.confinement(r) for r in self.rgrid])
         self.nucl = np.array([self.V_nuclear(r) for r in self.rgrid])
         self.get_veff_and_dens()
         self.calculate_Hartree_potential()
