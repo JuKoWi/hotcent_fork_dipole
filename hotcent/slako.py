@@ -324,6 +324,14 @@ class SlaterKosterTable:
         print('Start making table...', file=self.txt)
         self.txt.flush()
 
+        for p, (e1, e2) in enumerate(self.pairs):
+            print('Integrals:', end=' ', file=self.txt)
+            selected = select_integrals(e1, e2)
+            for s in selected:
+                print(s[0], end=' ', file=self.txt)
+            print(file=self.txt)
+            self.txt.flush()
+
         for Ri, R in enumerate(Rgrid):
             if R > 2 * self.wf_range: 
                 break
@@ -337,16 +345,6 @@ class SlaterKosterTable:
  
             for p, (e1, e2) in enumerate(self.pairs):
                 selected = select_integrals(e1, e2) 
-                if Ri == 0:
-                    print('R=%8.2f %s-%s, %i grid points, ' % \
-                          (R, e1.get_symbol(), e2.get_symbol(), len(grid)),
-                          end=' ', file=self.txt)
-                    print('integrals:', end=' ', file=self.txt)
-                    for s in selected:
-                        print(s[0], end=' ', file=self.txt)
-                    print(file=self.txt)
-                    self.txt.flush()
-               
                 if len(grid) == 0:
                     S, H, H2 = 0., 0., 0.
                 else:
