@@ -10,6 +10,7 @@ import pickle
 import collections
 from copy import copy
 import numpy as np
+from scipy.optimize import minimize
 from ase.data import atomic_numbers, covalent_radii
 from ase.units import Bohr
 from hotcent.interpolation import Function, SplineFunction
@@ -361,6 +362,158 @@ class AllElectron:
                     print(r, vc, file=f)
 
             print('\n\n', file=f)
+
+    def fit_sto(self, nl, num_exp, num_pow, regularization=1e-6,
+                filename=None):
+        """ Fit Slater-type orbitals to the one on the grid.
+            See self.write_hsd() for more information.
+
+        Parameters:
+        -----------
+        nl:              the (valence) orbital of interest (e.g. '2p')
+        num_exp:         number of exponents to use
+        num_pow:         number of r-powers for each exponents
+        regularization:  penalty to be used in the L2-regularization
+        filename:        filename for a figure with the grid-based
+                         and STO-fitted orbitals (to verify that the
+                         fit is decent)
+        """
+        r = self.rgrid
+        y = self.Rnlg[nl]
+        l = orbit_transform(nl, False)[1]
+        num_coeff = num_exp * num_pow
+        num_r = len(r)
+
+        def regression(param):
+            A = np.zeros((num_r, num_coeff))
+
+            for i in range(num_exp):
+                rexp = np.exp(-param[i] * r)[:, None]
+                A[:, i * num_pow : (i + 1) * num_pow] = rexp
+
+            for j in range(num_pow):
+                rpow = np.power(r, l + j)
+                for i in range(num_exp):
+                    A[:, num_pow * i + j] *= rpow
+
+            A_loss = np.identity(num_coeff) * regularization
+            AA = np.vstack((A, A_loss))
+
+            y_loss = np.zeros(num_coeff)
+            yy = np.hstack((y, y_loss))
+
+            coeff, residual, rank, s = np.linalg.lstsq(AA, yy)
+            values = np.dot(A, coeff)
+            return coeff, values, residual[0]
+
+        def residual(param):
+            coeff, values, residual = regression(param)
+            return residual
+
+        if num_exp > 1:
+            x0, x1 = self.Z, 0.5
+            ratio = (x0 / x1) ** (1. / (num_exp - 1.))
+            guess = [x0 / (ratio ** i) for i in range(num_exp)]
+        else:
+            guess = [1.]
+
+        result = minimize(residual, guess, method='COBYLA',
+                          options={'rhobeg': 0.1, 'tol': 1e-8})
+        exponents = result.x
+        coeff, values, residual = regression(exponents)
+
+        integral = np.trapz((r * y) ** 2, x=r)
+        if abs(integral - 1) > 1e-1:
+            print('Warning -- significant deviation from unity for integral'
+                  ' of grid-based %s orbital: %.5f' % (nl, integral))
+
+        integral = np.trapz((r * values) ** 2, x=r)
+        if abs(integral - 1) > 1e-1:
+            print('Warning -- significant deviation from unity for integral'
+                  ' of STO-based %s orbital: %.5f' % (nl, integral))
+
+        if filename is not None:
+            rmax = 3 * covalent_radii[self.Z] / Bohr
+            imax = np.where(r < rmax)[0][-1]
+            rmin = 1e-3 * self.Z
+            imin = np.where(r < rmin)[0][-1]
+            pl.plot(r[imin:imax], y[imin:imax], '-', label='On the grid')
+            pl.plot(r[imin:imax], values[imin:imax], '--', label='With STOs')
+            pl.xlim([0., rmax])
+            pl.grid(ls='--')
+            pl.legend(loc='upper right')
+            pl.xlabel('r (Bohr radii)')
+            pl.ylabel('Psi_%s (a.u.)' % nl)
+            pl.savefig(filename)
+            pl.clf()
+
+        return exponents, coeff, values, residual
+
+    def write_hsd(self, filename=None, num_exp=None, num_pow=4, wfthr=1e-2):
+        """ Writes a HSD-format file with information on the valence
+        orbitals. This includes a projection of these orbitals
+        on a set of Slater-type orbitals, for post-processing
+        purposes (e.g. using the Waveplot tool part of DFTB+).
+
+        The expansion is the same as in DFTB+.
+        For an atomic orbital with angular momentum l:
+
+          R_l(r) = \sum_{i=0}^{num_exp-1} \sum_{j=0}^{num_pow-1}
+                     coeff_{i,j} * r ^ (l + j) * \exp(-exponent_i * r)
+
+        Note that also the same normalization is used as in DFTB+.
+        This means that \int_{r=0}^{\infty} r^2 * |R_l(r)|^2 dr = 1.
+
+        Starting from a reasonable initial guess, the exponents
+        are optimized to reproduce the grid-based orbitals,
+        with the coefficient matrix being determined by
+        (L2-regularized) linear regression at each iteration.
+
+        Parameters:
+        -----------
+        filename:   output file name. If None, the name
+                    defaults to wcf.<Element>.hsd
+        num_exp:    number of exponents to use
+                    default = highest principal quantum number
+        num_pow:    number of powers for each exponent
+                    default = 4
+        wfthr:      parameter determining the 'Cutoff' radius,
+                    which will be where the orbital tail goes
+                    below wfthr in absolute value
+        """
+        if filename is None:
+            filename = 'wfc.%s.hsd' % self.symbol
+
+        if num_exp is None:
+            num_exp = max([orbit_transform(nl, False)[0]
+                           for nl in self.valence])
+
+        with open(filename, 'a') as f:
+            f.write('%s = {\n' % self.symbol)
+            f.write('  AtomicNumber = %d\n' % self.Z)
+
+            for nl in self.valence:
+                exp, coeff, values, resid = self.fit_sto(nl, num_exp, num_pow)
+                icut = len(values) - 1
+                while abs(values[icut]) < wfthr:
+                    icut -= 1
+                rcut = np.round(self.rgrid[icut + 1], 1)
+                l = orbit_transform(nl, False)[1]
+
+                f.write('  Orbital = {\n')
+                f.write('    AngularMomentum = %d\n' % l)
+                f.write('    Occupation = %.6f\n' % self.configuration[nl])
+                f.write('    Cutoff = %.1f\n' % rcut)
+                f.write('    Exponents = {\n    ')
+                for e in exp:
+                    f.write('  %.8f' % e)
+                f.write('\n    }\n    Coefficients = {\n')
+                for c in coeff:
+                    f.write('      {: .8E}\n'.format(c))
+                f.write('    }\n  }\n')
+            f.write('}\n')
+
+        return
 
 
 angular_momenta = ['s', 'p', 'd', 'f', 'g', 'h', 'i', 'j', 'k', 'l']
