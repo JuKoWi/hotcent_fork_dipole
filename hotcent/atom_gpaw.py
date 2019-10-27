@@ -94,7 +94,7 @@ class GPAWAE(AllElectron, GPAWAllElectron):
         self.Hartree = self.vHr.copy() / self.rgrid
         self.Hartree[0] = self.Hartree[1]
 
-        for nl in valence:
+        for n, l, nl in self.list_states():
             if nl in self.wf_confinement:
                 vconf = self.wf_confinement[nl]
                 if vconf is None:

@@ -138,23 +138,31 @@ class AllElectron:
     def run(self, **kwargs):
         raise NotImplementedError('Child class must implement run() method!')
         
-    def plot_Rnl(self, filename=None):
+    def plot_Rnl(self, filename=None, only_valence=True):
         """ Plot radial wave functions with matplotlib.
         
         filename:  output file name + extension (extension used in matplotlib)
+                   default = <Element>_KSAllElectron.pdf
+        only_valence: whether to only plot the valence states or all of them
         """
         if pl is None:
             raise AssertionError('pylab could not be imported')
 
         rmax = covalent_radii[self.Z] / Bohr * 3
         ri = np.where(self.rgrid < rmax)[0][-1]
-        states = len(self.list_states())
-        p = np.ceil(np.sqrt(states))  # p**2 >= states subplots
+
+        if only_valence:
+            states = self.valence
+        else:
+            states = [x[2] for x in self.list_states()]
+        Nstates = len(states)
+
+        p = np.ceil(np.sqrt(Nstates))  # p**2 >= states subplots
         
         fig = pl.figure()        
         i = 1
         # as a function of grid points
-        for n, l, nl in self.list_states():
+        for nl in states:
             ax = pl.subplot(2 * p, p, i)
             pl.plot(self.Rnlg[nl])
             pl.xticks(size=5)
@@ -171,7 +179,7 @@ class AllElectron:
             
         # as a function of radius
         i = p ** 2 + 1
-        for n, l, nl in self.list_states():
+        for nl in states:
             ax = pl.subplot(2 * p, p, i)
             pl.plot(self.rgrid[:ri], self.Rnlg[nl][:ri])
             pl.xticks(size=5)
