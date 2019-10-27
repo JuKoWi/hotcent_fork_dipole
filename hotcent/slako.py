@@ -583,8 +583,10 @@ class SlaterKosterTable:
                        np.nan]
             r0 = np.piecewise(Tj1, cond_list, r0_list)
 
-            Th0 = np.arccos(h / R[i])
-            Th1 = np.arccos(h / R[i + 1])
+            Th0 = np.piecewise(h / R[i], [np.abs(h / R[i]) > 1],
+                               [np.nan, lambda x: np.arccos(x)])
+            Th1 = np.piecewise(h / R[i + 1], [np.abs(h / R[i + 1]) > 1],
+                               [np.nan, lambda x: np.arccos(x)])
 
             t0_list = [lambda x: 0.5 * x,
                        0.5 * Th1,

@@ -76,7 +76,6 @@ class HotcentAE(AllElectron):
         self.xgrid = np.linspace(0, np.log(self.rmax / self.rmin), self.N)
         self.rgrid = self.rmin * np.exp(self.xgrid)
         self.grid = RadialGrid(self.rgrid)
-
         self.timer.stop('init')
 
     def set_output(self, txt):
@@ -597,11 +596,14 @@ class XC_PW92:
 
     def exc(self, n, der=0):
         """ Exchange-correlation with electron density n. """
+        is_scalar = type(n) == np.float64
+        n = np.array([n]) if is_scalar else n
+        indices = n < self.small
+        n[indices] = self.small
         e = self.e_x(n, der=der) + self.e_corr(n, der=der)
-        if type(e) != np.float64:
-            e[n < self.small] = 0.
-        elif n < self.small:
-            e = 0.
+        e[indices] = 0.
+        if is_scalar:
+            e = e[0]
         return e
 
     def e_x(self, n, der=0):
@@ -622,10 +624,12 @@ class XC_PW92:
             return (-2 * self.c0 * self.a1 * np.log(1 + aux ** -1) \
                     -2 * self.c0 * (1 + self.a1 * rs) * (1 + aux ** -1) ** -1 * (-aux ** -2) \
                    * 2 * self.c0 * (self.b1 / (2 * np.sqrt(rs)) + self.b2 + 3 * self.b3 * np.sqrt(rs) / 2 \
-                   + 2 * self.b4 * rs)) * (-(4 * pi * n **2 *rs **2) ** -1)
+                   + 2 * self.b4 * rs)) * (-(4 * pi * n ** 2 * rs ** 2) ** -1)
 
     def vxc(self, n):
         """ Exchange-correlation potential (functional derivative of exc). """
+        indices = n < self.small
+        n[indices] = self.small
         v = self.exc(n) + n * self.exc(n, der=1)
-        v[n < self.small] = 0.
+        v[indices] = 0.
         return v

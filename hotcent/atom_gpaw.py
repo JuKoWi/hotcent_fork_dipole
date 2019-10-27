@@ -87,12 +87,11 @@ class GPAWAE(AllElectron, GPAWAllElectron):
             e_j = [e for e in self.e_j]
 
         self.rgrid = self.r.copy()
+        self.rgrid[0] = 0.1 * self.rgrid[1]
         self.veff = self.vr.copy() / self.rgrid
-        self.veff[0] = self.veff[1]
         self.dens = self.calculate_density()
         self.total_energy = self.ETotal 
         self.Hartree = self.vHr.copy() / self.rgrid
-        self.Hartree[0] = self.Hartree[1]
 
         for n, l, nl in self.list_states():
             if nl in self.wf_confinement:
@@ -110,7 +109,6 @@ class GPAWAE(AllElectron, GPAWAllElectron):
             self.unlg[nl] = self.u_j[index].copy()
             self.enl[nl] = self.e_j[index]
             self.Rnlg[nl] = self.unlg[nl] / self.rgrid
-            self.Rnlg[nl][0] = self.Rnlg[nl][1]
             self.Rnl_fct[nl] = Function('spline', self.rgrid, self.Rnlg[nl])
             self.unl_fct[nl] = Function('spline', self.rgrid, self.unlg[nl])
 
