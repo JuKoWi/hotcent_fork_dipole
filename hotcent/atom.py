@@ -404,7 +404,7 @@ class AllElectron:
             y_loss = np.zeros(num_coeff)
             yy = np.hstack((y, y_loss))
 
-            coeff, residual, rank, s = np.linalg.lstsq(AA, yy)
+            coeff, residual, rank, s = np.linalg.lstsq(AA, yy, rcond=None)
             values = np.dot(A, coeff)
             return coeff, values, residual[0]
 
