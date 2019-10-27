@@ -36,7 +36,7 @@ class AllElectron:
                  nodegpts=500,
                  timing=False,
                  verbose=False,
-                 txt=None):
+                 txt='-'):
         """
         Base class for atomic DFT calculators
 
@@ -58,7 +58,9 @@ class AllElectron:
                         of antinodes for all orbitals
         timing:         output of timing summary
         verbose:        increase verbosity during iterations
-        txt:            output file name for log data
+        txt:            output file name for log data;
+                        use '-' for stdout (default), None for /dev/null,
+                        and any other string for a text file
         """
         self.symbol = symbol
         self.valence = valence
