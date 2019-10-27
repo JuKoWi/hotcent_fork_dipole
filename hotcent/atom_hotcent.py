@@ -81,9 +81,9 @@ class HotcentAE(AllElectron):
     def set_output(self, txt):
         """ Set output channel and give greetings. """
         if txt == '-':
-            self.txt = open(os.devnull,'w')
-        elif txt == None:
             self.txt = sys.stdout
+        elif txt == None:
+            self.txt = open(os.devnull,'w')
         else:
             self.txt = open(txt, 'a')
         print('*******************************************', file=self.txt)
