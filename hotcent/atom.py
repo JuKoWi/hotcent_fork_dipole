@@ -66,6 +66,8 @@ class AllElectron:
         self.valence = valence
         self.confinement = confinement
         self.wf_confinement = wf_confinement
+        if self.wf_confinement is None:
+            self.wf_confinement = {}
         self.xcname = xcname
         self.scalarrel = scalarrel
         self.mix = mix
