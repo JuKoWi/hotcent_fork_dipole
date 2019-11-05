@@ -7,6 +7,8 @@ if 'hotcent' in code:
     from hotcent.atom_hotcent import HotcentAE as AE
 elif 'gpaw' in code:
     from hotcent.atom_gpaw import GPAWAE as AE
+
+assert 'gpaw' in code, 'New wf_confinement_scheme not yet in HotcentAE'
  
 atom = AE('Si',
           xcname='LDA',
@@ -19,4 +21,4 @@ atom = AE('Si',
           timing=False,
           txt='-',
           )
-atom.run()
+atom.run(wf_confinement_scheme='new')

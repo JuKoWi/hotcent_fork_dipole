@@ -8,7 +8,7 @@ from math import sqrt, pi, log
 import numpy as np
 from hotcent.atom import AllElectron
 from hotcent.interpolation import Function
-from hotcent.confinement import ZeroConfinement
+from hotcent.confinement import ZeroConfinement, SoftConfinement
 from gpaw.xc import XC
 from gpaw.utilities import hartree
 from gpaw.atom.radialgd import AERadialGridDescriptor
@@ -47,8 +47,31 @@ class GPAWAE(AllElectron, GPAWAllElectron):
             raise ValueError(msg)
         return index 
 
-    def run(self, use_restart_file=False):
+    def run(self, use_restart_file=False, wf_confinement_scheme='old'):
+        """
+        Parameters:
+
+        use_restart_file: possibility to use restart file (untested)
+
+        wf_confinement_scheme: determines how to apply the orbital
+             confinement potentials for getting the confined orbitals:
+
+            'old' = by applying the confinement for the chosen nl to
+                    all states and reconverging all states (but only
+                    saving the confined nl orbital),
+
+            'new' = by applying the confinement only to the chosen nl and
+                    reconverging only that state, while keeping the others
+                    equal to those in the free (nonconfined) atom.
+
+            The 'new' scheme is how basis sets are generated in e.g. GPAW.
+            This option is also significantly faster, especially for
+            heavier atoms.
+            The choice of scheme does not affect the calculation of the
+            confined density (which always happens the 'old' way).
+        """
         self.timer.start('run')
+        assert wf_confinement_scheme in ['old', 'new']
 
         valence = self.get_valence_orbitals()
         self.enl = {}
@@ -87,7 +110,20 @@ class GPAWAE(AllElectron, GPAWAllElectron):
                     print('%s\nApplying %s' % (bar, vconf), file=self.txt)
                     print('to get a confined %s orbital' % nl, file=self.txt)
                     print(bar, file=self.txt)
-                    self.run_confined(vconf, use_restart_file=use_restart_file)
+                    if wf_confinement_scheme == 'old':
+                        self.run_confined(vconf,
+                                          use_restart_file=use_restart_file)
+                    elif wf_confinement_scheme == 'new':
+                        j = self.get_orbital_index(nl)
+                        if isinstance(vconf, SoftConfinement):
+                            rc = vconf.rc
+                        else:
+                            rc = np.max(self.rgrid)
+                        v = vconf(self.rgrid)
+                        u, e  = GPAWAllElectron.solve_confined(self, j, rc, v)
+                        self.u_j[j], self.e_j[j] = u, e
+                        print('Confined %s eigenvalue: %.6f' % (nl, e),
+                               file=self.txt)
 
             index = self.get_orbital_index(nl)
             self.rgrid[0] = 1.
