@@ -41,3 +41,22 @@ class WoodsSaxonConfinement(Confinement):
     def __str__(self):
         return 'WoodsSaxonConfinement(w=%.6f, r0=%.6f, a=%.6f)' % \
                (self.w, self.r0, self.a)
+
+
+class SoftConfinement(Confinement):
+    """ As in Junquera et al. PRB 64, 23511 (2001). """
+    def __init__(self, amp=12., rc=0., x_ri=0.6):
+        self.amp = amp
+        self.rc = rc
+        self.x_ri = x_ri
+
+    def __call__(self, r):
+        ri = self.x_ri * self.rc
+        condlist = [r < ri, np.logical_and(ri <= r, r < self.rc), r >= self.rc]
+        funclist = [0., lambda x: self.amp * np.exp(-(self.rc - ri) / (x - ri)) \
+                                  / (self.rc - x), lambda x: 0., np.inf]
+        return np.piecewise(r, condlist, funclist)
+
+    def __str__(self):
+        return 'SoftConfinement(amp=%.6f, rc=%.6f, x_ri=%.6f)' % \
+               (self.amp, self.rc, self.x_ri)
