@@ -2,7 +2,14 @@
 import numpy as np
 
 
-class ZeroConfinement():
+class Confinement():
+    def __call__(self, r):
+        raise NotImplementedError
+    def __str__(self):
+        raise NotImplementedError
+
+
+class ZeroConfinement(Confinement):
     def __call__(self, r):
         return np.zeros_like(r)
 
@@ -10,7 +17,7 @@ class ZeroConfinement():
         return 'ZeroConfinement'
 
 
-class PowerConfinement():
+class PowerConfinement(Confinement):
     def __init__(self, r0=1., s=2):
         self.r0 = r0
         self.s = s
@@ -22,7 +29,7 @@ class PowerConfinement():
         return 'PowerConfinement(r0=%.6f, s=%.6f)' % (self.r0, self.s)
 
 
-class WoodsSaxonConfinement():
+class WoodsSaxonConfinement(Confinement):
     def __init__(self, w=1., r0=1., a=1.):
         self.w = w
         self.r0 = r0

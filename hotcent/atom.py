@@ -15,6 +15,7 @@ from ase.data import atomic_numbers, covalent_radii
 from ase.units import Bohr
 from hotcent.interpolation import Function, SplineFunction
 from hotcent.timing import Timer
+from hotcent.confinement import Confinement, ZeroConfinement
 try:
     import pylab as pl
 except:
@@ -44,11 +45,17 @@ class AllElectron:
         configuration:  e.g. '[He] 2s2 2p2'    
         valence:        valence orbitals, e.g. ['2s','2p']. 
         confinement:    confinement potential for the electron density 
-                        (see hotcent.confinement)
+                        (see hotcent.confinement). The default None
+                        means no confinement will be applied.
         wf_confinement: dictionary with confinement potentials for the
-                        valence orbitals. If empty, the same confinement
-                        potential is used as for the electron density
-                        (see the 'confinement' parameter).
+                        valence orbitals. If None, no confinement will
+                        be applied to any orbital. If a certain Confinement
+                        instance is provided, this will be applied to all
+                        valence states. If a dictionary is provided,
+                        it is supposed to look like this:
+                        {nl: <a certain Confinement instance, or None>
+                         for each nl in your set of valence states}.
+                        For missing entries, no confinement will be applied.
         xcname:         Name of the XC functional
         scalarrel:      Use scalar relativistic corrections
         mix:            effective potential mixing constant
@@ -64,10 +71,6 @@ class AllElectron:
         """
         self.symbol = symbol
         self.valence = valence
-        self.confinement = confinement
-        self.wf_confinement = wf_confinement
-        if self.wf_confinement is None:
-            self.wf_confinement = {}
         self.xcname = xcname
         self.scalarrel = scalarrel
         self.mix = mix
@@ -77,6 +80,27 @@ class AllElectron:
         self.timing = timing
         self.verbose = verbose
         self.txt = txt
+
+        if confinement is None:
+            self.confinement = ZeroConfinement()
+        else:
+            self.confinement = confinement
+
+        if wf_confinement is None:
+            self.wf_confinement = {nl: ZeroConfinement() for nl in self.valence}
+        elif isinstance(wf_confinement, Confinement):
+            self.wf_confinement = {nl: wf_confinement for nl in self.valence}
+        elif isinstance(wf_confinement, dict):
+            self.wf_confinement = {}
+            for nl in self.valence:
+                if nl not in wf_confinement or wf_confinement[nl] is None:
+                    self.wf_confinement[nl] = ZeroConfinement()
+                else:
+                    self.wf_confinement[nl] = wf_confinement[nl]
+        else:
+            msg = "Don't know what to do with the provided wf_confinement:\n"
+            msg += str(wf_confinement)
+            raise ValueError(msg)
 
         self.timer = Timer('AllElectron', txt=self.txt, enabled=self.timing)
         self.timer.start('init')
