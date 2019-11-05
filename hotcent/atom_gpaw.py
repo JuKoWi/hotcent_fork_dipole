@@ -71,29 +71,10 @@ class GPAWAE(AllElectron, GPAWAllElectron):
 
         u_j = self.u_j.copy()
         e_j = [e for e in self.e_j]
-
-        vconf = self.confinement
-        print(bar, file=self.txt)
-        print('Applying %s' % vconf, file=self.txt)
-        print('to get the confined electron density', file=self.txt)
-        print(bar, file=self.txt)
-
-        self.run_confined(vconf, use_restart_file=use_restart_file)
-
-        # Note: since the grid in GPAW-AllElectron starts at exactly 0,
-        # there are cases where we need to take the limit for r->0.
-
         self.rgrid = self.r.copy()
-        self.rgrid[0] = 1.
+        # Note: since the grid in GPAW-AllElectron starts at exactly 0,
+        # there are cases where we will need to take limits for r->0.
         delta = (0. - self.rgrid[1]) / (self.rgrid[2] - self.rgrid[1])
-        self.veff = self.vr.copy() / self.rgrid
-        self.veff[0] = self.veff[1] + delta * (self.veff[2] - self.veff[1])
-        self.dens = self.calculate_density()
-        self.total_energy = self.ETotal 
-        self.Hartree = self.vHr.copy() / self.rgrid
-        self.Hartree[0] = self.Hartree[1]
-        self.Hartree[0] += delta * (self.Hartree[2] - self.Hartree[1])
-        self.rgrid[0] = 0.
 
         for n, l, nl in self.list_states():
             if nl in valence:
@@ -118,6 +99,26 @@ class GPAWAE(AllElectron, GPAWAllElectron):
             self.rgrid[0] = 0.
             self.Rnl_fct[nl] = Function('spline', self.rgrid, self.Rnlg[nl])
             self.unl_fct[nl] = Function('spline', self.rgrid, self.unlg[nl])
+
+        vconf = self.confinement
+        print(bar, file=self.txt)
+        print('Applying %s' % vconf, file=self.txt)
+        print('to get the confined electron density', file=self.txt)
+        print(bar, file=self.txt)
+
+        self.u_j = u_j.copy()
+        self.e_j = [e for e in e_j]
+        self.run_confined(vconf, use_restart_file=use_restart_file)
+
+        self.rgrid[0] = 1.
+        self.veff = self.vr.copy() / self.rgrid
+        self.veff[0] = self.veff[1] + delta * (self.veff[2] - self.veff[1])
+        self.dens = self.calculate_density()
+        self.total_energy = self.ETotal
+        self.Hartree = self.vHr.copy() / self.rgrid
+        self.Hartree[0] = self.Hartree[1]
+        self.Hartree[0] += delta * (self.Hartree[2] - self.Hartree[1])
+        self.rgrid[0] = 0.
 
         self.solved = True
         self.timer.stop('run')
