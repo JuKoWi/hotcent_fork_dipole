@@ -57,10 +57,10 @@ class BandStructure(BS):
         else:
             energies = energies
 
-        cell = self.atoms.get_cell()
-        kpts = kpts2ndarray(kpts, atoms=self.atoms)
-        BS.__init__(self, cell, kpts, energies, reference=0.0)
+        path = self.atoms.cell.bandpath(**kpts)
+        BS.__init__(self, path, energies, reference=0.0)
 
+        self.kpts = kpts
         self.kpts_scf = kpts_scf
         self.nsemicore = nsemicore
         self.weight = weight
