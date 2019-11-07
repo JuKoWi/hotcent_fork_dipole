@@ -221,7 +221,7 @@ class SlaterKosterGenerator:
             assert shape_dft[0] == shape_dftb[0], [shape_dft, shape_dftb]
             assert shape_dft[1] == shape_dftb[1], [shape_dft, shape_dftb]
             
-            nskip = bs_dft.nsemicore / 2
+            nskip = bs_dft.nsemicore // 2
             imin = min(shape_dft[2] - nskip, shape_dftb[2])
 
             diffs = bs_dft.energies[:, :, nskip:nskip + imin] - \
