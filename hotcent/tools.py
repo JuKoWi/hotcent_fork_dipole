@@ -23,7 +23,8 @@ try:
 except ImportError:
     have_gpaw = False
 from hotcent.slako import SlaterKosterTable
-from hotcent.confinement import PowerConfinement, WoodsSaxonConfinement
+from hotcent.confinement import (PowerConfinement, WoodsSaxonConfinement,
+                                 SoftConfinement)
 
 
 class Element:
@@ -134,10 +135,13 @@ class SlaterKosterGenerator:
             kwargs = {k.split('_guess')[0]:v for k, v in pardict.items()}
             is_pow = np.all([kw in ['s', 'r0'] for kw in kwargs])
             is_sax = np.all([kw in ['w', 'a', 'r0'] for kw in kwargs])
-            if is_pow and not is_sax:
+            is_soft = np.all([kw in ['amp', 'rc', 'x_ri'] for kw in kwargs])
+            if is_pow and not is_sax and not is_soft:
                 conf = PowerConfinement(**kwargs)
-            elif is_sax and not is_pow:
+            elif is_sax and not is_pow and not is_soft:
                 conf = WoodsSaxonConfinement(**kwargs)
+            elif is_soft and not is_pow and not is_sax:
+                conf = SoftConfinement(**kwargs)
             else:
                 msg = 'Bad Vconf keywords: ' + ' '.join(sorted(kwargs))
                 raise ValueError(msg)
