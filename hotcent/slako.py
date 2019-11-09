@@ -80,7 +80,8 @@ class SlaterKosterTable:
                 self.tables[p][:, i] = tail_smoothening(self.Rgrid,
                                                         self.tables[p][:, i])                
 
-    def write(self, filename=None, pair=None):
+    def write(self, filename=None, pair=None, eigenvalues=None,
+              hubbardvalues=None, occupations=None, spe=None):
         """ Write SK tables to a file
 
         filename: str with name of file to write to.
@@ -90,6 +91,10 @@ class SlaterKosterTable:
 
         pair: either (symbol_a, symbol_b) or (symbol_b, symbol_a)
               to select which of the two SK tables to write
+
+        other kwargs: [s,p,d]-eigenvalues, -hubbardvalues, and -occupations,
+                      as well as the spin-polarization error, to be written
+                      to the second line of a homo-nuclear .skf file.
         """
         if pair is None:
             pair = (self.ela.get_symbol(), self.elb.get_symbol())
@@ -105,9 +110,10 @@ class SlaterKosterTable:
             if ext == '.par':
                 self._write_par(handle)
             elif ext == '.skf':
-                self._write_skf(handle, pair=pair)
+                self._write_skf(handle, pair, eigenvalues, hubbardvalues,
+                                occupations, spe)
 
-    def _write_skf(self, handle, pair):
+    def _write_skf(self, handle, pair, eigval, hubval, occup, spe):
         """ Write to SKF file format; this function
         is an adaptation of hotbit.io.hbskf 
         """
@@ -128,8 +134,16 @@ class SlaterKosterTable:
 
         el1, el2 = self.ela.get_symbol(), self.elb.get_symbol()
         if el1 == el2:
-            print("E_d   E_p   E_s   SPE   U_d   U_p   U_s   f_d    f_p   f_s",
-                  file=handle)
+            line = 'E_d   E_p   E_s   SPE   U_d   U_p   U_s   f_d   f_p   f_s  '
+            labels = line.split()
+            items = [None] * 3 if eigval is None else eigval[::-1]
+            items += [spe]
+            items += [None] * 3 if hubval is None else hubval[::-1]
+            items += [None] * 3 if occup is None else occup[::-1]
+            for label, item in zip(labels, items):
+                if item is not None:
+                    line = line.replace(label + '  ', '%.6f' % item)
+            print(line, file=handle)
 
         m = atomic_masses[atomic_numbers[symbols[index]]]
         print("%.3f, 19*0.0" % m, file=handle)
