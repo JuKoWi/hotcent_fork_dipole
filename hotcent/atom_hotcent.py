@@ -257,10 +257,12 @@ class HotcentAE(AllElectron):
 
         self._run()
 
+        # restore overwritten attributes
         self.Rnlg.update(Rnlg)
         self.unlg.update(unlg)
         self.enl.update(enl)
-        for nl in val:
+
+        for n, l, nl in self.list_states():
             self.Rnl_fct[nl] = Function('spline', self.rgrid, self.Rnlg[nl])
             self.unl_fct[nl] = Function('spline', self.rgrid, self.unlg[nl])
 

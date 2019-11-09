@@ -28,7 +28,7 @@ class AllElectron:
                  configuration='',
                  valence=[],
                  confinement=None,
-                 wf_confinement={},
+                 wf_confinement=None,
                  xcname='LDA',
                  scalarrel=False,
                  mix=0.2,
@@ -48,12 +48,12 @@ class AllElectron:
                         (see hotcent.confinement). The default None
                         means no confinement will be applied.
         wf_confinement: dictionary with confinement potentials for the
-                        valence orbitals. If None, no confinement will
-                        be applied to any orbital. If a certain Confinement
-                        instance is provided, this will be applied to all
-                        valence states. If a dictionary is provided,
-                        it is supposed to look like this:
-                        {nl: <a certain Confinement instance, or None>
+                        valence orbitals. If None, the same confinement will
+                        be used as for the electron density. If a certain
+                        hotcent.confinement.Confinement instance is provided,
+                        this will be applied to all valence states. If a
+                        dictionary is provided, it is supposed to look like
+                        this: {nl: <a certain Confinement instance, or None>
                          for each nl in your set of valence states}.
                         For missing entries, no confinement will be applied.
         xcname:         Name of the XC functional
@@ -87,7 +87,7 @@ class AllElectron:
             self.confinement = confinement
 
         if wf_confinement is None:
-            self.wf_confinement = {nl: ZeroConfinement() for nl in self.valence}
+            self.wf_confinement = {}
         elif isinstance(wf_confinement, Confinement):
             self.wf_confinement = {nl: wf_confinement for nl in self.valence}
         elif isinstance(wf_confinement, dict):
