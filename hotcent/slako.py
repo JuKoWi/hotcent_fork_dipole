@@ -79,19 +79,22 @@ class SlaterKosterTable:
             for i in range(20):
                 self.tables[p][:, i] = tail_smoothening(self.Rgrid,
                                                         self.tables[p][:, i])                
-        
-    def write(self, filename=None, pair=None):
-        """ Use symbol1-symbol2.par as default.
 
-        filename: str with name of file to write to
+    def write(self, filename=None, pair=None):
+        """ Write SK tables to a file
+
+        filename: str with name of file to write to.
+                  The file format is selected by the extension
+                  (.par or .skf).
+                  Defaults to self.ela-self.elb_no_repulsion.skf
 
         pair: either (symbol_a, symbol_b) or (symbol_b, symbol_a)
-              to select which table to write in the SKF format
+              to select which of the two SK tables to write
         """
         if pair is None:
             pair = (self.ela.get_symbol(), self.elb.get_symbol())
 
-        fn = '%s-%s.skf' % pair if filename is None else filename
+        fn = '%s-%s_no_repulsion.skf' % pair if filename is None else filename
 
         ext = fn[-4:]
 
