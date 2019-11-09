@@ -158,11 +158,13 @@ class GPAWAE(AllElectron, GPAWAllElectron):
         self.Hartree = self.vHr.copy() / self.rgrid
         self.Hartree[0] = self.Hartree[1]
         self.Hartree[0] += delta * (self.Hartree[2] - self.Hartree[1])
+        self.rgrid[0] = 0.
 
         for n, l, nl in self.list_states():
             if nl in self.wf_confinement:
                 continue
             index = self.get_orbital_index(nl)
+            self.rgrid[0] = 1.
             self.unlg[nl] = self.u_j[index].copy()
             self.enl[nl] = self.e_j[index]
             self.Rnlg[nl] = self.unlg[nl] / self.rgrid
@@ -171,8 +173,6 @@ class GPAWAE(AllElectron, GPAWAllElectron):
             self.rgrid[0] = 0.
             self.Rnl_fct[nl] = Function('spline', self.rgrid, self.Rnlg[nl])
             self.unl_fct[nl] = Function('spline', self.rgrid, self.unlg[nl])
-
-        self.rgrid[0] = 0.
 
         self.solved = True
         self.timer.stop('run')
