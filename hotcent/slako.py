@@ -448,11 +448,16 @@ class SlaterKosterTable:
                     func = xc
                 func.kernel.calculate(exc, dens, dedn, sigma, dedsigma)
                 veff += dedn[0]
+
                 # add gradient corrections to vxc
-                splx = SmoothBivariateSpline(x, y, dedsigma * grad_x)
-                sply = SmoothBivariateSpline(x, y, dedsigma * grad_y)
-                veff += -2. * splx(x, y, dx=1, dy=0, grid=False)
-                veff += -2. * sply(x, y, dx=0, dy=1, grid=False)
+                # provided that we have enough points
+                # (otherwise we get "dfitpack.error:
+                # (m>=(kx+1)*(ky+1)) failed for hidden m")
+                if len(x) > 16:
+                    splx = SmoothBivariateSpline(x, y, dedsigma * grad_x)
+                    sply = SmoothBivariateSpline(x, y, dedsigma * grad_y)
+                    veff += -2. * splx(x, y, dx=1, dy=0, grid=False)
+                    veff += -2. * sply(x, y, dx=0, dy=1, grid=False)
 
         assert np.shape(gphi) == (N, 10)
         assert np.shape(radii) == (N, 2)
