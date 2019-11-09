@@ -310,6 +310,9 @@ class AllElectron:
             raise AssertionError('run calculations first.')
         return self.enl[nls]
 
+    def get_eigenvalue(self, nl):
+        return self.get_epsilon(nl)
+
     def effective_potential(self, r, der=0):
         """ Return effective potential at r or its derivatives. """
         if self.veff_fct is None:
