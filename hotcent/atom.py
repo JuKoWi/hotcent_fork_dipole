@@ -281,6 +281,9 @@ class AllElectron:
         pl.savefig(filename)
         pl.clf()
 
+    def plot_rho(self, *args, **kwargs):
+        self.plot_density(*args, **kwargs)
+
     def list_states(self):
         """ List all potential states {(n,l,'nl')}. """
         states = []
