@@ -11,7 +11,8 @@ import sys
 from math import sin, cos, tan, sqrt
 import numpy as np
 from scipy.interpolate import SmoothBivariateSpline
-from ase.data import atomic_numbers, atomic_masses
+from ase.units import Bohr
+from ase.data import atomic_numbers, atomic_masses, covalent_radii
 from hotcent.timing import Timer
 from hotcent.atom_hotcent import XC_PW92
 try:
@@ -212,9 +213,13 @@ class SlaterKosterTable:
         fig = pl.figure()
         fig.subplots_adjust(hspace=1e-4, wspace=1e-4)
 
-        mx = max(1, self.tables[0].max())
+        el1 = self.ela.get_symbol()
+        rmax = 6 * covalent_radii[atomic_numbers[el1]] / Bohr
+        ymax = max(1, self.tables[0].max())
         if self.nel == 2:
-            mx = max(mx, self.tables[1].max())
+            el2 = self.elb.get_symbol()
+            rmax = max(rmax, 6 * covalent_radii[atomic_numbers[el2]] / Bohr)
+            ymax = max(ymax, self.tables[1].max())
 
         for i in range(10):
             name = integrals[i]
@@ -233,9 +238,10 @@ class SlaterKosterTable:
                     alpha = 0.2
 
                 if np.all(abs(self.tables[p][:, i]) < 1e-10):
-                    ax.text(0.03, 0.02 + p * 0.15, 
-                            'No %s integrals for <%s|%s>' % (name, s1, s2), 
-                            transform=ax.transAxes, size=10)
+                    ax.text(0.03, 0.5 + p * 0.15,
+                            'No %s integrals for <%s|%s>' % (name, s1, s2),
+                            transform=ax.transAxes, size=10, va='center')
+
                     if not ax.is_last_row():
                         pl.xticks([], [])
                     if not ax.is_first_col():
@@ -246,19 +252,19 @@ class SlaterKosterTable:
                     pl.plot(self.Rgrid, self.tables[p][:, i + 10], c='b', 
                             ls=s, lw=lw, alpha=alpha)
                     pl.axhline(0, c='k', ls='--')
-                    pl.title(name, position=(0.9, 0.8)) 
+                    ax.text(0.8, 0.1 + p * 0.15, name, size=10,
+                            transform=ax.transAxes)
 
                     if ax.is_last_row():
                         pl.xlabel('r (Bohr)')                                        
                     else:
                         pl.xticks([], [])
-
                     if not ax.is_first_col():                   
                         pl.yticks([],[])
 
-                    pl.ylim(-mx, mx)
-                    pl.xlim(0)
-        
+                pl.xlim([0, rmax])
+                pl.ylim(-ymax, ymax)
+
         pl.figtext(0.3, 0.95, 'H', color='r', size=20)
         pl.figtext(0.34, 0.95, 'S', color='b', size=20)
         pl.figtext(0.38, 0.95, ' Slater-Koster tables', size=20)
@@ -268,7 +274,7 @@ class SlaterKosterTable:
         
         if filename is None:
             filename = '%s-%s_slako.pdf' % (e1, e2)
-        pl.savefig(filename)            
+        pl.savefig(filename, bbox_inches='tight')
     
     def get_range(self, fractional_limit):
         """ Define ranges for the atoms: largest r such that Rnl(r)<limit. """

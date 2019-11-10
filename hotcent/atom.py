@@ -174,7 +174,7 @@ class AllElectron:
         if pl is None:
             raise AssertionError('pylab could not be imported')
 
-        rmax = covalent_radii[self.Z] / Bohr * 3
+        rmax = 3 * covalent_radii[self.Z] / Bohr
         ri = np.where(self.rgrid < rmax)[0][-1]
 
         if only_valence:
@@ -185,7 +185,7 @@ class AllElectron:
         p = np.ceil(np.sqrt(len(states)))
         q = 2 * p - 1 if len(states) % 2 == 0 else 2 * p
 
-        fig = pl.figure()
+        fig = pl.figure(dpi=400)
         i = 1
         # as a function of grid points
         for nl in states:
@@ -229,7 +229,7 @@ class AllElectron:
 
         if filename is None:
             filename = '%s_Rnl.pdf' % self.symbol
-        pl.savefig(filename)
+        pl.savefig(filename, bbox_inches='tight')
         pl.clf()
 
     def plot_density(self, filename=None):
@@ -247,8 +247,10 @@ class AllElectron:
         if pl is None:
             raise AssertionError('pylab could not be imported')
 
-        rmax = covalent_radii[self.Z] / Bohr * 3
-        ri = np.where(self.rgrid < rmax)[0][-1]
+        rmax = 3 * covalent_radii[self.Z] / Bohr
+        ri = np.where(self.rgrid > rmax)[0][0]
+
+        fig = pl.figure(figsize=(6.4, 4.8), dpi=400)
 
         core_dens = 0
         colors = ['red', 'green', 'blue']  # s, p , d
@@ -270,15 +272,15 @@ class AllElectron:
 
         ymax = np.exp(np.ceil(np.log(np.max(dens))))
         pl.ylim([1e-7, ymax])
+        pl.xlim([-0.05 * rmax, rmax])
         pl.xlabel('r (Bohr)')
         pl.grid(ls='--')
         pl.legend(loc='upper right', ncol=2)
-        pl.figtext(0.4, 0.95, 'Electron and orbital densities for %s' \
-                   % self.symbol)
+        pl.title('Electron and orbital densities for %s' % self.symbol)
 
         if filename is None:
             filename = '%s_rho.pdf' % self.symbol
-        pl.savefig(filename)
+        pl.savefig(filename, bbox_inches='tight')
         pl.clf()
 
     def plot_rho(self, *args, **kwargs):
