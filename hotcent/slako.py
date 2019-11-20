@@ -275,7 +275,8 @@ class SlaterKosterTable:
         if filename is None:
             filename = '%s-%s_slako.pdf' % (e1, e2)
         pl.savefig(filename, bbox_inches='tight')
-    
+        pl.clf()
+
     def get_range(self, fractional_limit):
         """ Define ranges for the atoms: largest r such that Rnl(r)<limit. """
         self.timer.start('define ranges')
