@@ -1,8 +1,6 @@
 *.pyc
 *~
-examples/*.pdf
-examples/*.skf
-examples/*.par
-examples/*.txt
-examples/*.hsd
-examples/*.png
+examples/*
+!examples/*.py
+tutorial/*
+!tutorial/*.ipynb
