@@ -45,7 +45,7 @@ class GPAWAE(AllElectron, GPAWAllElectron):
         else:
             msg = "GPAW atom ain't got %s orbitals for %s" % (nl, self.symbol)
             raise ValueError(msg)
-        return index 
+        return index
 
     def run(self, use_restart_file=False, wf_confinement_scheme='old'):
         """
@@ -78,56 +78,49 @@ class GPAWAE(AllElectron, GPAWAllElectron):
         self.Rnlg = {}
         self.unlg = {}
         bar = '=' * 50
-
-        print(bar, file=self.txt)
-        print('Initial run without any confinement', file=self.txt)
-        print('for pre-converging orbitals and eigenvalues', file=self.txt)
-        nl_0 = [nl for nl in val if nl in self.wf_confinement and
-                isinstance(self.wf_confinement[nl], ZeroConfinement)]
-        if len(nl_0) > 0:
-            print('and to get the (nonconfined) %s orbital%s' % \
-                  (' and '.join(nl_0), 's' if len(nl_0) > 1 else ''),
-                  file=self.txt)
-        print(bar, file=self.txt)
-
-        GPAWAllElectron.run(self, use_restart_file=use_restart_file)
-
-        u_j = self.u_j.copy()
         e_j = [e for e in self.e_j]
-        self.rgrid = self.r.copy()
-        # Note: since the grid in GPAW-AllElectron starts at exactly 0,
-        # there are cases where we will need to take limits for r->0.
-        delta = (0. - self.rgrid[1]) / (self.rgrid[2] - self.rgrid[1])
+
+        if wf_confinement_scheme == 'new':
+            print(bar, file=self.txt)
+            print('Initial run without any confinement', file=self.txt)
+            print('for pre-converging orbitals and eigenvalues', file=self.txt)
+            print(bar, file=self.txt)
+            self.run_confined(ZeroConfinement(),
+                              use_restart_file=use_restart_file)
+            u_j = self.u_j.copy()
+            e_j = [e for e in self.e_j]
 
         for nl, wf_confinement in self.wf_confinement.items():
             assert nl in val, 'Confinement %s not in %s' % (nl, str(val))
-
-            self.u_j = u_j.copy()
+            j = self.get_orbital_index(nl)
             self.e_j = [e for e in e_j]
-            vconf = self.wf_confinement[nl]
-            if not isinstance(vconf, ZeroConfinement):
-                print('%s\nApplying %s' % (bar, vconf), file=self.txt)
-                print('to get a confined %s orbital' % nl, file=self.txt)
-                print(bar, file=self.txt)
-                if wf_confinement_scheme == 'old':
-                    self.run_confined(vconf,
-                                      use_restart_file=use_restart_file)
-                elif wf_confinement_scheme == 'new':
-                    j = self.get_orbital_index(nl)
-                    if isinstance(vconf, SoftConfinement):
-                        rc = vconf.rc
-                    else:
-                        rc = np.max(self.rgrid)
-                    v = vconf(self.rgrid)
-                    u, e  = GPAWAllElectron.solve_confined(self, j, rc, v)
-                    self.u_j[j], self.e_j[j] = u, e
-                    print('Confined %s eigenvalue: %.6f' % (nl, e),
-                           file=self.txt)
 
-            index = self.get_orbital_index(nl)
+            vconf = self.wf_confinement[nl]
+            print('%s\nApplying %s' % (bar, vconf), file=self.txt)
+            print('to get a confined %s orbital' % nl, file=self.txt)
+            print(bar, file=self.txt)
+
+            if wf_confinement_scheme == 'old':
+                self.run_confined(vconf,
+                                  use_restart_file=use_restart_file)
+            elif wf_confinement_scheme == 'new':
+                self.u_j = u_j.copy()
+                if isinstance(vconf, SoftConfinement):
+                    rc = vconf.rc
+                else:
+                    rc = np.max(self.r)
+                v = vconf(self.r)
+                u, e  = GPAWAllElectron.solve_confined(self, j, rc, v)
+                self.u_j[j], self.e_j[j] = u, e
+                print('Confined %s eigenvalue: %.6f' % (nl, e), file=self.txt)
+
+            self.rgrid = self.r.copy()
+            # Note: since the grid in GPAW-AllElectron starts at exactly 0,
+            # there are cases where we will need to take limits for r->0.
+            delta = (0. - self.rgrid[1]) / (self.rgrid[2] - self.rgrid[1])
             self.rgrid[0] = 1.
-            self.unlg[nl] = self.u_j[index].copy()
-            self.enl[nl] = self.e_j[index]
+            self.unlg[nl] = self.u_j[j].copy()
+            self.enl[nl] = self.e_j[j]
             self.Rnlg[nl] = self.unlg[nl] / self.rgrid
             self.Rnlg[nl][0] = self.Rnlg[nl][1]
             self.Rnlg[nl][0] += delta * (self.Rnlg[nl][2] - self.Rnlg[nl][1])
@@ -146,10 +139,11 @@ class GPAWAE(AllElectron, GPAWAllElectron):
                   file=self.txt)
         print(bar, file=self.txt)
 
-        self.u_j = u_j.copy()
         self.e_j = [e for e in e_j]
         self.run_confined(vconf, use_restart_file=use_restart_file)
 
+        self.rgrid = self.r.copy()
+        delta = (0. - self.rgrid[1]) / (self.rgrid[2] - self.rgrid[1])
         self.rgrid[0] = 1.
         self.veff = self.vr.copy() / self.rgrid
         self.veff[0] = self.veff[1] + delta * (self.veff[2] - self.veff[1])
@@ -163,10 +157,10 @@ class GPAWAE(AllElectron, GPAWAllElectron):
         for n, l, nl in self.list_states():
             if nl in self.wf_confinement:
                 continue
-            index = self.get_orbital_index(nl)
+            j = self.get_orbital_index(nl)
             self.rgrid[0] = 1.
-            self.unlg[nl] = self.u_j[index].copy()
-            self.enl[nl] = self.e_j[index]
+            self.unlg[nl] = self.u_j[j].copy()
+            self.enl[nl] = self.e_j[j]
             self.Rnlg[nl] = self.unlg[nl] / self.rgrid
             self.Rnlg[nl][0] = self.Rnlg[nl][1]
             self.Rnlg[nl][0] += delta * (self.Rnlg[nl][2] - self.Rnlg[nl][1])
