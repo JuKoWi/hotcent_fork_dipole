@@ -517,7 +517,7 @@ def shoot(u, dx, c2, c1, c0, N):
     dleft *= scale
     u = u * np.sign(u[1])
 
-    nodes = sum((u[0:ctp - 1] * u[1:ctp]) < 0)
+    nodes = np.sum((u[0:ctp - 1] * u[1:ctp]) < 0)
     A = (dright - dleft) * utp
     return u, nodes, A, ctp
 
