@@ -29,7 +29,6 @@ class AllElectron:
                  valence=[],
                  confinement=None,
                  wf_confinement=None,
-                 xcname='LDA',
                  scalarrel=False,
                  mix=0.2,
                  maxiter=200,
@@ -56,7 +55,6 @@ class AllElectron:
                         this: {nl: <a certain Confinement instance, or None>
                          for each nl in your set of valence states}.
                         For missing entries, no confinement will be applied.
-        xcname:         Name of the XC functional
         scalarrel:      Use scalar relativistic corrections
         mix:            effective potential mixing constant
         maxiter:          maximum number of iterations for self-consistency.
@@ -71,7 +69,6 @@ class AllElectron:
         """
         self.symbol = symbol
         self.valence = valence
-        self.xcname = xcname
         self.scalarrel = scalarrel
         self.mix = mix
         self.maxiter = maxiter

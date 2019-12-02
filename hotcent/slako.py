@@ -14,13 +14,7 @@ from scipy.interpolate import SmoothBivariateSpline
 from ase.units import Bohr
 from ase.data import atomic_numbers, atomic_masses, covalent_radii
 from hotcent.timing import Timer
-from hotcent.atom_hotcent import XC_PW92
-try:
-    from gpaw.xc import XC
-    has_gpaw = True
-except:
-    print('Warning: could not import from GPAW')
-    has_gpaw = False
+from hotcent.xc import XC_PW92, LibXC
 
 
 class SlaterKosterTable:
@@ -314,23 +308,15 @@ class SlaterKosterTable:
                 Hamiltonian integrals. 
         xc:     name of the exchange-correlation functional to be used
                 in calculating the effective potential in the density
-                superposition scheme. If the GPAW module is available,
+                superposition scheme. If the PyLibXC module is available,
                 any LDA or GGA (but not hybrid or MGGA) functional available
-                via GPAW can be specified, in the same syntax as the GPAW
-                calculator. Native GGA functionals in GPAW include, at present,
-                PBE, revPBE, RPBE, and PW91 (see gpaw/xc/kernel.py) and some
-                pure-python implementations of them ('pyPBE', 'pyPBEsol',
-                'pyRPBE'). Many more (LDA/GGA) functionals can be used if
-                GPAW has been linked to LibXC (e.g. for using the N12
-                functional, set xc='XC_GGA_X_N12+XC_GGA_C_N12').
-                Also the PyLibXC module can be used (see pylibxc_interface.py).
-                If GPAW or PyLibXC is not available, only the local density
-                approximation 'PW92' (alias: 'LDA') can be chosen.
+                via LibXC can be specified. E.g. for using the N12
+                functional, set xc='XC_GGA_X_N12+XC_GGA_C_N12'.
+                If PyLibXC is not available, only the local density
+                approximation xc='PW92' (alias: 'LDA') can be chosen.
         """
         assert R1 >= 1e-3, 'For stability; use R1 >~ 1e-3'
         assert superposition in ['density', 'potential']
-        if not has_gpaw:
-            assert xc in ['LDA', 'PW92']
 
         self.timer.start('calculate tables')   
         self.wf_range = self.get_range(wflimit)        
@@ -449,37 +435,28 @@ class SlaterKosterTable:
             v2 = e2.effective_potential(r2) - e2.confinement(r2)
             veff = v1 + v2
         elif superposition == 'density':
-            n = e2.electron_density(r1) + e2.electron_density(r2)
+            rho = e1.electron_density(r1) + e2.electron_density(r2)
             veff = e1.V_nuclear(r1) + e1.hartree_potential(r1)
             veff += e2.V_nuclear(r2) + e2.hartree_potential(r2)
-            if not has_gpaw:
-                assert xc in ['LDA', 'PW92']
-                func = XC_PW92()
-                veff += func.vxc(n)
+            if xc in ['LDA', 'PW92']:
+                xc = XC_PW92()
+                veff += xc.vxc(rho)
             else:
+                xc = LibXC(xc)
                 grad_x = e1.electron_density(r1, der=1) * np.sin(t1)
                 grad_x += e2.electron_density(r2, der=1) * np.sin(t2)
                 grad_y = e1.electron_density(r1, der=1) * np.cos(t1)
                 grad_y += e2.electron_density(r2, der=1) * np.cos(t2)
-                sigma = np.sqrt([grad_x ** 2 + grad_y ** 2]) ** 2
-                dens = np.array([n])
-                dedn = np.zeros_like(dens)
-                exc = np.zeros_like(dens)
-                dedsigma = np.zeros_like(dens)
-                if type(xc) == str:
-                    func = XC(xc)
-                else:
-                    func = xc
-                func.kernel.calculate(exc, dens, dedn, sigma, dedsigma)
-                veff += dedn[0]
-
+                sigma = np.sqrt(grad_x ** 2 + grad_y ** 2) ** 2
+                out = xc.compute_all(rho, sigma)
+                veff += out['vrho']
                 # add gradient corrections to vxc
                 # provided that we have enough points
                 # (otherwise we get "dfitpack.error:
                 # (m>=(kx+1)*(ky+1)) failed for hidden m")
-                if len(x) > 16:
-                    splx = SmoothBivariateSpline(x, y, dedsigma * grad_x)
-                    sply = SmoothBivariateSpline(x, y, dedsigma * grad_y)
+                if out['vsigma'] is not None and len(x) > 16:
+                    splx = SmoothBivariateSpline(x, y, out['vsigma'] * grad_x)
+                    sply = SmoothBivariateSpline(x, y, out['vsigma'] * grad_y)
                     veff += -2. * splx(x, y, dx=1, dy=0, grid=False)
                     veff += -2. * sply(x, y, dx=0, dy=1, grid=False)
 

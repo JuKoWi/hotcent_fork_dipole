@@ -17,12 +17,15 @@ from gpaw.atom.all_electron import shoot, tempdir
 
 
 class GPAWAE(AllElectron, GPAWAllElectron):
-    def __init__(self, symbol, **kwargs):
+    def __init__(self, symbol, xcname='LDA', **kwargs):
         """ 
         Run Kohn-Sham all-electron calculation for a given atom 
         using the atomic DFT calculator in GPAW.
 
         Parameters: see parent AllElectron class
+
+        xcname:         Name of the XC functional, see
+            https://wiki.fysik.dtu.dk/gpaw/documentation/manual.html#manual-xc
         """
         AllElectron.__init__(self, symbol, **kwargs)
 
@@ -30,7 +33,7 @@ class GPAWAE(AllElectron, GPAWAllElectron):
         config = config.replace('[', '').replace(']', '')
         config = ','.join(config.split())
  
-        GPAWAllElectron.__init__(self, symbol, xcname=self.xcname,
+        GPAWAllElectron.__init__(self, symbol, xcname=xcname,
                                  configuration=config, 
                                  scalarrel=self.scalarrel,
                                  gpernode=self.nodegpts,

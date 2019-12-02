@@ -18,6 +18,7 @@ from ase.units import Bohr
 from hotcent.interpolation import Function, SplineFunction
 from hotcent.atom import AllElectron
 from hotcent.confinement import ZeroConfinement
+from hotcent.xc import XC_PW92, LibXC
 try:
     import pylab as pl
 except:
@@ -27,6 +28,7 @@ except:
 class HotcentAE(AllElectron):
     def __init__(self,
                  symbol,
+                 xcname='LDA',
                  convergence={'density':1e-7, 'energies':1e-7},
                  restart=None,
                  write=None,
@@ -34,25 +36,39 @@ class HotcentAE(AllElectron):
         """
         Run Kohn-Sham all-electron calculations for a given atom.
 
-        Examples:
+        Example:
         ---------
-        atom = HotcentAllElectron('C')
         from hotcent.confinement import PowerConfinement
-        atom = HotcentAllElectron('C', confinement=PowerConfinement(r0=3., s=2))
+        atom = HotcentAllElectron('C',
+                                  xcname='GGA_C_PBE+GGA_X_PBE',
+                                  confinement=PowerConfinement(r0=3., s=2))
         atom.run()
 
         Parameters:
         -----------
+        xcname:         Name of the XC functional. If 'LDA' or 'PW92' are
+                        provided, then Hotcent's native LDA implementation
+                        will be used. For all other functionals, the PyLibXC
+                        module is required, which is bundled with LibXC.
+                        The names of the implemented functionals can be found on
+                        https://www.tddft.org/programs/libxc/functionals/
+                        Often one needs to combine different LibXC functionals,
+                        for example:
+                          xcname='GGA_X_PBE+GGA_C_PBE'  # for PBE XC
+
         convergence:    convergence criterion dictionary
                         * density: max change for integrated |n_old-n_new|
                         * energies: max change in single-particle energy (Hartree)
+
         write:          filename: save rgrid, effective potential and
                         density to a file for further calculations.
+
         restart:        filename: make an initial guess for effective
                         potential and density from another calculation.
         """
         AllElectron.__init__(self, symbol, **kwargs)
 
+        self.xcname = xcname
         self.convergence = convergence
         self.write = write
         self.restart = restart
@@ -60,13 +76,12 @@ class HotcentAE(AllElectron):
         self.set_output(self.txt)
 
         if self.xcname in ['PW92', 'LDA']:
-            self.xcf = XC_PW92()
+            self.xc = XC_PW92()
         else:
-            raise NotImplementedError('XC not implemented: %s' % self.xcname)
+            self.xc = LibXC(self.xcname)
 
         if self.scalarrel:
             print('Using scalar relativistic corrections.', file=self.txt)
-
 
         maxnodes = max( [n - l - 1 for n, l, nl in self.list_states()] )
         self.rmin = 1e-2 / self.Z
@@ -99,7 +114,7 @@ class HotcentAE(AllElectron):
         for n, l, nl in self.list_states():
             self.bs_energy += self.configuration[nl] * self.enl[nl]
 
-        self.exc = np.array([self.xcf.exc(self.dens[i]) for i in range(self.N)])
+        self.exc, self.vxc = self.xc.evaluate(self.dens, self.grid)
         self.Hartree_energy = self.grid.integrate(self.Hartree * self.dens, use_dV=True) / 2
         self.vxc_energy = self.grid.integrate(self.vxc * self.dens, use_dV=True)
         self.exc_energy = self.grid.integrate(self.exc * self.dens, use_dV=True)
@@ -180,7 +195,7 @@ class HotcentAE(AllElectron):
     def calculate_veff(self):
         """ Calculate effective potential. """
         self.timer.start('veff')
-        self.vxc = self.xcf.vxc(self.dens)
+        exc, self.vxc = self.xc.evaluate(self.dens, self.grid)
         self.timer.stop('veff')
         return self.nucl + self.Hartree + self.vxc + self.conf
 
@@ -583,55 +598,8 @@ class RadialGrid:
         else:
             return ((f[0:self.N - 1] + f[1:self.N]) * self.dr).sum() * 0.5
 
+    def gradient(self, f):
+        return np.gradient(f, self.grid)
 
-class XC_PW92:
-    def __init__(self):
-        """ The Perdew-Wang 1992 LDA exchange-correlation functional. """
-        self.small = 1e-90
-        self.a1 = 0.21370
-        self.c0 = 0.031091
-        self.c1 = 0.046644
-        self.b1 = 1.0 / 2.0 / self.c0 * np.exp(-self.c1 / 2.0 / self.c0)
-        self.b2 = 2 * self.c0 * self.b1 ** 2
-        self.b3 = 1.6382
-        self.b4 = 0.49294
-
-    def exc(self, n, der=0):
-        """ Exchange-correlation with electron density n. """
-        is_scalar = type(n) == np.float64
-        n = np.array([n]) if is_scalar else n
-        indices = n < self.small
-        n[indices] = self.small
-        e = self.e_x(n, der=der) + self.e_corr(n, der=der)
-        e[indices] = 0.
-        if is_scalar:
-            e = e[0]
-        return e
-
-    def e_x(self, n, der=0):
-        """ Exchange. """
-        if der == 0:
-            return -3. / 4 * (3 * n / pi) ** (1. / 3)
-        elif der == 1:
-            return -3. / (4 * pi) * (3 * n / pi) ** (-2. / 3)
-
-    def e_corr(self, n, der=0):
-        """ Correlation energy. """
-        rs = (3. / (4 * pi * n)) ** (1. / 3)
-        aux = 2 * self.c0 
-        aux *= self.b1 * np.sqrt(rs) + self.b2 * rs + self.b3 * rs ** (3. / 2) + self.b4 * rs ** 2
-        if der == 0:
-            return -2 * self.c0 * (1 + self.a1 * rs) * np.log(1 + aux ** -1)
-        elif der == 1:
-            return (-2 * self.c0 * self.a1 * np.log(1 + aux ** -1) \
-                    -2 * self.c0 * (1 + self.a1 * rs) * (1 + aux ** -1) ** -1 * (-aux ** -2) \
-                   * 2 * self.c0 * (self.b1 / (2 * np.sqrt(rs)) + self.b2 + 3 * self.b3 * np.sqrt(rs) / 2 \
-                   + 2 * self.b4 * rs)) * (-(4 * pi * n ** 2 * rs ** 2) ** -1)
-
-    def vxc(self, n):
-        """ Exchange-correlation potential (functional derivative of exc). """
-        indices = n < self.small
-        n[indices] = self.small
-        v = self.exc(n) + n * self.exc(n, der=1)
-        v[indices] = 0.
-        return v
+    def divergence(self, f):
+        return (1. / self.grid ** 2) * self.gradient(self.grid ** 2 * f)
