@@ -16,7 +16,7 @@ from scipy.interpolate import splrep, splev
 from ase.data import atomic_numbers, covalent_radii
 from ase.units import Bohr
 from hotcent.interpolation import Function, SplineFunction
-from hotcent.atom import AllElectron
+from hotcent.atom import AllElectron, orbit_transform
 from hotcent.confinement import ZeroConfinement
 from hotcent.xc import XC_PW92, LibXC
 try:
@@ -231,13 +231,26 @@ class HotcentAE(AllElectron):
             self.veff = self.nucl + self.conf
             self.dens = self.guess_density()
 
-    def run(self):
+    def run(self, wf_confinement_scheme='standard'):
+        assert wf_confinement_scheme in ['standard', 'perturbative']
+
         val = self.get_valence_orbitals()
         enl = {}
         Rnlg = {}
         unlg = {}
         bar = '=' * 50
         confinement = self.confinement
+
+        if wf_confinement_scheme == 'perturbative':
+            print(bar, file=self.txt)
+            print('Initial run without any confinement', file=self.txt)
+            print('for pre-converging orbitals and eigenvalues', file=self.txt)
+            print(bar, file=self.txt)
+            self.confinement = ZeroConfinement()
+            self._run()
+            #u_j = [self.unlg[nl].copy() for nl in valence]
+            #e_j = [self.enl[nl] for nl in valence]
+            veff = self.veff.copy()
 
         for nl, wf_confinement in self.wf_confinement.items():
             assert nl in val, 'Confinement %s not in %s' % (nl, str(val))
@@ -250,7 +263,13 @@ class HotcentAE(AllElectron):
             print('to get a confined %s orbital' % nl, file=self.txt)
             print(bar, file=self.txt)
 
-            self._run()
+            if wf_confinement_scheme == 'standard':
+                self._run()
+            elif wf_confinement_scheme == 'perturbative':
+                self.veff = veff + self.confinement(self.rgrid)
+                self.solve_single_eigenstate(nl)
+                print('Confined %s eigenvalue: %.6f' % (nl, self.enl[nl]),
+                      file=self.txt)
 
             Rnlg[nl] = self.Rnlg[nl].copy()
             unlg[nl] = self.unlg[nl].copy()
@@ -442,6 +461,115 @@ class HotcentAE(AllElectron):
                     print('nl=%s, eps=%f' % (nl,eps), file=self.txt)
                     print('max epsilon', epsmax, file=self.txt)
                     raise RuntimeError('Eigensolver out of iterations. Atom not stable?')
+
+            itmax = max(it, itmax)
+            self.unlg[nl] = u
+            self.Rnlg[nl] = self.unlg[nl] / self.rgrid
+            self.d_enl[nl] = abs(eps - self.enl[nl])
+            d_enl_max = max(d_enl_max, self.d_enl[nl])
+            self.enl[nl] = eps
+
+            if self.verbose:
+                line = '-- state %s, %i eigensolver iterations, e=%9.5f, de=%9.5f' % \
+                       (nl, it, self.enl[nl], self.d_enl[nl])
+                print(line, file=self.txt)
+
+            assert nodes == nodes_nl
+            assert u[1] > 0.0
+
+        self.timer.stop('eigenstates')
+        return d_enl_max, itmax
+
+    def solve_single_eigenstate(self, nl, iteration=0):
+        """
+        Solve a single eigenstate nl for given effective potential.
+
+        u''(r) - 2*(v_eff(r)+l*(l+1)/(2r**2)-e)*u(r)=0
+        ( u''(r) + c0(r)*u(r) = 0 )
+
+        r=r0*exp(x) --> (to get equally spaced integration mesh)
+
+        u''(x) - u'(x) + c0(x(r))*u(r) = 0
+        """
+        self.timer.start('eigenstates')
+
+        rgrid = self.rgrid
+        xgrid = self.xgrid
+        dx = xgrid[1] - xgrid[0]
+        N = self.N
+        c2 = np.ones(N)
+        c1 = -np.ones(N)
+        d_enl_max = 0.0
+        itmax = 0
+
+        n, l = orbit_transform(nl, string=False)
+        nodes_nl = n - l - 1
+        eps = self.enl[nl]
+        delta = self.d_enl[nl]
+
+        direction = 'none'
+        epsmax = self.veff[-1] - l * (l + 1) / (2 * self.rgrid[-1] ** 2)
+        it = 0
+        u = np.zeros(N)
+        hist = []
+
+        if self.scalarrel:
+            veff = SplineFunction(self.rgrid, self.veff)
+            self.dveff = np.array([veff(r, der=1) for r in self.rgrid])
+
+        while True:
+            eps0 = eps
+            c0, c1, c2 = self.construct_coefficients(l, eps)
+
+            # boundary conditions for integration from analytic behaviour (unscaled)
+            # u(r)~r**(l+1)   r->0
+            # u(r)~exp( -sqrt(c0(r)) ) (set u[-1]=1 and use expansion to avoid overflows)
+            u[0:2] = rgrid[0:2] ** (l + 1)
+
+            if not(c0[-2] < 0 and c0[-1] < 0):
+                pl.plot(c0)
+                pl.show()
+
+            assert c0[-2] < 0 and c0[-1] < 0
+
+            u, nodes, A, ctp = shoot(u, dx, c2, c1, c0, N)
+            it += 1
+            norm = self.grid.integrate(u ** 2)
+            u = u / sqrt(norm)
+
+            if nodes > nodes_nl:
+                # decrease energy
+                if direction == 'up':
+                    delta /= 2
+                eps -= delta
+                direction = 'down'
+            elif nodes < nodes_nl:
+                # increase energy
+                if direction == 'down':
+                    delta /= 2
+                eps += delta
+                direction = 'up'
+            elif nodes == nodes_nl:
+                shift = -0.5 * A / (rgrid[ctp] * norm)
+                if abs(shift) < 1e-8:  # convergence
+                    break
+                if shift > 0:
+                    direction = 'up'
+                elif shift < 0:
+                    direction = 'down'
+                eps += shift
+
+            if eps > epsmax:
+                eps = 0.5 * (epsmax + eps0)
+            hist.append(eps)
+
+            if it > 100:
+                print('Epsilon history for %s' % nl, file=self.txt)
+                for h in hist:
+                    print(h)
+                print('nl=%s, eps=%f' % (nl,eps), file=self.txt)
+                print('max epsilon', epsmax, file=self.txt)
+                raise RuntimeError('Eigensolver out of iterations. Atom not stable?')
 
             itmax = max(it, itmax)
             self.unlg[nl] = u

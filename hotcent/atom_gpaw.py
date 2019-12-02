@@ -50,7 +50,7 @@ class GPAWAE(AllElectron, GPAWAllElectron):
             raise ValueError(msg)
         return index
 
-    def run(self, use_restart_file=False, wf_confinement_scheme='old'):
+    def run(self, use_restart_file=False, wf_confinement_scheme='standard'):
         """
         Parameters:
 
@@ -59,22 +59,23 @@ class GPAWAE(AllElectron, GPAWAllElectron):
         wf_confinement_scheme: determines how to apply the orbital
              confinement potentials for getting the confined orbitals:
 
-            'old' = by applying the confinement for the chosen nl to
-                    all states and reconverging all states (but only
+            'standard' = by applying the confinement for the chosen nl
+                    to all states and reconverging all states (but only
                     saving the confined nl orbital),
 
-            'new' = by applying the confinement only to the chosen nl and
-                    reconverging only that state, while keeping the others
-                    equal to those in the free (nonconfined) atom.
+            'perturbative' = by applying the confinement only to the
+                    chosen nl and re-converging only that state, while
+                    keeping the others equal to those in the free
+                    (nonconfined) atom.
 
-            The 'new' scheme is how basis sets are generated in e.g. GPAW.
-            This option is also significantly faster, especially for
-            heavier atoms.
+            The 'perturbative' scheme is how basis sets are generated
+            in e.g. GPAW. This option is also significantly faster than
+            the 'standard' scheme, especially for heavier atoms.
             The choice of scheme does not affect the calculation of the
             confined density (which always happens the 'old' way).
         """
         self.timer.start('run')
-        assert wf_confinement_scheme in ['old', 'new']
+        assert wf_confinement_scheme in ['standard', 'perturbative']
 
         val = self.get_valence_orbitals()
         self.enl = {}
@@ -83,7 +84,7 @@ class GPAWAE(AllElectron, GPAWAllElectron):
         bar = '=' * 50
         e_j = [e for e in self.e_j]
 
-        if wf_confinement_scheme == 'new':
+        if wf_confinement_scheme == 'perturbative':
             print(bar, file=self.txt)
             print('Initial run without any confinement', file=self.txt)
             print('for pre-converging orbitals and eigenvalues', file=self.txt)
@@ -103,10 +104,10 @@ class GPAWAE(AllElectron, GPAWAllElectron):
             print('to get a confined %s orbital' % nl, file=self.txt)
             print(bar, file=self.txt)
 
-            if wf_confinement_scheme == 'old':
+            if wf_confinement_scheme == 'standard':
                 self.run_confined(vconf,
                                   use_restart_file=use_restart_file)
-            elif wf_confinement_scheme == 'new':
+            elif wf_confinement_scheme == 'perturbative':
                 self.u_j = u_j.copy()
                 if isinstance(vconf, SoftConfinement):
                     rc = vconf.rc
