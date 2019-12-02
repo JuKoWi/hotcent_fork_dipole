@@ -25,14 +25,8 @@ schemes are available.
 
 * With regards to exchange-correlation functionals, the PW92
 (LDA) functional is natively available, and other functionals
-can be applied through integration with the 
-[GPAW](https://wiki.fysik.dtu.dk/gpaw/) code. In the potential
-superposition scheme, it should be possible to use any of the 
-functionals available through GPAW (and LibXC if GPAW has been
-linked to it). When applying the density superposition scheme,
-the choice is currently restricted to LDA- and GGA-type functionals.
-LibXC functionals can now also be accessed via the PyLibXC module
-(see hotcent.pylibxc_interface).
+can be applied through integration with the PyLibXC module
+shipped with [LibXC](https://www.tddft.org/programs/libxc).
 
 
 ## Installation
@@ -42,5 +36,6 @@ LibXC functionals can now also be accessed via the PyLibXC module
 * Clone / download the Hotcent repository and update the `$PYTHONPATH` 
 accordingly.
 
-* If you want to use functionals other than LDA, the GPAW code must
-be installed. 
+* If you want to use functionals other than LDA, the
+[PyLibXC](https://www.tddft.org/programs/libxc/installation/#python-library)
+module needs to be available.
