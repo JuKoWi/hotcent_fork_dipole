@@ -101,13 +101,15 @@ class AtomicDFT(AtomicBase):
         else:
             self.txt = open(txt, 'a')
         print('*******************************************', file=self.txt)
-        print('Kohn-Sham all-electron calculation for %2s ' % self.symbol,
+        print('Kohn-Sham all-electron calculation for %s' % self.symbol,
               file=self.txt)
         print('*******************************************', file=self.txt)
 
-    def calculate_energies(self, echo=False):
+    def calculate_energies(self, echo='valence'):
         """ Calculate energy contributions. """
         self.timer.start('energies')
+        assert echo in [None, 'valence', 'all']
+
         self.bs_energy = 0.0
         for n, l, nl in self.list_states():
             self.bs_energy += self.configuration[nl] * self.enl[nl]
@@ -122,32 +124,26 @@ class AtomicDFT(AtomicBase):
         self.total_energy = self.bs_energy - self.Hartree_energy
         self.total_energy += - self.vxc_energy + self.exc_energy
 
-        if echo:
-            print('\n\nEnergetics:', file=self.txt)
-            print('-------------', file=self.txt)
-            print('\nsingle-particle energies', file=self.txt)
-            print('------------------------', file=self.txt)
+        if echo is not None:
+            line = '%s orbital eigenvalues:' % echo
+            print('\n'+line, file=self.txt)
+            print('-' * len(line), file=self.txt)
             for n, l, nl in self.list_states():
-                print('%s, energy %.15f' % (nl, self.enl[nl]), file=self.txt)
+                if echo == 'all' or nl in self.valence:
+                    print('  %s:   %.12f' % (nl, self.enl[nl]), file=self.txt)
 
-            print('\nvalence orbital energies', file=self.txt)
-            print('--------------------------', file=self.txt)
-            for nl in self.configuration:
-                print('%s, energy %.15f' % (nl, self.enl[nl]), file=self.txt)
-
-            print('\n', file=self.txt)
-            print('total energies:', file=self.txt)
-            print('---------------', file=self.txt)
-            print('sum of eigenvalues:     %.15f' % self.bs_energy,
+            print('\nenergy contributions:', file=self.txt)
+            print('----------------------------------------', file=self.txt)
+            print('sum of eigenvalues:     %.12f' % self.bs_energy,
                   file=self.txt)
-            print('Hartree energy:         %.15f' % self.Hartree_energy,
+            print('Hartree energy:         %.12f' % self.Hartree_energy,
                   file=self.txt)
-            print('vxc correction:         %.15f' % self.vxc_energy,
+            print('vxc correction:         %.12f' % self.vxc_energy,
                   file=self.txt)
-            print('exchange + corr energy: %.15f' % self.exc_energy,
+            print('exchange + corr energy: %.12f' % self.exc_energy,
                   file=self.txt)
-            print('----------------------------', file=self.txt)
-            print('total energy:           %.15f\n\n' % self.total_energy,
+            print('----------------------------------------', file=self.txt)
+            print('total energy:           %.12f\n' % self.total_energy,
                   file=self.txt)
 
         self.timer.stop('energies')
@@ -366,7 +362,7 @@ class AtomicDFT(AtomicBase):
                 raise RuntimeError(err)
             self.txt.flush()
 
-        self.calculate_energies(echo=True)
+        self.calculate_energies(echo='valence')
         print('converged in %i iterations' % it, file=self.txt)
         line = '%9.4f electrons, should be %9.4f' % \
                (self.grid.integrate(self.dens, use_dV=True), self.nel)
