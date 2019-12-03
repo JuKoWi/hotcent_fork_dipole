@@ -1,42 +1,27 @@
-from __future__ import print_function
-import os
-import sys
 from hotcent.slako import SlaterKosterTable
 from hotcent.confinement import PowerConfinement
+from hotcent.atomic_dft import AtomicDFT
 
-txt = os.devnull
-code = sys.argv[1].lower()
-
-if code == 'hotcent':
-    from hotcent.atom_hotcent import HotcentAE as AE
-    eps = 1e-7
-    eps_etot = 1e-7 
-elif code == 'gpaw':
-    from hotcent.atom_gpaw import GPAWAE as AE
-    eps = 5e-4
-    eps_etot = 1e-2
-else:
-    raise ValueError('Argument must be either "hotcent" or "gpaw"')
-
+eps = 1e-7
+eps_etot = 1e-7
 
 def check(x, y, eps):
     line = 'Result: {: .8f} | Ref.: {: .8f} | '.format(x, y)
     line += 'OK' if abs(x - y) < eps else 'FAIL'
     return line
 
-
 def check_abs(x, y, eps):
     return check(abs(x), abs(y), eps)
 
 
 # Check confined boron atom
-atom1 = AE('B',
-           xcname='LDA',
-           confinement=PowerConfinement(r0=2.9, s=2),
-           configuration='[He] 2s2 2p1',
-           valence=['2s', '2p'],
-           txt=txt,
-           )
+atom1 = AtomicDFT('B',
+                  xcname='LDA',
+                  confinement=PowerConfinement(r0=2.9, s=2),
+                  configuration='[He] 2s2 2p1',
+                  valence=['2s', '2p'],
+                  txt=None,
+                  )
 atom1.run()
 ener = atom1.get_energy()
 print('B -- Etot  | %s' % check(ener, -23.079723850586106, eps_etot))
@@ -47,13 +32,13 @@ print('B -- E_2p  | %s' % check(e_2p, 0.47362603289831301, eps))
 
 
 # Check confined hydrogen atom
-atom2 = AE('H',
-           xcname='LDA',
-           confinement=PowerConfinement(r0=1.1, s=2),
-           configuration='1s1',
-           valence=['1s'],
-           txt=txt,
-           )
+atom2 = AtomicDFT('H',
+                  xcname='LDA',
+                  confinement=PowerConfinement(r0=1.1, s=2),
+                  configuration='1s1',
+                  valence=['1s'],
+                  txt=None,
+                  )
 atom2.run()
 ener = atom2.get_energy()
 print('H -- Etot  | %s' % check(ener, 0.58885808402033557, eps_etot))
@@ -62,7 +47,7 @@ print('H -- E_1s  | %s' % check(e_1s, 1.00949638195278960, eps))
 
 
 # Check B-H Slater-Koster integrals
-sk = SlaterKosterTable(atom1, atom2, txt=txt)
+sk = SlaterKosterTable(atom1, atom2, txt=None)
 
 R, nt, nr = 2.0, 150, 50
 sk.wf_range = sk.get_range(1e-7)

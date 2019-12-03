@@ -2,16 +2,9 @@
 Slater-Koster table generation procedure by
 Fihey and coworkers (doi:10.1002/jcc.24046). """
 import os
-import sys
 from hotcent.slako import SlaterKosterTable
 from hotcent.confinement import PowerConfinement 
-
-code = sys.argv[1].lower()
-
-if code == 'hotcent':
-    from hotcent.atom_hotcent import HotcentAE as AE
-elif code == 'gpaw':
-    from hotcent.atom_gpaw import GPAWAE as AE
+from hotcent.atomic_dft import AtomicDFT
 
 element = 'Au'
 xc = 'GGA_X_PBE+GGA_C_PBE'
@@ -22,18 +15,18 @@ wf_conf = {'5d': PowerConfinement(r0=6.50, s=2),
            '6s': PowerConfinement(r0=6.50, s=2),
            '6p': PowerConfinement(r0=4.51, s=2),
            }
-atom = AE(element,
-          xcname=xc,
-          confinement=conf,
-          wf_confinement=wf_conf,
-          configuration='[Xe] 4f14 5d10 6s1 6p0',
-          valence=['5d', '6s', '6p'],
-          scalarrel=True,
-          timing=True,
-          nodegpts=150,
-          mix=0.2,
-          txt='-',
-          )
+atom = AtomicDFT(element,
+                 xcname=xc,
+                 confinement=conf,
+                 wf_confinement=wf_conf,
+                 configuration='[Xe] 4f14 5d10 6s1 6p0',
+                 valence=['5d', '6s', '6p'],
+                 scalarrel=True,
+                 timing=True,
+                 nodegpts=150,
+                 mix=0.2,
+                 txt='-',
+                 )
 atom.run()
 atom.plot_Rnl()
 atom.plot_density()

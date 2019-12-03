@@ -6,18 +6,13 @@ Release notes
 Development version
 ===================
 
-Added
------
+* The GPAW-based atomic DFT calculator has been removed, as it was
+  simply no longer needed (the native calculator now runs as
+  fast and is easier to extend with more functionality).
 
-
-Changed
--------
-
-
-Fixed
------
-
-
+* The native atomic DFT calculator has been renamed to 'AtomicDFT'
+  and now resides in hotcent.atomic_dft.py
+ 
 
 Version 0.9
 ===========

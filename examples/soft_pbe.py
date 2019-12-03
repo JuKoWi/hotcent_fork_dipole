@@ -1,19 +1,11 @@
-import sys
 from ase.units import Ha
 from hotcent.confinement import SoftConfinement
+from hotcent.atomic_dft import AtomicDFT
 try:
     import pylibxc
 except ImportError:
     print('Need PyLibXC to run this test!')
     raise
-
-
-code = sys.argv[1].lower()
-
-if 'hotcent' in code:
-    from hotcent.atom_hotcent import HotcentAE as AE
-elif 'gpaw' in code:
-    from hotcent.atom_gpaw import GPAWAE as AE
 
 kwargs = {'xcname': 'GGA_X_PBE+GGA_C_PBE',
           'configuration': '[Ar] 3d6 4s2 4p0',
@@ -23,16 +15,17 @@ kwargs = {'xcname': 'GGA_X_PBE+GGA_C_PBE',
           'timing': False,
           'txt': '-'}
 
-atom = AE('Fe',
-          wf_confinement=None,
-          **kwargs)
+atom = AtomicDFT('Fe',
+                 wf_confinement=None,
+                 **kwargs)
 atom.run()
 eps_free = {nl: atom.get_eigenvalue(nl) for nl in atom.valence}
 
-atom = AE('Fe',
-          wf_confinement={'3d':SoftConfinement(amp=12., rc=5.11, x_ri=0.6),
-                          '4s':SoftConfinement(amp=12., rc=8.85, x_ri=0.6)},
-          **kwargs)
+wf_confinement = {'3d':SoftConfinement(amp=12., rc=5.11, x_ri=0.6),
+                  '4s':SoftConfinement(amp=12., rc=8.85, x_ri=0.6)}
+atom = AtomicDFT('Fe',
+                 wf_confinement=wf_confinement,
+                 **kwargs)
 atom.run(wf_confinement_scheme='perturbative')
 eps_conf = {nl: atom.get_eigenvalue(nl) for nl in atom.valence}
 

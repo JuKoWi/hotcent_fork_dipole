@@ -21,10 +21,10 @@ class SlaterKosterTable:
     def __init__(self, ela, elb, txt=None, timing=False):
         """ Construct Slater-Koster table for given elements.
                 
-        parameters:
+        Parameters:
         -----------
-        ela:    element objects (KSAllElectron or Element)
-        elb:    element objects (KSAllElectron or Element)    
+        ela:    AtomicDFT object
+        elb:    AtomicDFT object
         txt:    output file object or file name
         timing: output of timing summary after calculation
         """

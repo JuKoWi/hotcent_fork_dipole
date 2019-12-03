@@ -1,5 +1,5 @@
-""" Defintion of the AllElectron based class (and 
-supporting methods) for atomic DFT calculations.
+""" Definition of the base class for atomic DFT
+calculations.
 
 The code below draws heavily from the Hotbit code 
 written by Pekka Koskinen (https://github.com/pekkosk/
@@ -22,7 +22,7 @@ except:
     pl = None
 
 
-class AllElectron:
+class AtomicBase:
     def __init__(self,
                  symbol,
                  configuration='',
@@ -99,7 +99,7 @@ class AllElectron:
             msg += str(wf_confinement)
             raise ValueError(msg)
 
-        self.timer = Timer('AllElectron', txt=self.txt, enabled=self.timing)
+        self.timer = Timer('Atomic', txt=self.txt, enabled=self.timing)
         self.timer.start('init')
 
         self.Z = atomic_numbers[self.symbol]

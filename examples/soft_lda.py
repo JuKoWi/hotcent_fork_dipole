@@ -1,13 +1,6 @@
-import sys
 from ase.units import Ha
 from hotcent.confinement import SoftConfinement
-
-code = sys.argv[1].lower()
-
-if 'hotcent' in code:
-    from hotcent.atom_hotcent import HotcentAE as AE
-elif 'gpaw' in code:
-    from hotcent.atom_gpaw import GPAWAE as AE
+from hotcent.atomic_dft import AtomicDFT
 
 kwargs = {'xcname': 'LDA',
           'configuration': '[Ne] 3s2 3p2',
@@ -17,16 +10,17 @@ kwargs = {'xcname': 'LDA',
           'timing': False,
           'txt': '-'}
 
-atom = AE('Si',
-          wf_confinement=None,
-          **kwargs)
+atom = AtomicDFT('Si',
+                 wf_confinement=None,
+                 **kwargs)
 atom.run()
 eps_free = {nl: atom.get_eigenvalue(nl) for nl in atom.valence}
 
-atom = AE('Si',
-          wf_confinement={'3s':SoftConfinement(amp=12., rc=6.74, x_ri=0.6),
-                          '3p':SoftConfinement(amp=12., rc=8.70, x_ri=0.6)},
-          **kwargs)
+wf_confinement = {'3s':SoftConfinement(amp=12., rc=6.74, x_ri=0.6),
+                  '3p':SoftConfinement(amp=12., rc=8.70, x_ri=0.6)}
+atom = AtomicDFT('Si',
+                 wf_confinement=wf_confinement,
+                 **kwargs)
 atom.run(wf_confinement_scheme='perturbative')
 eps_conf = {nl: atom.get_eigenvalue(nl) for nl in atom.valence}
 

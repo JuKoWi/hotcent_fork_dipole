@@ -1,6 +1,5 @@
-""" Defintion of the HotcentAllElectron class (and 
-supporting methods) for calculations with Hotcent's
-own atomic DFT calculator.
+""" Definition of the AtomicDFT class for atomic
+DFT calculations.
 
 The code below draws heavily from the Hotbit code 
 written by Pekka Koskinen (https://github.com/pekkosk/
@@ -16,7 +15,7 @@ from scipy.interpolate import splrep, splev
 from ase.data import atomic_numbers, covalent_radii
 from ase.units import Bohr
 from hotcent.interpolation import Function, SplineFunction
-from hotcent.atom import AllElectron, orbit_transform
+from hotcent.atomic_base import AtomicBase, orbit_transform
 from hotcent.confinement import ZeroConfinement
 from hotcent.xc import XC_PW92, LibXC
 try:
@@ -25,7 +24,7 @@ except:
     pl = None
 
 
-class HotcentAE(AllElectron):
+class AtomicDFT(AtomicBase):
     def __init__(self,
                  symbol,
                  xcname='LDA',
@@ -39,9 +38,9 @@ class HotcentAE(AllElectron):
         Example:
         ---------
         from hotcent.confinement import PowerConfinement
-        atom = HotcentAllElectron('C',
-                                  xcname='GGA_C_PBE+GGA_X_PBE',
-                                  confinement=PowerConfinement(r0=3., s=2))
+        atom = AtomicDFT('C',
+                         xcname='GGA_C_PBE+GGA_X_PBE',
+                         confinement=PowerConfinement(r0=3.0, s=2))
         atom.run()
 
         Parameters:
@@ -66,7 +65,7 @@ class HotcentAE(AllElectron):
         restart:        filename: make an initial guess for effective
                         potential and density from another calculation.
         """
-        AllElectron.__init__(self, symbol, **kwargs)
+        AtomicBase.__init__(self, symbol, **kwargs)
 
         self.xcname = xcname
         self.convergence = convergence
