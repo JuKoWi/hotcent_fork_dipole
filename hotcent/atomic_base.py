@@ -37,8 +37,7 @@ class AtomicBase:
                  timing=False,
                  verbose=False,
                  txt='-'):
-        """
-        Base class for atomic DFT calculators
+        """ Base class for atomic DFT calculators
 
         symbol:         chemical symbol
         configuration:  e.g. '[He] 2s2 2p2'    
@@ -295,8 +294,8 @@ class AtomicBase:
         return states
 
     def get_wf_range(self, nl, fractional_limit=1e-7):
-        """ Return the maximum r for which |R(r)|<fractional_limit*max(|R(r)|) """
-        #wfmax = max(abs(self.Rnlg[nl]))
+        """ Return the maximum r for which |R(r)| is
+        less than fractional_limit*max(|R(r)|) """
         wfmax = np.nanmax(np.abs(self.Rnlg[nl]))
         for r, wf in zip(self.rgrid[-1::-1], self.Rnlg[nl][-1::-1]):
             if abs(wf) > fractional_limit * wfmax:
@@ -355,9 +354,9 @@ class AtomicBase:
         return self.symbol
 
     def get_valence_energies(self):
-        """ Return list of valence energies, e.g. ['2s','2p'] --> [-39.2134,-36.9412] """
+        """ Return list of valence eigenenergies. """
         if not self.solved:
-            raise AssertionError('run calculations first.')
+            raise AssertionError('Call the run() method first.')
         return [(nl, self.enl[nl]) for nl in self.valence]
 
     def write_unl(self, filename, only_valence=True, step=20):
@@ -383,7 +382,7 @@ class AtomicBase:
 
                 for r, u in zip(self.rgrid[::step], self.unlg[nl][::step]):
                     print(r, u, file=f)
- 
+
             print('\n\nv_effective=', file=f)
 
             for r,ve in zip(self.rgrid[::step], self.veff[::step]):

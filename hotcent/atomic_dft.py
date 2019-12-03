@@ -1,7 +1,7 @@
 """ Definition of the AtomicDFT class for atomic
 DFT calculations.
 
-The code below draws heavily from the Hotbit code 
+The code below draws heavily from the Hotbit code
 written by Pekka Koskinen (https://github.com/pekkosk/
 hotbit/blob/master/hotbit/parametrization/atom.py).
 """
@@ -32,8 +32,7 @@ class AtomicDFT(AtomicBase):
                  restart=None,
                  write=None,
                  **kwargs):
-        """
-        Run Kohn-Sham all-electron calculations for a given atom.
+        """ Run Kohn-Sham all-electron calculations for a given atom.
 
         Example:
         ---------
@@ -49,15 +48,15 @@ class AtomicDFT(AtomicBase):
                         provided, then Hotcent's native LDA implementation
                         will be used. For all other functionals, the PyLibXC
                         module is required, which is bundled with LibXC.
-                        The names of the implemented functionals can be found on
-                        https://www.tddft.org/programs/libxc/functionals/
+                        The names of the implemented functionals can be found
+                        on https://www.tddft.org/programs/libxc/functionals/
                         Often one needs to combine different LibXC functionals,
                         for example:
                           xcname='GGA_X_PBE+GGA_C_PBE'  # for PBE XC
 
         convergence:    convergence criterion dictionary
                         * density: max change for integrated |n_old-n_new|
-                        * energies: max change in single-particle energy (Hartree)
+                        * energies: max change in single-particle energy (Ha)
 
         write:          filename: save rgrid, effective potential and
                         density to a file for further calculations.
@@ -82,10 +81,11 @@ class AtomicDFT(AtomicBase):
         if self.scalarrel:
             print('Using scalar relativistic corrections.', file=self.txt)
 
-        maxnodes = max( [n - l - 1 for n, l, nl in self.list_states()] )
+        maxnodes = max([n - l - 1 for n, l, nl in self.list_states()])
         self.rmin = 1e-2 / self.Z
         self.N = (maxnodes + 1) * self.nodegpts
-        print('max %i nodes, %i grid points' % (maxnodes, self.N), file=self.txt)
+        print('max %i nodes, %i grid points' % (maxnodes, self.N),
+              file=self.txt)
 
         self.xgrid = np.linspace(0, np.log(self.rmax / self.rmin), self.N)
         self.rgrid = self.rmin * np.exp(self.xgrid)
@@ -96,29 +96,30 @@ class AtomicDFT(AtomicBase):
         """ Set output channel and give greetings. """
         if txt == '-':
             self.txt = sys.stdout
-        elif txt == None:
+        elif txt is None:
             self.txt = open(os.devnull,'w')
         else:
             self.txt = open(txt, 'a')
         print('*******************************************', file=self.txt)
-        print('Kohn-Sham all-electron calculation for %2s ' % self.symbol, file=self.txt)
+        print('Kohn-Sham all-electron calculation for %2s ' % self.symbol,
+              file=self.txt)
         print('*******************************************', file=self.txt)
 
     def calculate_energies(self, echo=False):
-        """
-        Calculate energy contributions.
-        """
+        """ Calculate energy contributions. """
         self.timer.start('energies')
         self.bs_energy = 0.0
         for n, l, nl in self.list_states():
             self.bs_energy += self.configuration[nl] * self.enl[nl]
 
         self.exc, self.vxc = self.xc.evaluate(self.dens, self.grid)
-        self.Hartree_energy = self.grid.integrate(self.Hartree * self.dens, use_dV=True) / 2
+        self.Hartree_energy = self.grid.integrate(self.Hartree * self.dens,
+                                                  use_dV=True) / 2
         self.vxc_energy = self.grid.integrate(self.vxc * self.dens, use_dV=True)
         self.exc_energy = self.grid.integrate(self.exc * self.dens, use_dV=True)
-        self.confinement_energy = self.grid.integrate(self.conf * self.dens, use_dV=True)
-        self.total_energy = self.bs_energy - self.Hartree_energy 
+        self.confinement_energy = self.grid.integrate(self.conf * self.dens,
+                                                      use_dV=True)
+        self.total_energy = self.bs_energy - self.Hartree_energy
         self.total_energy += - self.vxc_energy + self.exc_energy
 
         if echo:
@@ -137,17 +138,24 @@ class AtomicDFT(AtomicBase):
             print('\n', file=self.txt)
             print('total energies:', file=self.txt)
             print('---------------', file=self.txt)
-            print('sum of eigenvalues:     %.15f' % self.bs_energy, file=self.txt)
-            print('Hartree energy:         %.15f' % self.Hartree_energy, file=self.txt)
-            print('vxc correction:         %.15f' % self.vxc_energy, file=self.txt)
-            print('exchange + corr energy: %.15f' % self.exc_energy, file=self.txt)
+            print('sum of eigenvalues:     %.15f' % self.bs_energy,
+                  file=self.txt)
+            print('Hartree energy:         %.15f' % self.Hartree_energy,
+                  file=self.txt)
+            print('vxc correction:         %.15f' % self.vxc_energy,
+                  file=self.txt)
+            print('exchange + corr energy: %.15f' % self.exc_energy,
+                  file=self.txt)
             print('----------------------------', file=self.txt)
-            print('total energy:           %.15f\n\n' % self.total_energy, file=self.txt)
+            print('total energy:           %.15f\n\n' % self.total_energy,
+                  file=self.txt)
 
         self.timer.stop('energies')
 
     def calculate_density(self):
-        """ Calculate the radial electron density.; sum_nl |Rnl(r)|**2/(4*pi) """
+        """ Calculate the radial electron density:
+        sum_nl occ_nl |Rnl(r)|**2 / (4*pi)
+        """
         self.timer.start('density')
         dens = np.zeros_like(self.rgrid)
         for n,l,nl in self.list_states():
@@ -156,7 +164,9 @@ class AtomicDFT(AtomicBase):
         nel = self.grid.integrate(dens)
 
         if abs(nel - self.nel) > 1e-10:
-            raise RuntimeError('Integrated density %.3g, number of electrons %.3g' % (nel, self.nel))
+            err = 'Integrated density %.3g' % nel
+            err += ', number of electrons %.3g' % self.nel
+            raise RuntimeError(err)
 
         dens = dens / (4 * np.pi * self.rgrid **2)
 
@@ -164,9 +174,7 @@ class AtomicDFT(AtomicBase):
         return dens
 
     def calculate_Hartree_potential(self):
-        """
-        Calculate Hartree potential.
-
+        """ Calculate Hartree potential.
         Everything is very sensitive to the way this is calculated.
         If you can think of how to improve this, please tell me!
         """
@@ -200,14 +208,15 @@ class AtomicDFT(AtomicBase):
 
     def guess_density(self):
         """ Guess initial density. """
-        r2 = 0.02 * self.Z # radius at which density has dropped to half; improve this!
+        r2 = 0.02 * self.Z  # radius at which density has dropped to half;
+                            # can this be improved?
         dens = np.exp(-self.rgrid / (r2 / np.log(2)))
         dens = dens / self.grid.integrate(dens, use_dV=True) * self.nel
         return dens
 
     def get_veff_and_dens(self):
         """ Construct effective potential and electron density. If restart
-            file is given, try to read from there, otherwise make a guess.
+        a file is given, try to read from there, otherwise make a guess.
         """
         done = False
         if self.restart is not None:
@@ -247,8 +256,6 @@ class AtomicDFT(AtomicBase):
             print(bar, file=self.txt)
             self.confinement = ZeroConfinement()
             self._run()
-            #u_j = [self.unlg[nl].copy() for nl in valence]
-            #e_j = [self.enl[nl] for nl in valence]
             veff = self.veff.copy()
 
         for nl, wf_confinement in self.wf_confinement.items():
@@ -312,9 +319,7 @@ class AtomicDFT(AtomicBase):
         self.txt.flush()
 
     def _run(self):
-        """
-        Solve the self-consistent potential.
-        """
+        """ Solve the self-consistent potential. """
         self.timer.start('solve ground state')
         print('\nStart iteration...', file=self.txt)
         self.enl = {}
@@ -332,7 +337,8 @@ class AtomicDFT(AtomicBase):
         self.calculate_Hartree_potential()
 
         for it in range(self.maxiter):
-            self.veff = self.mix * self.calculate_veff() + (1 - self.mix) * self.veff
+            self.veff *= 1. - self.mix
+            self.veff += self.mix * self.calculate_veff()
             if self.scalarrel:
                 veff = SplineFunction(self.rgrid, self.veff)
                 self.dveff = np.array([veff(r, der=1) for r in self.rgrid])
@@ -342,8 +348,9 @@ class AtomicDFT(AtomicBase):
             self.dens = self.calculate_density()
             diff = self.grid.integrate(np.abs(self.dens - dens0), use_dV=True)
 
-            if diff < self.convergence['density'] and d_enl_max < self.convergence['energies'] and it > 5:
-                break
+            if diff < self.convergence['density'] and it > 5:
+                if d_enl_max < self.convergence['energies']:
+                    break
             self.calculate_Hartree_potential()
 
             if np.mod(it, 10) == 0:
@@ -355,7 +362,8 @@ class AtomicDFT(AtomicBase):
             if it == self.maxiter - 1:
                 if self.timing:
                     self.timer.summary()
-                raise RuntimeError('Density not converged in %i iterations' % (it + 1))
+                err = 'Density not converged in %i iterations' % (it + 1)
+                raise RuntimeError(err)
             self.txt.flush()
 
         self.calculate_energies(echo=True)
@@ -365,10 +373,9 @@ class AtomicDFT(AtomicBase):
         print(line, file=self.txt)
 
         self.timer.stop('solve ground state')
-        
+
     def solve_eigenstates(self, iteration, itmax=100):
-        """
-        Solve the eigenstates for given effective potential.
+        """ Solve the eigenstates for given effective potential.
 
         u''(r) - 2*(v_eff(r)+l*(l+1)/(2r**2)-e)*u(r)=0
         ( u''(r) + c0(r)*u(r) = 0 )
@@ -411,9 +418,11 @@ class AtomicDFT(AtomicBase):
                 eps0 = eps
                 c0, c1, c2 = self.construct_coefficients(l, eps)
 
-                # boundary conditions for integration from analytic behaviour (unscaled)
+                # boundary conditions for integration from analytic behaviour
+                # (unscaled)
                 # u(r)~r**(l+1)   r->0
-                # u(r)~exp( -sqrt(c0(r)) ) (set u[-1]=1 and use expansion to avoid overflows)
+                # u(r)~exp( -sqrt(c0(r)) ) (set u[-1]=1
+                # and use expansion to avoid overflows)
                 u[0:2] = rgrid[0:2] ** (l + 1)
 
                 if not(c0[-2] < 0 and c0[-1] < 0):
@@ -459,7 +468,8 @@ class AtomicDFT(AtomicBase):
                         print(h)
                     print('nl=%s, eps=%f' % (nl,eps), file=self.txt)
                     print('max epsilon', epsmax, file=self.txt)
-                    raise RuntimeError('Eigensolver out of iterations. Atom not stable?')
+                    err = 'Eigensolver out of iterations. Atom not stable?'
+                    raise RuntimeError(err)
 
             itmax = max(it, itmax)
             self.unlg[nl] = u
@@ -469,8 +479,8 @@ class AtomicDFT(AtomicBase):
             self.enl[nl] = eps
 
             if self.verbose:
-                line = '-- state %s, %i eigensolver iterations, e=%9.5f, de=%9.5f' % \
-                       (nl, it, self.enl[nl], self.d_enl[nl])
+                line = '-- state %s, %i eigensolver iterations' % (nl, it)
+                line += ', e=%9.5f, de=%9.5f' % (self.enl[nl], self.d_enl[nl])
                 print(line, file=self.txt)
 
             assert nodes == nodes_nl
@@ -520,9 +530,11 @@ class AtomicDFT(AtomicBase):
             eps0 = eps
             c0, c1, c2 = self.construct_coefficients(l, eps)
 
-            # boundary conditions for integration from analytic behaviour (unscaled)
+            # boundary conditions for integration from analytic behaviour
+            # (unscaled)
             # u(r)~r**(l+1)   r->0
-            # u(r)~exp( -sqrt(c0(r)) ) (set u[-1]=1 and use expansion to avoid overflows)
+            # u(r)~exp( -sqrt(c0(r)) ) (set u[-1]=1
+            # and use expansion to avoid overflows)
             u[0:2] = rgrid[0:2] ** (l + 1)
 
             if not(c0[-2] < 0 and c0[-1] < 0):
@@ -568,7 +580,8 @@ class AtomicDFT(AtomicBase):
                     print(h)
                 print('nl=%s, eps=%f' % (nl,eps), file=self.txt)
                 print('max epsilon', epsmax, file=self.txt)
-                raise RuntimeError('Eigensolver out of iterations. Atom not stable?')
+                err = 'Eigensolver out of iterations. Atom not stable?'
+                raise RuntimeError(err)
 
             itmax = max(it, itmax)
             self.unlg[nl] = u
@@ -578,8 +591,8 @@ class AtomicDFT(AtomicBase):
             self.enl[nl] = eps
 
             if self.verbose:
-                line = '-- state %s, %i eigensolver iterations, e=%9.5f, de=%9.5f' % \
-                       (nl, it, self.enl[nl], self.d_enl[nl])
+                line = '-- state %s, %i eigensolver iterations' % (nl, it)
+                line += ', e=%9.5f, de=%9.5f' % (self.enl[nl], self.d_enl[nl])
                 print(line, file=self.txt)
 
             assert nodes == nodes_nl
@@ -597,15 +610,15 @@ class AtomicDFT(AtomicBase):
         else:
             # from Paolo Giannozzi: Notes on pseudopotential generation
             ScR_mass = 1 + 0.5 * (eps - self.veff) / c ** 2
-            c0 = -l * (l + 1) - 2 * ScR_mass * self.rgrid ** 2 * (self.veff - eps)
+            c0 = -l * (l + 1)
+            c0 -= 2 * ScR_mass * self.rgrid ** 2 * (self.veff - eps)
             c0 -= self.dveff * self.rgrid / (2 * ScR_mass * c ** 2)
             c1 = self.rgrid * self.dveff / (2 * ScR_mass * c ** 2) - 1
         return c0, c1, c2
 
 
 def shoot(u, dx, c2, c1, c0, N):
-    """
-    Integrate diff equation
+    """ Integrate diff equation
 
            2
          d u      du
@@ -673,8 +686,8 @@ class RadialGrid:
         rmin                                                        rmax
         r[0]     r[1]      r[2]            ...                     r[N-1] grid
         I----'----I----'----I----'----I----'----I----'----I----'----I
-           r0[0]     r0[1]     r0[2]       ...              r0[N-2]       r0grid
-           dV[0]     dV[1]     dV[2]       ...              dV[N-2]       dV
+           r0[0]     r0[1]     r0[2]       ...              r0[N-2]     r0grid
+           dV[0]     dV[1]     dV[2]       ...              dV[N-2]         dV
 
            dV[i] is volume element of shell between r[i] and r[i+1]
         """
@@ -702,7 +715,9 @@ class RadialGrid:
         return self.dr
 
     def get_r0grid(self):
-        """ Return the mid-points between grid spacings (array of length N-1). """
+        """ Return the mid-points between grid spacings
+        (array of length N-1).
+        """
         return self.r0
 
     def get_dvolumes(self):
@@ -716,8 +731,7 @@ class RadialGrid:
             pl.show()
 
     def integrate(self, f, use_dV=False):
-        """
-        Integrate function f (given with N grid points).
+        """ Integrate function f (given with N grid points).
         int_rmin^rmax f*dr (use_dv=False) or int_rmin^rmax*f dV (use_dV=True)
         """
         if use_dV:

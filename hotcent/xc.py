@@ -108,7 +108,7 @@ class XC_PW92:
     def e_corr(self, n, der=0):
         """ Correlation energy. """
         rs = (3. / (4 * np.pi * n)) ** (1. / 3)
-        aux = 2 * self.c0 
+        aux = 2 * self.c0
         aux *= self.b1 * np.sqrt(rs) + self.b2 * rs + self.b3 * rs ** (3. / 2) + self.b4 * rs ** 2
         if der == 0:
             return -2 * self.c0 * (1 + self.a1 * rs) * np.log(1 + aux ** -1)

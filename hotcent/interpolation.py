@@ -1,5 +1,5 @@
 """ Definition of spline functions used by the
-KSAllelectron class.
+AtomicDFT class.
 
 The code below draws heavily from the Hotbit code 
 written by Pekka Koskinen (https://github.com/pekkosk/
@@ -27,7 +27,6 @@ class SplineFunction:
         k:  order of spline (cubic by default)
         s:  smoothness parameters (means exact reproduction of x,y values)
         name: name of the function
-
         """
         if s == -1:
             s = len(x) - np.sqrt(2. * len(x))
@@ -78,15 +77,11 @@ class SplineFunction:
         return brentq(lambda x: self(x) - y, a=a, b=b)
 
     def integrate(self, a, b):
-        """
-        Integrate given function within [a, b]
-        """
+        """ Integrate given function within [a, b]. """
         return splint(a, b, self.tck)
 
     def plot(self, return_pylab=False, der=0, filename=None):
-        """
-        Plot the function with matplolib
-        """
+        """ Plot the function with matplolib """
         pl.clf()
         X = np.linspace(self.a, self.b, self.M * 10)
         Y = [self(x, der=der) for x in X]
@@ -104,8 +99,7 @@ class SplineFunction:
         pl.close()
 
     def max_deviation_from_linear(self):
-        """
-        For given spline (default cubic), return maximum difference
+        """ For given spline (default cubic), return maximum difference
         wrt linear (k=0) interpolation.
         """
         min_dx = np.min(np.array(self.x[1:]) - np.array(self.x[0:-1]))
@@ -115,8 +109,7 @@ class SplineFunction:
         return max([f1(x) - self(x) for x in X])
 
     def smoothness(self):
-        """
-        Return a measure for the ''smoothness'' of interpolation.
+        """ Return a measure for the ''smoothness'' of interpolation.
 
         It is measured by max_deviation_from_linear / average|dy|.
         Smooth interpolations should have <<1.

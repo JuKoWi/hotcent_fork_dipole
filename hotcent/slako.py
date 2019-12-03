@@ -20,7 +20,7 @@ from hotcent.xc import XC_PW92, LibXC
 class SlaterKosterTable:
     def __init__(self, ela, elb, txt=None, timing=False):
         """ Construct Slater-Koster table for given elements.
-                
+
         Parameters:
         -----------
         ela:    AtomicDFT object
@@ -32,29 +32,26 @@ class SlaterKosterTable:
         self.elb = elb
         self.timing = timing
 
-        if txt == None:
+        if txt is None:
             self.txt = sys.stdout
         else:
             if type(txt) == type(''):
                 self.txt = open(txt, 'a')
             else:
-                self.txt = txt                
-
-        #self.comment = self.ela.get_comment()
+                self.txt = txt
 
         if ela.get_symbol() != elb.get_symbol():
             self.nel = 2
             self.pairs = [(ela, elb), (elb, ela)]
             self.elements = [ela, elb]
-            #self.comment += '\n' + self.elb.get_comment()
         else:
             self.nel = 1
             self.pairs = [(ela, elb)]
             self.elements = [ela]
 
         self.timer = Timer('SlaterKosterTable', txt=self.txt, enabled=timing)
-                                        
-        print('\n\n\n\n', file=self.txt)                                        
+
+        print('\n\n\n\n', file=self.txt)
         print('***********************************************', file=self.txt)
         print('Slater-Koster table construction for %2s and %2s' % \
               (ela.get_symbol(), elb.get_symbol()), file=self.txt)
@@ -66,14 +63,14 @@ class SlaterKosterTable:
         
     def get_table(self):
         """ Return tables. """
-        return self.Rgrid, self.tables        
+        return self.Rgrid, self.tables
                 
     def smooth_tails(self):
         """ Smooth the behaviour of tables near cutoff. """
         for p in range(self.nel):
             for i in range(20):
                 self.tables[p][:, i] = tail_smoothening(self.Rgrid,
-                                                        self.tables[p][:, i])                
+                                                        self.tables[p][:, i])
 
     def write(self, filename=None, pair=None, eigenvalues=None,
               hubbardvalues=None, occupations=None, spe=None):
@@ -173,8 +170,6 @@ class SlaterKosterTable:
             print(line, file=handle)
 
     def _write_par(self, handle):
-        #print('slako_comment=', file=f)
-        #print(self.get_comment(), '\n\n', file=f)
         for p, (e1, e2) in enumerate(self.pairs):
             line = '%s-%s_table=' % (e1.get_symbol(), e2.get_symbol())
             print(line, file=handle)
@@ -191,13 +186,13 @@ class SlaterKosterTable:
                 print(file=handle)
 
             print('\n\n', file=handle)
-    
+
     def plot(self, filename=None):
-        """ Plot the Slater-Koster table with matplotlib. 
-        
+        """ Plot the Slater-Koster table with matplotlib.
+
         parameters:
         ===========
-        filename:     for graphics file
+        filename:     name for the figure
         """
         try:
             import pylab as pl
@@ -250,10 +245,10 @@ class SlaterKosterTable:
                             transform=ax.transAxes)
 
                     if ax.is_last_row():
-                        pl.xlabel('r (Bohr)')                                        
+                        pl.xlabel('r (Bohr)')
                     else:
                         pl.xticks([], [])
-                    if not ax.is_first_col():                   
+                    if not ax.is_first_col():
                         pl.yticks([],[])
 
                 pl.xlim([0, rmax])
@@ -279,18 +274,18 @@ class SlaterKosterTable:
         for el in self.elements:
             r = max([el.get_wf_range(nl, fractional_limit) 
                      for nl in el.get_valence_orbitals()])
-            print('wf range for %s=%10.5f' % (el.get_symbol(), r), 
+            print('wf range for %s=%10.5f' % (el.get_symbol(), r),
                   file=self.txt)
             wf_range = max(r, wf_range)
 
         assert wf_range < 20, 'Wave function range >20 Bohr. Decrease wflimit?'
-        self.timer.stop('define ranges')        
+        self.timer.stop('define ranges')
         return wf_range
         
-    def run(self, R1, R2, N, ntheta=150, nr=50, wflimit=1e-7, 
+    def run(self, R1, R2, N, ntheta=150, nr=50, wflimit=1e-7,
             superposition='potential', xc='LDA'):
-        """ Calculate the Slater-Koster table. 
-         
+        """ Calculate the Slater-Koster table.
+
         parameters:
         ------------
         R1, R2, N: make table from R1 to R2 with N points
@@ -318,15 +313,15 @@ class SlaterKosterTable:
         assert R1 >= 1e-3, 'For stability; use R1 >~ 1e-3'
         assert superposition in ['density', 'potential']
 
-        self.timer.start('calculate tables')   
-        self.wf_range = self.get_range(wflimit)        
+        self.timer.start('calculate tables')
+        self.wf_range = self.get_range(wflimit)
         Rgrid = np.linspace(R1, R2, N)
         self.N = N
         self.Rgrid = Rgrid
         self.dH = 0.
         self.Hmax = 0.
 
-        if self.nel == 1: 
+        if self.nel == 1:
             self.tables = [np.zeros((N, 20))]
         else: 
             self.tables = [np.zeros((N, 20)), np.zeros((N, 20))]
@@ -343,18 +338,18 @@ class SlaterKosterTable:
             self.txt.flush()
 
         for Ri, R in enumerate(Rgrid):
-            if R > 2 * self.wf_range: 
+            if R > 2 * self.wf_range:
                 break
 
             grid, areas = self.make_grid(R, nt=ntheta, nr=nr)
 
-            if  Ri == N - 1 or N // 10 == 0 or np.mod(Ri, N // 10) == 0:                    
+            if  Ri == N - 1 or N // 10 == 0 or np.mod(Ri, N // 10) == 0:
                 print('R=%8.2f, %i grid points ...' % (R, len(grid)),
                       file=self.txt)
                 self.txt.flush()
  
             for p, (e1, e2) in enumerate(self.pairs):
-                selected = select_integrals(e1, e2) 
+                selected = select_integrals(e1, e2)
                 if len(grid) == 0:
                     S, H, H2 = 0., 0., 0.
                 else:
@@ -366,21 +361,19 @@ class SlaterKosterTable:
                 self.tables[p][Ri, :10] = H
                 self.tables[p][Ri, 10:] = S
 
-        if superposition == 'potential':        
+        if superposition == 'potential':
             print('Maximum value for H=%.2g' % self.Hmax, file=self.txt)
-            print('Maximum error for H=%.2g' % self.dH, file=self.txt)        
+            print('Maximum error for H=%.2g' % self.dH, file=self.txt)
             print('     Relative error=%.2g %%' % (self.dH / self.Hmax * 100),
                   file=self.txt)
 
         self.smooth_tails()
-        self.timer.stop('calculate tables')  
-        #self.comment+='\n'+asctime()
+        self.timer.stop('calculate tables')
         self.txt.flush()
                
-    def calculate_mels(self, selected, e1, e2, R, grid, area, 
+    def calculate_mels(self, selected, e1, e2, R, grid, area,
                        superposition='potential', xc='LDA'):
-        """ 
-        Perform integration for selected H and S integrals.
+        """ Perform integration for selected H and S integrals.
          
         parameters:
         -----------
@@ -464,10 +457,10 @@ class SlaterKosterTable:
         assert np.shape(radii) == (N, 2)
         assert np.shape(veff) == (N,)
 
-        self.timer.stop('prelude')                             
-        
+        self.timer.stop('prelude')
+
         # calculate all selected integrals
-        for integral, nl1, nl2 in selected:           
+        for integral, nl1, nl2 in selected:
             index = integrals.index(integral)
             S, H, H2 = 0., 0., 0.
             l2 = angular_momentum[nl2[1]]
@@ -502,7 +495,7 @@ class SlaterKosterTable:
     def make_grid(self, Rz, nt, nr, p=2, q=2, view=False):
         """
         Construct a double-polar grid.
-        
+
         Parameters:
         -----------
         Rz: element 1 is at origin, element 2 at z=Rz
@@ -513,7 +506,7 @@ class SlaterKosterTable:
         q: power describing the radial disribution of grid points 
            (larger puts more weight towards centers)   
         view: view the distribution of grid points with pylab.
-          
+
         Plane at R/2 divides two polar grids.
                 
                                
@@ -576,9 +569,9 @@ class SlaterKosterTable:
             cond_list = [z1 <= h,  # area fully inside region 
                  (z1 > h) * (z2 <= h) * (z4 <= h),  # corner 1 outside region
                  (z1 > h) * (z2 > h) * (z3 <= h) * (z4 <= h),  # 1 & 2 outside
-                 (z1 > h) * (z2 > h) * (z3 <= h) * (z4 > h),  # only 3 inside    
+                 (z1 > h) * (z2 > h) * (z3 <= h) * (z4 > h),  # only 3 inside
                  (z1 > h) * (z2 <= h) * (z3 <= h) * (z4 > h),  # 1 & 4 outside
-                 (z1 > h) * (z3 > h) * ~((z2 <= h) * (z4 > h))]        
+                 (z1 > h) * (z3 > h) * ~((z2 <= h) * (z4 > h))]
 
             r0_list = [0.5 * (R[i] + R[i + 1]),
                        0.5 * (R[i] + R[i + 1]),
@@ -640,8 +633,8 @@ class SlaterKosterTable:
 
         grid = np.array([d, z]).T
 
-        self.timer.start('symmetrize')                                               
-        # calculate the polar centered on atom 2 by mirroring the other grid  
+        self.timer.start('symmetrize')
+        # calculate the polar centered on atom 2 by mirroring the other grid
 
         grid2 = grid.copy()
         grid2[:, 1] = -grid[:, 1]
@@ -650,26 +643,25 @@ class SlaterKosterTable:
         grid = np.concatenate((grid, grid2 + shift))
         area = np.concatenate((area, area))
         self.timer.stop('symmetrize')
-                
+
         if view:
             import pylab as pl
-            pl.plot([h, h ,h])        
+            pl.plot([h, h ,h])
             pl.scatter(grid[:, 0], grid[:, 1], s=10 * area / max(area))
             pl.show()
             
-        self.timer.stop('make grid')            
+        self.timer.stop('make grid')
         return grid, area
-        
-        
+
+
 integrals = ['dds', 'ddp', 'ddd', 'pds', 'pdp', 'pps', 'ppp', 
              'sds', 'sps', 'sss']
 angular_momentum = {'s':0, 'p':1, 'd':2}
 
 
 def select_orbitals(val1, val2, integral):
-    """ 
-    Select orbitals from given valences to calculate given integral. 
-    e.g. ['2s','2p'],['4s','3d'],'sds' --> '2s' & '3d'
+    """ Select orbitals from given valences to calculate given integral.
+    e.g. ['2s','2p'],['4s','3d'],'sds' --> ('2s', '3d')
     """
     nl1 = None
     for nl in val1:
@@ -682,8 +674,8 @@ def select_orbitals(val1, val2, integral):
             nl2 = nl
 
     return nl1, nl2
-        
-        
+
+
 def select_integrals(e1, e2):
     """ Return list of integrals (integral,nl1,nl2) 
     to be done for element pair e1, e2. """
@@ -693,22 +685,21 @@ def select_integrals(e1, e2):
     for ii, integral in enumerate(integrals):
         nl1, nl2 = select_orbitals(val1 , val2 , integral)
 
-        if nl1 == None or nl2 == None:
+        if nl1 is None or nl2 is None:
             continue
         else:
             selected.append((integral, nl1, nl2))
 
-    return selected 
-            
-        
+    return selected
+
+
 def g(t1, t2):
-    """
-    Return the angle-dependent part of the two-center 
+    """ Return the angle-dependent part of the two-center
     integral (it) with t1=theta_1 (atom at origin)
     and t2=theta2 (atom at z=Rz). These dependencies
     come after integrating analytically over phi.
     """
-    c1, c2, s1, s2 = np.cos(t1), np.cos(t2), np.sin(t1), np.sin(t2)   
+    c1, c2, s1, s2 = np.cos(t1), np.cos(t2), np.sin(t1), np.sin(t2)
     return np.array([5. / 8 * (3 * c1 ** 2 - 1) * (3 * c2 ** 2 - 1),\
                      15. / 4 * s1 * c1 * s2 * c2,\
                      15. / 16 * s1 ** 2 * s2 ** 2,\
@@ -779,7 +770,7 @@ def tail_smoothening(x, y):
             for i in range(k + 2,N):
                 y[i] = c2 * (xmax - x[i]) ** 2 + c3 * (xmax - x[i]) ** 3
 
-            y[-1] = 0.  # once more explicitly            
+            y[-1] = 0.  # once more explicitly
 
             if np.all(y[k:] * sgn >= 0):
                 y = np.append(y, np.zeros(Nzero))

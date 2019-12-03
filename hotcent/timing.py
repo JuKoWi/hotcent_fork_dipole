@@ -28,30 +28,30 @@ class Timer:
     ...
     tm.summary()
 
-    Timing can be nested, but still strictly hierarchial. 
+    Timing can be nested, but still strictly hierarchial.
     (e.g. if function (with timer) is called from different places
-    with different timers, timers will overlap and an error 
-    will result.)    
+    with different timers, timers will overlap and an error
+    will result.)
 
     Cannot be used to recursive functions.
     """
 
     def __init__(self, label, level=0, txt=None, enabled=True):
-        """ Init process timer with given label and output. 
+        """ Init process timer with given label and output.
 
         Parameters:
         -----------
         label:      label for process (e.g. 'integration')
 
-        level refers to deepness of nesting. 
+        level refers to deepness of nesting.
 
-        If not enabled, disable all timing stuff (start, top, summary) 
+        If not enabled, disable all timing stuff (start, top, summary)
         to speed things up.
         """
         self.label = label
         self.timers = []
         self.first = time()
-        if txt == None:
+        if txt is None:
             from sys import stdout
             self.txt = stdout
         else:
@@ -61,7 +61,6 @@ class Timer:
         self.enabled = enabled
         if level == 0:
             self.start()
-        # self.durations=[]
         self.elapsed_time = 0.0
         self.nr_of_calls = 0
         self.smry = False
@@ -82,9 +81,9 @@ class Timer:
     def get_timer(self, label):
         """ Does timer or any of it's timers have given label (recursively)? """
         if self.label == label:
-            return self               # this has given label
+            return self  # this has given label
         elif len(self.timers) == 0:
-            return None                # no given label, no child timers
+            return None  # no given label, no child timers
         else:
             for timer in self.timers:
                 tr = timer.get_timer(label)
@@ -96,9 +95,9 @@ class Timer:
         return self.level
 
     def get_outmost_running(self):
-        """ Return the most nested running timer. 
-        If timer is running and has no child timers, itself is the outmost timer.
-        If if no child timers are running, return itself.
+        """ Return the most nested running timer.
+        If timer is running and has no child timers, itself is the
+        outmost timer. If if no child timers are running, return itself.
         """
         if not self.running:
             raise AssertionError(
@@ -118,7 +117,7 @@ class Timer:
         """ Start timer itself or child timer with given label. """
         if not self.enabled:
             return
-        if label == None:
+        if label is None:
             if self.running:
                 raise AssertionError('Timer %s already running!' % self.label)
             self.t1 = time()
@@ -126,9 +125,9 @@ class Timer:
         else:
             tr = self.get_timer(label)
             if not self.running:
-                raise AssertionError(
-                    'Timer %s cannot make running child timers; itself is not running!' % self.label)
-            if tr == None:
+                raise AssertionError('Timer %s cannot make running \
+                            child timers; itself is not running!' % self.label)
+            if tr is None:
                 outmost = self.get_outmost_running()
                 tr = Timer(label, txt=self.txt, level=outmost.get_level()+1)
                 outmost.add_subtimer(tr)
@@ -139,7 +138,7 @@ class Timer:
     def stop(self, label=None):
         if not self.enabled:
             return
-        if label == None:
+        if label is None:
             if not self.running:
                 raise AssertionError(
                     'Timer %s cannot be stopped; it is not running!' % self.label)
@@ -149,7 +148,7 @@ class Timer:
             self.nr_of_calls += 1
         else:
             tr = self.get_timer(label)
-            if tr == None:
+            if tr is None:
                 raise AssertionError(
                     'Timer %s cannot be stopped; it does not exist!' % label)
             tr.stop()
@@ -210,11 +209,13 @@ class Timer:
             f = self.txt
 
         print('\nTiming:', file=f)
-        print('            label                    time     calls    %sub  %covered   %tot', file=f)
+        print('            label                    time     calls    %sub  %covered   %tot',
+              file=f)
         print('-' * 79, file=f)
         print(txt, end=' ', file=f)
         print('-' * 79, file=f)
-        print('total time %12.3f seconds      %s' % (total, self.human_readable_time(total)), file=f)
+        print('total time %12.3f seconds      %s' % (total, self.human_readable_time(total)),
+              file=f)
         print(asctime(), file=f)
         self.smry = True
 
