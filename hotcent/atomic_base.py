@@ -287,8 +287,7 @@ class AtomicBase:
         states = []
         for l in range(self.maxl + 1):
             for n in range(1, self.maxn + 1):
-                nl = orbit_transform((n, l), string=True)
-                #if nl in self.occu:
+                nl = tuple2nl(n, l)
                 if nl in self.configuration:
                     states.append((n, l, nl))
         return states
@@ -305,11 +304,10 @@ class AtomicBase:
         return self.total_energy
 
     def get_epsilon(self, nl):
-        """ get_eigenvalue('2p') or get_eigenvalue((2,1)) """
-        nls = orbit_transform(nl, string=True)
+        """ E.g. get_eigenvalue('2p') """
         if not self.solved:
-            raise AssertionError('run calculations first.')
-        return self.enl[nls]
+            raise AssertionError('Run the atomic DFT calculation first.')
+        return self.enl[nl]
 
     def get_eigenvalue(self, nl):
         return self.get_epsilon(nl)
@@ -336,14 +334,12 @@ class AtomicBase:
         return self.rgrid, self.dens
 
     def Rnl(self, r, nl, der=0):
-        """ Rnl(r,'2p') or Rnl(r,(2,1))"""
-        nls = orbit_transform(nl, string=True)
-        return self.Rnl_fct[nls](r, der=der)
+        """ Rnl(r, '2p') """
+        return self.Rnl_fct[nl](r, der=der)
 
     def unl(self, r, nl, der=0):
-        """ unl(r,'2p')=Rnl(r,'2p')/r or unl(r,(2,1))..."""
-        nls = orbit_transform(nl, string=True)
-        return self.unl_fct[nls](r, der=der)
+        """ unl(r, '2p') = Rnl(r,'2p') / r """
+        return self.unl_fct[nl](r, der=der)
 
     def get_valence_orbitals(self):
         """ Get list of valence orbitals, e.g. ['2s','2p'] """
@@ -412,7 +408,7 @@ class AtomicBase:
         """
         r = self.rgrid
         y = self.Rnlg[nl]
-        l = orbit_transform(nl, False)[1]
+        n, l = nl2tuple(nl)
         num_coeff = num_exp * num_pow
         num_r = len(r)
 
@@ -517,20 +513,19 @@ class AtomicBase:
             filename = 'wfc.%s.hsd' % self.symbol
 
         if num_exp is None:
-            num_exp = max([orbit_transform(nl, False)[0]
-                           for nl in self.valence])
+            num_exp = max([nl2tuple(nl)[0] for nl in self.valence])
 
         with open(filename, 'a') as f:
             f.write('%s = {\n' % self.symbol)
             f.write('  AtomicNumber = %d\n' % self.Z)
 
             for nl in self.valence:
+                n, l = nl2tuple(nl)
                 exp, coeff, values, resid = self.fit_sto(nl, num_exp, num_pow)
                 icut = len(values) - 1
                 while abs(values[icut]) < wfthr:
                     icut -= 1
                 rcut = np.round(self.rgrid[icut + 1], 1)
-                l = orbit_transform(nl, False)[1]
 
                 f.write('  Orbital = {\n')
                 f.write('    AngularMomentum = %d\n' % l)
@@ -550,15 +545,10 @@ class AtomicBase:
 
 angular_momenta = ['s', 'p', 'd', 'f', 'g', 'h', 'i', 'j', 'k', 'l']
 
-def orbit_transform(nl, string):
-    """ Transform orbitals into strings<->tuples, e.g. (2,1)<->'2p'. """
-    if string == True and type(nl) == type(''):
-        return nl  # '2p'->'2p'
-    elif string == True:
-        return '%i%s' % (nl[0], angular_momenta[nl[1]])  # (2,1)->'2p'
-    elif string == False and type(nl) == type((2, 1)):
-        return nl  # (2,1)->(2,1)
-    elif string == False:
-        l = angular_momenta.index(nl[1])
-        n = int(nl[0])
-        return (n,l)  # '2p'->(2,1)
+def nl2tuple(nl):
+    """ Transforms e.g. '2p' into (2, 1) """
+    return (int(nl[0]), angular_momenta.index(nl[1]))
+
+def tuple2nl(n, l):
+    """ Transforms e.g. (2, 1) into '2p' """
+    return '%i%s' % (n, angular_momenta[l])

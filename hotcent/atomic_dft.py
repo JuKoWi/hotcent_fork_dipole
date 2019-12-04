@@ -15,7 +15,7 @@ from scipy.interpolate import splrep, splev
 from ase.data import atomic_numbers, covalent_radii
 from ase.units import Bohr
 from hotcent.interpolation import Function, SplineFunction
-from hotcent.atomic_base import AtomicBase, orbit_transform
+from hotcent.atomic_base import AtomicBase, nl2tuple
 from hotcent.confinement import ZeroConfinement
 from hotcent.xc import XC_PW92, LibXC
 try:
@@ -507,7 +507,7 @@ class AtomicDFT(AtomicBase):
         d_enl_max = 0.0
         itmax = 0
 
-        n, l = orbit_transform(nl, string=False)
+        n, l = nl2tuple(nl)
         nodes_nl = n - l - 1
         eps = self.enl[nl]
         delta = self.d_enl[nl]
