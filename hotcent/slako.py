@@ -430,8 +430,8 @@ class SlaterKosterTable:
             veff = v1 + v2
         elif superposition == 'density':
             rho = e1.electron_density(r1) + e2.electron_density(r2)
-            veff = e1.V_nuclear(r1) + e1.hartree_potential(r1)
-            veff += e2.V_nuclear(r2) + e2.hartree_potential(r2)
+            veff = e1.nuclear_potential(r1) + e1.hartree_potential(r1)
+            veff += e2.nuclear_potential(r2) + e2.hartree_potential(r2)
             if xc in ['LDA', 'PW92']:
                 xc = XC_PW92()
                 veff += xc.vxc(rho)

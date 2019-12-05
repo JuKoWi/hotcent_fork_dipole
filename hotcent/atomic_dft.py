@@ -115,13 +115,13 @@ class AtomicDFT(AtomicBase):
             self.bs_energy += self.configuration[nl] * self.enl[nl]
 
         self.exc, self.vxc = self.xc.evaluate(self.dens, self.grid)
-        self.Hartree_energy = self.grid.integrate(self.Hartree * self.dens,
-                                                  use_dV=True) / 2
+        self.vhar_energy = self.grid.integrate(self.vhar * self.dens,
+                                               use_dV=True) / 2
         self.vxc_energy = self.grid.integrate(self.vxc * self.dens, use_dV=True)
         self.exc_energy = self.grid.integrate(self.exc * self.dens, use_dV=True)
         self.confinement_energy = self.grid.integrate(self.conf * self.dens,
                                                       use_dV=True)
-        self.total_energy = self.bs_energy - self.Hartree_energy
+        self.total_energy = self.bs_energy - self.vhar_energy
         self.total_energy += - self.vxc_energy + self.exc_energy
 
         if echo is not None:
@@ -136,7 +136,7 @@ class AtomicDFT(AtomicBase):
             print('----------------------------------------', file=self.txt)
             print('sum of eigenvalues:     %.12f' % self.bs_energy,
                   file=self.txt)
-            print('Hartree energy:         %.12f' % self.Hartree_energy,
+            print('Hartree energy:         %.12f' % self.vhar_energy,
                   file=self.txt)
             print('vxc correction:         %.12f' % self.vxc_energy,
                   file=self.txt)
@@ -157,11 +157,12 @@ class AtomicDFT(AtomicBase):
         for n,l,nl in self.list_states():
             dens += self.configuration[nl] * (self.unlg[nl] ** 2)
 
-        nel = self.grid.integrate(dens)
+        nel1 = self.grid.integrate(dens)
+        nel2 = self.get_number_of_electrons()
 
-        if abs(nel - self.nel) > 1e-10:
-            err = 'Integrated density %.3g' % nel
-            err += ', number of electrons %.3g' % self.nel
+        if abs(nel1 - nel2) > 1e-10:
+            err = 'Integrated density %.3g' % nel1
+            err += ', number of electrons %.3g' % nel2
             raise RuntimeError(err)
 
         dens = dens / (4 * np.pi * self.rgrid **2)
@@ -169,8 +170,8 @@ class AtomicDFT(AtomicBase):
         self.timer.stop('density')
         return dens
 
-    def calculate_Hartree_potential(self):
-        """ Calculate Hartree potential.
+    def calculate_hartree_potential(self):
+        """ Calculate the Hartree potential.
         Everything is very sensitive to the way this is calculated.
         If you can think of how to improve this, please tell me!
         """
@@ -179,9 +180,10 @@ class AtomicDFT(AtomicBase):
         r, r0 = self.rgrid, self.grid.get_r0grid()
         N = self.N
         n0 = 0.5 * (self.dens[1:] + self.dens[:-1])
-        n0 *= self.nel / sum(n0 * dV)
+        nel = self.get_number_of_electrons()
+        n0 *= nel / sum(n0 * dV)
 
-        lo, hi, Hartree = np.zeros(N), np.zeros(N), np.zeros(N)
+        lo, hi, vhar = np.zeros(N), np.zeros(N), np.zeros(N)
         lo[0] = 0.0
         for i in range(1, N):
             lo[i] = lo[i-1] + dV[i-1] * n0[i-1]
@@ -191,8 +193,8 @@ class AtomicDFT(AtomicBase):
             hi[i] = hi[i + 1] + n0[i] * dV[i] / r0[i]
 
         for i in range(N):
-            Hartree[i] = lo[i] / r[i] + hi[i]
-        self.Hartree = Hartree
+            vhar[i] = lo[i] / r[i] + hi[i]
+        self.vhar = vhar
         self.timer.stop('Hartree')
 
     def calculate_veff(self):
@@ -200,14 +202,15 @@ class AtomicDFT(AtomicBase):
         self.timer.start('veff')
         exc, self.vxc = self.xc.evaluate(self.dens, self.grid)
         self.timer.stop('veff')
-        return self.nucl + self.Hartree + self.vxc + self.conf
+        return self.vnuc + self.vhar + self.vxc + self.conf
 
     def guess_density(self):
         """ Guess initial density. """
         r2 = 0.02 * self.Z  # radius at which density has dropped to half;
                             # can this be improved?
         dens = np.exp(-self.rgrid / (r2 / np.log(2)))
-        dens = dens / self.grid.integrate(dens, use_dV=True) * self.nel
+        nel = self.get_number_of_electrons()
+        dens = dens / self.grid.integrate(dens, use_dV=True) * nel
         return dens
 
     def get_veff_and_dens(self):
@@ -232,7 +235,7 @@ class AtomicDFT(AtomicBase):
                       "starting from scratch.", file=self.txt)
 
         if not done:
-            self.veff = self.nucl + self.conf
+            self.veff = self.vnuc + self.conf
             self.dens = self.guess_density()
 
     def run(self, wf_confinement_scheme='standard'):
@@ -297,11 +300,6 @@ class AtomicDFT(AtomicBase):
         self.Rnlg.update(Rnlg)
         self.unlg.update(unlg)
         self.enl.update(enl)
-
-        for n, l, nl in self.list_states():
-            self.Rnl_fct[nl] = Function('spline', self.rgrid, self.Rnlg[nl])
-            self.unl_fct[nl] = Function('spline', self.rgrid, self.unlg[nl])
-
         self.veff = self.calculate_veff()
 
         if self.write != None:
@@ -328,9 +326,9 @@ class AtomicDFT(AtomicBase):
 
         # make confinement and nuclear potentials; intitial guess for veff
         self.conf = np.array([self.confinement(r) for r in self.rgrid])
-        self.nucl = np.array([self.V_nuclear(r) for r in self.rgrid])
+        self.vnuc = np.array([self.nuclear_potential(r) for r in self.rgrid])
         self.get_veff_and_dens()
-        self.calculate_Hartree_potential()
+        self.calculate_hartree_potential()
 
         for it in range(self.maxiter):
             self.veff *= 1. - self.mix
@@ -347,7 +345,7 @@ class AtomicDFT(AtomicBase):
             if diff < self.convergence['density'] and it > 5:
                 if d_enl_max < self.convergence['energies']:
                     break
-            self.calculate_Hartree_potential()
+            self.calculate_hartree_potential()
 
             if np.mod(it, 10) == 0:
                 line = 'iter %3i, dn=%.1e>%.1e, max %i sp-iter' % \
@@ -364,8 +362,9 @@ class AtomicDFT(AtomicBase):
 
         self.calculate_energies(echo='valence')
         print('converged in %i iterations' % it, file=self.txt)
+        nel = self.get_number_of_electrons()
         line = '%9.4f electrons, should be %9.4f' % \
-               (self.grid.integrate(self.dens, use_dV=True), self.nel)
+               (self.grid.integrate(self.dens, use_dV=True), nel)
         print(line, file=self.txt)
 
         self.timer.stop('solve ground state')

@@ -6,14 +6,12 @@ written by Pekka Koskinen (https://github.com/pekkosk/
 hotbit/blob/master/hotbit/parametrization/atom.py).
 """
 from __future__ import division, print_function
-import pickle
 import collections
-from copy import copy
 import numpy as np
 from scipy.optimize import minimize
 from ase.data import atomic_numbers, covalent_radii
 from ase.units import Bohr, Ha
-from hotcent.interpolation import Function, SplineFunction
+from hotcent.interpolation import Function
 from hotcent.timing import Timer
 from hotcent.confinement import Confinement, ZeroConfinement
 try:
@@ -21,6 +19,9 @@ try:
 except:
     plt = None
 
+
+not_solved_message = 'A required attribute is missing. ' \
+                     'Please call the run() method first.'
 
 class AtomicBase:
     def __init__(self,
@@ -40,8 +41,8 @@ class AtomicBase:
         """ Base class for atomic DFT calculators
 
         symbol:         chemical symbol
-        configuration:  e.g. '[He] 2s2 2p2'    
-        valence:        valence orbitals, e.g. ['2s','2p']. 
+        configuration:  e.g. '[He] 2s2 2p2'
+        valence:        valence orbitals, e.g. ['2s','2p'].
         confinement:    confinement potential for the electron density 
                         (see hotcent.confinement). The default None
                         means no confinement will be applied.
@@ -103,7 +104,27 @@ class AtomicBase:
 
         self.Z = atomic_numbers[self.symbol]
         assert len(self.valence) > 0
-     
+
+        assert len(configuration) > 0, "Specify the electronic configuration!"
+        self.set_configuration(configuration)
+
+        self.maxl = 9
+        self.maxn = 9
+        self.unlg = {}
+        self.Rnlg = {}
+        self.unl_fct = {nl: None for nl in self.configuration}
+        self.Rnl_fct = {nl: None for nl in self.configuration}
+        self.veff_fct = None
+        self.dens_fct = None
+        self.vhar_fct = None
+        self.solved = False
+
+    def set_configuration(self, configuration):
+        """ Set the electron configuration
+
+        configuration: e.g. '[He] 2s2 2p2'
+        """
+        self.configuration = {}
         noble_conf = {'He':{'1s':2}}
         noble_conf['Ne'] = dict({'2s':2, '2p':6}, **noble_conf['He'])
         noble_conf['Ar'] = dict({'3s':2, '3p':6}, **noble_conf['Ne'])
@@ -112,8 +133,6 @@ class AtomicBase:
         noble_conf['Rn'] = dict({'4f':14, '5d':10, '6s':2, '6p':6},
                                 **noble_conf['Xe'])
 
-        self.configuration = {}
-        assert len(configuration) > 0, "Specify the electronic configuration!"
         for term in configuration.split():
             if term[0] == '[' and term[-1] == ']':
                 core = term[1:-1]
@@ -123,27 +142,22 @@ class AtomicBase:
                 conf = {term[:2]: float(term[2:])}
             self.configuration.update(conf)
 
-        self.nel = sum(self.configuration.values())
-        self.charge = self.Z - self.nel
+    def run(self, **kwargs):
+        """ Child classes must implement a run() method which,
+        in turn, is supposed to set the following attributes:
 
-        self.conf = None
-        self.nucl = None
-        self.exc = None
-
-        self.plotr = {}
-        self.unlg = {}
-        self.Rnlg = {}
-        self.unl_fct = {}
-        self.Rnl_fct = {}
-        self.veff_fct = None
-        self.dens_fct = None
-        self.vhar_fct = None
-        self.total_energy = 0.0
-
-        self.maxl = 9
-        self.maxn = 9
-
-        self.solved = False
+        self.solved: whether the calculations are considered to be done
+        self.total_energy: the total energy
+        self.rgrid: an array with the radial grid points g
+        self.dens: an array with the electron density on the radial grid
+        self.vhar: an array with the Hartree potential on the radial grid
+        self.veff: an array with the effective potential on the radial grid
+                   (note: veff = vnuc + vhar + vxc + vconf)
+        self.enl: a {'nl': eigenvalue} dictionary
+        self.Rnlg: a {'nl': R_nl(g) array} dictionary
+        self.unlg: a {'nl': u_nl(g) array} dictionary (u_nl = R_nl / r)
+        """
+        raise NotImplementedError('Child class must implement run() method!')
 
     def __getstate__(self):
         """ Return dictionary of all pickable items. """
@@ -154,12 +168,91 @@ class AtomicBase:
         d.pop('out')
         return d
 
-    def V_nuclear(self,r):
+    def get_symbol(self):
+        """ Return atom's chemical symbol. """
+        return self.symbol
+
+    def get_number_of_electrons(self):
+        return sum(self.configuration.values())
+
+    def list_states(self):
+        """ List all potential states {(n,l,'nl')}. """
+        states = []
+        for l in range(self.maxl + 1):
+            for n in range(1, self.maxn + 1):
+                nl = tuple2nl(n, l)
+                if nl in self.configuration:
+                    states.append((n, l, nl))
+        return states
+
+    def get_valence_orbitals(self):
+        """ Get list of valence orbitals, e.g. ['2s','2p'] """
+        return self.valence
+
+    def get_energy(self):
+        assert self.solved, not_solved_message
+        return self.total_energy
+
+    def get_epsilon(self, nl):
+        """ E.g. get_eigenvalue('2p') """
+        assert self.solved, not_solved_message
+        return self.enl[nl]
+
+    def get_valence_energies(self):
+        """ Return list of valence eigenenergies. """
+        assert self.solved, not_solved_message
+        return [(nl, self.enl[nl]) for nl in self.valence]
+
+    def get_eigenvalue(self, nl):
+        return self.get_epsilon(nl)
+
+    def get_wf_range(self, nl, fractional_limit=1e-7):
+        """ Return the maximum r for which |R(r)| is
+        less than fractional_limit*max(|R(r)|) """
+        assert self.solved, not_solved_message
+        wfmax = np.nanmax(np.abs(self.Rnlg[nl]))
+        for r, wf in zip(self.rgrid[-1::-1], self.Rnlg[nl][-1::-1]):
+            if abs(wf) > fractional_limit * wfmax:
+                return r
+
+    def Rnl(self, r, nl, der=0):
+        """ Rnl(r, '2p') """
+        assert self.solved, not_solved_message
+        if self.Rnl_fct[nl] is None:
+            self.Rnl_fct[nl] = Function('spline', self.rgrid, self.Rnlg[nl])
+        return self.Rnl_fct[nl](r, der=der)
+
+    def unl(self, r, nl, der=0):
+        """ unl(r, '2p') = Rnl(r,'2p') / r """
+        assert self.solved, not_solved_message
+        if self.unl_fct[nl] is None:
+            self.unl_fct[nl] = Function('spline', self.rgrid, self.unlg[nl])
+        return self.unl_fct[nl](r, der=der)
+
+    def electron_density(self, r, der=0):
+        """ Return the all-electron density at r. """
+        assert self.solved, not_solved_message
+        if self.dens_fct is None:
+            self.dens_fct = Function('spline', self.rgrid, self.dens)
+        return self.dens_fct(r, der=der)
+
+    def nuclear_potential(self,r):
         return -self.Z / r
 
-    def run(self, **kwargs):
-        raise NotImplementedError('Child class must implement run() method!')
-        
+    def effective_potential(self, r, der=0):
+        """ Return effective potential at r or its derivatives. """
+        assert self.solved, not_solved_message
+        if self.veff_fct is None:
+            self.veff_fct = Function('spline', self.rgrid, self.veff)
+        return self.veff_fct(r, der=der)
+
+    def hartree_potential(self, r):
+        """ Return the Hartree potential at r. """
+        assert self.solved, not_solved_message
+        if self.vhar_fct is None:
+            self.vhar_fct = Function('spline', self.rgrid, self.vhar)
+        return self.vhar_fct(r)
+
     def plot_Rnl(self, filename=None, only_valence=True):
         """ Plot radial wave functions with matplotlib.
         
@@ -168,6 +261,7 @@ class AtomicBase:
         only_valence: whether to only plot the valence states or all of them
         """
         assert plt is not None, 'Matplotlib could not be imported!'
+        assert self.solved, not_solved_message
 
         rmax = 3 * covalent_radii[self.Z] / Bohr
         ri = np.where(self.rgrid < rmax)[0][-1]
@@ -240,6 +334,7 @@ class AtomicBase:
                    default = <Element>_rho.pdf
         """
         assert plt is not None, 'Matplotlib could not be imported!'
+        assert self.solved, not_solved_message
 
         rmax = 3 * covalent_radii[self.Z] / Bohr
         ri = np.where(self.rgrid > rmax)[0][0]
@@ -280,145 +375,8 @@ class AtomicBase:
     def plot_rho(self, *args, **kwargs):
         self.plot_density(*args, **kwargs)
 
-    def list_states(self):
-        """ List all potential states {(n,l,'nl')}. """
-        states = []
-        for l in range(self.maxl + 1):
-            for n in range(1, self.maxn + 1):
-                nl = tuple2nl(n, l)
-                if nl in self.configuration:
-                    states.append((n, l, nl))
-        return states
-
-    def get_wf_range(self, nl, fractional_limit=1e-7):
-        """ Return the maximum r for which |R(r)| is
-        less than fractional_limit*max(|R(r)|) """
-        wfmax = np.nanmax(np.abs(self.Rnlg[nl]))
-        for r, wf in zip(self.rgrid[-1::-1], self.Rnlg[nl][-1::-1]):
-            if abs(wf) > fractional_limit * wfmax:
-                return r
-
-    def get_energy(self):
-        return self.total_energy
-
-    def get_epsilon(self, nl):
-        """ E.g. get_eigenvalue('2p') """
-        if not self.solved:
-            raise AssertionError('Run the atomic DFT calculation first.')
-        return self.enl[nl]
-
-    def get_eigenvalue(self, nl):
-        return self.get_epsilon(nl)
-
-    def get_hubbard_value(self, nl, maxstep=1., scheme=None):
-        """ Calculates the Hubbard value of an orbital using
-        (second order) finite differences.
-
-        nl:      e.g. '2p'
-        maxstep: the maximal step size in the orbital occupancy;
-                 the default value of 1 means not going further
-                 than the monovalent ions
-        scheme:  the finite difference scheme, either 'central',
-                 'forward' or 'backward' or None. In the last
-                 case the appropriate scheme will be chosen
-                 based on the orbital in question being empty
-                 of partly or entirely filled
-        """
-        assert scheme in [None, 'central', 'forward', 'backward']
-
-        if scheme is None:
-            n, l = tuple2nl(nl)
-            max_occup = 2 * (2 * l + 1)
-            occup = self.configuration[nl]
-            if occup == 0:
-                scheme = 'forward'
-            elif occup == max_occup:
-                scheme = 'backward'
-            else:
-                scheme = 'central'
-
-        directions = {'forward': [0, 1, 2],
-                      'central': [-1, 0, 1],
-                      'backward': [-2, -1, 0]}
-        delta = maxstep if scheme == 'central' else 0.5 * maxstep
-
-        configuration = self.configuration.copy()
-        nel = self.nel
-
-        energies = {}
-        for direction in directions[scheme]:
-            self.configuration = configuration.copy()
-            self.configuration[nl] += direction * delta
-            self.nel = nel + direction * delta
-            s = ' '.join([nl + '%.1f' % self.configuration[nl]
-                          for nl in self.valence])
-            print('\n++++++++++++ Configuration %s ++++++++++++' % s)
-            self.run()
-            energies[direction] = self.total_energy
-
-        self.nel = nel
-        self.configuration = configuration.copy()
-        self.solved = False
-
-        if scheme in ['forward', 'central']:
-            EA = (energies[0] - energies[1]) / delta
-            print('\nElectron affinity = %.5f Ha (%.5f eV)' % (EA, EA * Ha))
-
-        if scheme in ['backward', 'central']:
-            IE = (energies[-1] - energies[0]) / delta
-            print('\nIonization energy = %.5f Ha (%.5f eV)' % (IE, IE * Ha))
-
-        U = 0.
-        for i, d in enumerate(directions[scheme]):
-            factor = 1 if i % 2 == 0 else -2
-            U += energies[d] * factor / (delta ** 2)
-        return U
-
-    def effective_potential(self, r, der=0):
-        """ Return effective potential at r or its derivatives. """
-        if self.veff_fct is None:
-            self.veff_fct = Function('spline', self.rgrid, self.veff)
-        return self.veff_fct(r, der=der)
-
-    def electron_density(self, r, der=0):
-        """ Return the all-electron density at r. """
-        if self.dens_fct is None:
-            self.dens_fct = Function('spline', self.rgrid, self.dens)
-        return self.dens_fct(r, der=der)
-
-    def hartree_potential(self, r):
-        """ Return the Hartree potential at r. """
-        if self.vhar_fct is None:
-            self.vhar_fct = Function('spline', self.rgrid, self.Hartree)
-        return self.vhar_fct(r)
-
-    def get_radial_density(self):
-        return self.rgrid, self.dens
-
-    def Rnl(self, r, nl, der=0):
-        """ Rnl(r, '2p') """
-        return self.Rnl_fct[nl](r, der=der)
-
-    def unl(self, r, nl, der=0):
-        """ unl(r, '2p') = Rnl(r,'2p') / r """
-        return self.unl_fct[nl](r, der=der)
-
-    def get_valence_orbitals(self):
-        """ Get list of valence orbitals, e.g. ['2s','2p'] """
-        return self.valence
-
-    def get_symbol(self):
-        """ Return atom's chemical symbol. """
-        return self.symbol
-
-    def get_valence_energies(self):
-        """ Return list of valence eigenenergies. """
-        if not self.solved:
-            raise AssertionError('Call the run() method first.')
-        return [(nl, self.enl[nl]) for nl in self.valence]
-
     def write_unl(self, filename, only_valence=True, step=20):
-        """ Append functions unl=Rnl*r, V_effective, V_confinement into file.
+        """ Append functions unl=Rnl*r into file.
             Only valence functions by default.
 
         Parameters:
@@ -427,8 +385,7 @@ class AtomicBase:
         only_valence:     output of only valence orbitals
         step:             step size for output grid
         """
-        if not self.solved:
-            raise AssertionError('run calculations first.')
+        assert self.solved, not_solved_message
         if only_valence:
             orbitals = self.valence
         else:
@@ -437,19 +394,8 @@ class AtomicBase:
         with open(filename, 'a') as f:
             for nl in orbitals:
                 print('\n\nu_%s=' % nl, file=f)
-
                 for r, u in zip(self.rgrid[::step], self.unlg[nl][::step]):
                     print(r, u, file=f)
-
-            print('\n\nv_effective=', file=f)
-
-            for r,ve in zip(self.rgrid[::step], self.veff[::step]):
-                    print(r, ve, file=f)
-
-            print('\n\nconfinement=', file=f)
-
-            for r,vc in zip(self.rgrid[::step], self.conf[::step]):
-                    print(r, vc, file=f)
 
             print('\n\n', file=f)
 
@@ -468,6 +414,7 @@ class AtomicBase:
                          and STO-fitted orbitals (to verify that the
                          fit is decent)
         """
+        assert self.solved, not_solved_message
         r = self.rgrid
         y = self.Rnlg[nl]
         n, l = nl2tuple(nl)
@@ -571,6 +518,7 @@ class AtomicBase:
                     which will be where the orbital tail goes
                     below wfthr in absolute value
         """
+        assert self.solved, not_solved_message
         if filename is None:
             filename = 'wfc.%s.hsd' % self.symbol
 
@@ -601,8 +549,69 @@ class AtomicBase:
                     f.write('      {: .8E}\n'.format(c))
                 f.write('    }\n  }\n')
             f.write('}\n')
-
         return
+
+    def get_hubbard_value(self, nl, maxstep=1., scheme=None):
+        """ Calculates the Hubbard value of an orbital using
+        (second order) finite differences.
+
+        nl:      e.g. '2p'
+        maxstep: the maximal step size in the orbital occupancy;
+                 the default value of 1 means not going further
+                 than the monovalent ions
+        scheme:  the finite difference scheme, either 'central',
+                 'forward' or 'backward' or None. In the last
+                 case the appropriate scheme will be chosen
+                 based on the orbital in question being empty
+                 of partly or entirely filled
+        """
+        assert scheme in [None, 'central', 'forward', 'backward']
+
+        if scheme is None:
+            n, l = tuple2nl(nl)
+            max_occup = 2 * (2 * l + 1)
+            occup = self.configuration[nl]
+            if occup == 0:
+                scheme = 'forward'
+            elif occup == max_occup:
+                scheme = 'backward'
+            else:
+                scheme = 'central'
+
+        directions = {'forward': [0, 1, 2],
+                      'central': [-1, 0, 1],
+                      'backward': [-2, -1, 0]}
+        delta = maxstep if scheme == 'central' else 0.5 * maxstep
+
+        configuration = self.configuration.copy()
+
+        energies = {}
+        for direction in directions[scheme]:
+            self.configuration = configuration.copy()
+            self.configuration[nl] += direction * delta
+            s = ' '.join([nl + '%.1f' % self.configuration[nl]
+                          for nl in self.valence])
+            print('\n++++++++++++ Configuration %s ++++++++++++' % s)
+            self.run()
+            energies[direction] = self.total_energy
+
+        if scheme in ['forward', 'central']:
+            EA = (energies[0] - energies[1]) / delta
+            print('\nElectron affinity = %.5f Ha (%.5f eV)' % (EA, EA * Ha))
+
+        if scheme in ['backward', 'central']:
+            IE = (energies[-1] - energies[0]) / delta
+            print('\nIonization energy = %.5f Ha (%.5f eV)' % (IE, IE * Ha))
+
+        U = 0.
+        for i, d in enumerate(directions[scheme]):
+            factor = 1 if i % 2 == 0 else -2
+            U += energies[d] * factor / (delta ** 2)
+
+        self.configuration = configuration.copy()
+        self.solved = False
+
+        return U
 
 
 angular_momenta = ['s', 'p', 'd', 'f', 'g', 'h', 'i', 'j', 'k', 'l']
