@@ -12,7 +12,7 @@ from copy import copy
 import numpy as np
 from scipy.optimize import minimize
 from ase.data import atomic_numbers, covalent_radii
-from ase.units import Bohr
+from ase.units import Bohr, Ha
 from hotcent.interpolation import Function, SplineFunction
 from hotcent.timing import Timer
 from hotcent.confinement import Confinement, ZeroConfinement
@@ -311,6 +311,70 @@ class AtomicBase:
 
     def get_eigenvalue(self, nl):
         return self.get_epsilon(nl)
+
+    def get_hubbard_value(self, nl, maxstep=1., scheme=None):
+        """ Calculates the Hubbard value of an orbital using
+        (second order) finite differences.
+
+        nl:      e.g. '2p'
+        maxstep: the maximal step size in the orbital occupancy;
+                 the default value of 1 means not going further
+                 than the monovalent ions
+        scheme:  the finite difference scheme, either 'central',
+                 'forward' or 'backward' or None. In the last
+                 case the appropriate scheme will be chosen
+                 based on the orbital in question being empty
+                 of partly or entirely filled
+        """
+        assert scheme in [None, 'central', 'forward', 'backward']
+
+        if scheme is None:
+            n, l = tuple2nl(nl)
+            max_occup = 2 * (2 * l + 1)
+            occup = self.configuration[nl]
+            if occup == 0:
+                scheme = 'forward'
+            elif occup == max_occup:
+                scheme = 'backward'
+            else:
+                scheme = 'central'
+
+        directions = {'forward': [0, 1, 2],
+                      'central': [-1, 0, 1],
+                      'backward': [-2, -1, 0]}
+        delta = maxstep if scheme == 'central' else 0.5 * maxstep
+
+        configuration = self.configuration.copy()
+        nel = self.nel
+
+        energies = {}
+        for direction in directions[scheme]:
+            self.configuration = configuration.copy()
+            self.configuration[nl] += direction * delta
+            self.nel = nel + direction * delta
+            s = ' '.join([nl + '%.1f' % self.configuration[nl]
+                          for nl in self.valence])
+            print('\n++++++++++++ Configuration %s ++++++++++++' % s)
+            self.run()
+            energies[direction] = self.total_energy
+
+        self.nel = nel
+        self.configuration = configuration.copy()
+        self.solved = False
+
+        if scheme in ['forward', 'central']:
+            EA = (energies[0] - energies[1]) / delta
+            print('\nElectron affinity = %.5f Ha (%.5f eV)' % (EA, EA * Ha))
+
+        if scheme in ['backward', 'central']:
+            IE = (energies[-1] - energies[0]) / delta
+            print('\nIonization energy = %.5f Ha (%.5f eV)' % (IE, IE * Ha))
+
+        U = 0.
+        for i, d in enumerate(directions[scheme]):
+            factor = 1 if i % 2 == 0 else -2
+            U += energies[d] * factor / (delta ** 2)
+        return U
 
     def effective_potential(self, r, der=0):
         """ Return effective potential at r or its derivatives. """

@@ -12,7 +12,9 @@ Development version
 
 * The native atomic DFT calculator has been renamed to 'AtomicDFT'
   and now resides in hotcent.atomic_dft.py
- 
+
+* Calculation of Hubbard values (see examples/hubbard.py)
+
 
 Version 0.9
 ===========
