@@ -15,6 +15,10 @@ from ase.units import Bohr
 from ase.data import atomic_numbers, atomic_masses, covalent_radii
 from hotcent.timing import Timer
 from hotcent.xc import XC_PW92, LibXC
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    plt = None
 
 
 class SlaterKosterTable:
@@ -194,12 +198,9 @@ class SlaterKosterTable:
         ===========
         filename:     name for the figure
         """
-        try:
-            import pylab as pl
-        except:
-            raise AssertionError('pylab could not be imported')
+        assert plt is not None, 'Matplotlib could not be imported!'
 
-        fig = pl.figure()
+        fig = plt.figure()
         fig.subplots_adjust(hspace=1e-4, wspace=1e-4)
 
         el1 = self.ela.get_symbol()
@@ -212,7 +213,7 @@ class SlaterKosterTable:
 
         for i in range(10):
             name = integrals[i]
-            ax = pl.subplot(5, 2, i + 1)
+            ax = plt.subplot(5, 2, i + 1)
 
             for p, (e1, e2) in enumerate(self.pairs):
                 s1, s2 = e1.get_symbol(), e2.get_symbol()
@@ -232,39 +233,39 @@ class SlaterKosterTable:
                             transform=ax.transAxes, size=10, va='center')
 
                     if not ax.is_last_row():
-                        pl.xticks([], [])
+                        plt.xticks([], [])
                     if not ax.is_first_col():
-                        pl.yticks([], [])
+                        plt.yticks([], [])
                 else:
-                    pl.plot(self.Rgrid, self.tables[p][:, i] , c='r', 
-                            ls=s, lw=lw, alpha=alpha)
-                    pl.plot(self.Rgrid, self.tables[p][:, i + 10], c='b', 
-                            ls=s, lw=lw, alpha=alpha)
-                    pl.axhline(0, c='k', ls='--')
+                    plt.plot(self.Rgrid, self.tables[p][:, i] , c='r', 
+                             ls=s, lw=lw, alpha=alpha)
+                    plt.plot(self.Rgrid, self.tables[p][:, i + 10], c='b', 
+                             ls=s, lw=lw, alpha=alpha)
+                    plt.axhline(0, c='k', ls='--')
                     ax.text(0.8, 0.1 + p * 0.15, name, size=10,
                             transform=ax.transAxes)
 
                     if ax.is_last_row():
-                        pl.xlabel('r (Bohr)')
+                        plt.xlabel('r (Bohr)')
                     else:
-                        pl.xticks([], [])
+                        plt.xticks([], [])
                     if not ax.is_first_col():
-                        pl.yticks([],[])
+                        plt.yticks([],[])
 
-                pl.xlim([0, rmax])
-                pl.ylim(-ymax, ymax)
+                plt.xlim([0, rmax])
+                plt.ylim(-ymax, ymax)
 
-        pl.figtext(0.3, 0.95, 'H', color='r', size=20)
-        pl.figtext(0.34, 0.95, 'S', color='b', size=20)
-        pl.figtext(0.38, 0.95, ' Slater-Koster tables', size=20)
+        plt.figtext(0.3, 0.95, 'H', color='r', size=20)
+        plt.figtext(0.34, 0.95, 'S', color='b', size=20)
+        plt.figtext(0.38, 0.95, ' Slater-Koster tables', size=20)
         e1, e2 = self.ela.get_symbol(), self.elb.get_symbol()
-        pl.figtext(0.3, 0.92, '(thin solid: <%s|%s>, wide dashed: <%s|%s>)' \
-                   % (e1, e2, e2, e1), size=10)
+        plt.figtext(0.3, 0.92, '(thin solid: <%s|%s>, wide dashed: <%s|%s>)' \
+                    % (e1, e2, e2, e1), size=10)
         
         if filename is None:
             filename = '%s-%s_slako.pdf' % (e1, e2)
-        pl.savefig(filename, bbox_inches='tight')
-        pl.clf()
+        plt.savefig(filename, bbox_inches='tight')
+        plt.clf()
 
     def get_range(self, fractional_limit):
         """ Define ranges for the atoms: largest r such that Rnl(r)<limit. """
@@ -505,7 +506,7 @@ class SlaterKosterTable:
            (larger puts more weight towards theta=0)
         q: power describing the radial disribution of grid points 
            (larger puts more weight towards centers)   
-        view: view the distribution of grid points with pylab.
+        view: view the distribution of grid points with matplotlib
 
         Plane at R/2 divides two polar grids.
                 
@@ -645,11 +646,12 @@ class SlaterKosterTable:
         self.timer.stop('symmetrize')
 
         if view:
-            import pylab as pl
-            pl.plot([h, h ,h])
-            pl.scatter(grid[:, 0], grid[:, 1], s=10 * area / max(area))
-            pl.show()
-            
+            assert plt is not None, 'Matplotlib could not be imported!'
+            plt.plot([h, h ,h])
+            plt.scatter(grid[:, 0], grid[:, 1], s=10 * area / max(area))
+            plt.show()
+            plt.clf()
+
         self.timer.stop('make grid')
         return grid, area
 

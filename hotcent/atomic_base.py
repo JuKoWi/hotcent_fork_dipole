@@ -17,9 +17,9 @@ from hotcent.interpolation import Function, SplineFunction
 from hotcent.timing import Timer
 from hotcent.confinement import Confinement, ZeroConfinement
 try:
-    import pylab as pl
+    import matplotlib.pyplot as plt
 except:
-    pl = None
+    plt = None
 
 
 class AtomicBase:
@@ -167,8 +167,7 @@ class AtomicBase:
                    default = <Element>_Rnl.pdf
         only_valence: whether to only plot the valence states or all of them
         """
-        if pl is None:
-            raise AssertionError('pylab could not be imported')
+        assert plt is not None, 'Matplotlib could not be imported!'
 
         rmax = 3 * covalent_radii[self.Z] / Bohr
         ri = np.where(self.rgrid < rmax)[0][-1]
@@ -181,52 +180,52 @@ class AtomicBase:
         p = np.ceil(np.sqrt(len(states)))
         q = 2 * p - 1 if len(states) % 2 == 0 else 2 * p
 
-        fig = pl.figure(dpi=400)
+        fig = plt.figure(dpi=400)
         i = 1
         # as a function of grid points
         for nl in states:
-            ax = pl.subplot(q, p, i)
-            pl.plot(self.Rnlg[nl])
-            pl.xticks(size=5)
-            pl.grid(ls='--')
+            ax = plt.subplot(q, p, i)
+            plt.plot(self.Rnlg[nl])
+            plt.xticks(size=5)
+            plt.grid(ls='--')
 
             # annotate
             c = 'k'
             if nl in self.valence:
                 c = 'r'
-            pl.text(0.5, 0.4, r'$R_{%s}(i)$' % nl, transform=ax.transAxes,
-                    size=15, color=c)
+            plt.text(0.5, 0.4, r'$R_{%s}(i)$' % nl, transform=ax.transAxes,
+                     size=15, color=c)
             if ax.is_first_col():
-                pl.ylabel(r'$R_{nl}(i)$', size=8)
+                plt.ylabel(r'$R_{nl}(i)$', size=8)
             i += 1
             
         # as a function of radius
         i = p ** 2 + 1
         for nl in states:
-            ax = pl.subplot(q, p, i)
-            pl.plot(self.rgrid[:ri], self.Rnlg[nl][:ri])
-            pl.xticks(size=5)
-            pl.grid(ls='--')
+            ax = plt.subplot(q, p, i)
+            plt.plot(self.rgrid[:ri], self.Rnlg[nl][:ri])
+            plt.xticks(size=5)
+            plt.grid(ls='--')
 
             # annotate
             c = 'k'
             if nl in self.valence: 
                 c = 'r'
-            pl.text(0.5, 0.4, r'$R_{%s}(r)$' % nl, transform=ax.transAxes,
-                    size=15, color=c)
+            plt.text(0.5, 0.4, r'$R_{%s}(r)$' % nl, transform=ax.transAxes,
+                     size=15, color=c)
             if ax.is_first_col():
-                pl.ylabel(r'$R_{nl}(r)$', size=8)
+                plt.ylabel(r'$R_{nl}(r)$', size=8)
             if ax.is_last_row():
-                pl.xlabel('r (Bohr)', size=8)
+                plt.xlabel('r (Bohr)', size=8)
             i += 1
 
         fig.subplots_adjust(hspace=0.2, wspace=0.2)
-        pl.figtext(0.4, 0.95, r'$R_{nl}(r)$ for %s' % self.symbol)
+        plt.figtext(0.4, 0.95, r'$R_{nl}(r)$ for %s' % self.symbol)
 
         if filename is None:
             filename = '%s_Rnl.pdf' % self.symbol
-        pl.savefig(filename, bbox_inches='tight')
-        pl.clf()
+        plt.savefig(filename, bbox_inches='tight')
+        plt.clf()
 
     def plot_density(self, filename=None):
         """ Plot the electron density and valence orbital densities.
@@ -240,13 +239,12 @@ class AtomicBase:
         filename:  output file name + extension (extension used in matplotlib)
                    default = <Element>_rho.pdf
         """
-        if pl is None:
-            raise AssertionError('pylab could not be imported')
+        assert plt is not None, 'Matplotlib could not be imported!'
 
         rmax = 3 * covalent_radii[self.Z] / Bohr
         ri = np.where(self.rgrid > rmax)[0][0]
 
-        fig = pl.figure(figsize=(6.4, 4.8), dpi=400)
+        fig = plt.figure(figsize=(6.4, 4.8), dpi=400)
 
         core_dens = 0
         colors = ['red', 'green', 'blue']  # s, p , d
@@ -260,24 +258,24 @@ class AtomicBase:
             ls = '-' if occupied else '--'
             label = r'$|R_\mathrm{%s%s}(r) / \sqrt{4\pi}|^2$' % (nl, suffix)
 
-            pl.semilogy(self.rgrid[:ri], dens[:ri], ls=ls, color=colors[l],
+            plt.semilogy(self.rgrid[:ri], dens[:ri], ls=ls, color=colors[l],
                         label=label)
 
         dens = self.dens[:ri]
-        pl.semilogy(self.rgrid[:ri], dens, 'k-', label=r'$\rho_0(r)$')
+        plt.semilogy(self.rgrid[:ri], dens, 'k-', label=r'$\rho_0(r)$')
 
         ymax = np.exp(np.ceil(np.log(np.max(dens))))
-        pl.ylim([1e-7, ymax])
-        pl.xlim([-0.05 * rmax, rmax])
-        pl.xlabel('r (Bohr)')
-        pl.grid(ls='--')
-        pl.legend(loc='upper right', ncol=2)
-        pl.title('Electron and orbital densities for %s' % self.symbol)
+        plt.ylim([1e-7, ymax])
+        plt.xlim([-0.05 * rmax, rmax])
+        plt.xlabel('r (Bohr)')
+        plt.grid(ls='--')
+        plt.legend(loc='upper right', ncol=2)
+        plt.title('Electron and orbital densities for %s' % self.symbol)
 
         if filename is None:
             filename = '%s_rho.pdf' % self.symbol
-        pl.savefig(filename, bbox_inches='tight')
-        pl.clf()
+        plt.savefig(filename, bbox_inches='tight')
+        plt.clf()
 
     def plot_rho(self, *args, **kwargs):
         self.plot_density(*args, **kwargs)
@@ -529,15 +527,15 @@ class AtomicBase:
             imax = np.where(r < rmax)[0][-1]
             rmin = 1e-3 * self.Z
             imin = np.where(r < rmin)[0][-1]
-            pl.plot(r[imin:imax], y[imin:imax], '-', label='On the grid')
-            pl.plot(r[imin:imax], values[imin:imax], '--', label='With STOs')
-            pl.xlim([0., rmax])
-            pl.grid(ls='--')
-            pl.legend(loc='upper right')
-            pl.xlabel('r (Bohr radii)')
-            pl.ylabel('Psi_%s (a.u.)' % nl)
-            pl.savefig(filename)
-            pl.clf()
+            plt.plot(r[imin:imax], y[imin:imax], '-', label='On the grid')
+            plt.plot(r[imin:imax], values[imin:imax], '--', label='With STOs')
+            plt.xlim([0., rmax])
+            plt.grid(ls='--')
+            plt.legend(loc='upper right')
+            plt.xlabel('r (Bohr radii)')
+            plt.ylabel('Psi_%s (a.u.)' % nl)
+            plt.savefig(filename)
+            plt.clf()
 
         return exponents, coeff, values, residual
 

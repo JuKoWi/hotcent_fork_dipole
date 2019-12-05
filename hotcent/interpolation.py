@@ -11,9 +11,9 @@ from scipy.linalg import norm
 from scipy.optimize import fminbound, brentq
 from scipy.interpolate import splprep, splrep, splev, splint
 try:
-    import pylab as pl
+    import matplotlib.pyplot as plt
 except:
-    pass
+    plt = None
 
 
 class SplineFunction:
@@ -80,23 +80,22 @@ class SplineFunction:
         """ Integrate given function within [a, b]. """
         return splint(a, b, self.tck)
 
-    def plot(self, return_pylab=False, der=0, filename=None):
+    def plot(self, der=0, filename=None):
         """ Plot the function with matplolib """
-        pl.clf()
         X = np.linspace(self.a, self.b, self.M * 10)
         Y = [self(x, der=der) for x in X]
-        pl.plot(X, Y)
+        plt.plot(X, Y)
         if der == 0:
-            pl.scatter(self.x, self.y)
+            plt.scatter(self.x, self.y)
+
         f1 = SplineFunction(self.x, self.y, k=1)
-        pl.plot(X, [f1(x, der=der) for x in X])
-        if return_pylab:
-            return pl
-        elif filename is not None:
-            pl.savefig(filename)
+        plt.plot(X, [f1(x, der=der) for x in X])
+
+        if filename is not None:
+            plt.savefig(filename)
         else:
-            pl.show()
-        pl.close()
+            plt.show()
+        plt.clf()
 
     def max_deviation_from_linear(self):
         """ For given spline (default cubic), return maximum difference
@@ -134,20 +133,16 @@ class Function:
     def __call__(self, x, der=0):
         return self.f(x, der)
 
-    def plot(self, der=0, a=None, b=None, npoints=1000, filename=None, 
-             return_pylab=False):
+    def plot(self, der=0, a=None, b=None, npoints=1000, filename=None):
         """ Plot the function with matplolib. """
-        pl.clf()
         a0, b0 = self.f.get_range()
-        lower=[a0, a][a is not None]
-        upper=[b0, b][b is not None]
+        lower = [a0, a][a is not None]
+        upper = [b0, b][b is not None]
         X = np.linspace(lower, upper, npoints)
         Y = [self(x, der=der) for x in X]
-        pl.plot(X, Y)
-        if return_pylab:
-            return pl
-        elif filename is not None:
-            pl.savefig(filename)
+        plt.plot(X, Y)
+        if filename is not None:
+            plt.savefig(filename)
         else:
-            pl.show()
-        pl.close()
+            plt.show()
+        plt.clf()

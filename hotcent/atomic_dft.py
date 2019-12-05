@@ -19,9 +19,9 @@ from hotcent.atomic_base import AtomicBase, nl2tuple
 from hotcent.confinement import ZeroConfinement
 from hotcent.xc import XC_PW92, LibXC
 try:
-    import pylab as pl
+    import matplotlib.pyplot as plt
 except:
-    pl = None
+    plt = None
 
 
 class AtomicDFT(AtomicBase):
@@ -422,8 +422,8 @@ class AtomicDFT(AtomicBase):
                 u[0:2] = rgrid[0:2] ** (l + 1)
 
                 if not(c0[-2] < 0 and c0[-1] < 0):
-                    pl.plot(c0)
-                    pl.show()
+                    plt.plot(c0)
+                    plt.show()
 
                 assert c0[-2] < 0 and c0[-1] < 0
 
@@ -534,8 +534,8 @@ class AtomicDFT(AtomicBase):
             u[0:2] = rgrid[0:2] ** (l + 1)
 
             if not(c0[-2] < 0 and c0[-1] < 0):
-                pl.plot(c0)
-                pl.show()
+                plt.plot(c0)
+                plt.show()
 
             assert c0[-2] < 0 and c0[-1] < 0
 
@@ -722,9 +722,9 @@ class RadialGrid:
 
     def plot(self, screen=True):
         rgrid = self.get_grid()
-        pl.scatter(list(range(len(rgrid))), rgrid)
+        plt.scatter(list(range(len(rgrid))), rgrid)
         if screen: 
-            pl.show()
+            plt.show()
 
     def integrate(self, f, use_dV=False):
         """ Integrate function f (given with N grid points).
