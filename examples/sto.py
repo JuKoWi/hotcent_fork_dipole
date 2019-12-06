@@ -8,6 +8,7 @@ atom = AtomicDFT('Sn',
                  nodegpts=150,
                  mix=0.2,
                  txt='-',
+                 timing=True,
                  )
 
 atom.run()

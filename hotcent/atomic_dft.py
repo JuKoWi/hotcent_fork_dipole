@@ -425,8 +425,9 @@ class AtomicDFT(AtomicBase):
                     plt.show()
 
                 assert c0[-2] < 0 and c0[-1] < 0
-
+                self.timer.start('shoot')
                 u, nodes, A, ctp = shoot(u, dx, c2, c1, c0, N)
+                self.timer.stop('shoot')
                 it += 1
                 norm = self.grid.integrate(u ** 2)
                 u = u / sqrt(norm)
@@ -538,7 +539,9 @@ class AtomicDFT(AtomicBase):
 
             assert c0[-2] < 0 and c0[-1] < 0
 
+            self.timer.start('shoot')
             u, nodes, A, ctp = shoot(u, dx, c2, c1, c0, N)
+            self.timer.stop('shoot')
             it += 1
             norm = self.grid.integrate(u ** 2)
             u = u / sqrt(norm)
@@ -644,7 +647,7 @@ def shoot(u, dx, c2, c1, c0, N):
     all_negative = np.all(c0 < 0)
     for i in range(N - 2 , 0, -1):
         u[i - 1] = (-fp[i] * u[i + 1] - f0[i] * u[i]) / fm[i]
-        if abs(u[i - 1]) > 1e10: 
+        if abs(u[i - 1]) > 1e10:
             u[i - 1:] *= 1e-10  # numerical stability
         if c0[i] > 0:
             ctp = i

@@ -8,6 +8,7 @@ atom = AtomicDFT('C',
                  configuration='[He] 2s2 2p2',
                  valence=['2s', '2p'],
                  scalarrel=False,
+                 timing=True,
                  )
 
 values = []

@@ -7,7 +7,7 @@ kwargs = {'xcname': 'LDA',
           'valence': ['3s', '3p'],
           'confinement': None,
           'scalarrel': True,
-          'timing': False,
+          'timing': True,
           'txt': '-'}
 
 atom = AtomicDFT('Si',

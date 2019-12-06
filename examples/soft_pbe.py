@@ -12,7 +12,7 @@ kwargs = {'xcname': 'GGA_X_PBE+GGA_C_PBE',
           'valence': ['3d', '4s'],
           'confinement': None,
           'scalarrel': True,
-          'timing': False,
+          'timing': True,
           'txt': '-'}
 
 atom = AtomicDFT('Fe',
