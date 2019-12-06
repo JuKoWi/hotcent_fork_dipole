@@ -238,8 +238,8 @@ class AtomicDFT(AtomicBase):
                     dens = pickle.load(f)
                 v = splrep(rgrid, veff)
                 d = splrep(rgrid, dens)
-                self.veff = np.array([splev(r,v) for r in self.rgrid])
-                self.dens = np.array([splev(r,d) for r in self.rgrid])
+                self.veff = splev(self.rgrid, v)
+                self.dens = splev(self.rgrid, d)
                 done = True
             except IOError:
                 print("Could not open restart file, " \
@@ -336,8 +336,8 @@ class AtomicDFT(AtomicBase):
         N = self.grid.get_N()
 
         # make confinement and nuclear potentials; intitial guess for veff
-        self.conf = np.array([self.confinement(r) for r in self.rgrid])
-        self.vnuc = np.array([self.nuclear_potential(r) for r in self.rgrid])
+        self.conf = self.confinement(self.rgrid)
+        self.vnuc = self.nuclear_potential(self.rgrid)
         self.get_veff_and_dens()
         self.calculate_hartree_potential()
 
@@ -346,7 +346,7 @@ class AtomicDFT(AtomicBase):
             self.veff += self.mix * self.calculate_veff()
             if self.scalarrel:
                 veff = SplineFunction(self.rgrid, self.veff)
-                self.dveff = np.array([veff(r, der=1) for r in self.rgrid])
+                self.dveff = veff(self.rgrid, der=1)
             d_enl_max, itmax = self.solve_eigenstates(it)
 
             dens0 = self.dens.copy()
@@ -531,7 +531,7 @@ class AtomicDFT(AtomicBase):
 
         if self.scalarrel:
             veff = SplineFunction(self.rgrid, self.veff)
-            self.dveff = np.array([veff(r, der=1) for r in self.rgrid])
+            self.dveff = veff(self.rgrid, der=1)
 
         while True:
             eps0 = eps

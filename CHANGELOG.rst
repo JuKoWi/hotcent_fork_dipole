@@ -15,8 +15,8 @@ Development version
 
 * Calculation of Hubbard values (see examples/hubbard.py)
 
-* Optional C-extensions allow for significantly faster (5-7x)
-  atomic DFT calculations
+* Optional C-extensions allow for significantly faster atomic
+  atomic DFT calculations (8-10x speedup)
 
 
 Version 0.9
