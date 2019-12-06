@@ -1,5 +1,7 @@
+build
 *.pyc
 *~
+*.so
 examples/*
 !examples/*.py
 tutorial/*

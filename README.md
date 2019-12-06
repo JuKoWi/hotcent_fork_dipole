@@ -33,8 +33,24 @@ shipped with [LibXC](https://www.tddft.org/programs/libxc).
 
 * Set up the [ASE](https://wiki.fysik.dtu.dk/ase/) Python module. 
 
-* Clone / download the Hotcent repository and update the `$PYTHONPATH` 
-accordingly.
+* Clone / download the Hotcent repository and update the
+`$PYTHONPATH` accordingly, e.g. like this:
+```shell
+cd <your_location_of_choice>
+git clone https://gitlab.com/mvdb/hotcent
+export PYTHONPATH=$PWD/hotcent:$PYTHONPATH
+```
+
+* If you want significantly faster calculations (who doesn't?),
+you will want to build the optional C-extensions:
+```shell
+python setup.py build_ext --inplace
+```
+If you have Cython installed and want/need to regenerate the C-code,
+just run:
+```shell
+python setup.py build_ext --inplace --use-cython
+```
 
 * If you want to use functionals other than LDA, the
 [PyLibXC](https://www.tddft.org/programs/libxc/installation/#python-library)
