@@ -22,11 +22,17 @@ try:
     import matplotlib.pyplot as plt
 except:
     plt = None
+warning_extension = 'Warning: C-extension "%s" not available'
 try:
-    from _hotcent import shoot
-except:
-    print('Warning: cython-compiled code not available')
+    from _shoot import shoot
+except ModuleNotFoundError:
+    print(warning_extension % 'shoot')
     from hotcent.shoot import shoot
+try:
+    from _hartree import hartree
+except ModuleNotFoundError:
+    print(warning_extension % 'hartree')
+    hartree = None
 
 
 class AtomicDFT(AtomicBase):
@@ -176,30 +182,30 @@ class AtomicDFT(AtomicBase):
         return dens
 
     def calculate_hartree_potential(self):
-        """ Calculate the Hartree potential.
-        Everything is very sensitive to the way this is calculated.
-        If you can think of how to improve this, please tell me!
-        """
+        """ Calculate the Hartree potential. """
         self.timer.start('Hartree')
         dV = self.grid.get_dvolumes()
         r, r0 = self.rgrid, self.grid.get_r0grid()
         N = self.N
         n0 = 0.5 * (self.dens[1:] + self.dens[:-1])
         nel = self.get_number_of_electrons()
-        n0 *= nel / sum(n0 * dV)
+        n0 *= nel / np.sum(n0 * dV)
 
-        lo, hi, vhar = np.zeros(N), np.zeros(N), np.zeros(N)
-        lo[0] = 0.0
-        for i in range(1, N):
-            lo[i] = lo[i-1] + dV[i-1] * n0[i-1]
+        if hartree is not None:
+            self.vhar = hartree(n0, dV, r, r0, N)
+        else:
+            lo, hi, self.vhar = np.zeros(N), np.zeros(N), np.zeros(N)
+            lo[0] = 0.0
+            for i in range(1, N):
+                lo[i] = lo[i-1] + dV[i-1] * n0[i-1]
 
-        hi[-1] = 0.0
-        for i in range(N - 2, -1, -1):
-            hi[i] = hi[i + 1] + n0[i] * dV[i] / r0[i]
+            hi[-1] = 0.0
+            for i in range(N - 2, -1, -1):
+                hi[i] = hi[i + 1] + n0[i] * dV[i] / r0[i]
 
-        for i in range(N):
-            vhar[i] = lo[i] / r[i] + hi[i]
-        self.vhar = vhar
+            for i in range(N):
+                self.vhar[i] = lo[i] / r[i] + hi[i]
+
         self.timer.stop('Hartree')
 
     def calculate_veff(self):

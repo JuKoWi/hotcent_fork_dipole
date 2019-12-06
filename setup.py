@@ -8,7 +8,10 @@ if '--use-cython' in sys.argv:
     sys.argv.remove('--use-cython')
 
 ext = '.pyx' if USE_CYTHON else '.c'
-extensions = [Extension("_hotcent", ["hotcent/shoot" + ext])]
+
+extensions = [Extension('_shoot', ['hotcent/shoot' + ext]),
+              Extension('_hartree', ['hotcent/hartree' + ext]),
+              ]
 
 if USE_CYTHON:
     from Cython.Build import cythonize
