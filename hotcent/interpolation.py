@@ -30,7 +30,7 @@ class SplineFunction:
         """
         if s == -1:
             s = len(x) - np.sqrt(2. * len(x))
-        self.tck=splrep(x, y, s=s, k=k)
+        self.tck = splrep(x, y, s=s, k=k)
         self.x = x
         self.y = y
         self.a = x[0]
@@ -44,13 +44,8 @@ class SplineFunction:
         Return zero if x beyond the original grid range.
         """
         if isinstance(x, np.ndarray):
-            return np.where(x < self.x[0],
-                            np.zeros(len(x)),
-                            np.where(x > self.x[-1],
-                                     np.zeros(len(x)),
-                                     splev(x, self.tck, der=der)
-                                     )
-                            )
+            return np.piecewise(x, [x < self.x[0], x > self.x[-1]],
+                                [0, 0, lambda x: splev(x, self.tck, der=der)])
         else:
             if x < self.x[0] or x > self.x[-1]:
                 return 0.
