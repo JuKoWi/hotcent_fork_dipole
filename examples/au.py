@@ -1,7 +1,6 @@
 """ This example aims to reproduce the Au-Au 
 Slater-Koster table generation procedure by
 Fihey and coworkers (doi:10.1002/jcc.24046). """
-import os
 from hotcent.slako import SlaterKosterTable
 from hotcent.confinement import PowerConfinement 
 from hotcent.atomic_dft import AtomicDFT
