@@ -15,6 +15,7 @@ from ase.units import Bohr
 from ase.data import atomic_numbers, atomic_masses, covalent_radii
 from hotcent.timing import Timer
 from hotcent.xc import XC_PW92, LibXC
+from hotcent.interpolation import CubicSplineFunction
 try:
     import matplotlib.pyplot as plt
 except ImportError:
@@ -204,6 +205,7 @@ class SlaterKosterTable:
         ===========
         filename:     name for the figure
         """
+        self.timer.start('plotting')
         assert plt is not None, 'Matplotlib could not be imported!'
 
         fig = plt.figure()
@@ -272,6 +274,7 @@ class SlaterKosterTable:
             filename = '%s-%s_slako.pdf' % (e1, e2)
         plt.savefig(filename, bbox_inches='tight')
         plt.clf()
+        self.timer.stop('plotting')
 
     def get_range(self, fractional_limit):
         """ Define ranges for the atoms: largest r such that Rnl(r)<limit. """
@@ -290,7 +293,7 @@ class SlaterKosterTable:
         return wf_range
         
     def run(self, R1, R2, N, ntheta=150, nr=50, wflimit=1e-7,
-            superposition='potential', xc='LDA'):
+            superposition='potential', xc='LDA', stride=1):
         """ Calculate the Slater-Koster table.
 
         parameters:
@@ -316,23 +319,31 @@ class SlaterKosterTable:
                 functional, set xc='XC_GGA_X_N12+XC_GGA_C_N12'.
                 If PyLibXC is not available, only the local density
                 approximation xc='PW92' (alias: 'LDA') can be chosen.
+        stride: the desired SK-table typically has quite a large number
+                of points (N=500-1000), even though the integrals
+                themselves are comparatively smooth. To speed up the
+                construction of the SK-table, one can therefore restrict
+                the expensive integrations to a subset N' = N // stride,
+                and map the resulting curves on the N-grid afterwards.
+                The default stride = 1 means that N' = N (no shortcut).
         """
-        assert R1 >= 1e-3, 'For stability; use R1 >~ 1e-3'
+        assert R1 >= 1e-3, 'For stability; use R1 >= 1e-3'
         assert superposition in ['density', 'potential']
 
         self.timer.start('calculate tables')
         self.wf_range = self.get_range(wflimit)
-        Rgrid = np.linspace(R1, R2, N)
         self.N = N
+        Nsub = N // stride
+        Rgrid = np.linspace(R1, R2, Nsub, endpoint=True)
         self.Rgrid = Rgrid
         self.dH = 0.
         self.Hmax = 0.
 
         if self.nel == 1:
-            self.tables = [np.zeros((N, 20))]
+            self.tables = [np.zeros((Nsub, 20))]
         else: 
-            self.tables = [np.zeros((N, 20)), np.zeros((N, 20))]
-        
+            self.tables = [np.zeros((Nsub, 20)), np.zeros((Nsub, 20))]
+
         print('Start making table...', file=self.txt)
         self.txt.flush()
 
@@ -344,17 +355,16 @@ class SlaterKosterTable:
             print(file=self.txt)
             self.txt.flush()
 
-        for Ri, R in enumerate(Rgrid):
+        for i, R in enumerate(Rgrid):
             if R > 2 * self.wf_range:
                 break
 
             grid, areas = self.make_grid(R, nt=ntheta, nr=nr)
 
-            if  Ri == N - 1 or N // 10 == 0 or np.mod(Ri, N // 10) == 0:
+            if  i == Nsub - 1 or Nsub // 10 == 0 or i % (Nsub // 10) == 0:
                 print('R=%8.2f, %i grid points ...' % (R, len(grid)),
-                      file=self.txt)
-                self.txt.flush()
- 
+                      file=self.txt, flush=True)
+
             for p, (e1, e2) in enumerate(self.pairs):
                 selected = select_integrals(e1, e2)
                 if len(grid) == 0:
@@ -365,8 +375,8 @@ class SlaterKosterTable:
                                                    superposition=superposition)
                     self.Hmax = max(self.Hmax, max(abs(H)))
                     self.dH = max(self.dH, max(abs(H - H2)))
-                self.tables[p][Ri, :10] = H
-                self.tables[p][Ri, 10:] = S
+                self.tables[p][i, :10] = H
+                self.tables[p][i, 10:] = S
 
         if superposition == 'potential':
             print('Maximum value for H=%.2g' % self.Hmax, file=self.txt)
@@ -374,10 +384,19 @@ class SlaterKosterTable:
             print('     Relative error=%.2g %%' % (self.dH / self.Hmax * 100),
                   file=self.txt)
 
+        if stride > 1:
+            self.Rgrid = np.linspace(R1, R2, N, endpoint=True)
+            for p in range(len(self.pairs)):
+                table = np.zeros((N, 20))
+                for i in range(20):
+                    spl = CubicSplineFunction(Rgrid, self.tables[p][:, i])
+                    table[:, i] = spl(self.Rgrid)
+                self.tables[p] = table
+
         self.smooth_tails()
         self.timer.stop('calculate tables')
         self.txt.flush()
-               
+
     def calculate_mels(self, selected, e1, e2, R, grid, area,
                        superposition='potential', xc='LDA'):
         """ Perform integration for selected H and S integrals.

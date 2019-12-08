@@ -19,6 +19,12 @@ Development version
   atomic DFT calculations (8-10x speedup) and construction of
   Slater-Koster tables (2-3x speedup).
 
+* A new `stride` option for SlaterKosterTable.run() with default = 1.
+  Setting higher integer values for `stride` means that the
+  H and S integrals are only be explicitly calculated every
+  `stride` points and will then be mapped on the final, denser grid
+  using cubic spline interpolation. Use with care.
+
 
 Version 0.9
 ===========
