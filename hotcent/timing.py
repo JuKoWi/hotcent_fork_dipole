@@ -171,12 +171,12 @@ class Timer:
         procent2 = dt / partial * 100.0 if partial > 0.0 else 100
         txt = '../' * self.level + '%-20s' % self.label
         if subs:
-            txt += ' ' * (10 - 3 * self.level)
-            txt += '%12.3f %9i (%5.1f %%,%5.1f %%) %5.1f %% %s\n' % \
+            txt += ' ' * (13 - 3 * self.level)
+            txt += '%2.3f %9i (%5.1f %%,%5.1f %%) %5.1f %% %s\n' % \
                    (dt, calls, procent2, sub_covered, procent1, bar)
         else:
-            txt += ' ' * (10 - 3 * self.level) 
-            txt += '%12.3f %9i (%5.1f %%        ) %5.1f %% %s\n' % \
+            txt += ' ' * (13 - 3 * self.level)
+            txt += '%2.3f %9i (%5.1f %%        ) %5.1f %% %s\n' % \
                    (dt, calls, procent2, procent1, bar)
         dict[self.label] = dt
 
@@ -209,7 +209,7 @@ class Timer:
             f = self.txt
 
         print('\nTiming:', file=f)
-        print('            label                    time     calls    %sub  %covered   %tot',
+        print('         label                    time     calls    %sub  %covered   %tot',
               file=f)
         print('-' * 79, file=f)
         print(txt, end=' ', file=f)
