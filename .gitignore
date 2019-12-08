@@ -2,6 +2,7 @@ build
 *.pyc
 *~
 *.so
+hotcent/*.html
 examples/*
 !examples/*.py
 tutorial/*

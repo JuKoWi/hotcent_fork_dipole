@@ -3,12 +3,12 @@
 /* BEGIN: Cython Metadata
 {
     "distutils": {
-        "name": "_shoot",
+        "name": "_hotcent",
         "sources": [
-            "hotcent/shoot.pyx"
+            "hotcent/extensions.pyx"
         ]
     },
-    "module_name": "_shoot"
+    "module_name": "_hotcent"
 }
 END: Cython Metadata */
 
@@ -602,8 +602,8 @@ static CYTHON_INLINE float __PYX_NAN() {
   #endif
 #endif
 
-#define __PYX_HAVE___shoot
-#define __PYX_HAVE_API___shoot
+#define __PYX_HAVE___hotcent
+#define __PYX_HAVE_API___hotcent
 /* Early includes */
 #include "pythread.h"
 #include <string.h>
@@ -819,7 +819,7 @@ static const char *__pyx_filename;
 
 
 static const char *__pyx_f[] = {
-  "hotcent/shoot.pyx",
+  "hotcent/extensions.pyx",
   "stringsource",
 };
 /* MemviewSliceStruct.proto */
@@ -1678,7 +1678,7 @@ static PyObject *__pyx_memoryview_assign_item_from_object(struct __pyx_memoryvie
 static PyObject *__pyx_memoryviewslice_convert_item_to_object(struct __pyx_memoryviewslice_obj *__pyx_v_self, char *__pyx_v_itemp); /* proto*/
 static PyObject *__pyx_memoryviewslice_assign_item_from_object(struct __pyx_memoryviewslice_obj *__pyx_v_self, char *__pyx_v_itemp, PyObject *__pyx_v_value); /* proto*/
 
-/* Module declarations from '_shoot' */
+/* Module declarations from '_hotcent' */
 static PyTypeObject *__pyx_array_type = 0;
 static PyTypeObject *__pyx_MemviewEnum_type = 0;
 static PyTypeObject *__pyx_memoryview_type = 0;
@@ -1724,11 +1724,11 @@ static void __pyx_memoryview_slice_assign_scalar(__Pyx_memviewslice *, int, size
 static void __pyx_memoryview__slice_assign_scalar(char *, Py_ssize_t *, Py_ssize_t *, int, size_t, void *); /*proto*/
 static PyObject *__pyx_unpickle_Enum__set_state(struct __pyx_MemviewEnum_obj *, PyObject *); /*proto*/
 static __Pyx_TypeInfo __Pyx_TypeInfo_double = { "double", NULL, sizeof(double), { 0 }, 0, 'R', 0, 0 };
-#define __Pyx_MODULE_NAME "_shoot"
-extern int __pyx_module_is_main__shoot;
-int __pyx_module_is_main__shoot = 0;
+#define __Pyx_MODULE_NAME "_hotcent"
+extern int __pyx_module_is_main__hotcent;
+int __pyx_module_is_main__hotcent = 0;
 
-/* Implementation of '_shoot' */
+/* Implementation of '_hotcent' */
 static PyObject *__pyx_builtin_range;
 static PyObject *__pyx_builtin_ValueError;
 static PyObject *__pyx_builtin_MemoryError;
@@ -1743,19 +1743,25 @@ static const char __pyx_k_O[] = "O";
 static const char __pyx_k_c[] = "c";
 static const char __pyx_k_i[] = "i";
 static const char __pyx_k_j[] = "j";
+static const char __pyx_k_r[] = "r";
 static const char __pyx_k_u[] = "u";
 static const char __pyx_k_c0[] = "c0";
 static const char __pyx_k_c1[] = "c1";
 static const char __pyx_k_c2[] = "c2";
+static const char __pyx_k_dV[] = "dV";
 static const char __pyx_k_dx[] = "dx";
 static const char __pyx_k_f0[] = "f0";
 static const char __pyx_k_fm[] = "fm";
 static const char __pyx_k_fp[] = "fp";
+static const char __pyx_k_hi[] = "hi";
 static const char __pyx_k_id[] = "id";
+static const char __pyx_k_lo[] = "lo";
 static const char __pyx_k_np[] = "np";
+static const char __pyx_k_r0[] = "r0";
 static const char __pyx_k_ctp[] = "ctp";
 static const char __pyx_k_new[] = "__new__";
 static const char __pyx_k_obj[] = "obj";
+static const char __pyx_k_rho[] = "rho";
 static const char __pyx_k_utp[] = "utp";
 static const char __pyx_k_base[] = "base";
 static const char __pyx_k_dict[] = "__dict__";
@@ -1769,6 +1775,7 @@ static const char __pyx_k_step[] = "step";
 static const char __pyx_k_stop[] = "stop";
 static const char __pyx_k_test[] = "__test__";
 static const char __pyx_k_utp1[] = "utp1";
+static const char __pyx_k_vhar[] = "vhar";
 static const char __pyx_k_ASCII[] = "ASCII";
 static const char __pyx_k_DTYPE[] = "DTYPE";
 static const char __pyx_k_class[] = "__class__";
@@ -1802,8 +1809,11 @@ static const char __pyx_k_float64[] = "float64";
 static const char __pyx_k_fm_view[] = "fm_view";
 static const char __pyx_k_fortran[] = "fortran";
 static const char __pyx_k_fp_view[] = "fp_view";
+static const char __pyx_k_hartree[] = "hartree";
+static const char __pyx_k_hi_view[] = "hi_view";
+static const char __pyx_k_hotcent[] = "_hotcent";
+static const char __pyx_k_lo_view[] = "lo_view";
 static const char __pyx_k_memview[] = "memview";
-static const char __pyx_k_shoot_2[] = "_shoot";
 static const char __pyx_k_Ellipsis[] = "Ellipsis";
 static const char __pyx_k_getstate[] = "__getstate__";
 static const char __pyx_k_itemsize[] = "itemsize";
@@ -1813,6 +1823,7 @@ static const char __pyx_k_TypeError[] = "TypeError";
 static const char __pyx_k_enumerate[] = "enumerate";
 static const char __pyx_k_pyx_state[] = "__pyx_state";
 static const char __pyx_k_reduce_ex[] = "__reduce_ex__";
+static const char __pyx_k_vhar_view[] = "vhar_view";
 static const char __pyx_k_IndexError[] = "IndexError";
 static const char __pyx_k_ValueError[] = "ValueError";
 static const char __pyx_k_pyx_result[] = "__pyx_result";
@@ -1829,13 +1840,13 @@ static const char __pyx_k_allocate_buffer[] = "allocate_buffer";
 static const char __pyx_k_dtype_is_object[] = "dtype_is_object";
 static const char __pyx_k_pyx_PickleError[] = "__pyx_PickleError";
 static const char __pyx_k_setstate_cython[] = "__setstate_cython__";
-static const char __pyx_k_hotcent_shoot_pyx[] = "hotcent/shoot.pyx";
 static const char __pyx_k_pyx_unpickle_Enum[] = "__pyx_unpickle_Enum";
 static const char __pyx_k_cline_in_traceback[] = "cline_in_traceback";
 static const char __pyx_k_strided_and_direct[] = "<strided and direct>";
 static const char __pyx_k_strided_and_indirect[] = "<strided and indirect>";
 static const char __pyx_k_contiguous_and_direct[] = "<contiguous and direct>";
 static const char __pyx_k_MemoryView_of_r_object[] = "<MemoryView of %r object>";
+static const char __pyx_k_hotcent_extensions_pyx[] = "hotcent/extensions.pyx";
 static const char __pyx_k_MemoryView_of_r_at_0x_x[] = "<MemoryView of %r at 0x%x>";
 static const char __pyx_k_contiguous_and_indirect[] = "<contiguous and indirect>";
 static const char __pyx_k_Cannot_index_with_type_s[] = "Cannot index with type '%s'";
@@ -1895,6 +1906,7 @@ static PyObject *__pyx_n_s_cline_in_traceback;
 static PyObject *__pyx_kp_s_contiguous_and_direct;
 static PyObject *__pyx_kp_s_contiguous_and_indirect;
 static PyObject *__pyx_n_s_ctp;
+static PyObject *__pyx_n_s_dV;
 static PyObject *__pyx_n_s_dict;
 static PyObject *__pyx_n_s_dleft;
 static PyObject *__pyx_n_s_dright;
@@ -1917,13 +1929,19 @@ static PyObject *__pyx_n_s_fp;
 static PyObject *__pyx_n_s_fp_view;
 static PyObject *__pyx_n_s_getstate;
 static PyObject *__pyx_kp_s_got_differing_extents_in_dimensi;
-static PyObject *__pyx_kp_s_hotcent_shoot_pyx;
+static PyObject *__pyx_n_s_hartree;
+static PyObject *__pyx_n_s_hi;
+static PyObject *__pyx_n_s_hi_view;
+static PyObject *__pyx_n_s_hotcent;
+static PyObject *__pyx_kp_s_hotcent_extensions_pyx;
 static PyObject *__pyx_n_s_i;
 static PyObject *__pyx_n_s_id;
 static PyObject *__pyx_n_s_import;
 static PyObject *__pyx_n_s_itemsize;
 static PyObject *__pyx_kp_s_itemsize_0_for_cython_array;
 static PyObject *__pyx_n_s_j;
+static PyObject *__pyx_n_s_lo;
+static PyObject *__pyx_n_s_lo_view;
 static PyObject *__pyx_n_s_main;
 static PyObject *__pyx_n_s_memview;
 static PyObject *__pyx_n_s_mode;
@@ -1946,16 +1964,18 @@ static PyObject *__pyx_n_s_pyx_state;
 static PyObject *__pyx_n_s_pyx_type;
 static PyObject *__pyx_n_s_pyx_unpickle_Enum;
 static PyObject *__pyx_n_s_pyx_vtable;
+static PyObject *__pyx_n_s_r;
+static PyObject *__pyx_n_s_r0;
 static PyObject *__pyx_n_s_range;
 static PyObject *__pyx_n_s_reduce;
 static PyObject *__pyx_n_s_reduce_cython;
 static PyObject *__pyx_n_s_reduce_ex;
+static PyObject *__pyx_n_s_rho;
 static PyObject *__pyx_n_s_scale;
 static PyObject *__pyx_n_s_setstate;
 static PyObject *__pyx_n_s_setstate_cython;
 static PyObject *__pyx_n_s_shape;
 static PyObject *__pyx_n_s_shoot;
-static PyObject *__pyx_n_s_shoot_2;
 static PyObject *__pyx_n_s_size;
 static PyObject *__pyx_n_s_start;
 static PyObject *__pyx_n_s_step;
@@ -1976,8 +1996,11 @@ static PyObject *__pyx_n_s_unpack;
 static PyObject *__pyx_n_s_update;
 static PyObject *__pyx_n_s_utp;
 static PyObject *__pyx_n_s_utp1;
+static PyObject *__pyx_n_s_vhar;
+static PyObject *__pyx_n_s_vhar_view;
 static PyObject *__pyx_n_s_zeros;
-static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_u, double __pyx_v_dx, __Pyx_memviewslice __pyx_v_c2, __Pyx_memviewslice __pyx_v_c1, __Pyx_memviewslice __pyx_v_c0, int __pyx_v_N); /* proto */
+static PyObject *__pyx_pf_8_hotcent_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_u, double __pyx_v_dx, __Pyx_memviewslice __pyx_v_c2, __Pyx_memviewslice __pyx_v_c1, __Pyx_memviewslice __pyx_v_c0, int __pyx_v_N); /* proto */
+static PyObject *__pyx_pf_8_hotcent_2hartree(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_rho, __Pyx_memviewslice __pyx_v_dV, __Pyx_memviewslice __pyx_v_r, __Pyx_memviewslice __pyx_v_r0, int __pyx_v_N); /* proto */
 static int __pyx_array___pyx_pf_15View_dot_MemoryView_5array___cinit__(struct __pyx_array_obj *__pyx_v_self, PyObject *__pyx_v_shape, Py_ssize_t __pyx_v_itemsize, PyObject *__pyx_v_format, PyObject *__pyx_v_mode, int __pyx_v_allocate_buffer); /* proto */
 static int __pyx_array___pyx_pf_15View_dot_MemoryView_5array_2__getbuffer__(struct __pyx_array_obj *__pyx_v_self, Py_buffer *__pyx_v_info, int __pyx_v_flags); /* proto */
 static void __pyx_array___pyx_pf_15View_dot_MemoryView_5array_4__dealloc__(struct __pyx_array_obj *__pyx_v_self); /* proto */
@@ -2048,16 +2071,18 @@ static PyObject *__pyx_tuple__17;
 static PyObject *__pyx_tuple__18;
 static PyObject *__pyx_tuple__19;
 static PyObject *__pyx_tuple__21;
-static PyObject *__pyx_tuple__22;
 static PyObject *__pyx_tuple__23;
 static PyObject *__pyx_tuple__24;
 static PyObject *__pyx_tuple__25;
 static PyObject *__pyx_tuple__26;
+static PyObject *__pyx_tuple__27;
+static PyObject *__pyx_tuple__28;
 static PyObject *__pyx_codeobj__20;
-static PyObject *__pyx_codeobj__27;
+static PyObject *__pyx_codeobj__22;
+static PyObject *__pyx_codeobj__29;
 /* Late includes */
 
-/* "hotcent/shoot.pyx":7
+/* "hotcent/extensions.pyx":7
  * 
  * 
  * def shoot(double[:] u, double dx, double[:] c2, double[:] c1, double[:] c0,             # <<<<<<<<<<<<<<
@@ -2066,10 +2091,10 @@ static PyObject *__pyx_codeobj__27;
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_6_shoot_1shoot(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_6_shoot_shoot[] = " Cython version of shoot.py for faster atomic DFT calculations ";
-static PyMethodDef __pyx_mdef_6_shoot_1shoot = {"shoot", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_6_shoot_1shoot, METH_VARARGS|METH_KEYWORDS, __pyx_doc_6_shoot_shoot};
-static PyObject *__pyx_pw_6_shoot_1shoot(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+static PyObject *__pyx_pw_8_hotcent_1shoot(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static char __pyx_doc_8_hotcent_shoot[] = " Cython version of shoot.py for faster atomic DFT calculations ";
+static PyMethodDef __pyx_mdef_8_hotcent_1shoot = {"shoot", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_8_hotcent_1shoot, METH_VARARGS|METH_KEYWORDS, __pyx_doc_8_hotcent_shoot};
+static PyObject *__pyx_pw_8_hotcent_1shoot(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   __Pyx_memviewslice __pyx_v_u = { 0, 0, { 0 }, { 0 }, { 0 } };
   double __pyx_v_dx;
   __Pyx_memviewslice __pyx_v_c2 = { 0, 0, { 0 }, { 0 }, { 0 } };
@@ -2161,18 +2186,18 @@ static PyObject *__pyx_pw_6_shoot_1shoot(PyObject *__pyx_self, PyObject *__pyx_a
   __pyx_L5_argtuple_error:;
   __Pyx_RaiseArgtupleInvalid("shoot", 1, 6, 6, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 7, __pyx_L3_error)
   __pyx_L3_error:;
-  __Pyx_AddTraceback("_shoot.shoot", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("_hotcent.shoot", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  __pyx_r = __pyx_pf_6_shoot_shoot(__pyx_self, __pyx_v_u, __pyx_v_dx, __pyx_v_c2, __pyx_v_c1, __pyx_v_c0, __pyx_v_N);
+  __pyx_r = __pyx_pf_8_hotcent_shoot(__pyx_self, __pyx_v_u, __pyx_v_dx, __pyx_v_c2, __pyx_v_c1, __pyx_v_c0, __pyx_v_N);
 
   /* function exit code */
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_u, double __pyx_v_dx, __Pyx_memviewslice __pyx_v_c2, __Pyx_memviewslice __pyx_v_c1, __Pyx_memviewslice __pyx_v_c0, int __pyx_v_N) {
+static PyObject *__pyx_pf_8_hotcent_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_u, double __pyx_v_dx, __Pyx_memviewslice __pyx_v_c2, __Pyx_memviewslice __pyx_v_c1, __Pyx_memviewslice __pyx_v_c0, int __pyx_v_N) {
   Py_ssize_t __pyx_v_u_len;
   int __pyx_v_nodes;
   int __pyx_v_ctp;
@@ -2261,7 +2286,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
   Py_ssize_t __pyx_t_64;
   __Pyx_RefNannySetupContext("shoot", 0);
 
-  /* "hotcent/shoot.pyx":10
+  /* "hotcent/extensions.pyx":10
  *           int N):
  *     """ Cython version of shoot.py for faster atomic DFT calculations """
  *     cdef Py_ssize_t u_len = u.shape[0]             # <<<<<<<<<<<<<<
@@ -2270,7 +2295,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
  */
   __pyx_v_u_len = (__pyx_v_u.shape[0]);
 
-  /* "hotcent/shoot.pyx":11
+  /* "hotcent/extensions.pyx":11
  *     """ Cython version of shoot.py for faster atomic DFT calculations """
  *     cdef Py_ssize_t u_len = u.shape[0]
  *     assert u_len == N             # <<<<<<<<<<<<<<
@@ -2286,7 +2311,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
   }
   #endif
 
-  /* "hotcent/shoot.pyx":12
+  /* "hotcent/extensions.pyx":12
  *     cdef Py_ssize_t u_len = u.shape[0]
  *     assert u_len == N
  *     cdef int nodes = 0             # <<<<<<<<<<<<<<
@@ -2295,7 +2320,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
  */
   __pyx_v_nodes = 0;
 
-  /* "hotcent/shoot.pyx":13
+  /* "hotcent/extensions.pyx":13
  *     assert u_len == N
  *     cdef int nodes = 0
  *     cdef int ctp = 0             # <<<<<<<<<<<<<<
@@ -2304,7 +2329,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
  */
   __pyx_v_ctp = 0;
 
-  /* "hotcent/shoot.pyx":14
+  /* "hotcent/extensions.pyx":14
  *     cdef int nodes = 0
  *     cdef int ctp = 0
  *     cdef double A = 0.             # <<<<<<<<<<<<<<
@@ -2313,7 +2338,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
  */
   __pyx_v_A = 0.;
 
-  /* "hotcent/shoot.pyx":17
+  /* "hotcent/extensions.pyx":17
  *     cdef Py_ssize_t i, j
  * 
  *     u_new = np.zeros(N, dtype=DTYPE)             # <<<<<<<<<<<<<<
@@ -2346,7 +2371,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
   __pyx_v_u_new = __pyx_t_4;
   __pyx_t_4 = 0;
 
-  /* "hotcent/shoot.pyx":18
+  /* "hotcent/extensions.pyx":18
  * 
  *     u_new = np.zeros(N, dtype=DTYPE)
  *     cdef double[:] u_view = u_new             # <<<<<<<<<<<<<<
@@ -2358,7 +2383,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
   __pyx_t_5.memview = NULL;
   __pyx_t_5.data = NULL;
 
-  /* "hotcent/shoot.pyx":19
+  /* "hotcent/extensions.pyx":19
  *     u_new = np.zeros(N, dtype=DTYPE)
  *     cdef double[:] u_view = u_new
  *     for i in range(N):             # <<<<<<<<<<<<<<
@@ -2370,7 +2395,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
   for (__pyx_t_8 = 0; __pyx_t_8 < __pyx_t_7; __pyx_t_8+=1) {
     __pyx_v_i = __pyx_t_8;
 
-    /* "hotcent/shoot.pyx":20
+    /* "hotcent/extensions.pyx":20
  *     cdef double[:] u_view = u_new
  *     for i in range(N):
  *         u_view[i] = u[i]             # <<<<<<<<<<<<<<
@@ -2400,7 +2425,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
     *((double *) ( /* dim=0 */ (__pyx_v_u_view.data + __pyx_t_11 * __pyx_v_u_view.strides[0]) )) = (*((double *) ( /* dim=0 */ (__pyx_v_u.data + __pyx_t_9 * __pyx_v_u.strides[0]) )));
   }
 
-  /* "hotcent/shoot.pyx":22
+  /* "hotcent/extensions.pyx":22
  *         u_view[i] = u[i]
  * 
  *     fp = np.zeros(N, dtype=DTYPE)             # <<<<<<<<<<<<<<
@@ -2433,7 +2458,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
   __pyx_v_fp = __pyx_t_2;
   __pyx_t_2 = 0;
 
-  /* "hotcent/shoot.pyx":23
+  /* "hotcent/extensions.pyx":23
  * 
  *     fp = np.zeros(N, dtype=DTYPE)
  *     fm = np.zeros(N, dtype=DTYPE)             # <<<<<<<<<<<<<<
@@ -2466,7 +2491,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
   __pyx_v_fm = __pyx_t_1;
   __pyx_t_1 = 0;
 
-  /* "hotcent/shoot.pyx":24
+  /* "hotcent/extensions.pyx":24
  *     fp = np.zeros(N, dtype=DTYPE)
  *     fm = np.zeros(N, dtype=DTYPE)
  *     f0 = np.zeros(N, dtype=DTYPE)             # <<<<<<<<<<<<<<
@@ -2499,7 +2524,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
   __pyx_v_f0 = __pyx_t_4;
   __pyx_t_4 = 0;
 
-  /* "hotcent/shoot.pyx":25
+  /* "hotcent/extensions.pyx":25
  *     fm = np.zeros(N, dtype=DTYPE)
  *     f0 = np.zeros(N, dtype=DTYPE)
  *     cdef double[:] fp_view = fp             # <<<<<<<<<<<<<<
@@ -2511,7 +2536,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
   __pyx_t_5.memview = NULL;
   __pyx_t_5.data = NULL;
 
-  /* "hotcent/shoot.pyx":26
+  /* "hotcent/extensions.pyx":26
  *     f0 = np.zeros(N, dtype=DTYPE)
  *     cdef double[:] fp_view = fp
  *     cdef double[:] fm_view = fm             # <<<<<<<<<<<<<<
@@ -2523,7 +2548,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
   __pyx_t_5.memview = NULL;
   __pyx_t_5.data = NULL;
 
-  /* "hotcent/shoot.pyx":27
+  /* "hotcent/extensions.pyx":27
  *     cdef double[:] fp_view = fp
  *     cdef double[:] fm_view = fm
  *     cdef double[:] f0_view = f0             # <<<<<<<<<<<<<<
@@ -2535,7 +2560,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
   __pyx_t_5.memview = NULL;
   __pyx_t_5.data = NULL;
 
-  /* "hotcent/shoot.pyx":29
+  /* "hotcent/extensions.pyx":29
  *     cdef double[:] f0_view = f0
  * 
  *     cdef int all_negative = 1             # <<<<<<<<<<<<<<
@@ -2544,7 +2569,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
  */
   __pyx_v_all_negative = 1;
 
-  /* "hotcent/shoot.pyx":30
+  /* "hotcent/extensions.pyx":30
  * 
  *     cdef int all_negative = 1
  *     for i in range(N):             # <<<<<<<<<<<<<<
@@ -2556,7 +2581,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
   for (__pyx_t_8 = 0; __pyx_t_8 < __pyx_t_7; __pyx_t_8+=1) {
     __pyx_v_i = __pyx_t_8;
 
-    /* "hotcent/shoot.pyx":31
+    /* "hotcent/extensions.pyx":31
  *     cdef int all_negative = 1
  *     for i in range(N):
  *         fp_view[i] = c2[i] / dx ** 2 + 0.5 * c1[i] / dx             # <<<<<<<<<<<<<<
@@ -2606,7 +2631,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
     }
     *((double *) ( /* dim=0 */ (__pyx_v_fp_view.data + __pyx_t_17 * __pyx_v_fp_view.strides[0]) )) = ((__pyx_t_13 / __pyx_t_14) + (__pyx_t_16 / __pyx_v_dx));
 
-    /* "hotcent/shoot.pyx":32
+    /* "hotcent/extensions.pyx":32
  *     for i in range(N):
  *         fp_view[i] = c2[i] / dx ** 2 + 0.5 * c1[i] / dx
  *         fm_view[i] = c2[i] / dx ** 2 - 0.5 * c1[i] / dx             # <<<<<<<<<<<<<<
@@ -2656,7 +2681,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
     }
     *((double *) ( /* dim=0 */ (__pyx_v_fm_view.data + __pyx_t_20 * __pyx_v_fm_view.strides[0]) )) = ((__pyx_t_16 / __pyx_t_14) - (__pyx_t_13 / __pyx_v_dx));
 
-    /* "hotcent/shoot.pyx":33
+    /* "hotcent/extensions.pyx":33
  *         fp_view[i] = c2[i] / dx ** 2 + 0.5 * c1[i] / dx
  *         fm_view[i] = c2[i] / dx ** 2 - 0.5 * c1[i] / dx
  *         f0_view[i] = c0[i] - 2 * c2[i] / (dx ** 2)             # <<<<<<<<<<<<<<
@@ -2701,7 +2726,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
     }
     *((double *) ( /* dim=0 */ (__pyx_v_f0_view.data + __pyx_t_23 * __pyx_v_f0_view.strides[0]) )) = ((*((double *) ( /* dim=0 */ (__pyx_v_c0.data + __pyx_t_21 * __pyx_v_c0.strides[0]) ))) - (__pyx_t_13 / __pyx_t_14));
 
-    /* "hotcent/shoot.pyx":34
+    /* "hotcent/extensions.pyx":34
  *         fm_view[i] = c2[i] / dx ** 2 - 0.5 * c1[i] / dx
  *         f0_view[i] = c0[i] - 2 * c2[i] / (dx ** 2)
  *         if c0[i] > 0:             # <<<<<<<<<<<<<<
@@ -2721,7 +2746,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
     __pyx_t_25 = (((*((double *) ( /* dim=0 */ (__pyx_v_c0.data + __pyx_t_24 * __pyx_v_c0.strides[0]) ))) > 0.0) != 0);
     if (__pyx_t_25) {
 
-      /* "hotcent/shoot.pyx":35
+      /* "hotcent/extensions.pyx":35
  *         f0_view[i] = c0[i] - 2 * c2[i] / (dx ** 2)
  *         if c0[i] > 0:
  *             all_negative = 0             # <<<<<<<<<<<<<<
@@ -2730,7 +2755,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
  */
       __pyx_v_all_negative = 0;
 
-      /* "hotcent/shoot.pyx":34
+      /* "hotcent/extensions.pyx":34
  *         fm_view[i] = c2[i] / dx ** 2 - 0.5 * c1[i] / dx
  *         f0_view[i] = c0[i] - 2 * c2[i] / (dx ** 2)
  *         if c0[i] > 0:             # <<<<<<<<<<<<<<
@@ -2740,7 +2765,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
     }
   }
 
-  /* "hotcent/shoot.pyx":40
+  /* "hotcent/extensions.pyx":40
  *     # (or one point beyond to get derivative)
  *     # If no ctp, integrate half-way
  *     u_view[-1] = 1.0             # <<<<<<<<<<<<<<
@@ -2759,7 +2784,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
   }
   *((double *) ( /* dim=0 */ (__pyx_v_u_view.data + __pyx_t_26 * __pyx_v_u_view.strides[0]) )) = 1.0;
 
-  /* "hotcent/shoot.pyx":41
+  /* "hotcent/extensions.pyx":41
  *     # If no ctp, integrate half-way
  *     u_view[-1] = 1.0
  *     u_view[-2] = u_view[-1] * f0_view[-1] / fm_view[-1]             # <<<<<<<<<<<<<<
@@ -2814,7 +2839,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
   }
   *((double *) ( /* dim=0 */ (__pyx_v_u_view.data + __pyx_t_30 * __pyx_v_u_view.strides[0]) )) = (__pyx_t_14 / __pyx_t_13);
 
-  /* "hotcent/shoot.pyx":42
+  /* "hotcent/extensions.pyx":42
  *     u_view[-1] = 1.0
  *     u_view[-2] = u_view[-1] * f0_view[-1] / fm_view[-1]
  *     for i in range(N - 2 , 0, -1):             # <<<<<<<<<<<<<<
@@ -2824,7 +2849,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
   for (__pyx_t_8 = (__pyx_v_N - 2); __pyx_t_8 > 0; __pyx_t_8-=1) {
     __pyx_v_i = __pyx_t_8;
 
-    /* "hotcent/shoot.pyx":43
+    /* "hotcent/extensions.pyx":43
  *     u_view[-2] = u_view[-1] * f0_view[-1] / fm_view[-1]
  *     for i in range(N - 2 , 0, -1):
  *         u_view[i - 1] = -fp_view[i] * u_view[i + 1] - f0_view[i] * u_view[i]             # <<<<<<<<<<<<<<
@@ -2883,7 +2908,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
     }
     *((double *) ( /* dim=0 */ (__pyx_v_u_view.data + __pyx_t_35 * __pyx_v_u_view.strides[0]) )) = (((-(*((double *) ( /* dim=0 */ (__pyx_v_fp_view.data + __pyx_t_31 * __pyx_v_fp_view.strides[0]) )))) * (*((double *) ( /* dim=0 */ (__pyx_v_u_view.data + __pyx_t_32 * __pyx_v_u_view.strides[0]) )))) - ((*((double *) ( /* dim=0 */ (__pyx_v_f0_view.data + __pyx_t_33 * __pyx_v_f0_view.strides[0]) ))) * (*((double *) ( /* dim=0 */ (__pyx_v_u_view.data + __pyx_t_34 * __pyx_v_u_view.strides[0]) )))));
 
-    /* "hotcent/shoot.pyx":44
+    /* "hotcent/extensions.pyx":44
  *     for i in range(N - 2 , 0, -1):
  *         u_view[i - 1] = -fp_view[i] * u_view[i + 1] - f0_view[i] * u_view[i]
  *         u_view[i - 1] /= fm_view[i]             # <<<<<<<<<<<<<<
@@ -2912,7 +2937,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
     }
     *((double *) ( /* dim=0 */ (__pyx_v_u_view.data + __pyx_t_37 * __pyx_v_u_view.strides[0]) )) /= (*((double *) ( /* dim=0 */ (__pyx_v_fm_view.data + __pyx_t_36 * __pyx_v_fm_view.strides[0]) )));
 
-    /* "hotcent/shoot.pyx":45
+    /* "hotcent/extensions.pyx":45
  *         u_view[i - 1] = -fp_view[i] * u_view[i + 1] - f0_view[i] * u_view[i]
  *         u_view[i - 1] /= fm_view[i]
  *         if abs(u_view[i - 1]) > 1e10:             # <<<<<<<<<<<<<<
@@ -2932,7 +2957,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
     __pyx_t_25 = ((fabs((*((double *) ( /* dim=0 */ (__pyx_v_u_view.data + __pyx_t_38 * __pyx_v_u_view.strides[0]) )))) > 1e10) != 0);
     if (__pyx_t_25) {
 
-      /* "hotcent/shoot.pyx":46
+      /* "hotcent/extensions.pyx":46
  *         u_view[i - 1] /= fm_view[i]
  *         if abs(u_view[i - 1]) > 1e10:
  *             for j in range(i - 1, N):             # <<<<<<<<<<<<<<
@@ -2944,7 +2969,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
       for (__pyx_t_39 = (__pyx_v_i - 1); __pyx_t_39 < __pyx_t_7; __pyx_t_39+=1) {
         __pyx_v_j = __pyx_t_39;
 
-        /* "hotcent/shoot.pyx":47
+        /* "hotcent/extensions.pyx":47
  *         if abs(u_view[i - 1]) > 1e10:
  *             for j in range(i - 1, N):
  *                 u_view[j] *= 1e-10  # numerical stability             # <<<<<<<<<<<<<<
@@ -2964,7 +2989,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
         *((double *) ( /* dim=0 */ (__pyx_v_u_view.data + __pyx_t_40 * __pyx_v_u_view.strides[0]) )) *= 1e-10;
       }
 
-      /* "hotcent/shoot.pyx":45
+      /* "hotcent/extensions.pyx":45
  *         u_view[i - 1] = -fp_view[i] * u_view[i + 1] - f0_view[i] * u_view[i]
  *         u_view[i - 1] /= fm_view[i]
  *         if abs(u_view[i - 1]) > 1e10:             # <<<<<<<<<<<<<<
@@ -2973,7 +2998,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
  */
     }
 
-    /* "hotcent/shoot.pyx":48
+    /* "hotcent/extensions.pyx":48
  *             for j in range(i - 1, N):
  *                 u_view[j] *= 1e-10  # numerical stability
  *         if c0[i] > 0:             # <<<<<<<<<<<<<<
@@ -2993,7 +3018,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
     __pyx_t_25 = (((*((double *) ( /* dim=0 */ (__pyx_v_c0.data + __pyx_t_41 * __pyx_v_c0.strides[0]) ))) > 0.0) != 0);
     if (__pyx_t_25) {
 
-      /* "hotcent/shoot.pyx":49
+      /* "hotcent/extensions.pyx":49
  *                 u_view[j] *= 1e-10  # numerical stability
  *         if c0[i] > 0:
  *             ctp = i             # <<<<<<<<<<<<<<
@@ -3002,7 +3027,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
  */
       __pyx_v_ctp = __pyx_v_i;
 
-      /* "hotcent/shoot.pyx":50
+      /* "hotcent/extensions.pyx":50
  *         if c0[i] > 0:
  *             ctp = i
  *             break             # <<<<<<<<<<<<<<
@@ -3011,7 +3036,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
  */
       goto __pyx_L9_break;
 
-      /* "hotcent/shoot.pyx":48
+      /* "hotcent/extensions.pyx":48
  *             for j in range(i - 1, N):
  *                 u_view[j] *= 1e-10  # numerical stability
  *         if c0[i] > 0:             # <<<<<<<<<<<<<<
@@ -3020,7 +3045,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
  */
     }
 
-    /* "hotcent/shoot.pyx":51
+    /* "hotcent/extensions.pyx":51
  *             ctp = i
  *             break
  *         if all_negative > 0 and i == N // 2:             # <<<<<<<<<<<<<<
@@ -3038,7 +3063,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
     __pyx_L15_bool_binop_done:;
     if (__pyx_t_25) {
 
-      /* "hotcent/shoot.pyx":52
+      /* "hotcent/extensions.pyx":52
  *             break
  *         if all_negative > 0 and i == N // 2:
  *             ctp = N // 2             # <<<<<<<<<<<<<<
@@ -3047,7 +3072,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
  */
       __pyx_v_ctp = __Pyx_div_long(__pyx_v_N, 2);
 
-      /* "hotcent/shoot.pyx":53
+      /* "hotcent/extensions.pyx":53
  *         if all_negative > 0 and i == N // 2:
  *             ctp = N // 2
  *             break             # <<<<<<<<<<<<<<
@@ -3056,7 +3081,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
  */
       goto __pyx_L9_break;
 
-      /* "hotcent/shoot.pyx":51
+      /* "hotcent/extensions.pyx":51
  *             ctp = i
  *             break
  *         if all_negative > 0 and i == N // 2:             # <<<<<<<<<<<<<<
@@ -3067,7 +3092,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
   }
   __pyx_L9_break:;
 
-  /* "hotcent/shoot.pyx":56
+  /* "hotcent/extensions.pyx":56
  * 
  *     cdef double utp, utp1, dright
  *     utp = u_view[ctp]             # <<<<<<<<<<<<<<
@@ -3086,7 +3111,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
   }
   __pyx_v_utp = (*((double *) ( /* dim=0 */ (__pyx_v_u_view.data + __pyx_t_43 * __pyx_v_u_view.strides[0]) )));
 
-  /* "hotcent/shoot.pyx":57
+  /* "hotcent/extensions.pyx":57
  *     cdef double utp, utp1, dright
  *     utp = u_view[ctp]
  *     utp1 = u_view[ctp + 1]             # <<<<<<<<<<<<<<
@@ -3105,7 +3130,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
   }
   __pyx_v_utp1 = (*((double *) ( /* dim=0 */ (__pyx_v_u_view.data + __pyx_t_44 * __pyx_v_u_view.strides[0]) )));
 
-  /* "hotcent/shoot.pyx":58
+  /* "hotcent/extensions.pyx":58
  *     utp = u_view[ctp]
  *     utp1 = u_view[ctp + 1]
  *     dright = (u_view[ctp + 1] - u_view[ctp - 1]) / (2 * dx)             # <<<<<<<<<<<<<<
@@ -3140,7 +3165,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
   }
   __pyx_v_dright = (__pyx_t_13 / __pyx_t_14);
 
-  /* "hotcent/shoot.pyx":60
+  /* "hotcent/extensions.pyx":60
  *     dright = (u_view[ctp + 1] - u_view[ctp - 1]) / (2 * dx)
  * 
  *     for i in range(1, ctp + 1):             # <<<<<<<<<<<<<<
@@ -3152,7 +3177,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
   for (__pyx_t_8 = 1; __pyx_t_8 < __pyx_t_48; __pyx_t_8+=1) {
     __pyx_v_i = __pyx_t_8;
 
-    /* "hotcent/shoot.pyx":61
+    /* "hotcent/extensions.pyx":61
  * 
  *     for i in range(1, ctp + 1):
  *         u_view[i + 1] = -f0_view[i] * u_view[i] - fm_view[i] * u_view[i - 1]             # <<<<<<<<<<<<<<
@@ -3211,7 +3236,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
     }
     *((double *) ( /* dim=0 */ (__pyx_v_u_view.data + __pyx_t_53 * __pyx_v_u_view.strides[0]) )) = (((-(*((double *) ( /* dim=0 */ (__pyx_v_f0_view.data + __pyx_t_49 * __pyx_v_f0_view.strides[0]) )))) * (*((double *) ( /* dim=0 */ (__pyx_v_u_view.data + __pyx_t_50 * __pyx_v_u_view.strides[0]) )))) - ((*((double *) ( /* dim=0 */ (__pyx_v_fm_view.data + __pyx_t_51 * __pyx_v_fm_view.strides[0]) ))) * (*((double *) ( /* dim=0 */ (__pyx_v_u_view.data + __pyx_t_52 * __pyx_v_u_view.strides[0]) )))));
 
-    /* "hotcent/shoot.pyx":62
+    /* "hotcent/extensions.pyx":62
  *     for i in range(1, ctp + 1):
  *         u_view[i + 1] = -f0_view[i] * u_view[i] - fm_view[i] * u_view[i - 1]
  *         u_view[i + 1] /= fp_view[i]             # <<<<<<<<<<<<<<
@@ -3241,7 +3266,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
     *((double *) ( /* dim=0 */ (__pyx_v_u_view.data + __pyx_t_55 * __pyx_v_u_view.strides[0]) )) /= (*((double *) ( /* dim=0 */ (__pyx_v_fp_view.data + __pyx_t_54 * __pyx_v_fp_view.strides[0]) )));
   }
 
-  /* "hotcent/shoot.pyx":65
+  /* "hotcent/extensions.pyx":65
  * 
  *     cdef double dleft, scale
  *     dleft = (u_view[ctp + 1] - u_view[ctp - 1]) / (2 * dx)             # <<<<<<<<<<<<<<
@@ -3276,7 +3301,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
   }
   __pyx_v_dleft = (__pyx_t_14 / __pyx_t_13);
 
-  /* "hotcent/shoot.pyx":66
+  /* "hotcent/extensions.pyx":66
  *     cdef double dleft, scale
  *     dleft = (u_view[ctp + 1] - u_view[ctp - 1]) / (2 * dx)
  *     scale = utp / u_view[ctp]             # <<<<<<<<<<<<<<
@@ -3300,7 +3325,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
   }
   __pyx_v_scale = (__pyx_v_utp / __pyx_t_13);
 
-  /* "hotcent/shoot.pyx":67
+  /* "hotcent/extensions.pyx":67
  *     dleft = (u_view[ctp + 1] - u_view[ctp - 1]) / (2 * dx)
  *     scale = utp / u_view[ctp]
  *     for i in range(ctp + 1):             # <<<<<<<<<<<<<<
@@ -3312,7 +3337,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
   for (__pyx_t_8 = 0; __pyx_t_8 < __pyx_t_48; __pyx_t_8+=1) {
     __pyx_v_i = __pyx_t_8;
 
-    /* "hotcent/shoot.pyx":68
+    /* "hotcent/extensions.pyx":68
  *     scale = utp / u_view[ctp]
  *     for i in range(ctp + 1):
  *         u_view[i] *= scale             # <<<<<<<<<<<<<<
@@ -3332,7 +3357,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
     *((double *) ( /* dim=0 */ (__pyx_v_u_view.data + __pyx_t_59 * __pyx_v_u_view.strides[0]) )) *= __pyx_v_scale;
   }
 
-  /* "hotcent/shoot.pyx":69
+  /* "hotcent/extensions.pyx":69
  *     for i in range(ctp + 1):
  *         u_view[i] *= scale
  *     u_view[ctp + 1] = utp1  # above overrode             # <<<<<<<<<<<<<<
@@ -3351,7 +3376,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
   }
   *((double *) ( /* dim=0 */ (__pyx_v_u_view.data + __pyx_t_60 * __pyx_v_u_view.strides[0]) )) = __pyx_v_utp1;
 
-  /* "hotcent/shoot.pyx":70
+  /* "hotcent/extensions.pyx":70
  *         u_view[i] *= scale
  *     u_view[ctp + 1] = utp1  # above overrode
  *     dleft *= scale             # <<<<<<<<<<<<<<
@@ -3360,7 +3385,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
  */
   __pyx_v_dleft = (__pyx_v_dleft * __pyx_v_scale);
 
-  /* "hotcent/shoot.pyx":72
+  /* "hotcent/extensions.pyx":72
  *     dleft *= scale
  * 
  *     if u_view[1] < 0:             # <<<<<<<<<<<<<<
@@ -3380,7 +3405,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
   __pyx_t_25 = (((*((double *) ( /* dim=0 */ (__pyx_v_u_view.data + __pyx_t_61 * __pyx_v_u_view.strides[0]) ))) < 0.0) != 0);
   if (__pyx_t_25) {
 
-    /* "hotcent/shoot.pyx":73
+    /* "hotcent/extensions.pyx":73
  * 
  *     if u_view[1] < 0:
  *         for i in range(N):             # <<<<<<<<<<<<<<
@@ -3392,7 +3417,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
     for (__pyx_t_8 = 0; __pyx_t_8 < __pyx_t_7; __pyx_t_8+=1) {
       __pyx_v_i = __pyx_t_8;
 
-      /* "hotcent/shoot.pyx":74
+      /* "hotcent/extensions.pyx":74
  *     if u_view[1] < 0:
  *         for i in range(N):
  *             u_view[i] *= -1             # <<<<<<<<<<<<<<
@@ -3412,7 +3437,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
       *((double *) ( /* dim=0 */ (__pyx_v_u_view.data + __pyx_t_62 * __pyx_v_u_view.strides[0]) )) *= -1.0;
     }
 
-    /* "hotcent/shoot.pyx":72
+    /* "hotcent/extensions.pyx":72
  *     dleft *= scale
  * 
  *     if u_view[1] < 0:             # <<<<<<<<<<<<<<
@@ -3421,7 +3446,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
  */
   }
 
-  /* "hotcent/shoot.pyx":76
+  /* "hotcent/extensions.pyx":76
  *             u_view[i] *= -1
  * 
  *     for i in range(ctp - 1):             # <<<<<<<<<<<<<<
@@ -3433,7 +3458,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
   for (__pyx_t_8 = 0; __pyx_t_8 < __pyx_t_48; __pyx_t_8+=1) {
     __pyx_v_i = __pyx_t_8;
 
-    /* "hotcent/shoot.pyx":77
+    /* "hotcent/extensions.pyx":77
  * 
  *     for i in range(ctp - 1):
  *         if u_view[i] * u_view[i+1] < 0:             # <<<<<<<<<<<<<<
@@ -3463,7 +3488,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
     __pyx_t_25 = ((((*((double *) ( /* dim=0 */ (__pyx_v_u_view.data + __pyx_t_63 * __pyx_v_u_view.strides[0]) ))) * (*((double *) ( /* dim=0 */ (__pyx_v_u_view.data + __pyx_t_64 * __pyx_v_u_view.strides[0]) )))) < 0.0) != 0);
     if (__pyx_t_25) {
 
-      /* "hotcent/shoot.pyx":78
+      /* "hotcent/extensions.pyx":78
  *     for i in range(ctp - 1):
  *         if u_view[i] * u_view[i+1] < 0:
  *             nodes += 1             # <<<<<<<<<<<<<<
@@ -3472,7 +3497,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
  */
       __pyx_v_nodes = (__pyx_v_nodes + 1);
 
-      /* "hotcent/shoot.pyx":77
+      /* "hotcent/extensions.pyx":77
  * 
  *     for i in range(ctp - 1):
  *         if u_view[i] * u_view[i+1] < 0:             # <<<<<<<<<<<<<<
@@ -3482,18 +3507,21 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
     }
   }
 
-  /* "hotcent/shoot.pyx":80
+  /* "hotcent/extensions.pyx":80
  *             nodes += 1
  * 
  *     A = (dright - dleft) * utp             # <<<<<<<<<<<<<<
  *     return u_new, nodes, A, ctp
+ * 
  */
   __pyx_v_A = ((__pyx_v_dright - __pyx_v_dleft) * __pyx_v_utp);
 
-  /* "hotcent/shoot.pyx":81
+  /* "hotcent/extensions.pyx":81
  * 
  *     A = (dright - dleft) * utp
  *     return u_new, nodes, A, ctp             # <<<<<<<<<<<<<<
+ * 
+ * 
  */
   __Pyx_XDECREF(__pyx_r);
   __pyx_t_4 = __Pyx_PyInt_From_int(__pyx_v_nodes); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 81, __pyx_L1_error)
@@ -3520,7 +3548,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
   __pyx_t_2 = 0;
   goto __pyx_L0;
 
-  /* "hotcent/shoot.pyx":7
+  /* "hotcent/extensions.pyx":7
  * 
  * 
  * def shoot(double[:] u, double dx, double[:] c2, double[:] c1, double[:] c0,             # <<<<<<<<<<<<<<
@@ -3535,7 +3563,7 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
   __Pyx_XDECREF(__pyx_t_3);
   __Pyx_XDECREF(__pyx_t_4);
   __PYX_XDEC_MEMVIEW(&__pyx_t_5, 1);
-  __Pyx_AddTraceback("_shoot.shoot", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("_hotcent.shoot", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
   __Pyx_XDECREF(__pyx_v_u_new);
@@ -3550,6 +3578,530 @@ static PyObject *__pyx_pf_6_shoot_shoot(CYTHON_UNUSED PyObject *__pyx_self, __Py
   __PYX_XDEC_MEMVIEW(&__pyx_v_c2, 1);
   __PYX_XDEC_MEMVIEW(&__pyx_v_c1, 1);
   __PYX_XDEC_MEMVIEW(&__pyx_v_c0, 1);
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "hotcent/extensions.pyx":84
+ * 
+ * 
+ * def hartree(double[:] rho, double[:] dV, double[:] r, double[:] r0, int N):             # <<<<<<<<<<<<<<
+ *     """ Calculate Hartree potential from radial density """
+ *     vhar = np.zeros(N, dtype=DTYPE)
+ */
+
+/* Python wrapper */
+static PyObject *__pyx_pw_8_hotcent_3hartree(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static char __pyx_doc_8_hotcent_2hartree[] = " Calculate Hartree potential from radial density ";
+static PyMethodDef __pyx_mdef_8_hotcent_3hartree = {"hartree", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_8_hotcent_3hartree, METH_VARARGS|METH_KEYWORDS, __pyx_doc_8_hotcent_2hartree};
+static PyObject *__pyx_pw_8_hotcent_3hartree(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+  __Pyx_memviewslice __pyx_v_rho = { 0, 0, { 0 }, { 0 }, { 0 } };
+  __Pyx_memviewslice __pyx_v_dV = { 0, 0, { 0 }, { 0 }, { 0 } };
+  __Pyx_memviewslice __pyx_v_r = { 0, 0, { 0 }, { 0 }, { 0 } };
+  __Pyx_memviewslice __pyx_v_r0 = { 0, 0, { 0 }, { 0 }, { 0 } };
+  int __pyx_v_N;
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("hartree (wrapper)", 0);
+  {
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_rho,&__pyx_n_s_dV,&__pyx_n_s_r,&__pyx_n_s_r0,&__pyx_n_s_N,0};
+    PyObject* values[5] = {0,0,0,0,0};
+    if (unlikely(__pyx_kwds)) {
+      Py_ssize_t kw_args;
+      const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
+      switch (pos_args) {
+        case  5: values[4] = PyTuple_GET_ITEM(__pyx_args, 4);
+        CYTHON_FALLTHROUGH;
+        case  4: values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
+        CYTHON_FALLTHROUGH;
+        case  3: values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
+        CYTHON_FALLTHROUGH;
+        case  2: values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+        CYTHON_FALLTHROUGH;
+        case  1: values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+        CYTHON_FALLTHROUGH;
+        case  0: break;
+        default: goto __pyx_L5_argtuple_error;
+      }
+      kw_args = PyDict_Size(__pyx_kwds);
+      switch (pos_args) {
+        case  0:
+        if (likely((values[0] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_rho)) != 0)) kw_args--;
+        else goto __pyx_L5_argtuple_error;
+        CYTHON_FALLTHROUGH;
+        case  1:
+        if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_dV)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("hartree", 1, 5, 5, 1); __PYX_ERR(0, 84, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  2:
+        if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_r)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("hartree", 1, 5, 5, 2); __PYX_ERR(0, 84, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  3:
+        if (likely((values[3] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_r0)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("hartree", 1, 5, 5, 3); __PYX_ERR(0, 84, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  4:
+        if (likely((values[4] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_N)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("hartree", 1, 5, 5, 4); __PYX_ERR(0, 84, __pyx_L3_error)
+        }
+      }
+      if (unlikely(kw_args > 0)) {
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "hartree") < 0)) __PYX_ERR(0, 84, __pyx_L3_error)
+      }
+    } else if (PyTuple_GET_SIZE(__pyx_args) != 5) {
+      goto __pyx_L5_argtuple_error;
+    } else {
+      values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+      values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+      values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
+      values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
+      values[4] = PyTuple_GET_ITEM(__pyx_args, 4);
+    }
+    __pyx_v_rho = __Pyx_PyObject_to_MemoryviewSlice_ds_double(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_rho.memview)) __PYX_ERR(0, 84, __pyx_L3_error)
+    __pyx_v_dV = __Pyx_PyObject_to_MemoryviewSlice_ds_double(values[1], PyBUF_WRITABLE); if (unlikely(!__pyx_v_dV.memview)) __PYX_ERR(0, 84, __pyx_L3_error)
+    __pyx_v_r = __Pyx_PyObject_to_MemoryviewSlice_ds_double(values[2], PyBUF_WRITABLE); if (unlikely(!__pyx_v_r.memview)) __PYX_ERR(0, 84, __pyx_L3_error)
+    __pyx_v_r0 = __Pyx_PyObject_to_MemoryviewSlice_ds_double(values[3], PyBUF_WRITABLE); if (unlikely(!__pyx_v_r0.memview)) __PYX_ERR(0, 84, __pyx_L3_error)
+    __pyx_v_N = __Pyx_PyInt_As_int(values[4]); if (unlikely((__pyx_v_N == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 84, __pyx_L3_error)
+  }
+  goto __pyx_L4_argument_unpacking_done;
+  __pyx_L5_argtuple_error:;
+  __Pyx_RaiseArgtupleInvalid("hartree", 1, 5, 5, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 84, __pyx_L3_error)
+  __pyx_L3_error:;
+  __Pyx_AddTraceback("_hotcent.hartree", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_RefNannyFinishContext();
+  return NULL;
+  __pyx_L4_argument_unpacking_done:;
+  __pyx_r = __pyx_pf_8_hotcent_2hartree(__pyx_self, __pyx_v_rho, __pyx_v_dV, __pyx_v_r, __pyx_v_r0, __pyx_v_N);
+
+  /* function exit code */
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_8_hotcent_2hartree(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_rho, __Pyx_memviewslice __pyx_v_dV, __Pyx_memviewslice __pyx_v_r, __Pyx_memviewslice __pyx_v_r0, int __pyx_v_N) {
+  PyObject *__pyx_v_vhar = NULL;
+  PyObject *__pyx_v_lo = NULL;
+  PyObject *__pyx_v_hi = NULL;
+  __Pyx_memviewslice __pyx_v_lo_view = { 0, 0, { 0 }, { 0 }, { 0 } };
+  __Pyx_memviewslice __pyx_v_hi_view = { 0, 0, { 0 }, { 0 }, { 0 } };
+  __Pyx_memviewslice __pyx_v_vhar_view = { 0, 0, { 0 }, { 0 }, { 0 } };
+  Py_ssize_t __pyx_v_i;
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  PyObject *__pyx_t_1 = NULL;
+  PyObject *__pyx_t_2 = NULL;
+  PyObject *__pyx_t_3 = NULL;
+  PyObject *__pyx_t_4 = NULL;
+  __Pyx_memviewslice __pyx_t_5 = { 0, 0, { 0 }, { 0 }, { 0 } };
+  int __pyx_t_6;
+  int __pyx_t_7;
+  Py_ssize_t __pyx_t_8;
+  Py_ssize_t __pyx_t_9;
+  int __pyx_t_10;
+  Py_ssize_t __pyx_t_11;
+  Py_ssize_t __pyx_t_12;
+  Py_ssize_t __pyx_t_13;
+  Py_ssize_t __pyx_t_14;
+  Py_ssize_t __pyx_t_15;
+  Py_ssize_t __pyx_t_16;
+  double __pyx_t_17;
+  Py_ssize_t __pyx_t_18;
+  double __pyx_t_19;
+  Py_ssize_t __pyx_t_20;
+  Py_ssize_t __pyx_t_21;
+  Py_ssize_t __pyx_t_22;
+  Py_ssize_t __pyx_t_23;
+  Py_ssize_t __pyx_t_24;
+  __Pyx_RefNannySetupContext("hartree", 0);
+
+  /* "hotcent/extensions.pyx":86
+ * def hartree(double[:] rho, double[:] dV, double[:] r, double[:] r0, int N):
+ *     """ Calculate Hartree potential from radial density """
+ *     vhar = np.zeros(N, dtype=DTYPE)             # <<<<<<<<<<<<<<
+ *     lo = np.zeros(N, dtype=DTYPE)
+ *     hi = np.zeros(N, dtype=DTYPE)
+ */
+  __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_n_s_np); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 86, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_zeros); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 86, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  __pyx_t_1 = __Pyx_PyInt_From_int(__pyx_v_N); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 86, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_t_3 = PyTuple_New(1); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 86, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_3);
+  __Pyx_GIVEREF(__pyx_t_1);
+  PyTuple_SET_ITEM(__pyx_t_3, 0, __pyx_t_1);
+  __pyx_t_1 = 0;
+  __pyx_t_1 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 86, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __Pyx_GetModuleGlobalName(__pyx_t_4, __pyx_n_s_DTYPE); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 86, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_4);
+  if (PyDict_SetItem(__pyx_t_1, __pyx_n_s_dtype, __pyx_t_4) < 0) __PYX_ERR(0, 86, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+  __pyx_t_4 = __Pyx_PyObject_Call(__pyx_t_2, __pyx_t_3, __pyx_t_1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 86, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_4);
+  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  __pyx_v_vhar = __pyx_t_4;
+  __pyx_t_4 = 0;
+
+  /* "hotcent/extensions.pyx":87
+ *     """ Calculate Hartree potential from radial density """
+ *     vhar = np.zeros(N, dtype=DTYPE)
+ *     lo = np.zeros(N, dtype=DTYPE)             # <<<<<<<<<<<<<<
+ *     hi = np.zeros(N, dtype=DTYPE)
+ *     cdef double[:] lo_view = lo
+ */
+  __Pyx_GetModuleGlobalName(__pyx_t_4, __pyx_n_s_np); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 87, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_4);
+  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_t_4, __pyx_n_s_zeros); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 87, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+  __pyx_t_4 = __Pyx_PyInt_From_int(__pyx_v_N); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 87, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_4);
+  __pyx_t_3 = PyTuple_New(1); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 87, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_3);
+  __Pyx_GIVEREF(__pyx_t_4);
+  PyTuple_SET_ITEM(__pyx_t_3, 0, __pyx_t_4);
+  __pyx_t_4 = 0;
+  __pyx_t_4 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 87, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_4);
+  __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_n_s_DTYPE); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 87, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  if (PyDict_SetItem(__pyx_t_4, __pyx_n_s_dtype, __pyx_t_2) < 0) __PYX_ERR(0, 87, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+  __pyx_t_2 = __Pyx_PyObject_Call(__pyx_t_1, __pyx_t_3, __pyx_t_4); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 87, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+  __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+  __pyx_v_lo = __pyx_t_2;
+  __pyx_t_2 = 0;
+
+  /* "hotcent/extensions.pyx":88
+ *     vhar = np.zeros(N, dtype=DTYPE)
+ *     lo = np.zeros(N, dtype=DTYPE)
+ *     hi = np.zeros(N, dtype=DTYPE)             # <<<<<<<<<<<<<<
+ *     cdef double[:] lo_view = lo
+ *     cdef double[:] hi_view = hi
+ */
+  __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_n_s_np); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 88, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_2, __pyx_n_s_zeros); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 88, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_4);
+  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+  __pyx_t_2 = __Pyx_PyInt_From_int(__pyx_v_N); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 88, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  __pyx_t_3 = PyTuple_New(1); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 88, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_3);
+  __Pyx_GIVEREF(__pyx_t_2);
+  PyTuple_SET_ITEM(__pyx_t_3, 0, __pyx_t_2);
+  __pyx_t_2 = 0;
+  __pyx_t_2 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 88, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_n_s_DTYPE); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 88, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  if (PyDict_SetItem(__pyx_t_2, __pyx_n_s_dtype, __pyx_t_1) < 0) __PYX_ERR(0, 88, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
+  __pyx_t_1 = __Pyx_PyObject_Call(__pyx_t_4, __pyx_t_3, __pyx_t_2); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 88, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+  __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+  __pyx_v_hi = __pyx_t_1;
+  __pyx_t_1 = 0;
+
+  /* "hotcent/extensions.pyx":89
+ *     lo = np.zeros(N, dtype=DTYPE)
+ *     hi = np.zeros(N, dtype=DTYPE)
+ *     cdef double[:] lo_view = lo             # <<<<<<<<<<<<<<
+ *     cdef double[:] hi_view = hi
+ *     cdef double[:] vhar_view = vhar
+ */
+  __pyx_t_5 = __Pyx_PyObject_to_MemoryviewSlice_ds_double(__pyx_v_lo, PyBUF_WRITABLE); if (unlikely(!__pyx_t_5.memview)) __PYX_ERR(0, 89, __pyx_L1_error)
+  __pyx_v_lo_view = __pyx_t_5;
+  __pyx_t_5.memview = NULL;
+  __pyx_t_5.data = NULL;
+
+  /* "hotcent/extensions.pyx":90
+ *     hi = np.zeros(N, dtype=DTYPE)
+ *     cdef double[:] lo_view = lo
+ *     cdef double[:] hi_view = hi             # <<<<<<<<<<<<<<
+ *     cdef double[:] vhar_view = vhar
+ *     cdef Py_ssize_t i
+ */
+  __pyx_t_5 = __Pyx_PyObject_to_MemoryviewSlice_ds_double(__pyx_v_hi, PyBUF_WRITABLE); if (unlikely(!__pyx_t_5.memview)) __PYX_ERR(0, 90, __pyx_L1_error)
+  __pyx_v_hi_view = __pyx_t_5;
+  __pyx_t_5.memview = NULL;
+  __pyx_t_5.data = NULL;
+
+  /* "hotcent/extensions.pyx":91
+ *     cdef double[:] lo_view = lo
+ *     cdef double[:] hi_view = hi
+ *     cdef double[:] vhar_view = vhar             # <<<<<<<<<<<<<<
+ *     cdef Py_ssize_t i
+ * 
+ */
+  __pyx_t_5 = __Pyx_PyObject_to_MemoryviewSlice_ds_double(__pyx_v_vhar, PyBUF_WRITABLE); if (unlikely(!__pyx_t_5.memview)) __PYX_ERR(0, 91, __pyx_L1_error)
+  __pyx_v_vhar_view = __pyx_t_5;
+  __pyx_t_5.memview = NULL;
+  __pyx_t_5.data = NULL;
+
+  /* "hotcent/extensions.pyx":94
+ *     cdef Py_ssize_t i
+ * 
+ *     for i in range(1, N):             # <<<<<<<<<<<<<<
+ *         lo_view[i] = lo_view[i-1] + dV[i-1] * rho[i-1]
+ * 
+ */
+  __pyx_t_6 = __pyx_v_N;
+  __pyx_t_7 = __pyx_t_6;
+  for (__pyx_t_8 = 1; __pyx_t_8 < __pyx_t_7; __pyx_t_8+=1) {
+    __pyx_v_i = __pyx_t_8;
+
+    /* "hotcent/extensions.pyx":95
+ * 
+ *     for i in range(1, N):
+ *         lo_view[i] = lo_view[i-1] + dV[i-1] * rho[i-1]             # <<<<<<<<<<<<<<
+ * 
+ *     for i in range(N - 2, -1, -1):
+ */
+    __pyx_t_9 = (__pyx_v_i - 1);
+    __pyx_t_10 = -1;
+    if (__pyx_t_9 < 0) {
+      __pyx_t_9 += __pyx_v_lo_view.shape[0];
+      if (unlikely(__pyx_t_9 < 0)) __pyx_t_10 = 0;
+    } else if (unlikely(__pyx_t_9 >= __pyx_v_lo_view.shape[0])) __pyx_t_10 = 0;
+    if (unlikely(__pyx_t_10 != -1)) {
+      __Pyx_RaiseBufferIndexError(__pyx_t_10);
+      __PYX_ERR(0, 95, __pyx_L1_error)
+    }
+    __pyx_t_11 = (__pyx_v_i - 1);
+    __pyx_t_10 = -1;
+    if (__pyx_t_11 < 0) {
+      __pyx_t_11 += __pyx_v_dV.shape[0];
+      if (unlikely(__pyx_t_11 < 0)) __pyx_t_10 = 0;
+    } else if (unlikely(__pyx_t_11 >= __pyx_v_dV.shape[0])) __pyx_t_10 = 0;
+    if (unlikely(__pyx_t_10 != -1)) {
+      __Pyx_RaiseBufferIndexError(__pyx_t_10);
+      __PYX_ERR(0, 95, __pyx_L1_error)
+    }
+    __pyx_t_12 = (__pyx_v_i - 1);
+    __pyx_t_10 = -1;
+    if (__pyx_t_12 < 0) {
+      __pyx_t_12 += __pyx_v_rho.shape[0];
+      if (unlikely(__pyx_t_12 < 0)) __pyx_t_10 = 0;
+    } else if (unlikely(__pyx_t_12 >= __pyx_v_rho.shape[0])) __pyx_t_10 = 0;
+    if (unlikely(__pyx_t_10 != -1)) {
+      __Pyx_RaiseBufferIndexError(__pyx_t_10);
+      __PYX_ERR(0, 95, __pyx_L1_error)
+    }
+    __pyx_t_13 = __pyx_v_i;
+    __pyx_t_10 = -1;
+    if (__pyx_t_13 < 0) {
+      __pyx_t_13 += __pyx_v_lo_view.shape[0];
+      if (unlikely(__pyx_t_13 < 0)) __pyx_t_10 = 0;
+    } else if (unlikely(__pyx_t_13 >= __pyx_v_lo_view.shape[0])) __pyx_t_10 = 0;
+    if (unlikely(__pyx_t_10 != -1)) {
+      __Pyx_RaiseBufferIndexError(__pyx_t_10);
+      __PYX_ERR(0, 95, __pyx_L1_error)
+    }
+    *((double *) ( /* dim=0 */ (__pyx_v_lo_view.data + __pyx_t_13 * __pyx_v_lo_view.strides[0]) )) = ((*((double *) ( /* dim=0 */ (__pyx_v_lo_view.data + __pyx_t_9 * __pyx_v_lo_view.strides[0]) ))) + ((*((double *) ( /* dim=0 */ (__pyx_v_dV.data + __pyx_t_11 * __pyx_v_dV.strides[0]) ))) * (*((double *) ( /* dim=0 */ (__pyx_v_rho.data + __pyx_t_12 * __pyx_v_rho.strides[0]) )))));
+  }
+
+  /* "hotcent/extensions.pyx":97
+ *         lo_view[i] = lo_view[i-1] + dV[i-1] * rho[i-1]
+ * 
+ *     for i in range(N - 2, -1, -1):             # <<<<<<<<<<<<<<
+ *         hi_view[i] = hi_view[i + 1] + rho[i] * dV[i] / r0[i]
+ * 
+ */
+  for (__pyx_t_8 = (__pyx_v_N - 2); __pyx_t_8 > -1L; __pyx_t_8-=1) {
+    __pyx_v_i = __pyx_t_8;
+
+    /* "hotcent/extensions.pyx":98
+ * 
+ *     for i in range(N - 2, -1, -1):
+ *         hi_view[i] = hi_view[i + 1] + rho[i] * dV[i] / r0[i]             # <<<<<<<<<<<<<<
+ * 
+ *     for i in range(N):
+ */
+    __pyx_t_14 = (__pyx_v_i + 1);
+    __pyx_t_6 = -1;
+    if (__pyx_t_14 < 0) {
+      __pyx_t_14 += __pyx_v_hi_view.shape[0];
+      if (unlikely(__pyx_t_14 < 0)) __pyx_t_6 = 0;
+    } else if (unlikely(__pyx_t_14 >= __pyx_v_hi_view.shape[0])) __pyx_t_6 = 0;
+    if (unlikely(__pyx_t_6 != -1)) {
+      __Pyx_RaiseBufferIndexError(__pyx_t_6);
+      __PYX_ERR(0, 98, __pyx_L1_error)
+    }
+    __pyx_t_15 = __pyx_v_i;
+    __pyx_t_6 = -1;
+    if (__pyx_t_15 < 0) {
+      __pyx_t_15 += __pyx_v_rho.shape[0];
+      if (unlikely(__pyx_t_15 < 0)) __pyx_t_6 = 0;
+    } else if (unlikely(__pyx_t_15 >= __pyx_v_rho.shape[0])) __pyx_t_6 = 0;
+    if (unlikely(__pyx_t_6 != -1)) {
+      __Pyx_RaiseBufferIndexError(__pyx_t_6);
+      __PYX_ERR(0, 98, __pyx_L1_error)
+    }
+    __pyx_t_16 = __pyx_v_i;
+    __pyx_t_6 = -1;
+    if (__pyx_t_16 < 0) {
+      __pyx_t_16 += __pyx_v_dV.shape[0];
+      if (unlikely(__pyx_t_16 < 0)) __pyx_t_6 = 0;
+    } else if (unlikely(__pyx_t_16 >= __pyx_v_dV.shape[0])) __pyx_t_6 = 0;
+    if (unlikely(__pyx_t_6 != -1)) {
+      __Pyx_RaiseBufferIndexError(__pyx_t_6);
+      __PYX_ERR(0, 98, __pyx_L1_error)
+    }
+    __pyx_t_17 = ((*((double *) ( /* dim=0 */ (__pyx_v_rho.data + __pyx_t_15 * __pyx_v_rho.strides[0]) ))) * (*((double *) ( /* dim=0 */ (__pyx_v_dV.data + __pyx_t_16 * __pyx_v_dV.strides[0]) ))));
+    __pyx_t_18 = __pyx_v_i;
+    __pyx_t_6 = -1;
+    if (__pyx_t_18 < 0) {
+      __pyx_t_18 += __pyx_v_r0.shape[0];
+      if (unlikely(__pyx_t_18 < 0)) __pyx_t_6 = 0;
+    } else if (unlikely(__pyx_t_18 >= __pyx_v_r0.shape[0])) __pyx_t_6 = 0;
+    if (unlikely(__pyx_t_6 != -1)) {
+      __Pyx_RaiseBufferIndexError(__pyx_t_6);
+      __PYX_ERR(0, 98, __pyx_L1_error)
+    }
+    __pyx_t_19 = (*((double *) ( /* dim=0 */ (__pyx_v_r0.data + __pyx_t_18 * __pyx_v_r0.strides[0]) )));
+    if (unlikely(__pyx_t_19 == 0)) {
+      PyErr_SetString(PyExc_ZeroDivisionError, "float division");
+      __PYX_ERR(0, 98, __pyx_L1_error)
+    }
+    __pyx_t_20 = __pyx_v_i;
+    __pyx_t_6 = -1;
+    if (__pyx_t_20 < 0) {
+      __pyx_t_20 += __pyx_v_hi_view.shape[0];
+      if (unlikely(__pyx_t_20 < 0)) __pyx_t_6 = 0;
+    } else if (unlikely(__pyx_t_20 >= __pyx_v_hi_view.shape[0])) __pyx_t_6 = 0;
+    if (unlikely(__pyx_t_6 != -1)) {
+      __Pyx_RaiseBufferIndexError(__pyx_t_6);
+      __PYX_ERR(0, 98, __pyx_L1_error)
+    }
+    *((double *) ( /* dim=0 */ (__pyx_v_hi_view.data + __pyx_t_20 * __pyx_v_hi_view.strides[0]) )) = ((*((double *) ( /* dim=0 */ (__pyx_v_hi_view.data + __pyx_t_14 * __pyx_v_hi_view.strides[0]) ))) + (__pyx_t_17 / __pyx_t_19));
+  }
+
+  /* "hotcent/extensions.pyx":100
+ *         hi_view[i] = hi_view[i + 1] + rho[i] * dV[i] / r0[i]
+ * 
+ *     for i in range(N):             # <<<<<<<<<<<<<<
+ *         vhar_view[i] = lo_view[i] / r[i] + hi_view[i]
+ * 
+ */
+  __pyx_t_6 = __pyx_v_N;
+  __pyx_t_7 = __pyx_t_6;
+  for (__pyx_t_8 = 0; __pyx_t_8 < __pyx_t_7; __pyx_t_8+=1) {
+    __pyx_v_i = __pyx_t_8;
+
+    /* "hotcent/extensions.pyx":101
+ * 
+ *     for i in range(N):
+ *         vhar_view[i] = lo_view[i] / r[i] + hi_view[i]             # <<<<<<<<<<<<<<
+ * 
+ *     return vhar
+ */
+    __pyx_t_21 = __pyx_v_i;
+    __pyx_t_10 = -1;
+    if (__pyx_t_21 < 0) {
+      __pyx_t_21 += __pyx_v_lo_view.shape[0];
+      if (unlikely(__pyx_t_21 < 0)) __pyx_t_10 = 0;
+    } else if (unlikely(__pyx_t_21 >= __pyx_v_lo_view.shape[0])) __pyx_t_10 = 0;
+    if (unlikely(__pyx_t_10 != -1)) {
+      __Pyx_RaiseBufferIndexError(__pyx_t_10);
+      __PYX_ERR(0, 101, __pyx_L1_error)
+    }
+    __pyx_t_19 = (*((double *) ( /* dim=0 */ (__pyx_v_lo_view.data + __pyx_t_21 * __pyx_v_lo_view.strides[0]) )));
+    __pyx_t_22 = __pyx_v_i;
+    __pyx_t_10 = -1;
+    if (__pyx_t_22 < 0) {
+      __pyx_t_22 += __pyx_v_r.shape[0];
+      if (unlikely(__pyx_t_22 < 0)) __pyx_t_10 = 0;
+    } else if (unlikely(__pyx_t_22 >= __pyx_v_r.shape[0])) __pyx_t_10 = 0;
+    if (unlikely(__pyx_t_10 != -1)) {
+      __Pyx_RaiseBufferIndexError(__pyx_t_10);
+      __PYX_ERR(0, 101, __pyx_L1_error)
+    }
+    __pyx_t_17 = (*((double *) ( /* dim=0 */ (__pyx_v_r.data + __pyx_t_22 * __pyx_v_r.strides[0]) )));
+    if (unlikely(__pyx_t_17 == 0)) {
+      PyErr_SetString(PyExc_ZeroDivisionError, "float division");
+      __PYX_ERR(0, 101, __pyx_L1_error)
+    }
+    __pyx_t_23 = __pyx_v_i;
+    __pyx_t_10 = -1;
+    if (__pyx_t_23 < 0) {
+      __pyx_t_23 += __pyx_v_hi_view.shape[0];
+      if (unlikely(__pyx_t_23 < 0)) __pyx_t_10 = 0;
+    } else if (unlikely(__pyx_t_23 >= __pyx_v_hi_view.shape[0])) __pyx_t_10 = 0;
+    if (unlikely(__pyx_t_10 != -1)) {
+      __Pyx_RaiseBufferIndexError(__pyx_t_10);
+      __PYX_ERR(0, 101, __pyx_L1_error)
+    }
+    __pyx_t_24 = __pyx_v_i;
+    __pyx_t_10 = -1;
+    if (__pyx_t_24 < 0) {
+      __pyx_t_24 += __pyx_v_vhar_view.shape[0];
+      if (unlikely(__pyx_t_24 < 0)) __pyx_t_10 = 0;
+    } else if (unlikely(__pyx_t_24 >= __pyx_v_vhar_view.shape[0])) __pyx_t_10 = 0;
+    if (unlikely(__pyx_t_10 != -1)) {
+      __Pyx_RaiseBufferIndexError(__pyx_t_10);
+      __PYX_ERR(0, 101, __pyx_L1_error)
+    }
+    *((double *) ( /* dim=0 */ (__pyx_v_vhar_view.data + __pyx_t_24 * __pyx_v_vhar_view.strides[0]) )) = ((__pyx_t_19 / __pyx_t_17) + (*((double *) ( /* dim=0 */ (__pyx_v_hi_view.data + __pyx_t_23 * __pyx_v_hi_view.strides[0]) ))));
+  }
+
+  /* "hotcent/extensions.pyx":103
+ *         vhar_view[i] = lo_view[i] / r[i] + hi_view[i]
+ * 
+ *     return vhar             # <<<<<<<<<<<<<<
+ */
+  __Pyx_XDECREF(__pyx_r);
+  __Pyx_INCREF(__pyx_v_vhar);
+  __pyx_r = __pyx_v_vhar;
+  goto __pyx_L0;
+
+  /* "hotcent/extensions.pyx":84
+ * 
+ * 
+ * def hartree(double[:] rho, double[:] dV, double[:] r, double[:] r0, int N):             # <<<<<<<<<<<<<<
+ *     """ Calculate Hartree potential from radial density """
+ *     vhar = np.zeros(N, dtype=DTYPE)
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_1);
+  __Pyx_XDECREF(__pyx_t_2);
+  __Pyx_XDECREF(__pyx_t_3);
+  __Pyx_XDECREF(__pyx_t_4);
+  __PYX_XDEC_MEMVIEW(&__pyx_t_5, 1);
+  __Pyx_AddTraceback("_hotcent.hartree", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XDECREF(__pyx_v_vhar);
+  __Pyx_XDECREF(__pyx_v_lo);
+  __Pyx_XDECREF(__pyx_v_hi);
+  __PYX_XDEC_MEMVIEW(&__pyx_v_lo_view, 1);
+  __PYX_XDEC_MEMVIEW(&__pyx_v_hi_view, 1);
+  __PYX_XDEC_MEMVIEW(&__pyx_v_vhar_view, 1);
+  __PYX_XDEC_MEMVIEW(&__pyx_v_rho, 1);
+  __PYX_XDEC_MEMVIEW(&__pyx_v_dV, 1);
+  __PYX_XDEC_MEMVIEW(&__pyx_v_r, 1);
+  __PYX_XDEC_MEMVIEW(&__pyx_v_r0, 1);
   __Pyx_XGIVEREF(__pyx_r);
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
@@ -16500,7 +17052,7 @@ static PyBufferProcs __pyx_tp_as_buffer_array = {
 
 static PyTypeObject __pyx_type___pyx_array = {
   PyVarObject_HEAD_INIT(0, 0)
-  "_shoot.array", /*tp_name*/
+  "_hotcent.array", /*tp_name*/
   sizeof(struct __pyx_array_obj), /*tp_basicsize*/
   0, /*tp_itemsize*/
   __pyx_tp_dealloc_array, /*tp_dealloc*/
@@ -16619,7 +17171,7 @@ static PyMethodDef __pyx_methods_Enum[] = {
 
 static PyTypeObject __pyx_type___pyx_MemviewEnum = {
   PyVarObject_HEAD_INIT(0, 0)
-  "_shoot.Enum", /*tp_name*/
+  "_hotcent.Enum", /*tp_name*/
   sizeof(struct __pyx_MemviewEnum_obj), /*tp_basicsize*/
   0, /*tp_itemsize*/
   __pyx_tp_dealloc_Enum, /*tp_dealloc*/
@@ -16880,7 +17432,7 @@ static PyBufferProcs __pyx_tp_as_buffer_memoryview = {
 
 static PyTypeObject __pyx_type___pyx_memoryview = {
   PyVarObject_HEAD_INIT(0, 0)
-  "_shoot.memoryview", /*tp_name*/
+  "_hotcent.memoryview", /*tp_name*/
   sizeof(struct __pyx_memoryview_obj), /*tp_basicsize*/
   0, /*tp_itemsize*/
   __pyx_tp_dealloc_memoryview, /*tp_dealloc*/
@@ -17018,7 +17570,7 @@ static struct PyGetSetDef __pyx_getsets__memoryviewslice[] = {
 
 static PyTypeObject __pyx_type___pyx_memoryviewslice = {
   PyVarObject_HEAD_INIT(0, 0)
-  "_shoot._memoryviewslice", /*tp_name*/
+  "_hotcent._memoryviewslice", /*tp_name*/
   sizeof(struct __pyx_memoryviewslice_obj), /*tp_basicsize*/
   0, /*tp_itemsize*/
   __pyx_tp_dealloc__memoryviewslice, /*tp_dealloc*/
@@ -17100,17 +17652,17 @@ static PyMethodDef __pyx_methods[] = {
 #if PY_MAJOR_VERSION >= 3
 #if CYTHON_PEP489_MULTI_PHASE_INIT
 static PyObject* __pyx_pymod_create(PyObject *spec, PyModuleDef *def); /*proto*/
-static int __pyx_pymod_exec__shoot(PyObject* module); /*proto*/
+static int __pyx_pymod_exec__hotcent(PyObject* module); /*proto*/
 static PyModuleDef_Slot __pyx_moduledef_slots[] = {
   {Py_mod_create, (void*)__pyx_pymod_create},
-  {Py_mod_exec, (void*)__pyx_pymod_exec__shoot},
+  {Py_mod_exec, (void*)__pyx_pymod_exec__hotcent},
   {0, NULL}
 };
 #endif
 
 static struct PyModuleDef __pyx_moduledef = {
     PyModuleDef_HEAD_INIT,
-    "_shoot",
+    "_hotcent",
     0, /* m_doc */
   #if CYTHON_PEP489_MULTI_PHASE_INIT
     0, /* m_size */
@@ -17178,6 +17730,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_kp_s_contiguous_and_direct, __pyx_k_contiguous_and_direct, sizeof(__pyx_k_contiguous_and_direct), 0, 0, 1, 0},
   {&__pyx_kp_s_contiguous_and_indirect, __pyx_k_contiguous_and_indirect, sizeof(__pyx_k_contiguous_and_indirect), 0, 0, 1, 0},
   {&__pyx_n_s_ctp, __pyx_k_ctp, sizeof(__pyx_k_ctp), 0, 0, 1, 1},
+  {&__pyx_n_s_dV, __pyx_k_dV, sizeof(__pyx_k_dV), 0, 0, 1, 1},
   {&__pyx_n_s_dict, __pyx_k_dict, sizeof(__pyx_k_dict), 0, 0, 1, 1},
   {&__pyx_n_s_dleft, __pyx_k_dleft, sizeof(__pyx_k_dleft), 0, 0, 1, 1},
   {&__pyx_n_s_dright, __pyx_k_dright, sizeof(__pyx_k_dright), 0, 0, 1, 1},
@@ -17200,13 +17753,19 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_fp_view, __pyx_k_fp_view, sizeof(__pyx_k_fp_view), 0, 0, 1, 1},
   {&__pyx_n_s_getstate, __pyx_k_getstate, sizeof(__pyx_k_getstate), 0, 0, 1, 1},
   {&__pyx_kp_s_got_differing_extents_in_dimensi, __pyx_k_got_differing_extents_in_dimensi, sizeof(__pyx_k_got_differing_extents_in_dimensi), 0, 0, 1, 0},
-  {&__pyx_kp_s_hotcent_shoot_pyx, __pyx_k_hotcent_shoot_pyx, sizeof(__pyx_k_hotcent_shoot_pyx), 0, 0, 1, 0},
+  {&__pyx_n_s_hartree, __pyx_k_hartree, sizeof(__pyx_k_hartree), 0, 0, 1, 1},
+  {&__pyx_n_s_hi, __pyx_k_hi, sizeof(__pyx_k_hi), 0, 0, 1, 1},
+  {&__pyx_n_s_hi_view, __pyx_k_hi_view, sizeof(__pyx_k_hi_view), 0, 0, 1, 1},
+  {&__pyx_n_s_hotcent, __pyx_k_hotcent, sizeof(__pyx_k_hotcent), 0, 0, 1, 1},
+  {&__pyx_kp_s_hotcent_extensions_pyx, __pyx_k_hotcent_extensions_pyx, sizeof(__pyx_k_hotcent_extensions_pyx), 0, 0, 1, 0},
   {&__pyx_n_s_i, __pyx_k_i, sizeof(__pyx_k_i), 0, 0, 1, 1},
   {&__pyx_n_s_id, __pyx_k_id, sizeof(__pyx_k_id), 0, 0, 1, 1},
   {&__pyx_n_s_import, __pyx_k_import, sizeof(__pyx_k_import), 0, 0, 1, 1},
   {&__pyx_n_s_itemsize, __pyx_k_itemsize, sizeof(__pyx_k_itemsize), 0, 0, 1, 1},
   {&__pyx_kp_s_itemsize_0_for_cython_array, __pyx_k_itemsize_0_for_cython_array, sizeof(__pyx_k_itemsize_0_for_cython_array), 0, 0, 1, 0},
   {&__pyx_n_s_j, __pyx_k_j, sizeof(__pyx_k_j), 0, 0, 1, 1},
+  {&__pyx_n_s_lo, __pyx_k_lo, sizeof(__pyx_k_lo), 0, 0, 1, 1},
+  {&__pyx_n_s_lo_view, __pyx_k_lo_view, sizeof(__pyx_k_lo_view), 0, 0, 1, 1},
   {&__pyx_n_s_main, __pyx_k_main, sizeof(__pyx_k_main), 0, 0, 1, 1},
   {&__pyx_n_s_memview, __pyx_k_memview, sizeof(__pyx_k_memview), 0, 0, 1, 1},
   {&__pyx_n_s_mode, __pyx_k_mode, sizeof(__pyx_k_mode), 0, 0, 1, 1},
@@ -17229,16 +17788,18 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_pyx_type, __pyx_k_pyx_type, sizeof(__pyx_k_pyx_type), 0, 0, 1, 1},
   {&__pyx_n_s_pyx_unpickle_Enum, __pyx_k_pyx_unpickle_Enum, sizeof(__pyx_k_pyx_unpickle_Enum), 0, 0, 1, 1},
   {&__pyx_n_s_pyx_vtable, __pyx_k_pyx_vtable, sizeof(__pyx_k_pyx_vtable), 0, 0, 1, 1},
+  {&__pyx_n_s_r, __pyx_k_r, sizeof(__pyx_k_r), 0, 0, 1, 1},
+  {&__pyx_n_s_r0, __pyx_k_r0, sizeof(__pyx_k_r0), 0, 0, 1, 1},
   {&__pyx_n_s_range, __pyx_k_range, sizeof(__pyx_k_range), 0, 0, 1, 1},
   {&__pyx_n_s_reduce, __pyx_k_reduce, sizeof(__pyx_k_reduce), 0, 0, 1, 1},
   {&__pyx_n_s_reduce_cython, __pyx_k_reduce_cython, sizeof(__pyx_k_reduce_cython), 0, 0, 1, 1},
   {&__pyx_n_s_reduce_ex, __pyx_k_reduce_ex, sizeof(__pyx_k_reduce_ex), 0, 0, 1, 1},
+  {&__pyx_n_s_rho, __pyx_k_rho, sizeof(__pyx_k_rho), 0, 0, 1, 1},
   {&__pyx_n_s_scale, __pyx_k_scale, sizeof(__pyx_k_scale), 0, 0, 1, 1},
   {&__pyx_n_s_setstate, __pyx_k_setstate, sizeof(__pyx_k_setstate), 0, 0, 1, 1},
   {&__pyx_n_s_setstate_cython, __pyx_k_setstate_cython, sizeof(__pyx_k_setstate_cython), 0, 0, 1, 1},
   {&__pyx_n_s_shape, __pyx_k_shape, sizeof(__pyx_k_shape), 0, 0, 1, 1},
   {&__pyx_n_s_shoot, __pyx_k_shoot, sizeof(__pyx_k_shoot), 0, 0, 1, 1},
-  {&__pyx_n_s_shoot_2, __pyx_k_shoot_2, sizeof(__pyx_k_shoot_2), 0, 0, 1, 1},
   {&__pyx_n_s_size, __pyx_k_size, sizeof(__pyx_k_size), 0, 0, 1, 1},
   {&__pyx_n_s_start, __pyx_k_start, sizeof(__pyx_k_start), 0, 0, 1, 1},
   {&__pyx_n_s_step, __pyx_k_step, sizeof(__pyx_k_step), 0, 0, 1, 1},
@@ -17259,6 +17820,8 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_update, __pyx_k_update, sizeof(__pyx_k_update), 0, 0, 1, 1},
   {&__pyx_n_s_utp, __pyx_k_utp, sizeof(__pyx_k_utp), 0, 0, 1, 1},
   {&__pyx_n_s_utp1, __pyx_k_utp1, sizeof(__pyx_k_utp1), 0, 0, 1, 1},
+  {&__pyx_n_s_vhar, __pyx_k_vhar, sizeof(__pyx_k_vhar), 0, 0, 1, 1},
+  {&__pyx_n_s_vhar_view, __pyx_k_vhar_view, sizeof(__pyx_k_vhar_view), 0, 0, 1, 1},
   {&__pyx_n_s_zeros, __pyx_k_zeros, sizeof(__pyx_k_zeros), 0, 0, 1, 1},
   {0, 0, 0, 0, 0, 0, 0}
 };
@@ -17472,7 +18035,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_tuple__18);
   __Pyx_GIVEREF(__pyx_tuple__18);
 
-  /* "hotcent/shoot.pyx":7
+  /* "hotcent/extensions.pyx":7
  * 
  * 
  * def shoot(double[:] u, double dx, double[:] c2, double[:] c1, double[:] c0,             # <<<<<<<<<<<<<<
@@ -17482,7 +18045,19 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __pyx_tuple__19 = PyTuple_Pack(26, __pyx_n_s_u, __pyx_n_s_dx, __pyx_n_s_c2, __pyx_n_s_c1, __pyx_n_s_c0, __pyx_n_s_N, __pyx_n_s_u_len, __pyx_n_s_nodes, __pyx_n_s_ctp, __pyx_n_s_A, __pyx_n_s_i, __pyx_n_s_j, __pyx_n_s_u_new, __pyx_n_s_u_view, __pyx_n_s_fp, __pyx_n_s_fm, __pyx_n_s_f0, __pyx_n_s_fp_view, __pyx_n_s_fm_view, __pyx_n_s_f0_view, __pyx_n_s_all_negative, __pyx_n_s_utp, __pyx_n_s_utp1, __pyx_n_s_dright, __pyx_n_s_dleft, __pyx_n_s_scale); if (unlikely(!__pyx_tuple__19)) __PYX_ERR(0, 7, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__19);
   __Pyx_GIVEREF(__pyx_tuple__19);
-  __pyx_codeobj__20 = (PyObject*)__Pyx_PyCode_New(6, 0, 26, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__19, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_hotcent_shoot_pyx, __pyx_n_s_shoot, 7, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__20)) __PYX_ERR(0, 7, __pyx_L1_error)
+  __pyx_codeobj__20 = (PyObject*)__Pyx_PyCode_New(6, 0, 26, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__19, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_hotcent_extensions_pyx, __pyx_n_s_shoot, 7, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__20)) __PYX_ERR(0, 7, __pyx_L1_error)
+
+  /* "hotcent/extensions.pyx":84
+ * 
+ * 
+ * def hartree(double[:] rho, double[:] dV, double[:] r, double[:] r0, int N):             # <<<<<<<<<<<<<<
+ *     """ Calculate Hartree potential from radial density """
+ *     vhar = np.zeros(N, dtype=DTYPE)
+ */
+  __pyx_tuple__21 = PyTuple_Pack(12, __pyx_n_s_rho, __pyx_n_s_dV, __pyx_n_s_r, __pyx_n_s_r0, __pyx_n_s_N, __pyx_n_s_vhar, __pyx_n_s_lo, __pyx_n_s_hi, __pyx_n_s_lo_view, __pyx_n_s_hi_view, __pyx_n_s_vhar_view, __pyx_n_s_i); if (unlikely(!__pyx_tuple__21)) __PYX_ERR(0, 84, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__21);
+  __Pyx_GIVEREF(__pyx_tuple__21);
+  __pyx_codeobj__22 = (PyObject*)__Pyx_PyCode_New(5, 0, 12, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__21, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_hotcent_extensions_pyx, __pyx_n_s_hartree, 84, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__22)) __PYX_ERR(0, 84, __pyx_L1_error)
 
   /* "View.MemoryView":286
  *         return self.name
@@ -17491,9 +18066,9 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
  * cdef strided = Enum("<strided and direct>") # default
  * cdef indirect = Enum("<strided and indirect>")
  */
-  __pyx_tuple__21 = PyTuple_Pack(1, __pyx_kp_s_strided_and_direct_or_indirect); if (unlikely(!__pyx_tuple__21)) __PYX_ERR(1, 286, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__21);
-  __Pyx_GIVEREF(__pyx_tuple__21);
+  __pyx_tuple__23 = PyTuple_Pack(1, __pyx_kp_s_strided_and_direct_or_indirect); if (unlikely(!__pyx_tuple__23)) __PYX_ERR(1, 286, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__23);
+  __Pyx_GIVEREF(__pyx_tuple__23);
 
   /* "View.MemoryView":287
  * 
@@ -17502,9 +18077,9 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
  * cdef indirect = Enum("<strided and indirect>")
  * 
  */
-  __pyx_tuple__22 = PyTuple_Pack(1, __pyx_kp_s_strided_and_direct); if (unlikely(!__pyx_tuple__22)) __PYX_ERR(1, 287, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__22);
-  __Pyx_GIVEREF(__pyx_tuple__22);
+  __pyx_tuple__24 = PyTuple_Pack(1, __pyx_kp_s_strided_and_direct); if (unlikely(!__pyx_tuple__24)) __PYX_ERR(1, 287, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__24);
+  __Pyx_GIVEREF(__pyx_tuple__24);
 
   /* "View.MemoryView":288
  * cdef generic = Enum("<strided and direct or indirect>")
@@ -17513,9 +18088,9 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
  * 
  * 
  */
-  __pyx_tuple__23 = PyTuple_Pack(1, __pyx_kp_s_strided_and_indirect); if (unlikely(!__pyx_tuple__23)) __PYX_ERR(1, 288, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__23);
-  __Pyx_GIVEREF(__pyx_tuple__23);
+  __pyx_tuple__25 = PyTuple_Pack(1, __pyx_kp_s_strided_and_indirect); if (unlikely(!__pyx_tuple__25)) __PYX_ERR(1, 288, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__25);
+  __Pyx_GIVEREF(__pyx_tuple__25);
 
   /* "View.MemoryView":291
  * 
@@ -17524,9 +18099,9 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
  * cdef indirect_contiguous = Enum("<contiguous and indirect>")
  * 
  */
-  __pyx_tuple__24 = PyTuple_Pack(1, __pyx_kp_s_contiguous_and_direct); if (unlikely(!__pyx_tuple__24)) __PYX_ERR(1, 291, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__24);
-  __Pyx_GIVEREF(__pyx_tuple__24);
+  __pyx_tuple__26 = PyTuple_Pack(1, __pyx_kp_s_contiguous_and_direct); if (unlikely(!__pyx_tuple__26)) __PYX_ERR(1, 291, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__26);
+  __Pyx_GIVEREF(__pyx_tuple__26);
 
   /* "View.MemoryView":292
  * 
@@ -17535,19 +18110,19 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
  * 
  * 
  */
-  __pyx_tuple__25 = PyTuple_Pack(1, __pyx_kp_s_contiguous_and_indirect); if (unlikely(!__pyx_tuple__25)) __PYX_ERR(1, 292, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__25);
-  __Pyx_GIVEREF(__pyx_tuple__25);
+  __pyx_tuple__27 = PyTuple_Pack(1, __pyx_kp_s_contiguous_and_indirect); if (unlikely(!__pyx_tuple__27)) __PYX_ERR(1, 292, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__27);
+  __Pyx_GIVEREF(__pyx_tuple__27);
 
   /* "(tree fragment)":1
  * def __pyx_unpickle_Enum(__pyx_type, long __pyx_checksum, __pyx_state):             # <<<<<<<<<<<<<<
  *     cdef object __pyx_PickleError
  *     cdef object __pyx_result
  */
-  __pyx_tuple__26 = PyTuple_Pack(5, __pyx_n_s_pyx_type, __pyx_n_s_pyx_checksum, __pyx_n_s_pyx_state, __pyx_n_s_pyx_PickleError, __pyx_n_s_pyx_result); if (unlikely(!__pyx_tuple__26)) __PYX_ERR(1, 1, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__26);
-  __Pyx_GIVEREF(__pyx_tuple__26);
-  __pyx_codeobj__27 = (PyObject*)__Pyx_PyCode_New(3, 0, 5, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__26, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_stringsource, __pyx_n_s_pyx_unpickle_Enum, 1, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__27)) __PYX_ERR(1, 1, __pyx_L1_error)
+  __pyx_tuple__28 = PyTuple_Pack(5, __pyx_n_s_pyx_type, __pyx_n_s_pyx_checksum, __pyx_n_s_pyx_state, __pyx_n_s_pyx_PickleError, __pyx_n_s_pyx_result); if (unlikely(!__pyx_tuple__28)) __PYX_ERR(1, 1, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__28);
+  __Pyx_GIVEREF(__pyx_tuple__28);
+  __pyx_codeobj__29 = (PyObject*)__Pyx_PyCode_New(3, 0, 5, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__28, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_stringsource, __pyx_n_s_pyx_unpickle_Enum, 1, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__29)) __PYX_ERR(1, 1, __pyx_L1_error)
   __Pyx_RefNannyFinishContext();
   return 0;
   __pyx_L1_error:;
@@ -17706,11 +18281,11 @@ static int __Pyx_modinit_function_import_code(void) {
 
 
 #if PY_MAJOR_VERSION < 3
-__Pyx_PyMODINIT_FUNC init_shoot(void) CYTHON_SMALL_CODE; /*proto*/
-__Pyx_PyMODINIT_FUNC init_shoot(void)
+__Pyx_PyMODINIT_FUNC init_hotcent(void) CYTHON_SMALL_CODE; /*proto*/
+__Pyx_PyMODINIT_FUNC init_hotcent(void)
 #else
-__Pyx_PyMODINIT_FUNC PyInit__shoot(void) CYTHON_SMALL_CODE; /*proto*/
-__Pyx_PyMODINIT_FUNC PyInit__shoot(void)
+__Pyx_PyMODINIT_FUNC PyInit__hotcent(void) CYTHON_SMALL_CODE; /*proto*/
+__Pyx_PyMODINIT_FUNC PyInit__hotcent(void)
 #if CYTHON_PEP489_MULTI_PHASE_INIT
 {
   return PyModuleDef_Init(&__pyx_moduledef);
@@ -17777,7 +18352,7 @@ bad:
 }
 
 
-static CYTHON_SMALL_CODE int __pyx_pymod_exec__shoot(PyObject *__pyx_pyinit_module)
+static CYTHON_SMALL_CODE int __pyx_pymod_exec__hotcent(PyObject *__pyx_pyinit_module)
 #endif
 #endif
 {
@@ -17788,7 +18363,7 @@ static CYTHON_SMALL_CODE int __pyx_pymod_exec__shoot(PyObject *__pyx_pyinit_modu
   #if CYTHON_PEP489_MULTI_PHASE_INIT
   if (__pyx_m) {
     if (__pyx_m == __pyx_pyinit_module) return 0;
-    PyErr_SetString(PyExc_RuntimeError, "Module '_shoot' has already been imported. Re-initialisation is not supported.");
+    PyErr_SetString(PyExc_RuntimeError, "Module '_hotcent' has already been imported. Re-initialisation is not supported.");
     return -1;
   }
   #elif PY_MAJOR_VERSION >= 3
@@ -17803,7 +18378,7 @@ if (!__Pyx_RefNanny) {
       Py_FatalError("failed to import 'refnanny' module");
 }
 #endif
-  __Pyx_RefNannySetupContext("__Pyx_PyMODINIT_FUNC PyInit__shoot(void)", 0);
+  __Pyx_RefNannySetupContext("__Pyx_PyMODINIT_FUNC PyInit__hotcent(void)", 0);
   if (__Pyx_check_binary_version() < 0) __PYX_ERR(0, 1, __pyx_L1_error)
   #ifdef __Pxy_PyFrame_Initialize_Offsets
   __Pxy_PyFrame_Initialize_Offsets();
@@ -17842,7 +18417,7 @@ if (!__Pyx_RefNanny) {
   Py_INCREF(__pyx_m);
   #else
   #if PY_MAJOR_VERSION < 3
-  __pyx_m = Py_InitModule4("_shoot", __pyx_methods, 0, 0, PYTHON_API_VERSION); Py_XINCREF(__pyx_m);
+  __pyx_m = Py_InitModule4("_hotcent", __pyx_methods, 0, 0, PYTHON_API_VERSION); Py_XINCREF(__pyx_m);
   #else
   __pyx_m = PyModule_Create(&__pyx_moduledef);
   #endif
@@ -17860,14 +18435,14 @@ if (!__Pyx_RefNanny) {
   #if PY_MAJOR_VERSION < 3 && (__PYX_DEFAULT_STRING_ENCODING_IS_ASCII || __PYX_DEFAULT_STRING_ENCODING_IS_DEFAULT)
   if (__Pyx_init_sys_getdefaultencoding_params() < 0) __PYX_ERR(0, 1, __pyx_L1_error)
   #endif
-  if (__pyx_module_is_main__shoot) {
+  if (__pyx_module_is_main__hotcent) {
     if (PyObject_SetAttr(__pyx_m, __pyx_n_s_name_2, __pyx_n_s_main) < 0) __PYX_ERR(0, 1, __pyx_L1_error)
   }
   #if PY_MAJOR_VERSION >= 3
   {
     PyObject *modules = PyImport_GetModuleDict(); if (unlikely(!modules)) __PYX_ERR(0, 1, __pyx_L1_error)
-    if (!PyDict_GetItemString(modules, "_shoot")) {
-      if (unlikely(PyDict_SetItemString(modules, "_shoot", __pyx_m) < 0)) __PYX_ERR(0, 1, __pyx_L1_error)
+    if (!PyDict_GetItemString(modules, "_hotcent")) {
+      if (unlikely(PyDict_SetItemString(modules, "_hotcent", __pyx_m) < 0)) __PYX_ERR(0, 1, __pyx_L1_error)
     }
   }
   #endif
@@ -17888,7 +18463,7 @@ if (!__Pyx_RefNanny) {
   if (__Pyx_patch_abc() < 0) __PYX_ERR(0, 1, __pyx_L1_error)
   #endif
 
-  /* "hotcent/shoot.pyx":2
+  /* "hotcent/extensions.pyx":2
  * #cython: language_level=3
  * import numpy as np             # <<<<<<<<<<<<<<
  * 
@@ -17899,7 +18474,7 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_np, __pyx_t_1) < 0) __PYX_ERR(0, 2, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "hotcent/shoot.pyx":4
+  /* "hotcent/extensions.pyx":4
  * import numpy as np
  * 
  * DTYPE = np.float64             # <<<<<<<<<<<<<<
@@ -17914,19 +18489,31 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_DTYPE, __pyx_t_2) < 0) __PYX_ERR(0, 4, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "hotcent/shoot.pyx":7
+  /* "hotcent/extensions.pyx":7
  * 
  * 
  * def shoot(double[:] u, double dx, double[:] c2, double[:] c1, double[:] c0,             # <<<<<<<<<<<<<<
  *           int N):
  *     """ Cython version of shoot.py for faster atomic DFT calculations """
  */
-  __pyx_t_2 = PyCFunction_NewEx(&__pyx_mdef_6_shoot_1shoot, NULL, __pyx_n_s_shoot_2); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 7, __pyx_L1_error)
+  __pyx_t_2 = PyCFunction_NewEx(&__pyx_mdef_8_hotcent_1shoot, NULL, __pyx_n_s_hotcent); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 7, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_shoot, __pyx_t_2) < 0) __PYX_ERR(0, 7, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "hotcent/shoot.pyx":1
+  /* "hotcent/extensions.pyx":84
+ * 
+ * 
+ * def hartree(double[:] rho, double[:] dV, double[:] r, double[:] r0, int N):             # <<<<<<<<<<<<<<
+ *     """ Calculate Hartree potential from radial density """
+ *     vhar = np.zeros(N, dtype=DTYPE)
+ */
+  __pyx_t_2 = PyCFunction_NewEx(&__pyx_mdef_8_hotcent_3hartree, NULL, __pyx_n_s_hotcent); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 84, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_hartree, __pyx_t_2) < 0) __PYX_ERR(0, 84, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+
+  /* "hotcent/extensions.pyx":1
  * #cython: language_level=3             # <<<<<<<<<<<<<<
  * import numpy as np
  * 
@@ -17956,7 +18543,7 @@ if (!__Pyx_RefNanny) {
  * cdef strided = Enum("<strided and direct>") # default
  * cdef indirect = Enum("<strided and indirect>")
  */
-  __pyx_t_2 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__21, NULL); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 286, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__23, NULL); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 286, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_XGOTREF(generic);
   __Pyx_DECREF_SET(generic, __pyx_t_2);
@@ -17970,7 +18557,7 @@ if (!__Pyx_RefNanny) {
  * cdef indirect = Enum("<strided and indirect>")
  * 
  */
-  __pyx_t_2 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__22, NULL); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 287, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__24, NULL); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 287, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_XGOTREF(strided);
   __Pyx_DECREF_SET(strided, __pyx_t_2);
@@ -17984,7 +18571,7 @@ if (!__Pyx_RefNanny) {
  * 
  * 
  */
-  __pyx_t_2 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__23, NULL); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 288, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__25, NULL); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 288, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_XGOTREF(indirect);
   __Pyx_DECREF_SET(indirect, __pyx_t_2);
@@ -17998,7 +18585,7 @@ if (!__Pyx_RefNanny) {
  * cdef indirect_contiguous = Enum("<contiguous and indirect>")
  * 
  */
-  __pyx_t_2 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__24, NULL); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 291, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__26, NULL); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 291, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_XGOTREF(contiguous);
   __Pyx_DECREF_SET(contiguous, __pyx_t_2);
@@ -18012,7 +18599,7 @@ if (!__Pyx_RefNanny) {
  * 
  * 
  */
-  __pyx_t_2 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__25, NULL); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 292, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__27, NULL); if (unlikely(!__pyx_t_2)) __PYX_ERR(1, 292, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_XGOTREF(indirect_contiguous);
   __Pyx_DECREF_SET(indirect_contiguous, __pyx_t_2);
@@ -18097,11 +18684,11 @@ if (!__Pyx_RefNanny) {
   __Pyx_XDECREF(__pyx_t_2);
   if (__pyx_m) {
     if (__pyx_d) {
-      __Pyx_AddTraceback("init _shoot", __pyx_clineno, __pyx_lineno, __pyx_filename);
+      __Pyx_AddTraceback("init _hotcent", __pyx_clineno, __pyx_lineno, __pyx_filename);
     }
     Py_CLEAR(__pyx_m);
   } else if (!PyErr_Occurred()) {
-    PyErr_SetString(PyExc_ImportError, "init _shoot");
+    PyErr_SetString(PyExc_ImportError, "init _hotcent");
   }
   __pyx_L0:;
   __Pyx_RefNannyFinishContext();

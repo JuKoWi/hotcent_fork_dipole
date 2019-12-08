@@ -24,12 +24,12 @@ except:
     plt = None
 warning_extension = 'Warning: C-extension "%s" not available'
 try:
-    from _shoot import shoot
+    from _hotcent import shoot
 except ModuleNotFoundError:
     print(warning_extension % 'shoot')
     from hotcent.shoot import shoot
 try:
-    from _hartree import hartree
+    from _hotcent import hartree
 except ModuleNotFoundError:
     print(warning_extension % 'hartree')
     hartree = None

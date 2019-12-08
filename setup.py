@@ -9,13 +9,12 @@ if '--use-cython' in sys.argv:
 
 ext = '.pyx' if USE_CYTHON else '.c'
 
-extensions = [Extension('_shoot', ['hotcent/shoot' + ext]),
-              Extension('_hartree', ['hotcent/hartree' + ext]),
+extensions = [Extension('_hotcent', ['hotcent/extensions' + ext]),
               ]
 
 if USE_CYTHON:
     from Cython.Build import cythonize
-    extensions = cythonize(extensions)
+    extensions = cythonize(extensions, annotate=True)
 
 setup(
   name='Hotcent',
