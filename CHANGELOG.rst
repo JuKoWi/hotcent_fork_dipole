@@ -16,7 +16,8 @@ Development version
 * Calculation of Hubbard values (see examples/hubbard.py)
 
 * Optional C-extensions allow for significantly faster atomic
-  atomic DFT calculations (8-10x speedup)
+  atomic DFT calculations (8-10x speedup) and construction of
+  Slater-Koster tables (2-3x speedup).
 
 
 Version 0.9

@@ -19,6 +19,12 @@ try:
     import matplotlib.pyplot as plt
 except ImportError:
     plt = None
+warning_extension = 'Warning: C-extension "%s" not available'
+try:
+    from _hotcent import make_grid
+except ModuleNotFoundError:
+    print(warning_extension % '')
+    make_grid = None
 
 
 class SlaterKosterTable:
@@ -410,10 +416,9 @@ class SlaterKosterTable:
         """
         self.timer.start('calculate_mels')
         Sl, Hl, H2l = np.zeros(10), np.zeros(10), np.zeros(10)
-        
+
         # common for all integrals (not wf-dependent parts)
         self.timer.start('prelude')
-
         N = len(grid)
         x = grid[:N, 0]
         y = grid[:N, 1]
@@ -425,25 +430,33 @@ class SlaterKosterTable:
         gphi = g(t1, t2).T
 
         if superposition == 'potential':
+            self.timer.start('vrho')
             v1 = e1.effective_potential(r1) - e1.confinement(r1)
             v2 = e2.effective_potential(r2) - e2.confinement(r2)
             veff = v1 + v2
+            self.timer.stop('vrho')
         elif superposition == 'density':
+            self.timer.start('vrho')
             rho = e1.electron_density(r1) + e2.electron_density(r2)
             veff = e1.nuclear_potential(r1) + e1.hartree_potential(r1)
             veff += e2.nuclear_potential(r2) + e2.hartree_potential(r2)
             if xc in ['LDA', 'PW92']:
                 xc = XC_PW92()
                 veff += xc.vxc(rho)
+                self.timer.stop('vrho')
             else:
                 xc = LibXC(xc)
-                grad_x = e1.electron_density(r1, der=1) * np.sin(t1)
-                grad_x += e2.electron_density(r2, der=1) * np.sin(t2)
-                grad_y = e1.electron_density(r1, der=1) * np.cos(t1)
-                grad_y += e2.electron_density(r2, der=1) * np.cos(t2)
+                drho1 = e1.electron_density(r1, der=1)
+                drho2 = e2.electron_density(r2, der=1)
+                grad_x = drho1 * np.sin(t1)
+                grad_x += drho2 * np.sin(t2)
+                grad_y = drho1 * np.cos(t1)
+                grad_y += drho2 * np.cos(t2)
                 sigma = np.sqrt(grad_x ** 2 + grad_y ** 2) ** 2
                 out = xc.compute_all(rho, sigma)
                 veff += out['vrho']
+                self.timer.stop('vrho')
+                self.timer.start('vsigma')
                 # add gradient corrections to vxc
                 # provided that we have enough points
                 # (otherwise we get "dfitpack.error:
@@ -453,11 +466,11 @@ class SlaterKosterTable:
                     sply = SmoothBivariateSpline(x, y, out['vsigma'] * grad_y)
                     veff += -2. * splx(x, y, dx=1, dy=0, grid=False)
                     veff += -2. * sply(x, y, dx=0, dy=1, grid=False)
+                self.timer.stop('vsigma')
 
         assert np.shape(gphi) == (N, 10)
         assert np.shape(radii) == (N, 2)
         assert np.shape(veff) == (N,)
-
         self.timer.stop('prelude')
 
         # calculate all selected integrals
@@ -476,10 +489,9 @@ class SlaterKosterTable:
             ddunl2 = e2.unl(r2, nl2, der=2)
 
             S = np.sum(Rnl1 * Rnl2 * aux)
-            
             H = np.sum(Rnl1 * (-0.5* ddunl2 / r2 + (veff + \
                        l2 * (l2 + 1) / (2 * r2 ** 2)) * Rnl2) * aux)
-            
+
             if superposition == 'potential':
                 H2 = np.sum(Rnl1 * Rnl2 * aux * (v2 - e1.confinement(r1)))
                 H2 += e1.get_epsilon(nl1) * S
@@ -489,10 +501,10 @@ class SlaterKosterTable:
             Sl[index] = S
             Hl[index] = H
             H2l[index] = H2
-            
+
         self.timer.stop('calculate_mels')
         return Sl, Hl, H2l
-        
+
     def make_grid(self, Rz, nt, nr, p=2, q=2, view=False):
         """
         Construct a double-polar grid.
@@ -539,104 +551,105 @@ class SlaterKosterTable:
          |---------
          
         """ 
-        self.timer.start('make grid')
-        rmin, rmax = (1e-7, self.wf_range)
-        max_range = self.wf_range
+        self.timer.start('make_grid')
+        rmin, rmax = 1e-7, self.wf_range
         h = Rz / 2
 
-        T = np.linspace(0, 1, nt) ** p * np.pi
-        R = rmin + np.linspace(0, 1, nr) ** q * (rmax - rmin)
+        if make_grid is not None:
+            grid, area = make_grid(Rz, rmin, rmax, nt, nr, p, q)
+        else:
+            max_range = self.wf_range
+            T = np.linspace(0, 1, nt) ** p * np.pi
+            R = rmin + np.linspace(0, 1, nr) ** q * (rmax - rmin)
 
-        area = np.array([])
-        d = np.array([])
-        z = np.array([])
+            area = np.array([])
+            d = np.array([])
+            z = np.array([])
 
-        # first calculate grid for polar centered on atom 1:
-        # the z=h-like starts cutting full elements starting from point (1)
-        Tj0 = T[:nt - 1]
-        Tj1 = T[1: nt]
+            # first calculate grid for polar centered on atom 1:
+            # the z=h-like starts cutting full elements starting from point (1)
+            Tj0 = T[:nt - 1]
+            Tj1 = T[1: nt]
 
-        for i in range(nr - 1):
-            # corners of area element
-            d1 = R[i + 1] * np.sin(Tj0)
-            z1 = R[i + 1] * np.cos(Tj0)
-            d2 = R[i] * np.sin(Tj0)
-            z2 = R[i] * np.cos(Tj0)
-            d3 = R[i] * np.sin(Tj1)
-            z3 = R[i] * np.cos(Tj1)
-            d4 = R[i + 1] * np.sin(Tj1)
-            z4 = R[i + 1] * np.cos(Tj1)
+            for i in range(nr - 1):
+                # corners of area element
+                d1 = R[i + 1] * np.sin(Tj0)
+                z1 = R[i + 1] * np.cos(Tj0)
+                d2 = R[i] * np.sin(Tj0)
+                z2 = R[i] * np.cos(Tj0)
+                d3 = R[i] * np.sin(Tj1)
+                z3 = R[i] * np.cos(Tj1)
+                d4 = R[i + 1] * np.sin(Tj1)
+                z4 = R[i + 1] * np.cos(Tj1)
 
-            cond_list = [z1 <= h,  # area fully inside region 
-                 (z1 > h) * (z2 <= h) * (z4 <= h),  # corner 1 outside region
-                 (z1 > h) * (z2 > h) * (z3 <= h) * (z4 <= h),  # 1 & 2 outside
-                 (z1 > h) * (z2 > h) * (z3 <= h) * (z4 > h),  # only 3 inside
-                 (z1 > h) * (z2 <= h) * (z3 <= h) * (z4 > h),  # 1 & 4 outside
-                 (z1 > h) * (z3 > h) * ~((z2 <= h) * (z4 > h))]
+                cond_list = [z1 <= h,  # area fully inside region
+                     (z1 > h) * (z2 <= h) * (z4 <= h),  # corner 1 outside region
+                     (z1 > h) * (z2 > h) * (z3 <= h) * (z4 <= h),  # 1 & 2 outside
+                     (z1 > h) * (z2 > h) * (z3 <= h) * (z4 > h),  # only 3 inside
+                     (z1 > h) * (z2 <= h) * (z3 <= h) * (z4 > h),  # 1 & 4 outside
+                     (z1 > h) * (z3 > h) * ~((z2 <= h) * (z4 > h))]
 
-            r0_list = [0.5 * (R[i] + R[i + 1]),
-                       0.5 * (R[i] + R[i + 1]),
-                       0.5 * (R[i] + R[i + 1]),
-                       lambda x: 0.5 * (R[i] + h / np.cos(x)),
-                       lambda x: 0.5 * (R[i] + h / np.cos(x)),
-                       0,
-                       np.nan]
-            r0 = np.piecewise(Tj1, cond_list, r0_list)
+                r0_list = [0.5 * (R[i] + R[i + 1]),
+                           0.5 * (R[i] + R[i + 1]),
+                           0.5 * (R[i] + R[i + 1]),
+                           lambda x: 0.5 * (R[i] + h / np.cos(x)),
+                           lambda x: 0.5 * (R[i] + h / np.cos(x)),
+                           0,
+                           np.nan]
+                r0 = np.piecewise(Tj1, cond_list, r0_list)
 
-            Th0 = np.piecewise(h / R[i], [np.abs(h / R[i]) > 1],
-                               [np.nan, lambda x: np.arccos(x)])
-            Th1 = np.piecewise(h / R[i + 1], [np.abs(h / R[i + 1]) > 1],
-                               [np.nan, lambda x: np.arccos(x)])
+                Th0 = np.piecewise(h / R[i], [np.abs(h / R[i]) > 1],
+                                   [np.nan, lambda x: np.arccos(x)])
+                Th1 = np.piecewise(h / R[i + 1], [np.abs(h / R[i + 1]) > 1],
+                                   [np.nan, lambda x: np.arccos(x)])
 
-            t0_list = [lambda x: 0.5 * x,
-                       0.5 * Th1,
-                       0.5 * Th1,
-                       0.5 * Th0,
-                       lambda x: 0.5 * x,
-                       0,
-                       np.nan]
-            t0 = 0.5 * Tj1
-            t0 += np.piecewise(Tj0, cond_list, t0_list)
-           
-            rr = 0.5 * (R[i + 1] ** 2 - R[i] ** 2)
-            A_list0 = [lambda x: rr * -x,
-                       lambda x: rr * -x - 0.5 * R[i + 1] ** 2 * (Th1 - x) \
-                                 + 0.5 * h ** 2 * (tan(Th1) - np.tan(x)),
-                       lambda x: rr * -x - (rr * -x + 0.5 * R[i + 1] ** 2 \
-                                 * (Th1 - Th0)),
-                       0.,
-                       lambda x: 0.5 * h ** 2 * -np.tan(x) \
-                                 - 0.5 * R[i] ** 2 * -x,
-                       -1,
-                       np.nan]
-            A = np.piecewise(Tj0, cond_list, A_list0)
+                t0_list = [lambda x: 0.5 * x,
+                           0.5 * Th1,
+                           0.5 * Th1,
+                           0.5 * Th0,
+                           lambda x: 0.5 * x,
+                           0,
+                           np.nan]
+                t0 = 0.5 * Tj1
+                t0 += np.piecewise(Tj0, cond_list, t0_list)
 
-            A_list1 = [lambda x: rr * x,
-                       lambda x: rr * x,
-                       lambda x: rr * x - (rr * Th0 - 0.5 * h ** 2 \
-                                 * (tan(Th1) - tan(Th0))),
-                       lambda x: 0.5 * h ** 2 * (np.tan(x) - tan(Th0)) \
-                                 - 0.5 * R[i] ** 2 * (x - Th0),
-                       lambda x: 0.5 * h ** 2 * np.tan(x) \
-                                 - 0.5 * R[i] ** 2 * x,
-                       0, 
-                       np.nan]
-            A += np.piecewise(Tj1, cond_list, A_list1)
+                rr = 0.5 * (R[i + 1] ** 2 - R[i] ** 2)
+                A_list0 = [lambda x: rr * -x,
+                           lambda x: rr * -x - 0.5 * R[i + 1] ** 2 * (Th1 - x) \
+                                     + 0.5 * h ** 2 * (tan(Th1) - np.tan(x)),
+                           lambda x: rr * -x - (rr * -x + 0.5 * R[i + 1] ** 2 \
+                                     * (Th1 - Th0)),
+                           0.,
+                           lambda x: 0.5 * h ** 2 * -np.tan(x) \
+                                     - 0.5 * R[i] ** 2 * -x,
+                           -1,
+                           np.nan]
+                A = np.piecewise(Tj0, cond_list, A_list0)
 
-            dd = r0 * np.sin(t0) 
-            zz = r0 * np.cos(t0)
-            select = np.sqrt(dd ** 2 + zz ** 2) < max_range
-            select *= np.sqrt(dd ** 2 + (Rz - zz) ** 2) < max_range
-            select *= A > 0
-            area = np.hstack((area, A[select]))
-            d = np.hstack((d, dd[select]))
-            z = np.hstack((z, zz[select]))
+                A_list1 = [lambda x: rr * x,
+                           lambda x: rr * x,
+                           lambda x: rr * x - (rr * Th0 - 0.5 * h ** 2 \
+                                     * (tan(Th1) - tan(Th0))),
+                           lambda x: 0.5 * h ** 2 * (np.tan(x) - tan(Th0)) \
+                                     - 0.5 * R[i] ** 2 * (x - Th0),
+                           lambda x: 0.5 * h ** 2 * np.tan(x) \
+                                     - 0.5 * R[i] ** 2 * x,
+                           0,
+                           np.nan]
+                A += np.piecewise(Tj1, cond_list, A_list1)
 
-        grid = np.array([d, z]).T
+                dd = r0 * np.sin(t0)
+                zz = r0 * np.cos(t0)
+                select = np.sqrt(dd ** 2 + zz ** 2) < max_range
+                select *= np.sqrt(dd ** 2 + (Rz - zz) ** 2) < max_range
+                select *= A > 0
+                area = np.hstack((area, A[select]))
+                d = np.hstack((d, dd[select]))
+                z = np.hstack((z, zz[select]))
+            grid = np.array([d, z]).T
 
         self.timer.start('symmetrize')
         # calculate the polar centered on atom 2 by mirroring the other grid
-
         grid2 = grid.copy()
         grid2[:, 1] = -grid[:, 1]
         shift = np.zeros_like(grid)
@@ -648,11 +661,11 @@ class SlaterKosterTable:
         if view:
             assert plt is not None, 'Matplotlib could not be imported!'
             plt.plot([h, h ,h])
-            plt.scatter(grid[:, 0], grid[:, 1], s=10 * area / max(area))
+            plt.scatter(grid[:, 0], grid[:, 1], s=10 * area / np.max(area))
             plt.show()
             plt.clf()
 
-        self.timer.stop('make grid')
+        self.timer.stop('make_grid')
         return grid, area
 
 
