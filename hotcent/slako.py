@@ -41,15 +41,6 @@ class SlaterKosterTable:
         """
         self.ela = ela
         self.elb = elb
-        self.timing = timing
-
-        if txt is None:
-            self.txt = sys.stdout
-        else:
-            if type(txt) == type(''):
-                self.txt = open(txt, 'a')
-            else:
-                self.txt = txt
 
         if ela.get_symbol() != elb.get_symbol():
             self.nel = 2
@@ -60,28 +51,18 @@ class SlaterKosterTable:
             self.pairs = [(ela, elb)]
             self.elements = [ela]
 
-        self.timer = Timer('SlaterKosterTable', txt=self.txt, enabled=timing)
+        if txt is None:
+            self.txt = sys.stdout
+        else:
+            if type(txt) == type(''):
+                self.txt = open(txt, 'a')
+            else:
+                self.txt = txt
 
-        print('\n\n\n\n', file=self.txt)
-        print('***********************************************', file=self.txt)
-        print('Slater-Koster table construction for %2s and %2s' % \
-              (ela.get_symbol(), elb.get_symbol()), file=self.txt)
-        print('***********************************************', file=self.txt)
-        self.txt.flush()
+        self.timer = Timer('SlaterKosterTable', txt=self.txt, enabled=timing)
 
     def __del__(self):
         self.timer.summary()
-        
-    def get_table(self):
-        """ Return tables. """
-        return self.Rgrid, self.tables
-                
-    def smooth_tails(self):
-        """ Smooth the behaviour of tables near cutoff. """
-        for p in range(self.nel):
-            for i in range(20):
-                self.tables[p][:, i] = tail_smoothening(self.Rgrid,
-                                                        self.tables[p][:, i])
 
     def write(self, filename=None, pair=None, eigenvalues=None,
               hubbardvalues=None, occupations=None, spe=None):
@@ -278,18 +259,17 @@ class SlaterKosterTable:
 
     def get_range(self, fractional_limit):
         """ Define ranges for the atoms: largest r such that Rnl(r)<limit. """
-        self.timer.start('define ranges')
         wf_range = 0.
 
         for el in self.elements:
             r = max([el.get_wf_range(nl, fractional_limit) 
                      for nl in el.get_valence_orbitals()])
-            print('wf range for %s=%10.5f' % (el.get_symbol(), r),
+            print('Wave function range for %s = %.5f a0' % (el.get_symbol(), r),
                   file=self.txt)
             wf_range = max(r, wf_range)
 
-        assert wf_range < 20, 'Wave function range >20 Bohr. Decrease wflimit?'
-        self.timer.stop('define ranges')
+        assert wf_range < 20, 'Wave function range exceeds 20 Bohr radii. ' \
+                              'Decrease wflimit?'
         return wf_range
         
     def run(self, R1, R2, N, ntheta=150, nr=50, wflimit=1e-7,
@@ -298,7 +278,9 @@ class SlaterKosterTable:
 
         parameters:
         ------------
-        R1, R2, N: make table from R1 to R2 with N points
+        R1, R2, N: parameters defining the equidistant grid of interatomic
+                separations (shortest distance R1, longest distance R2,
+                number of grid points N).
         ntheta: number of angular divisions in polar grid
                 (more dense towards bonding region).
         nr:     number of radial divisions in polar grid
@@ -310,7 +292,7 @@ class SlaterKosterTable:
         wflimit: use max range for wfs such that at R(rmax)<wflimit*max(R(r))
         superposition: 'density' or 'potential': whether to use the density
                 superposition or potential superposition approach for the 
-                Hamiltonian integrals. 
+                Hamiltonian integrals.
         xc:     name of the exchange-correlation functional to be used
                 in calculating the effective potential in the density
                 superposition scheme. If the PyLibXC module is available,
@@ -327,25 +309,23 @@ class SlaterKosterTable:
                 and map the resulting curves on the N-grid afterwards.
                 The default stride = 1 means that N' = N (no shortcut).
         """
+        print('\n\n', file=self.txt)
+        print('***********************************************', file=self.txt)
+        print('Slater-Koster table construction for %s and %s' % \
+              (self.ela.get_symbol(), self.elb.get_symbol()), file=self.txt)
+        print('***********************************************', file=self.txt)
+        self.txt.flush()
+
         assert R1 >= 1e-3, 'For stability; use R1 >= 1e-3'
         assert superposition in ['density', 'potential']
 
-        self.timer.start('calculate tables')
+        self.timer.start('calculate_tables')
         self.wf_range = self.get_range(wflimit)
-        self.N = N
         Nsub = N // stride
         Rgrid = np.linspace(R1, R2, Nsub, endpoint=True)
-        self.Rgrid = Rgrid
-        self.dH = 0.
-        self.Hmax = 0.
-
-        if self.nel == 1:
-            self.tables = [np.zeros((Nsub, 20))]
-        else: 
-            self.tables = [np.zeros((Nsub, 20)), np.zeros((Nsub, 20))]
-
-        print('Start making table...', file=self.txt)
-        self.txt.flush()
+        tables = [np.zeros((Nsub, 20)) for i in range(self.nel)]
+        dH = 0.
+        Hmax = 0.
 
         for p, (e1, e2) in enumerate(self.pairs):
             print('Integrals:', end=' ', file=self.txt)
@@ -359,7 +339,7 @@ class SlaterKosterTable:
             if R > 2 * self.wf_range:
                 break
 
-            grid, areas = self.make_grid(R, nt=ntheta, nr=nr)
+            grid, area = self.make_grid(R, nt=ntheta, nr=nr)
 
             if  i == Nsub - 1 or Nsub // 10 == 0 or i % (Nsub // 10) == 0:
                 print('R=%8.2f, %i grid points ...' % (R, len(grid)),
@@ -367,40 +347,46 @@ class SlaterKosterTable:
 
             for p, (e1, e2) in enumerate(self.pairs):
                 selected = select_integrals(e1, e2)
-                if len(grid) == 0:
-                    S, H, H2 = 0., 0., 0.
-                else:
+                S, H, H2 = 0., 0., 0.
+                if len(grid) > 0:
                     S, H, H2 = self.calculate_mels(selected, e1, e2, R, grid,
-                                                   areas, xc=xc,
+                                                   area, xc=xc,
                                                    superposition=superposition)
-                    self.Hmax = max(self.Hmax, max(abs(H)))
-                    self.dH = max(self.dH, max(abs(H - H2)))
-                self.tables[p][i, :10] = H
-                self.tables[p][i, 10:] = S
+                    Hmax = max(Hmax, max(abs(H)))
+                    dH = max(dH, max(abs(H - H2)))
+                tables[p][i, :10] = H
+                tables[p][i, 10:] = S
 
         if superposition == 'potential':
-            print('Maximum value for H=%.2g' % self.Hmax, file=self.txt)
-            print('Maximum error for H=%.2g' % self.dH, file=self.txt)
-            print('     Relative error=%.2g %%' % (self.dH / self.Hmax * 100),
+            print('Maximum value for H=%.2g' % Hmax, file=self.txt)
+            print('Maximum error for H=%.2g' % dH, file=self.txt)
+            print('     Relative error=%.2g %%' % (dH / Hmax * 100),
                   file=self.txt)
 
-        if stride > 1:
-            self.Rgrid = np.linspace(R1, R2, N, endpoint=True)
-            for p in range(len(self.pairs)):
-                table = np.zeros((N, 20))
-                for i in range(20):
-                    spl = CubicSplineFunction(Rgrid, self.tables[p][:, i])
-                    table[:, i] = spl(self.Rgrid)
-                self.tables[p] = table
+        self.Rgrid = np.linspace(R1, R2, N, endpoint=True)
 
-        self.smooth_tails()
-        self.timer.stop('calculate tables')
+        if stride > 1:
+            self.tables = [np.zeros((N, 20)) for i in range(self.nel)]
+            for p in range(self.nel):
+                for i in range(20):
+                    spl = CubicSplineFunction(Rgrid, tables[p][:, i])
+                    self.tables[p][:, i] = spl(self.Rgrid)
+        else:
+            self.tables = tables
+
+        # Smooth the curves near the cutoff
+        for p in range(self.nel):
+            for i in range(20):
+                self.tables[p][:, i] = tail_smoothening(self.Rgrid,
+                                                        self.tables[p][:, i])
+
+        self.timer.stop('calculate_tables')
         self.txt.flush()
 
     def calculate_mels(self, selected, e1, e2, R, grid, area,
                        superposition='potential', xc='LDA'):
         """ Perform integration for selected H and S integrals.
-         
+
         parameters:
         -----------
         selected: list of [('dds','3d','4d'),(...)]
@@ -418,7 +404,7 @@ class SlaterKosterTable:
         superposition scheme, H2 is calculated using a different technique
         and can be used for error estimation. This is not available
         for the density superposition scheme, where simply H2=0 is returned.
-        
+
         S: simply R1*R2*angle-part
 
         H: operate (derivate) R2 <R1|t+Veff-Conf1-Conf2|R2>.
@@ -525,8 +511,7 @@ class SlaterKosterTable:
         return Sl, Hl, H2l
 
     def make_grid(self, Rz, nt, nr, p=2, q=2, view=False):
-        """
-        Construct a double-polar grid.
+        """ Construct a double-polar grid.
 
         Parameters:
         -----------
@@ -540,12 +525,12 @@ class SlaterKosterTable:
         view: view the distribution of grid points with matplotlib
 
         Plane at R/2 divides two polar grids.
-                
-                               
-         ^ (z-axis)     
+
+
+         ^ (z-axis)
          |--------_____               phi_j
          |       /     ----__         *
-         |      /            \       /  *              
+         |      /            \       /  *
          |     /               \    /  X *                X=coordinates of the center of area element(z,d), 
          |    /                  \  \-----* phi_(j+1)     area=(r_(i+1)**2-r_i**2)*(phi_(j+1)-phi_j)/2
          |   /                    \  r_i   r_(i+1)
@@ -568,8 +553,7 @@ class SlaterKosterTable:
          |      \           /
          |       \ ___ ---
          |---------
-         
-        """ 
+        """
         self.timer.start('make_grid')
         rmin, rmax = 1e-7, self.wf_range
         h = Rz / 2
