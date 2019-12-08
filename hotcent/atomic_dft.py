@@ -304,7 +304,10 @@ class AtomicDFT(AtomicBase):
                 self._run()
             elif wf_confinement_scheme == 'perturbative':
                 self.veff = veff + self.confinement(self.rgrid)
-                self.solve_single_eigenstate(nl)
+                if self.scalarrel:
+                    spl = CubicSplineFunction(self.rgrid, self.veff)
+                    self.dveff = spl(self.rgrid, der=1)
+                self.solve_eigenstates(5, solve=[nl])
                 print('Confined %s eigenvalue: %.6f' % (nl, self.enl[nl]),
                       file=self.txt)
 
@@ -401,7 +404,7 @@ class AtomicDFT(AtomicBase):
 
         self.timer.stop('solve ground state')
 
-    def solve_eigenstates(self, iteration, itmax=100):
+    def solve_eigenstates(self, iteration, itmax=100, solve='all'):
         """ Solve the eigenstates for given effective potential.
 
         u''(r) - 2*(v_eff(r)+l*(l+1)/(2r**2)-e)*u(r)=0
@@ -410,6 +413,13 @@ class AtomicDFT(AtomicBase):
         r=r0*exp(x) --> (to get equally spaced integration mesh)
 
         u''(x) - u'(x) + c0(x(r))*u(r) = 0
+
+        Parameters:
+
+        iteration: iteration number in the SCF cycle
+        itmax: maximum number of optimization steps per eigenstate
+        solve: which eigenstates to solve: solve='all' -> all states;
+               solve = [nl1, nl2, ...] -> only the given subset
         """
         self.timer.start('eigenstates')
 
@@ -423,10 +433,13 @@ class AtomicDFT(AtomicBase):
         itmax = 0
 
         for n, l, nl in self.list_states():
+            if solve != 'all' and nl not in solve:
+                continue
+
             nodes_nl = n - l - 1
 
             if iteration == 0:
-                eps = -1.0 * self.Z **2 / n**2
+                eps = -1.0 * self.Z **2 / n ** 2
             else:
                 eps = self.enl[nl]
 
@@ -498,120 +511,6 @@ class AtomicDFT(AtomicBase):
                     print('max epsilon', epsmax, file=self.txt)
                     err = 'Eigensolver out of iterations. Atom not stable?'
                     raise RuntimeError(err)
-
-            itmax = max(it, itmax)
-            self.unlg[nl] = u
-            self.Rnlg[nl] = self.unlg[nl] / self.rgrid
-            self.d_enl[nl] = abs(eps - self.enl[nl])
-            d_enl_max = max(d_enl_max, self.d_enl[nl])
-            self.enl[nl] = eps
-
-            if self.verbose:
-                line = '-- state %s, %i eigensolver iterations' % (nl, it)
-                line += ', e=%9.5f, de=%9.5f' % (self.enl[nl], self.d_enl[nl])
-                print(line, file=self.txt)
-
-            assert nodes == nodes_nl
-            assert u[1] > 0.0
-
-        self.timer.stop('eigenstates')
-        return d_enl_max, itmax
-
-    def solve_single_eigenstate(self, nl, iteration=0):
-        """
-        Solve a single eigenstate nl for given effective potential.
-
-        u''(r) - 2*(v_eff(r)+l*(l+1)/(2r**2)-e)*u(r)=0
-        ( u''(r) + c0(r)*u(r) = 0 )
-
-        r=r0*exp(x) --> (to get equally spaced integration mesh)
-
-        u''(x) - u'(x) + c0(x(r))*u(r) = 0
-        """
-        self.timer.start('eigenstates')
-
-        rgrid = self.rgrid
-        xgrid = self.xgrid
-        dx = xgrid[1] - xgrid[0]
-        N = self.N
-        c2 = np.ones(N)
-        c1 = -np.ones(N)
-        d_enl_max = 0.0
-        itmax = 0
-
-        n, l = nl2tuple(nl)
-        nodes_nl = n - l - 1
-        eps = self.enl[nl]
-        delta = self.d_enl[nl]
-
-        direction = 'none'
-        epsmax = self.veff[-1] - l * (l + 1) / (2 * self.rgrid[-1] ** 2)
-        it = 0
-        u = np.zeros(N)
-        hist = []
-
-        if self.scalarrel:
-            veff = CubicSplineFunction(self.rgrid, self.veff)
-            self.dveff = veff(self.rgrid, der=1)
-
-        while True:
-            eps0 = eps
-            c0, c1, c2 = self.construct_coefficients(l, eps)
-
-            # boundary conditions for integration from analytic behaviour
-            # (unscaled)
-            # u(r)~r**(l+1)   r->0
-            # u(r)~exp( -sqrt(c0(r)) ) (set u[-1]=1
-            # and use expansion to avoid overflows)
-            u[0:2] = rgrid[0:2] ** (l + 1)
-
-            if not(c0[-2] < 0 and c0[-1] < 0):
-                plt.plot(c0)
-                plt.show()
-
-            assert c0[-2] < 0 and c0[-1] < 0
-
-            self.timer.start('shoot')
-            u, nodes, A, ctp = shoot(u, dx, c2, c1, c0, N)
-            self.timer.stop('shoot')
-            it += 1
-            norm = self.grid.integrate(u ** 2)
-            u = u / sqrt(norm)
-
-            if nodes > nodes_nl:
-                # decrease energy
-                if direction == 'up':
-                    delta /= 2
-                eps -= delta
-                direction = 'down'
-            elif nodes < nodes_nl:
-                # increase energy
-                if direction == 'down':
-                    delta /= 2
-                eps += delta
-                direction = 'up'
-            elif nodes == nodes_nl:
-                shift = -0.5 * A / (rgrid[ctp] * norm)
-                if abs(shift) < 1e-8:  # convergence
-                    break
-                if shift > 0:
-                    direction = 'up'
-                elif shift < 0:
-                    direction = 'down'
-                eps += shift
-
-            if eps > epsmax:
-                eps = 0.5 * (epsmax + eps0)
-            hist.append(eps)
-
-            if it > 100:
-                print('Epsilon history for %s' % nl, file=self.txt)
-                for h in hist:
-                    print(h)
-                print('nl=%s, eps=%f' % (nl,eps), file=self.txt)
-                print('max epsilon', epsmax, file=self.txt)
-                err = 'Eigensolver out of iterations. Atom not stable?'
-                raise RuntimeError(err)
 
             itmax = max(it, itmax)
             self.unlg[nl] = u
