@@ -14,7 +14,7 @@ from math import pi, sqrt
 from scipy.interpolate import splrep, splev
 from ase.data import atomic_numbers, covalent_radii
 from ase.units import Bohr
-from hotcent.interpolation import Function, SplineFunction
+from hotcent.interpolation import CubicSplineFunction
 from hotcent.atomic_base import AtomicBase, nl2tuple
 from hotcent.confinement import ZeroConfinement
 from hotcent.xc import XC_PW92, LibXC
@@ -345,7 +345,7 @@ class AtomicDFT(AtomicBase):
             self.veff *= 1. - self.mix
             self.veff += self.mix * self.calculate_veff()
             if self.scalarrel:
-                veff = SplineFunction(self.rgrid, self.veff)
+                veff = CubicSplineFunction(self.rgrid, self.veff)
                 self.dveff = veff(self.rgrid, der=1)
             d_enl_max, itmax = self.solve_eigenstates(it)
 
@@ -530,7 +530,7 @@ class AtomicDFT(AtomicBase):
         hist = []
 
         if self.scalarrel:
-            veff = SplineFunction(self.rgrid, self.veff)
+            veff = CubicSplineFunction(self.rgrid, self.veff)
             self.dveff = veff(self.rgrid, der=1)
 
         while True:

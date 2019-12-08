@@ -11,7 +11,7 @@ import numpy as np
 from scipy.optimize import minimize
 from ase.data import atomic_numbers, covalent_radii
 from ase.units import Bohr, Ha
-from hotcent.interpolation import Function
+from hotcent.interpolation import CubicSplineFunction
 from hotcent.timing import Timer
 from hotcent.confinement import Confinement, ZeroConfinement
 try:
@@ -219,21 +219,21 @@ class AtomicBase:
         """ Rnl(r, '2p') """
         assert self.solved, not_solved_message
         if self.Rnl_fct[nl] is None:
-            self.Rnl_fct[nl] = Function('spline', self.rgrid, self.Rnlg[nl])
+            self.Rnl_fct[nl] = CubicSplineFunction(self.rgrid, self.Rnlg[nl])
         return self.Rnl_fct[nl](r, der=der)
 
     def unl(self, r, nl, der=0):
         """ unl(r, '2p') = Rnl(r,'2p') / r """
         assert self.solved, not_solved_message
         if self.unl_fct[nl] is None:
-            self.unl_fct[nl] = Function('spline', self.rgrid, self.unlg[nl])
+            self.unl_fct[nl] = CubicSplineFunction(self.rgrid, self.unlg[nl])
         return self.unl_fct[nl](r, der=der)
 
     def electron_density(self, r, der=0):
         """ Return the all-electron density at r. """
         assert self.solved, not_solved_message
         if self.dens_fct is None:
-            self.dens_fct = Function('spline', self.rgrid, self.dens)
+            self.dens_fct = CubicSplineFunction(self.rgrid, self.dens)
         return self.dens_fct(r, der=der)
 
     def nuclear_potential(self,r):
@@ -243,14 +243,14 @@ class AtomicBase:
         """ Return effective potential at r or its derivatives. """
         assert self.solved, not_solved_message
         if self.veff_fct is None:
-            self.veff_fct = Function('spline', self.rgrid, self.veff)
+            self.veff_fct = CubicSplineFunction(self.rgrid, self.veff)
         return self.veff_fct(r, der=der)
 
     def hartree_potential(self, r):
         """ Return the Hartree potential at r. """
         assert self.solved, not_solved_message
         if self.vhar_fct is None:
-            self.vhar_fct = Function('spline', self.rgrid, self.vhar)
+            self.vhar_fct = CubicSplineFunction(self.rgrid, self.vhar)
         return self.vhar_fct(r)
 
     def plot_Rnl(self, filename=None, only_valence=True):

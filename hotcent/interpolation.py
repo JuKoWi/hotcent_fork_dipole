@@ -9,11 +9,26 @@ from __future__ import print_function
 import numpy as np
 from scipy.linalg import norm
 from scipy.optimize import fminbound, brentq
-from scipy.interpolate import splprep, splrep, splev, splint
+from scipy.interpolate import splprep, splrep, splev, splint, CubicSpline
 try:
     import matplotlib.pyplot as plt
 except:
     plt = None
+
+
+class CubicSplineFunction(CubicSpline):
+    def __init__(self, x, y):
+        CubicSpline.__init__(self, x, y, bc_type='natural', extrapolate=False)
+
+    def __call__(self, x, der=0):
+        if isinstance(x, np.ndarray):
+            y = CubicSpline.__call__(self, x, nu=der)
+            return np.nan_to_num(y, copy=False, nan=0.)
+        else:
+            if x < self.x[0] or x > self.x[-1]:
+                return 0.
+            else:
+                return CubicSpline.__call__(self, x, nu=der)
 
 
 class SplineFunction:
@@ -116,17 +131,14 @@ class SplineFunction:
 
 class Function:
     def __init__(self, mode, *args, **kwargs):
+        assert mode in ['spline', 'cubic_spline']
         if mode == 'spline':
             self.f = SplineFunction(*args, **kwargs)
-        elif mode == 'string':
-            raise NotImplementedError('todo')
-            self.args = args
-            self.kwargs = kwargs
-        else:
-            raise NotImplementedError('todo')
+        elif mode == 'cspline':
+            self.f = CubicSplineFunction(*args, **kwargs)
 
     def __call__(self, x, der=0):
-        return self.f(x, der)
+        return self.f(x, der=der)
 
     def plot(self, der=0, a=None, b=None, npoints=1000, filename=None):
         """ Plot the function with matplolib. """
