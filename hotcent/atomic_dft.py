@@ -250,8 +250,29 @@ class AtomicDFT(AtomicBase):
             self.dens = self.guess_density()
 
     def run(self, wf_confinement_scheme='standard'):
-        assert wf_confinement_scheme in ['standard', 'perturbative']
+        """ Execute the required atomic DFT calculations
 
+        Parameters:
+
+        wf_confinement_scheme: determines how to apply the orbital
+             confinement potentials for getting the confined orbitals:
+
+            'standard' = by applying the confinement for the chosen nl
+                    to all states and reconverging all states (but only
+                    saving the confined nl orbital),
+
+            'perturbative' = by applying the confinement only to the
+                    chosen nl and re-converging only that state, while
+                    keeping the others equal to those in the free
+                    (nonconfined) atom.
+
+            The 'perturbative' scheme is e.g. how basis sets are
+            generated in GPAW. This option is also faster than the
+            'standard' scheme, especially for heavier atoms.
+            The choice of scheme does not affect the calculation of the
+            confined density (which always happens the 'old' way).
+        """
+        assert wf_confinement_scheme in ['standard', 'perturbative']
         val = self.get_valence_orbitals()
         enl = {}
         Rnlg = {}
