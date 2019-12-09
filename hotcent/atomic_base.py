@@ -393,11 +393,10 @@ class AtomicBase:
 
         with open(filename, 'a') as f:
             for nl in orbitals:
-                print('\n\nu_%s=' % nl, file=f)
+                f.write('\n\nu_%s=' % nl)
                 for r, u in zip(self.rgrid[::step], self.unlg[nl][::step]):
-                    print(r, u, file=f)
-
-            print('\n\n', file=f)
+                    f.write(r, u)
+            f.write('\n\n')
 
     def fit_sto(self, nl, num_exp, num_pow, regularization=1e-6,
                 filename=None):
@@ -464,12 +463,14 @@ class AtomicBase:
         integral = np.trapz((r * y) ** 2, x=r)
         if abs(integral - 1) > 1e-1:
             print('Warning -- significant deviation from unity for integral'
-                  ' of grid-based %s orbital: %.5f' % (nl, integral))
+                  ' of grid-based %s orbital: %.5f' % (nl, integral),
+                  file=self.txt)
 
         integral = np.trapz((r * values) ** 2, x=r)
         if abs(integral - 1) > 1e-1:
             print('Warning -- significant deviation from unity for integral'
-                  ' of STO-based %s orbital: %.5f' % (nl, integral))
+                  ' of STO-based %s orbital: %.5f' % (nl, integral),
+                  file=self.txt)
 
         if filename is not None:
             rmax = 3 * covalent_radii[self.Z] / Bohr
@@ -588,23 +589,25 @@ class AtomicBase:
         configuration = self.configuration.copy()
 
         energies = {}
+        bar = '+' * 12
         for direction in directions[scheme]:
             self.configuration = configuration.copy()
             self.configuration[nl] += direction * delta
             s = ' '.join([nl + '%.1f' % self.configuration[nl]
                           for nl in self.valence])
-            print('\n++++++++++++ Configuration %s ++++++++++++' % s)
+            print('\n%s Configuration %s %s' % (bar, s, bar), file=self.txt)
             self.run()
             energies[direction] = self.total_energy
 
         if scheme in ['forward', 'central']:
             EA = (energies[0] - energies[1]) / delta
-            print('\nElectron affinity = %.5f Ha (%.5f eV)' % (EA, EA * Ha))
+            print('\nElectron affinity = %.5f Ha (%.5f eV)' % (EA, EA * Ha),
+                  file=self.txt)
 
         if scheme in ['backward', 'central']:
             IE = (energies[-1] - energies[0]) / delta
-            print('\nIonization energy = %.5f Ha (%.5f eV)' % (IE, IE * Ha))
-
+            print('\nIonization energy = %.5f Ha (%.5f eV)' % (IE, IE * Ha),
+                  file=self.txt)
         U = 0.
         for i, d in enumerate(directions[scheme]):
             factor = 1 if i % 2 == 0 else -2
