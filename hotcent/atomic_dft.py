@@ -39,7 +39,6 @@ class AtomicDFT(AtomicBase):
                  symbol,
                  xcname='LDA',
                  convergence={'density':1e-7, 'energies':1e-7},
-                 restart=None,
                  write=None,
                  **kwargs):
         """ Run Kohn-Sham all-electron calculations for a given atom.
@@ -73,17 +72,12 @@ class AtomicDFT(AtomicBase):
 
         write:          filename: save rgrid, effective potential and
                         density to a file for further calculations.
-
-        restart:        filename: make an initial guess for effective
-                        potential and density from another calculation.
         """
         AtomicBase.__init__(self, symbol, **kwargs)
 
         self.xcname = xcname
         self.convergence = convergence
         self.write = write
-        self.restart = restart
-        
         self.set_output(self.txt)
 
         if self.xcname in ['PW92', 'LDA']:
