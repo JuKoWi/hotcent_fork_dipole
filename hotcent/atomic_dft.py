@@ -11,7 +11,6 @@ import sys
 import pickle
 import numpy as np
 from math import pi, sqrt
-from scipy.interpolate import splrep, splev
 from ase.data import atomic_numbers, covalent_radii
 from ase.units import Bohr
 from hotcent.interpolation import CubicSplineFunction
@@ -116,24 +115,28 @@ class AtomicDFT(AtomicBase):
               file=self.txt)
         print('*******************************************', file=self.txt)
 
-    def calculate_energies(self, echo='valence'):
+    def calculate_energies(self, enl, dens, echo='valence'):
         """ Calculate energy contributions. """
         self.timer.start('energies')
         assert echo in [None, 'valence', 'all']
 
         self.bs_energy = 0.0
         for n, l, nl in self.list_states():
-            self.bs_energy += self.configuration[nl] * self.enl[nl]
+            self.bs_energy += self.configuration[nl] * enl[nl]
 
-        self.exc, self.vxc = self.xc.evaluate(self.dens, self.grid)
-        self.vhar_energy = self.grid.integrate(self.vhar * self.dens,
-                                               use_dV=True) / 2
-        self.vxc_energy = self.grid.integrate(self.vxc * self.dens, use_dV=True)
-        self.exc_energy = self.grid.integrate(self.exc * self.dens, use_dV=True)
-        self.confinement_energy = self.grid.integrate(self.conf * self.dens,
+        vhar = self.calculate_hartree_potential(dens)
+        self.vhar_energy = 0.5 * self.grid.integrate(vhar * dens, use_dV=True)
+
+        exc, vxc = self.xc.evaluate(dens, self.grid)
+        self.vxc_energy = self.grid.integrate(vxc * dens, use_dV=True)
+        self.exc_energy = self.grid.integrate(exc * dens, use_dV=True)
+
+        vconf = self.confinement(self.rgrid)
+        self.confinement_energy = self.grid.integrate(vconf * dens,
                                                       use_dV=True)
+
         self.total_energy = self.bs_energy - self.vhar_energy
-        self.total_energy += - self.vxc_energy + self.exc_energy
+        self.total_energy += -self.vxc_energy + self.exc_energy
 
         if echo is not None:
             line = '%s orbital eigenvalues:' % echo
@@ -141,7 +144,7 @@ class AtomicDFT(AtomicBase):
             print('-' * len(line), file=self.txt)
             for n, l, nl in self.list_states():
                 if echo == 'all' or nl in self.valence:
-                    print('  %s:   %.12f' % (nl, self.enl[nl]), file=self.txt)
+                    print('  %s:   %.12f' % (nl, enl[nl]), file=self.txt)
 
             print('\nenergy contributions:', file=self.txt)
             print('----------------------------------------', file=self.txt)
@@ -159,14 +162,14 @@ class AtomicDFT(AtomicBase):
 
         self.timer.stop('energies')
 
-    def calculate_density(self):
+    def calculate_density(self, unlg):
         """ Calculate the radial electron density:
         sum_nl occ_nl |Rnl(r)|**2 / (4*pi)
         """
         self.timer.start('density')
         dens = np.zeros_like(self.rgrid)
-        for n,l,nl in self.list_states():
-            dens += self.configuration[nl] * (self.unlg[nl] ** 2)
+        for n, l, nl in self.list_states():
+            dens += self.configuration[nl] * (unlg[nl] ** 2)
 
         nel1 = self.grid.integrate(dens)
         nel2 = self.get_number_of_electrons()
@@ -176,25 +179,25 @@ class AtomicDFT(AtomicBase):
             err += ', number of electrons %.3g' % nel2
             raise RuntimeError(err)
 
-        dens = dens / (4 * np.pi * self.rgrid **2)
+        dens = dens / (4 * np.pi * self.rgrid ** 2)
 
         self.timer.stop('density')
         return dens
 
-    def calculate_hartree_potential(self):
+    def calculate_hartree_potential(self, dens):
         """ Calculate the Hartree potential. """
         self.timer.start('Hartree')
         dV = self.grid.get_dvolumes()
         r, r0 = self.rgrid, self.grid.get_r0grid()
         N = self.N
-        n0 = 0.5 * (self.dens[1:] + self.dens[:-1])
+        n0 = 0.5 * (dens[1:] + dens[:-1])
         nel = self.get_number_of_electrons()
         n0 *= nel / np.sum(n0 * dV)
 
         if hartree is not None:
-            self.vhar = hartree(n0, dV, r, r0, N)
+            vhar = hartree(n0, dV, r, r0, N)
         else:
-            lo, hi, self.vhar = np.zeros(N), np.zeros(N), np.zeros(N)
+            lo, hi, vhar = np.zeros(N), np.zeros(N), np.zeros(N)
             lo[0] = 0.0
             for i in range(1, N):
                 lo[i] = lo[i-1] + dV[i-1] * n0[i-1]
@@ -204,16 +207,20 @@ class AtomicDFT(AtomicBase):
                 hi[i] = hi[i + 1] + n0[i] * dV[i] / r0[i]
 
             for i in range(N):
-                self.vhar[i] = lo[i] / r[i] + hi[i]
+                vhar[i] = lo[i] / r[i] + hi[i]
 
         self.timer.stop('Hartree')
+        return vhar
 
-    def calculate_veff(self):
+    def calculate_veff(self, dens):
         """ Calculate effective potential. """
         self.timer.start('veff')
-        exc, self.vxc = self.xc.evaluate(self.dens, self.grid)
+        vnuc = self.nuclear_potential(self.rgrid)
+        vhar = self.calculate_hartree_potential(dens)
+        exc, vxc = self.xc.evaluate(dens, self.grid)
+        vconf = self.confinement(self.rgrid)
         self.timer.stop('veff')
-        return self.vnuc + self.vhar + self.vxc + self.conf
+        return vnuc + vhar + vxc + vconf
 
     def guess_density(self):
         """ Guess initial density. """
@@ -223,31 +230,6 @@ class AtomicDFT(AtomicBase):
         nel = self.get_number_of_electrons()
         dens = dens / self.grid.integrate(dens, use_dV=True) * nel
         return dens
-
-    def get_veff_and_dens(self):
-        """ Construct effective potential and electron density. If restart
-        a file is given, try to read from there, otherwise make a guess.
-        """
-        done = False
-        if self.restart is not None:
-            # use density and effective potential from another calculation
-            try:
-                with open(self.restart) as f:
-                    rgrid = pickle.load(f)
-                    veff = pickle.load(f)
-                    dens = pickle.load(f)
-                v = splrep(rgrid, veff)
-                d = splrep(rgrid, dens)
-                self.veff = splev(self.rgrid, v)
-                self.dens = splev(self.rgrid, d)
-                done = True
-            except IOError:
-                print("Could not open restart file, " \
-                      "starting from scratch.", file=self.txt)
-
-        if not done:
-            self.veff = self.vnuc + self.conf
-            self.dens = self.guess_density()
 
     def run(self, wf_confinement_scheme='standard'):
         """ Execute the required atomic DFT calculations
@@ -274,9 +256,9 @@ class AtomicDFT(AtomicBase):
         """
         assert wf_confinement_scheme in ['standard', 'perturbative']
         val = self.get_valence_orbitals()
-        enl = {}
-        Rnlg = {}
-        unlg = {}
+        self.enl = {}
+        self.unlg = {}
+        self.Rnlg = {}
         bar = '=' * 50
         confinement = self.confinement
 
@@ -286,8 +268,7 @@ class AtomicDFT(AtomicBase):
             print('for pre-converging orbitals and eigenvalues', file=self.txt)
             print(bar, file=self.txt)
             self.confinement = ZeroConfinement()
-            self._run()
-            veff = self.veff.copy()
+            dens_free, veff_free, enl_free, unlg_free, Rnlg_free = self.outer_scf()
 
         for nl, wf_confinement in self.wf_confinement.items():
             assert nl in val, 'Confinement %s not in %s' % (nl, str(val))
@@ -301,19 +282,18 @@ class AtomicDFT(AtomicBase):
             print(bar, file=self.txt)
 
             if wf_confinement_scheme == 'standard':
-                self._run()
+                dens, veff, enl, unlg, Rnlg = self.outer_scf()
             elif wf_confinement_scheme == 'perturbative':
-                self.veff = veff + self.confinement(self.rgrid)
-                if self.scalarrel:
-                    spl = CubicSplineFunction(self.rgrid, self.veff)
-                    self.dveff = spl(self.rgrid, der=1)
-                self.solve_eigenstates(5, solve=[nl])
-                print('Confined %s eigenvalue: %.6f' % (nl, self.enl[nl]),
+                veff = veff_free + self.confinement(self.rgrid)
+                enl = {nl: enl_free[nl]}
+                itmax, enl, d_enl, unlg, Rnlg = self.inner_scf(0, veff, enl, {},
+                                                               solve=[nl])
+                print('Confined %s eigenvalue: %.6f' % (nl, enl[nl]),
                       file=self.txt)
 
-            Rnlg[nl] = self.Rnlg[nl].copy()
-            unlg[nl] = self.unlg[nl].copy()
-            enl[nl] = self.enl[nl]
+            self.enl[nl] = enl[nl]
+            self.unlg[nl] = unlg[nl]
+            self.Rnlg[nl] = Rnlg[nl]
 
         self.confinement = confinement
         if self.confinement is None:
@@ -329,13 +309,16 @@ class AtomicDFT(AtomicBase):
                   file=self.txt)
         print(bar, file=self.txt)
 
-        self._run()
+        self.dens, self.veff, enl, unlg, Rnlg = self.outer_scf()
+        self.vhar = self.calculate_hartree_potential(self.dens)
+        exc, self.vxc = self.xc.evaluate(self.dens, self.grid)
 
-        # restore overwritten attributes
-        self.Rnlg.update(Rnlg)
-        self.unlg.update(unlg)
-        self.enl.update(enl)
-        self.veff = self.calculate_veff()
+        for n, l, nl in self.list_states():
+            if nl not in self.wf_confinement:
+                assert nl not in self.enl
+                self.enl[nl] = enl[nl]
+                self.unlg[nl] = unlg[nl]
+                self.Rnlg[nl] = Rnlg[nl]
 
         if self.write != None:
             with open(self.write, 'w') as f:
@@ -347,45 +330,40 @@ class AtomicDFT(AtomicBase):
         self.timer.summary()
         self.txt.flush()
 
-    def _run(self):
+    def outer_scf(self):
         """ Solve the self-consistent potential. """
-        self.timer.start('solve ground state')
+        self.timer.start('outer_scf')
         print('\nStart iteration...', file=self.txt)
-        self.enl = {}
-        self.d_enl = {}
-        for n, l, nl in self.list_states():
-            self.enl[nl] = 0.0
-            self.d_enl[nl] = 0.0
+        enl = {nl: 0. for n, l, nl in self.list_states()}
+        d_enl = {nl: 0. for n, l, nl in self.list_states()}
 
-        N = self.grid.get_N()
-
-        # make confinement and nuclear potentials; intitial guess for veff
-        self.conf = self.confinement(self.rgrid)
-        self.vnuc = self.nuclear_potential(self.rgrid)
-        self.get_veff_and_dens()
-        self.calculate_hartree_potential()
+        dens = self.guess_density()
+        veff = self.nuclear_potential(self.rgrid)
+        veff += self.confinement(self.rgrid)
 
         for it in range(self.maxiter):
-            self.veff *= 1. - self.mix
-            self.veff += self.mix * self.calculate_veff()
-            if self.scalarrel:
-                veff = CubicSplineFunction(self.rgrid, self.veff)
-                self.dveff = veff(self.rgrid, der=1)
-            d_enl_max, itmax = self.solve_eigenstates(it)
+            veff *= 1. - self.mix
+            veff += self.mix * self.calculate_veff(dens)
 
-            dens0 = self.dens.copy()
-            self.dens = self.calculate_density()
-            diff = self.grid.integrate(np.abs(self.dens - dens0), use_dV=True)
+            dveff = None
+            if self.scalarrel:
+                spl = CubicSplineFunction(self.rgrid, veff)
+                dveff = spl(self.rgrid, der=1)
+
+            itmax, enl, d_enl, unlg, Rnlg = self.inner_scf(it, veff, enl, d_enl,
+                                                           dveff=dveff)
+            dens0 = dens.copy()
+            dens = self.calculate_density(unlg)
+            diff = self.grid.integrate(np.abs(dens - dens0), use_dV=True)
 
             if diff < self.convergence['density'] and it > 5:
+                d_enl_max = max(d_enl.values())
                 if d_enl_max < self.convergence['energies']:
                     break
-            self.calculate_hartree_potential()
 
             if np.mod(it, 10) == 0:
                 line = 'iter %3i, dn=%.1e>%.1e, max %i sp-iter' % \
                        (it, diff, self.convergence['density'], itmax)
-                
                 print(line, file=self.txt)
 
             if it == self.maxiter - 1:
@@ -395,16 +373,18 @@ class AtomicDFT(AtomicBase):
                 raise RuntimeError(err)
             self.txt.flush()
 
-        self.calculate_energies(echo='valence')
+        self.calculate_energies(enl, dens, echo='valence')
         print('converged in %i iterations' % it, file=self.txt)
         nel = self.get_number_of_electrons()
         line = '%9.4f electrons, should be %9.4f' % \
-               (self.grid.integrate(self.dens, use_dV=True), nel)
+               (self.grid.integrate(dens, use_dV=True), nel)
         print(line, file=self.txt)
 
-        self.timer.stop('solve ground state')
+        self.timer.stop('outer_scf')
+        return dens, veff, enl, unlg, Rnlg
 
-    def solve_eigenstates(self, iteration, itmax=100, solve='all'):
+    def inner_scf(self, iteration, veff, enl, d_enl, dveff=None, itmax=100,
+                  solve='all'):
         """ Solve the eigenstates for given effective potential.
 
         u''(r) - 2*(v_eff(r)+l*(l+1)/(2r**2)-e)*u(r)=0
@@ -421,16 +401,16 @@ class AtomicDFT(AtomicBase):
         solve: which eigenstates to solve: solve='all' -> all states;
                solve = [nl1, nl2, ...] -> only the given subset
         """
-        self.timer.start('eigenstates')
+        self.timer.start('inner_scf')
+        if self.scalarrel and dveff is None:
+            spl = CubicSplineFunction(self.rgrid, veff)
+            dveff = spl(self.rgrid, der=1)
 
         rgrid = self.rgrid
         xgrid = self.xgrid
         dx = xgrid[1] - xgrid[0]
         N = self.N
-        c2 = np.ones(N)
-        c1 = -np.ones(N)
-        d_enl_max = 0.0
-        itmax = 0
+        unlg, Rnlg = {}, {}
 
         for n, l, nl in self.list_states():
             if solve != 'all' and nl not in solve:
@@ -439,25 +419,27 @@ class AtomicDFT(AtomicBase):
             nodes_nl = n - l - 1
 
             if iteration == 0:
-                eps = -1.0 * self.Z **2 / n ** 2
+                eps = -1.0 * self.Z ** 2 / n ** 2
             else:
-                eps = self.enl[nl]
+                eps = enl[nl]
 
             if iteration <= 3:
-                delta = 0.5 * self.Z **2 / n ** 2  # previous!!!!!!!!!!
+                delta = 0.5 * self.Z ** 2 / n ** 2  # previous!!!!!!!!!!
             else:
-                delta = self.d_enl[nl]
+                delta = d_enl[nl]
 
             direction = 'none'
-            epsmax = self.veff[-1] - l * (l + 1) / (2 * self.rgrid[-1] ** 2)
+            epsmax = veff[-1] - l * (l + 1) / (2 * self.rgrid[-1] ** 2)
             it = 0
             u = np.zeros(N)
             hist = []
 
             while True:
                 eps0 = eps
-                c0, c1, c2 = self.construct_coefficients(l, eps)
-
+                self.timer.start('coeff')
+                c0, c1, c2 = self.construct_coefficients(l, eps, veff,
+                                                         dveff=dveff)
+                self.timer.stop('coeff')
                 # boundary conditions for integration from analytic behaviour
                 # (unscaled)
                 # u(r)~r**(l+1)   r->0
@@ -513,36 +495,36 @@ class AtomicDFT(AtomicBase):
                     raise RuntimeError(err)
 
             itmax = max(it, itmax)
-            self.unlg[nl] = u
-            self.Rnlg[nl] = self.unlg[nl] / self.rgrid
-            self.d_enl[nl] = abs(eps - self.enl[nl])
-            d_enl_max = max(d_enl_max, self.d_enl[nl])
-            self.enl[nl] = eps
+            unlg[nl] = u
+            Rnlg[nl] = unlg[nl] / self.rgrid
+            d_enl[nl] = abs(eps - enl[nl])
+            enl[nl] = eps
 
             if self.verbose:
                 line = '-- state %s, %i eigensolver iterations' % (nl, it)
-                line += ', e=%9.5f, de=%9.5f' % (self.enl[nl], self.d_enl[nl])
+                line += ', e=%9.5f, de=%9.5f' % (enl[nl], d_enl[nl])
                 print(line, file=self.txt)
 
             assert nodes == nodes_nl
             assert u[1] > 0.0
 
-        self.timer.stop('eigenstates')
-        return d_enl_max, itmax
+        self.timer.stop('inner_scf')
+        return itmax, enl, d_enl, unlg, Rnlg
 
-    def construct_coefficients(self, l, eps):
+    def construct_coefficients(self, l, eps, veff, dveff=None):
         c = 137.036
         c2 = np.ones(self.N)
-        if self.scalarrel == False:
-            c0 = -2 * (0.5 * l * (l + 1) + self.rgrid ** 2 * (self.veff - eps))
+        if not self.scalarrel:
+            c0 = -2 * (0.5 * l * (l + 1) + self.rgrid ** 2 * (veff - eps))
             c1 = -1. * np.ones(self.N)
         else:
+            assert dveff is not None
             # from Paolo Giannozzi: Notes on pseudopotential generation
-            ScR_mass = 1 + 0.5 * (eps - self.veff) / c ** 2
+            ScR_mass = 1 + 0.5 * (eps - veff) / c ** 2
             c0 = -l * (l + 1)
-            c0 -= 2 * ScR_mass * self.rgrid ** 2 * (self.veff - eps)
-            c0 -= self.dveff * self.rgrid / (2 * ScR_mass * c ** 2)
-            c1 = self.rgrid * self.dveff / (2 * ScR_mass * c ** 2) - 1
+            c0 -= 2 * ScR_mass * self.rgrid ** 2 * (veff - eps)
+            c0 -= dveff * self.rgrid / (2 * ScR_mass * c ** 2)
+            c1 = self.rgrid * dveff / (2 * ScR_mass * c ** 2) - 1
         return c0, c1, c2
 
 
