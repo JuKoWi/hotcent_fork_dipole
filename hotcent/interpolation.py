@@ -23,7 +23,7 @@ class CubicSplineFunction(CubicSpline):
     def __call__(self, x, der=0):
         if isinstance(x, np.ndarray):
             y = CubicSpline.__call__(self, x, nu=der)
-            return np.nan_to_num(y, copy=False, nan=0.)
+            return np.nan_to_num(y, copy=False)  # NaN -> 0
         else:
             if x < self.x[0] or x > self.x[-1]:
                 return 0.
