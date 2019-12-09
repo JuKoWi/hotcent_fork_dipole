@@ -231,65 +231,70 @@ class AtomicDFT(AtomicBase):
         dens = dens / self.grid.integrate(dens, use_dV=True) * nel
         return dens
 
-    def run(self, wf_confinement_scheme='standard'):
+    def run(self, perturbative_confinement=False):
         """ Execute the required atomic DFT calculations
 
         Parameters:
 
-        wf_confinement_scheme: determines how to apply the orbital
-             confinement potentials for getting the confined orbitals:
+        perturbative_confinement: determines which type of self-
+            consistent calculation is performed when applying each
+            of the orbital- or density-confinement potentials:
 
-            'standard' = by applying the confinement for the chosen nl
-                    to all states and reconverging all states (but only
-                    saving the confined nl orbital),
+            False: apply the confinement potential in a conventional
+                  calculation with self-consistency between
+                  the density and the effective potential,
 
-            'perturbative' = by applying the confinement only to the
-                    chosen nl and re-converging only that state, while
-                    keeping the others equal to those in the free
-                    (nonconfined) atom.
+            True: add the confinement potential to the effective
+                  potential of the free (nonconfined) atom and
+                  solve for the eigenstate(s)* while keeping this
+                  potential fixed.
 
-            The 'perturbative' scheme is e.g. how basis sets are
+            * i.e. all valence orbitals when confining the density and
+            only the orbital in question in wave function confinement
+
+            The perturbative scheme is e.g. how basis sets are
             generated in GPAW. This option is also faster than the
-            'standard' scheme, especially for heavier atoms.
-            The choice of scheme does not affect the calculation of the
-            confined density (which always happens the 'old' way).
+            self-consistent one, in particular for heavier atoms.
         """
-        assert wf_confinement_scheme in ['standard', 'perturbative']
+        def header(*args):
+            print('=' * 50, file=self.txt)
+            print('\n'.join(args), file=self.txt)
+            print('=' * 50, file=self.txt)
+
         val = self.get_valence_orbitals()
+        confinement = self.confinement
+
+        assert all([nl in val for nl in self.wf_confinement])
+        nl_x = [nl for nl in val if nl not in self.wf_confinement]
+        assert len(nl_x) == 0 or len(nl_x) == len(val), nl_x
+
         self.enl = {}
         self.unlg = {}
         self.Rnlg = {}
-        bar = '=' * 50
-        confinement = self.confinement
 
-        if wf_confinement_scheme == 'perturbative':
-            print(bar, file=self.txt)
-            print('Initial run without any confinement', file=self.txt)
-            print('for pre-converging orbitals and eigenvalues', file=self.txt)
-            print(bar, file=self.txt)
+        if perturbative_confinement:
             self.confinement = ZeroConfinement()
-            dens_free, veff_free, enl_free, unlg_free, Rnlg_free = self.outer_scf()
+            header('Initial run without any confinement',
+                   'for pre-converging orbitals and eigenvalues')
+            dens_free, veff_free, enl_free, unlg_free, Rnlg_free = \
+                                                               self.outer_scf()
 
         for nl, wf_confinement in self.wf_confinement.items():
-            assert nl in val, 'Confinement %s not in %s' % (nl, str(val))
             self.confinement = wf_confinement
             if self.confinement is None:
                 self.confinement = ZeroConfinement()
+            header('Applying a %s' % self.confinement,
+                   'to get a confined %s orbital' % nl)
 
-            print(bar, file=self.txt)
-            print('Applying %s' % self.confinement, file=self.txt)
-            print('to get a confined %s orbital' % nl, file=self.txt)
-            print(bar, file=self.txt)
-
-            if wf_confinement_scheme == 'standard':
-                dens, veff, enl, unlg, Rnlg = self.outer_scf()
-            elif wf_confinement_scheme == 'perturbative':
+            if perturbative_confinement:
                 veff = veff_free + self.confinement(self.rgrid)
                 enl = {nl: enl_free[nl]}
-                itmax, enl, d_enl, unlg, Rnlg = self.inner_scf(0, veff, enl, {},
-                                                               solve=[nl])
+                itmax, enl, d_enl, unlg, Rnlg = self.inner_scf(0, veff, enl,
+                                                               {}, solve=[nl])
                 print('Confined %s eigenvalue: %.6f' % (nl, enl[nl]),
                       file=self.txt)
+            else:
+                dens, veff, enl, unlg, Rnlg = self.outer_scf()
 
             self.enl[nl] = enl[nl]
             self.unlg[nl] = unlg[nl]
@@ -298,29 +303,34 @@ class AtomicDFT(AtomicBase):
         self.confinement = confinement
         if self.confinement is None:
             self.confinement = ZeroConfinement()
+        extra = '' if len(nl_x) == 0 else '\nand the confined %s orbital(s)' \
+                                           % ' and '.join(nl_x)
+        header('Applying %s' % self.confinement,
+               'to get the confined electron density%s' % extra)
 
-        print(bar, file=self.txt)
-        print('Applying %s' % self.confinement, file=self.txt)
-        print('to get the confined electron density', file=self.txt)
-        nl_0 = [nl for nl in val if nl not in self.wf_confinement]
-        if len(nl_0) > 0:
-            print('as well as the confined %s orbital%s' % \
-                  (' and '.join(nl_0), 's' if len(nl_0) > 1 else ''),
-                  file=self.txt)
-        print(bar, file=self.txt)
-
-        self.dens, self.veff, enl, unlg, Rnlg = self.outer_scf()
-        self.vhar = self.calculate_hartree_potential(self.dens)
-        exc, self.vxc = self.xc.evaluate(self.dens, self.grid)
+        if perturbative_confinement:
+            veff = veff_free + self.confinement(self.rgrid)
+            enl = {nl_: enl_free[nl_] for nl_ in val}
+            itmax, enl, d_enl, unlg, Rnlg = self.inner_scf(0, veff, enl, {},
+                                                           solve=val)
+        else:
+            self.dens, veff, enl, unlg, Rnlg = self.outer_scf()
 
         for n, l, nl in self.list_states():
             if nl not in self.wf_confinement:
-                assert nl not in self.enl
-                self.enl[nl] = enl[nl]
-                self.unlg[nl] = unlg[nl]
-                self.Rnlg[nl] = Rnlg[nl]
+                assert nl in enl or perturbative_confinement
+                self.enl[nl] = enl[nl] if nl in enl else enl_free[nl]
+                self.unlg[nl] = unlg[nl] if nl in enl else unlg_free[nl]
+                self.Rnlg[nl] = Rnlg[nl] if nl in enl else Rnlg_free[nl]
 
-        if self.write != None:
+        if perturbative_confinement:
+            self.dens = self.calculate_density(self.unlg)
+
+        self.veff = self.calculate_veff(self.dens)
+        self.vhar = self.calculate_hartree_potential(self.dens)
+        exc, self.vxc = self.xc.evaluate(self.dens, self.grid)
+
+        if self.write is not None:
             with open(self.write, 'w') as f:
                 pickle.dump(self.rgrid, f)
                 pickle.dump(self.veff, f)

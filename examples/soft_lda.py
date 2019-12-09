@@ -21,7 +21,7 @@ wf_confinement = {'3s':SoftConfinement(amp=12., rc=6.74, x_ri=0.6),
 atom = AtomicDFT('Si',
                  wf_confinement=wf_confinement,
                  **kwargs)
-atom.run(wf_confinement_scheme='perturbative')
+atom.run(perturbative_confinement=True)
 eps_conf = {nl: atom.get_eigenvalue(nl) for nl in atom.valence}
 
 print('\nChecking eigenvalues and their shifts upon confinement:')
