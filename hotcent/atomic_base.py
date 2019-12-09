@@ -415,6 +415,8 @@ class AtomicBase:
                          fit is decent)
         """
         assert self.solved, not_solved_message
+        print('Fitting Slater-type orbitals to eigenstate %s' % nl,
+              file=self.txt)
         r = self.rgrid
         y = self.Rnlg[nl]
         n, l = nl2tuple(nl)
