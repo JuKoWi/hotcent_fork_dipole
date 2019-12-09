@@ -46,9 +46,12 @@ class AtomicDFT(AtomicBase):
 
         Example:
         ---------
+        from hotcent.atomic_dft import AtomicDFT
         from hotcent.confinement import PowerConfinement
         atom = AtomicDFT('C',
                          xcname='GGA_C_PBE+GGA_X_PBE',
+                         configuration='[He] 2s2 2p2',
+                         valence=['2s', '2p'],
                          confinement=PowerConfinement(r0=3.0, s=2))
         atom.run()
 
