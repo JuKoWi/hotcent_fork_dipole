@@ -37,7 +37,6 @@ class AtomicDFT(AtomicBase):
                  symbol,
                  xcname='LDA',
                  convergence={'density':1e-7, 'energies':1e-7},
-                 write=None,
                  **kwargs):
         """ Run Kohn-Sham all-electron calculations for a given atom.
 
@@ -67,9 +66,6 @@ class AtomicDFT(AtomicBase):
         convergence:    convergence criterion dictionary
                         * density: max change for integrated |n_old-n_new|
                         * energies: max change in single-particle energy (Ha)
-
-        write:          filename: save rgrid, effective potential and
-                        density to a file for further calculations.
         """
         AtomicBase.__init__(self, symbol, **kwargs)
 
@@ -80,7 +76,6 @@ class AtomicDFT(AtomicBase):
 
         self.xcname = xcname
         self.convergence = convergence
-        self.write = write
 
         if self.xcname in ['PW92', 'LDA']:
             self.xc = XC_PW92()
@@ -217,7 +212,7 @@ class AtomicDFT(AtomicBase):
         dens = dens / self.grid.integrate(dens, use_dV=True) * nel
         return dens
 
-    def run(self, perturbative_confinement=False):
+    def run(self, perturbative_confinement=False, write=None):
         """ Execute the required atomic DFT calculations
 
         Parameters:
@@ -241,6 +236,9 @@ class AtomicDFT(AtomicBase):
             The perturbative scheme is e.g. how basis sets are
             generated in GPAW. This option is also faster than the
             self-consistent one, in particular for heavier atoms.
+
+        write: None or a filename for saving the rgrid, effective
+               potential and electron density.
         """
         def header(*args):
             print('=' * 50, file=self.txt)
@@ -316,8 +314,8 @@ class AtomicDFT(AtomicBase):
         self.vhar = self.calculate_hartree_potential(self.dens)
         exc, self.vxc = self.xc.evaluate(self.dens, self.grid)
 
-        if self.write is not None:
-            with open(self.write, 'w') as f:
+        if write is not None:
+            with open(write, 'w') as f:
                 pickle.dump(self.rgrid, f)
                 pickle.dump(self.veff, f)
                 pickle.dump(self.dens, f)
