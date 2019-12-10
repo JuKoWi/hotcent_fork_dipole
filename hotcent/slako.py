@@ -7,7 +7,6 @@ written by Pekka Koskinen (https://github.com/pekkosk/
 hotbit/blob/master/hotbit/parametrization/slako.py).
 """
 import sys
-from math import sin, cos, tan, sqrt
 import numpy as np
 from scipy.interpolate import SmoothBivariateSpline
 from ase.units import Bohr
@@ -615,7 +614,7 @@ class SlaterKosterTable:
                 rr = 0.5 * (R[i + 1] ** 2 - R[i] ** 2)
                 A_list0 = [lambda x: rr * -x,
                            lambda x: rr * -x - 0.5 * R[i + 1] ** 2 * (Th1 - x) \
-                                     + 0.5 * h ** 2 * (tan(Th1) - np.tan(x)),
+                                     + 0.5 * h ** 2 * (np.tan(Th1) - np.tan(x)),
                            lambda x: rr * -x - (rr * -x + 0.5 * R[i + 1] ** 2 \
                                      * (Th1 - Th0)),
                            0.,
@@ -628,8 +627,8 @@ class SlaterKosterTable:
                 A_list1 = [lambda x: rr * x,
                            lambda x: rr * x,
                            lambda x: rr * x - (rr * Th0 - 0.5 * h ** 2 \
-                                     * (tan(Th1) - tan(Th0))),
-                           lambda x: 0.5 * h ** 2 * (np.tan(x) - tan(Th0)) \
+                                     * (np.tan(Th1) - np.tan(Th0))),
+                           lambda x: 0.5 * h ** 2 * (np.tan(x) - np.tan(Th0)) \
                                      - 0.5 * R[i] ** 2 * (x - Th0),
                            lambda x: 0.5 * h ** 2 * np.tan(x) \
                                      - 0.5 * R[i] ** 2 * x,

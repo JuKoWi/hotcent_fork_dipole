@@ -7,7 +7,6 @@ hotbit/blob/master/hotbit/parametrization/atom.py).
 """
 import pickle
 import numpy as np
-from math import pi, sqrt
 from ase.data import atomic_numbers, covalent_radii
 from ase.units import Bohr
 from hotcent.interpolation import CubicSplineFunction
@@ -450,7 +449,7 @@ class AtomicDFT(AtomicBase):
 
                 self.timer.start('norm')
                 norm = self.grid.integrate(u ** 2)
-                u /= sqrt(norm)
+                u /= np.sqrt(norm)
                 self.timer.stop('norm')
 
                 if nodes > nodes_nl:
