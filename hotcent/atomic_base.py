@@ -6,6 +6,8 @@ written by Pekka Koskinen (https://github.com/pekkosk/
 hotbit/blob/master/hotbit/parametrization/atom.py).
 """
 from __future__ import division, print_function
+import os
+import sys
 import collections
 import numpy as np
 from scipy.optimize import minimize
@@ -76,7 +78,7 @@ class AtomicBase:
         self.nodegpts = nodegpts
         self.timing = timing
         self.verbose = verbose
-        self.txt = txt
+        self.set_output(txt)
 
         if confinement is None:
             self.confinement = ZeroConfinement()
@@ -118,6 +120,15 @@ class AtomicBase:
         self.dens_fct = None
         self.vhar_fct = None
         self.solved = False
+
+    def set_output(self, txt):
+        """ Set output channel and give greetings. """
+        if txt == '-':
+            self.txt = sys.stdout
+        elif txt is None:
+            self.txt = open(os.devnull,'w')
+        else:
+            self.txt = open(txt, 'a')
 
     def set_configuration(self, configuration):
         """ Set the electron configuration

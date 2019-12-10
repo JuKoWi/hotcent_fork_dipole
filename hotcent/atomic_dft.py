@@ -6,8 +6,6 @@ written by Pekka Koskinen (https://github.com/pekkosk/
 hotbit/blob/master/hotbit/parametrization/atom.py).
 """
 from __future__ import division, print_function
-import os
-import sys
 import pickle
 import numpy as np
 from math import pi, sqrt
@@ -75,10 +73,14 @@ class AtomicDFT(AtomicBase):
         """
         AtomicBase.__init__(self, symbol, **kwargs)
 
+        print('*******************************************', file=self.txt)
+        print('Kohn-Sham all-electron calculator for %s' % self.symbol,
+              file=self.txt)
+        print('*******************************************', file=self.txt)
+
         self.xcname = xcname
         self.convergence = convergence
         self.write = write
-        self.set_output(self.txt)
 
         if self.xcname in ['PW92', 'LDA']:
             self.xc = XC_PW92()
@@ -98,19 +100,6 @@ class AtomicDFT(AtomicBase):
         self.rgrid = self.rmin * np.exp(self.xgrid)
         self.grid = RadialGrid(self.rgrid)
         self.timer.stop('init')
-
-    def set_output(self, txt):
-        """ Set output channel and give greetings. """
-        if txt == '-':
-            self.txt = sys.stdout
-        elif txt is None:
-            self.txt = open(os.devnull,'w')
-        else:
-            self.txt = open(txt, 'a')
-        print('*******************************************', file=self.txt)
-        print('Kohn-Sham all-electron calculation for %s' % self.symbol,
-              file=self.txt)
-        print('*******************************************', file=self.txt)
 
     def calculate_energies(self, enl, dens, echo='valence'):
         """ Calculate energy contributions. """
