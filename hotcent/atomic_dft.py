@@ -30,6 +30,11 @@ try:
 except ModuleNotFoundError:
     print(warning_extension % 'hartree')
     hartree = None
+try:
+    from _hotcent import construct_coefficients
+except ModuleNotFoundError:
+    print(warning_extension % 'construct_coefficients')
+    construct_coefficients = None
 
 
 class AtomicDFT(AtomicBase):
@@ -399,6 +404,8 @@ class AtomicDFT(AtomicBase):
         if self.scalarrel and dveff is None:
             spl = CubicSplineFunction(self.rgrid, veff)
             dveff = spl(self.rgrid, der=1)
+        elif not self.scalarrel:
+            dveff = np.array([])
 
         rgrid = self.rgrid
         xgrid = self.xgrid
@@ -431,37 +438,39 @@ class AtomicDFT(AtomicBase):
             while True:
                 eps0 = eps
                 self.timer.start('coeff')
-                c0, c1, c2 = self.construct_coefficients(l, eps, veff,
-                                                         dveff=dveff)
+                if construct_coefficients is not None:
+                    c0, c1, c2 = construct_coefficients(l, eps, veff, dveff,
+                                                        self.rgrid)
+                else:
+                    c0, c1, c2 = self.construct_coefficients(l, eps, veff,
+                                                             dveff=dveff)
+                assert c0[-2] < 0 and c0[-1] < 0
                 self.timer.stop('coeff')
+
                 # boundary conditions for integration from analytic behaviour
                 # (unscaled)
                 # u(r)~r**(l+1)   r->0
                 # u(r)~exp( -sqrt(c0(r)) ) (set u[-1]=1
                 # and use expansion to avoid overflows)
                 u[0:2] = rgrid[0:2] ** (l + 1)
-
-                if not(c0[-2] < 0 and c0[-1] < 0):
-                    plt.plot(c0)
-                    plt.show()
-
-                assert c0[-2] < 0 and c0[-1] < 0
                 self.timer.start('shoot')
                 u, nodes, A, ctp = shoot(u, dx, c2, c1, c0, N)
                 self.timer.stop('shoot')
-                it += 1
+
+                self.timer.start('norm')
                 norm = self.grid.integrate(u ** 2)
-                u = u / sqrt(norm)
+                u /= sqrt(norm)
+                self.timer.stop('norm')
 
                 if nodes > nodes_nl:
                     # decrease energy
-                    if direction == 'up': 
+                    if direction == 'up':
                         delta /= 2
                     eps -= delta
                     direction = 'down'
                 elif nodes < nodes_nl:
                     # increase energy
-                    if direction == 'down': 
+                    if direction == 'down':
                         delta /= 2
                     eps += delta
                     direction = 'up'
@@ -479,6 +488,7 @@ class AtomicDFT(AtomicBase):
                     eps = 0.5 * (epsmax + eps0)
                 hist.append(eps)
 
+                it += 1
                 if it > 100:
                     print('Epsilon history for %s' % nl, file=self.txt)
                     for h in hist:
@@ -506,19 +516,20 @@ class AtomicDFT(AtomicBase):
         return itmax, enl, d_enl, unlg, Rnlg
 
     def construct_coefficients(self, l, eps, veff, dveff=None):
+        """ Construct the coefficients for Numerov's method; see shoot.py """
         c = 137.036
+        ll = l * (l + 1)
         c2 = np.ones(self.N)
         if not self.scalarrel:
-            c0 = -2 * (0.5 * l * (l + 1) + self.rgrid ** 2 * (veff - eps))
+            c0 = -ll - 2 * self.rgrid ** 2 * (veff - eps)
             c1 = -1. * np.ones(self.N)
         else:
             assert dveff is not None
             # from Paolo Giannozzi: Notes on pseudopotential generation
-            ScR_mass = 1 + 0.5 * (eps - veff) / c ** 2
-            c0 = -l * (l + 1)
-            c0 -= 2 * ScR_mass * self.rgrid ** 2 * (veff - eps)
+            ScR_mass = 1 - 0.5 * (veff - eps) / c ** 2
+            c0 = -ll - 2 * ScR_mass * self.rgrid ** 2 * (veff - eps)
             c0 -= dveff * self.rgrid / (2 * ScR_mass * c ** 2)
-            c1 = self.rgrid * dveff / (2 * ScR_mass * c ** 2) - 1
+            c1 = dveff * self.rgrid / (2 * ScR_mass * c ** 2) - 1
         return c0, c1, c2
 
 

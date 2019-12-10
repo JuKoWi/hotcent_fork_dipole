@@ -207,3 +207,32 @@ def make_grid(double Rz, double rmin, double rmax, int nt, int nr,
         area_new_view[i] = area_view[i]
 
     return grid_new, area_new
+
+
+def construct_coefficients(int l, double eps, double[:] veff, double[:] dveff,
+                           double[:] rgrid):
+    """ Construct the coefficients for Numerov's method; see shoot.py """
+    cdef int N = veff.shape[0]
+    c0 = np.zeros(N, dtype=DTYPE)
+    c1 = np.zeros(N, dtype=DTYPE)
+    c2 = np.ones(N, dtype=DTYPE)
+    cdef double[:] c0_view = c0
+    cdef double[:] c1_view = c1
+
+    cdef Py_ssize_t i
+    cdef double ScR_mass
+    cdef double c = 137.036
+    cdef int ll = l * (l + 1)
+
+    if dveff.shape[0] == 0:
+        for i in range(N):
+            c0_view[i] = -ll - 2 * rgrid[i] ** 2 * (veff[i] - eps)
+            c1_view[i] = -1.
+    else:
+        for i in range(N):
+            ScR_mass = 1 - 0.5 * (veff[i] - eps) / c ** 2
+            c0_view[i] = -ll - 2 * ScR_mass * rgrid[i] ** 2 * (veff[i] - eps)
+            c0_view[i] -= dveff[i] * rgrid[i] / (2 * ScR_mass * c ** 2)
+            c1_view[i] = dveff[i] * rgrid[i] / (2 * ScR_mass * c ** 2) - 1
+
+    return c0, c1, c2
