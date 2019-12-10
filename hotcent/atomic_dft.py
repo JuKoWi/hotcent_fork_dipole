@@ -19,22 +19,12 @@ try:
     import matplotlib.pyplot as plt
 except:
     plt = None
-warning_extension = 'Warning: C-extension "%s" not available'
 try:
-    from _hotcent import shoot
+    import _hotcent
 except ModuleNotFoundError:
-    print(warning_extension % 'shoot')
+    print('Warning: C-extensions not available')
     from hotcent.shoot import shoot
-try:
-    from _hotcent import hartree
-except ModuleNotFoundError:
-    print(warning_extension % 'hartree')
-    hartree = None
-try:
-    from _hotcent import construct_coefficients
-except ModuleNotFoundError:
-    print(warning_extension % 'construct_coefficients')
-    construct_coefficients = None
+    _hotcent = None
 
 
 class AtomicDFT(AtomicBase):
@@ -180,8 +170,8 @@ class AtomicDFT(AtomicBase):
         nel = self.get_number_of_electrons()
         n0 *= nel / np.sum(n0 * dV)
 
-        if hartree is not None:
-            vhar = hartree(n0, dV, r, r0, N)
+        if _hotcent is not None:
+            vhar = _hotcent.hartree(n0, dV, r, r0, N)
         else:
             lo, hi, vhar = np.zeros(N), np.zeros(N), np.zeros(N)
             lo[0] = 0.0
@@ -438,9 +428,9 @@ class AtomicDFT(AtomicBase):
             while True:
                 eps0 = eps
                 self.timer.start('coeff')
-                if construct_coefficients is not None:
-                    c0, c1, c2 = construct_coefficients(l, eps, veff, dveff,
-                                                        self.rgrid)
+                if _hotcent is not None:
+                    c0, c1, c2 = _hotcent.construct_coefficients(l, eps, veff,
+                                                             dveff, self.rgrid)
                 else:
                     c0, c1, c2 = self.construct_coefficients(l, eps, veff,
                                                              dveff=dveff)
@@ -454,7 +444,10 @@ class AtomicDFT(AtomicBase):
                 # and use expansion to avoid overflows)
                 u[0:2] = rgrid[0:2] ** (l + 1)
                 self.timer.start('shoot')
-                u, nodes, A, ctp = shoot(u, dx, c2, c1, c0, N)
+                if _hotcent is not None:
+                    u, nodes, A, ctp = _hotcent.shoot(u, dx, c2, c1, c0, N)
+                else:
+                    u, nodes, A, ctp = shoot(u, dx, c2, c1, c0, N)
                 self.timer.stop('shoot')
 
                 self.timer.start('norm')

@@ -20,12 +20,11 @@ try:
     import matplotlib.pyplot as plt
 except ImportError:
     plt = None
-warning_extension = 'Warning: C-extension "%s" not available'
 try:
-    from _hotcent import make_grid
+    import _hotcent
 except ModuleNotFoundError:
-    print(warning_extension % '')
-    make_grid = None
+    print('Warning: C-extensions not available')
+    _hotcent = None
 
 
 class SlaterKosterTable:
@@ -558,8 +557,8 @@ class SlaterKosterTable:
         rmin, rmax = 1e-7, self.wf_range
         h = Rz / 2
 
-        if make_grid is not None:
-            grid, area = make_grid(Rz, rmin, rmax, nt, nr, p, q)
+        if _hotcent is not None:
+            grid, area = _hotcent.make_grid(Rz, rmin, rmax, nt, nr, p, q)
         else:
             max_range = self.wf_range
             T = np.linspace(0, 1, nt) ** p * np.pi
