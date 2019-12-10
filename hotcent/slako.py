@@ -6,7 +6,6 @@ The code below draws heavily from the Hotbit code
 written by Pekka Koskinen (https://github.com/pekkosk/
 hotbit/blob/master/hotbit/parametrization/slako.py).
 """
-from __future__ import division, print_function
 import sys
 from math import sin, cos, tan, sqrt
 import numpy as np
@@ -331,8 +330,7 @@ class SlaterKosterTable:
             selected = select_integrals(e1, e2)
             for s in selected:
                 print(s[0], end=' ', file=self.txt)
-            print(file=self.txt)
-            self.txt.flush()
+            print(file=self.txt, flush=True)
 
         for i, R in enumerate(Rgrid):
             if R > 2 * self.wf_range:
@@ -380,7 +378,6 @@ class SlaterKosterTable:
                                                         self.tables[p][:, i])
 
         self.timer.stop('calculate_tables')
-        self.txt.flush()
 
     def calculate_mels(self, selected, e1, e2, R, grid, area,
                        superposition='potential', xc='LDA'):

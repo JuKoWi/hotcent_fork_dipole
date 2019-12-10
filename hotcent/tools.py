@@ -1,8 +1,6 @@
 ''' Tools for tuning the confinement potentials to
 fit band structures calculated with e.g. DFT. '''
-from __future__ import print_function
 import os
-import sys
 import copy
 import numpy as np
 from scipy.optimize import minimize
@@ -153,8 +151,7 @@ class SlaterKosterGenerator:
         if self.verbose:
             print('PARAM labels:')
             print(' '.join([label.split('_guess')[0]
-                            for label, val in self.var_param]))
-            sys.stdout.flush()
+                            for label, val in self.var_param]), flush=True)
 
         result = minimize(self._residual, opt_param, args=(callback,),
                           method='COBYLA', tol=tol, options={'rhobeg':rhobeg,
@@ -195,8 +192,7 @@ class SlaterKosterGenerator:
                    eigenvalues and Hubbard values.
         """
         if self.verbose:
-            print('PARAM:', opt_param)
-            sys.stdout.flush()
+            print('PARAM:', opt_param, flush=True)
 
         if opt_param is not None:
             try:
@@ -204,8 +200,7 @@ class SlaterKosterGenerator:
             except (ValueError, AssertionError, RuntimeError, IndexError,
                     TypeError) as err:
                 if self.verbose:
-                    print(err.message)
-                    sys.stdout.flush()
+                    print(err.message, flush=True)
                 return 1e23
 
         residual = 0.
@@ -230,8 +225,7 @@ class SlaterKosterGenerator:
             residual = callback()
 
         if self.verbose:
-            print('RESIDUAL:', residual)
-            sys.stdout.flush()
+            print('RESIDUAL:', residual, flush=True)
 
         return residual
 

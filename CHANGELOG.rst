@@ -25,6 +25,9 @@ Development version
   `stride` points and will then be mapped on the final, denser grid
   using cubic spline interpolation. Use with care.
 
+* No more backwards compatibility with Python2 (only Python3).
+
+
 
 Version 0.9
 ===========

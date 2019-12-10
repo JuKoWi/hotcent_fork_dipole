@@ -5,7 +5,6 @@ The code below draws heavily from the Hotbit code
 written by Pekka Koskinen (https://github.com/pekkosk/
 hotbit/blob/master/hotbit/parametrization/atom.py).
 """
-from __future__ import division, print_function
 import os
 import sys
 import collections

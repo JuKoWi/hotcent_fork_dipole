@@ -5,8 +5,6 @@ The code below draws heavily from the Hotbit code
 written by Pekka Koskinen (https://github.com/pekkosk/
 hotbit/blob/master/box/timing.py).
 """
-
-from __future__ import print_function
 import sys
 from time import time, asctime
 import numpy as np

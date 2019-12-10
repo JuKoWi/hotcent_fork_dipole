@@ -5,7 +5,6 @@ The code below draws heavily from the Hotbit code
 written by Pekka Koskinen (https://github.com/pekkosk/
 hotbit/blob/master/hotbit/parametrization/atom.py).
 """
-from __future__ import division, print_function
 import pickle
 import numpy as np
 from math import pi, sqrt
@@ -353,21 +352,20 @@ class AtomicDFT(AtomicBase):
             if np.mod(it, 10) == 0:
                 line = 'iter %3i, dn=%.1e>%.1e, max %i sp-iter' % \
                        (it, diff, self.convergence['density'], itmax)
-                print(line, file=self.txt)
+                print(line, file=self.txt, flush=True)
 
             if it == self.maxiter - 1:
                 if self.timing:
                     self.timer.summary()
                 err = 'Density not converged in %i iterations' % (it + 1)
                 raise RuntimeError(err)
-            self.txt.flush()
 
         self.calculate_energies(enl, dens, echo='valence')
         print('converged in %i iterations' % it, file=self.txt)
         nel = self.get_number_of_electrons()
         line = '%9.4f electrons, should be %9.4f' % \
                (self.grid.integrate(dens, use_dV=True), nel)
-        print(line, file=self.txt)
+        print(line, file=self.txt, flush=True)
 
         self.timer.stop('outer_scf')
         return dens, veff, enl, unlg, Rnlg
