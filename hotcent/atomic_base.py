@@ -142,6 +142,8 @@ class AtomicBase:
         noble_conf['Xe'] = dict({'4d':10, '5s':2, '5p':6}, **noble_conf['Kr'])
         noble_conf['Rn'] = dict({'4f':14, '5d':10, '6s':2, '6p':6},
                                 **noble_conf['Xe'])
+        noble_conf['Og'] = dict({'5f':14, '6d':10, '7s':2, '7p':6},
+                                **noble_conf['Rn'])
 
         for term in configuration.split():
             if term[0] == '[' and term[-1] == ']':
