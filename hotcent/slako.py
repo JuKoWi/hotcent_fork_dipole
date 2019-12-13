@@ -61,8 +61,8 @@ class SlaterKosterTable:
     def __del__(self):
         self.timer.summary()
 
-    def write(self, filename=None, pair=None, eigenvalues=None,
-              hubbardvalues=None, occupations=None, spe=None):
+    def write(self, filename=None, pair=None, eigenvalues={},
+              hubbardvalues={}, occupations={}, spe=0.):
         """ Write SK tables to a file
 
         filename: str with name of file to write to.
@@ -73,9 +73,13 @@ class SlaterKosterTable:
         pair: either (symbol_a, symbol_b) or (symbol_b, symbol_a)
               to select which of the two SK tables to write
 
-        other kwargs: [s,p,d]-eigenvalues, -hubbardvalues, and -occupations,
-                      as well as the spin-polarization error, to be written
-                      to the second line of a homo-nuclear .skf file.
+        other kwargs: {nl: value}-dictionaries with eigenvalues,
+              hubbardvalues and valence orbital occupations, as well
+              as the spin-polarization error (all typically calculated
+              on the basis of atomic DFT calculations). These will be
+              written to the second line of a homo-nuclear .skf file.
+              Examples: hubbardvalues={'2s': 0.5}, spe=0.2,
+                        occupations={'3d':10, '4s': 1}, etc.
         """
         if pair is None:
             pair = (self.ela.get_symbol(), self.elb.get_symbol())
@@ -116,14 +120,19 @@ class SlaterKosterTable:
         el1, el2 = self.ela.get_symbol(), self.elb.get_symbol()
         if el1 == el2:
             line = 'E_d   E_p   E_s   SPE   U_d   U_p   U_s   f_d   f_p   f_s  '
-            labels = line.split()
-            items = [None] * 3 if eigval is None else eigval[::-1]
-            items += [spe]
-            items += [None] * 3 if hubval is None else hubval[::-1]
-            items += [None] * 3 if occup is None else occup[::-1]
-            for label, item in zip(labels, items):
-                if item is not None:
-                    line = line.replace(label + '  ', '%.6f' % item)
+            labels = {x: 0 for x in line.split()}
+            labels['SPE'] = spe
+            for prefix, d in zip(['E', 'U', 'f'], [eigval, hubval, occup]):
+                keys = list(d.keys())
+                for l in ['s', 'p', 'd']:
+                    check = [l in key for key in keys]
+                    if any(check):
+                        key = keys[check.index(True)]
+                        labels['%s_%s' % (prefix, l)] = d[key]
+
+            for label, value in labels.items():
+                s = '%d' % value if isinstance(value, int) else '%.6f' % value
+                line = line.replace(label + '  ', s)
             print(line, file=handle)
 
         m = atomic_masses[atomic_numbers[symbols[index]]]
