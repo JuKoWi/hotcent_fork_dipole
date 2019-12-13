@@ -583,7 +583,7 @@ class AtomicBase:
         assert scheme in [None, 'central', 'forward', 'backward']
 
         if scheme is None:
-            n, l = tuple2nl(nl)
+            n, l = nl2tuple(nl)
             max_occup = 2 * (2 * l + 1)
             occup = self.configuration[nl]
             if occup == 0:
