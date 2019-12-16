@@ -6,6 +6,7 @@ The code below draws heavily from the Hotbit code
 written by Pekka Koskinen (https://github.com/pekkosk/
 hotbit/blob/master/hotbit/parametrization/slako.py).
 """
+import os
 import sys
 import numpy as np
 from scipy.interpolate import SmoothBivariateSpline
@@ -26,14 +27,16 @@ except ModuleNotFoundError:
 
 
 class SlaterKosterTable:
-    def __init__(self, ela, elb, txt=None, timing=False):
+    def __init__(self, ela, elb, txt='-', timing=False):
         """ Construct Slater-Koster table for given elements.
 
         Parameters:
         -----------
         ela:    AtomicDFT object
         elb:    AtomicDFT object
-        txt:    output file object or file name
+        txt:    where output should be printed
+                use '-' for stdout (default), None for /dev/null,
+                any other string for a text file, or a file handle
         timing: output of timing summary after calculation
         """
         self.ela = ela
@@ -49,12 +52,14 @@ class SlaterKosterTable:
             self.elements = [ela]
 
         if txt is None:
-            self.txt = sys.stdout
-        else:
-            if type(txt) == type(''):
-                self.txt = open(txt, 'a')
+            self.txt = open(os.devnull, 'w')
+        elif isinstance(txt, str):
+            if txt == '-':
+                self.txt = sys.stdout
             else:
-                self.txt = txt
+                self.txt = open(txt, 'a')
+        else:
+            self.txt = txt
 
         self.timer = Timer('SlaterKosterTable', txt=self.txt, enabled=timing)
 
