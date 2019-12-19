@@ -32,9 +32,8 @@ atom.plot_density()
 
 # Compute Slater-Koster integrals:
 rmin, dr, N = 0.4, 0.02, 900  
-rmax = rmin + (N - 1) * dr
 sk = SlaterKosterTable(atom, atom, timing=True)
-sk.run(rmin, rmax, N, superposition='density', xc=xc)
+sk.run(rmin, dr, N, superposition='density', xc=xc)
 sk.write('Au-Au_no_repulsion.par')
 sk.write('Au-Au_no_repulsion.skf')
 sk.plot()

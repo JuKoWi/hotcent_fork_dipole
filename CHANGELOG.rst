@@ -27,6 +27,10 @@ Development version
 
 * No more backwards compatibility with Python2 (only Python3).
 
+* The SlaterKosterTable.run() method now requires rmin, dr and N
+  as arguments to specify the interatomic distances for which the
+  Slater-Koster integrals are tabulated (rmin being the minimal
+  distance, dr the grid spacing dr, and N the number of grid points).
 
 
 Version 0.9

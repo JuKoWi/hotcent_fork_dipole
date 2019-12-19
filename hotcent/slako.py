@@ -283,15 +283,15 @@ class SlaterKosterTable:
                               'Decrease wflimit?'
         return wf_range
         
-    def run(self, R1, R2, N, ntheta=150, nr=50, wflimit=1e-7,
+    def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
             superposition='potential', xc='LDA', stride=1):
         """ Calculate the Slater-Koster table.
 
         parameters:
         ------------
-        R1, R2, N: parameters defining the equidistant grid of interatomic
-                separations (shortest distance R1, longest distance R2,
-                number of grid points N).
+        rmin, dr, N: parameters defining the equidistant grid of interatomic
+                separations: the shortest distance rmin and grid spacing dr
+                (both in Bohr radii) and the number of grid points N.
         ntheta: number of angular divisions in polar grid
                 (more dense towards bonding region).
         nr:     number of radial divisions in polar grid
@@ -327,13 +327,14 @@ class SlaterKosterTable:
         print('***********************************************', file=self.txt)
         self.txt.flush()
 
-        assert R1 >= 1e-3, 'For stability; use R1 >= 1e-3'
+        assert N is not None, 'Need to set number of grid points N!'
+        assert rmin >= 1e-3, 'For stability, please set rmin >= 1e-3'
         assert superposition in ['density', 'potential']
 
         self.timer.start('calculate_tables')
         self.wf_range = self.get_range(wflimit)
         Nsub = N // stride
-        Rgrid = np.linspace(R1, R2, Nsub, endpoint=True)
+        Rgrid = rmin + dr * np.arange(Nsub)
         tables = [np.zeros((Nsub, 20)) for i in range(self.nel)]
         dH = 0.
         Hmax = 0.
@@ -373,7 +374,7 @@ class SlaterKosterTable:
             print('     Relative error=%.2g %%' % (dH / Hmax * 100),
                   file=self.txt)
 
-        self.Rgrid = np.linspace(R1, R2, N, endpoint=True)
+        self.Rgrid = rmin + dr * np.arange(N)
 
         if stride > 1:
             self.tables = [np.zeros((N, 20)) for i in range(self.nel)]
