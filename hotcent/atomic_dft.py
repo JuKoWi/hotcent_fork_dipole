@@ -248,6 +248,8 @@ class AtomicDFT(AtomicBase):
         self.enl = {}
         self.unlg = {}
         self.Rnlg = {}
+        self.unl_fct = {nl: None for nl in self.configuration}
+        self.Rnl_fct = {nl: None for nl in self.configuration}
 
         if perturbative_confinement:
             self.confinement = ZeroConfinement()
@@ -260,7 +262,7 @@ class AtomicDFT(AtomicBase):
             self.confinement = wf_confinement
             if self.confinement is None:
                 self.confinement = ZeroConfinement()
-            header('Applying a %s' % self.confinement,
+            header('Applying %s' % self.confinement,
                    'to get a confined %s orbital' % nl)
 
             if perturbative_confinement:
