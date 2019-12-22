@@ -3,6 +3,21 @@ import numpy as np
 
 
 class Confinement():
+    def __init__(self, adjustable=[]):
+        """ Keyword argument:
+
+        adjustable: list of confinement potential parameters that
+                    are allowed to be adjusted (e.g. during
+                    bandstructure or energy fitting procedures).
+        """
+        # Check validity of 'adjustable' keyword argument;
+        # it is only supposed to contain names of parameters
+        # that are actually used by the confinement potential
+        msg = self.__str__() + ' does not have %s parameter'
+        for parameter in adjustable:
+            assert parameter in self.__dir__(), msg % parameter
+        self.adjustable = adjustable
+
     def __call__(self, r):
         raise NotImplementedError
     def __str__(self):
@@ -18,9 +33,10 @@ class ZeroConfinement(Confinement):
 
 
 class PowerConfinement(Confinement):
-    def __init__(self, r0=1., s=2):
+    def __init__(self, r0=1., s=2, adjustable=[]):
         self.r0 = r0
         self.s = s
+        Confinement.__init__(self, adjustable=adjustable)
 
     def __call__(self, r):
         return (r / self.r0) ** self.s
@@ -30,10 +46,11 @@ class PowerConfinement(Confinement):
 
 
 class WoodsSaxonConfinement(Confinement):
-    def __init__(self, w=1., r0=1., a=1.):
+    def __init__(self, w=1., r0=1., a=1., adjustable=[]):
         self.w = w
         self.r0 = r0
         self.a = a
+        Confinement.__init__(self, adjustable=adjustable)
 
     def __call__(self, r):
         return self.w / (1 + np.exp(self.a * (self.r0 - r)))
@@ -45,10 +62,11 @@ class WoodsSaxonConfinement(Confinement):
 
 class SoftConfinement(Confinement):
     """ As in Junquera et al. PRB 64, 23511 (2001). """
-    def __init__(self, amp=12., rc=0., x_ri=0.6):
+    def __init__(self, amp=12., rc=0., x_ri=0.6, adjustable=[]):
         self.amp = amp
         self.rc = rc
         self.x_ri = x_ri
+        Confinement.__init__(self, adjustable=adjustable)
 
     def __call__(self, r):
         ri = self.x_ri * self.rc
