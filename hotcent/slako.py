@@ -334,7 +334,7 @@ class SlaterKosterTable:
         self.timer.start('calculate_tables')
         self.wf_range = self.get_range(wflimit)
         Nsub = N // stride
-        Rgrid = rmin + dr * np.arange(Nsub)
+        Rgrid = rmin + stride * dr * np.arange(Nsub)
         tables = [np.zeros((Nsub, 20)) for i in range(self.nel)]
         dH = 0.
         Hmax = 0.
@@ -773,6 +773,11 @@ def tail_smoothening(x, y):
         if x0i < xmax:
             k = i
             break
+    else:
+        print('N:', N, 'len(y):', len(y))
+        for i in range(len(y)):
+            print(x[i], y[i])
+        raise RuntimeError('Problem with tail smoothening')
 
     if k < N/4:
         for i in range(N):
