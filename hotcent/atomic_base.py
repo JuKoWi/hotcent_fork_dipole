@@ -88,26 +88,8 @@ class AtomicBase:
         else:
             self.txt = txt
 
-        if confinement is None:
-            self.confinement = ZeroConfinement()
-        else:
-            self.confinement = confinement
-
-        if wf_confinement is None:
-            self.wf_confinement = {}
-        elif isinstance(wf_confinement, Confinement):
-            self.wf_confinement = {nl: wf_confinement for nl in self.valence}
-        elif isinstance(wf_confinement, dict):
-            self.wf_confinement = {}
-            for nl in self.valence:
-                if nl not in wf_confinement or wf_confinement[nl] is None:
-                    self.wf_confinement[nl] = ZeroConfinement()
-                else:
-                    self.wf_confinement[nl] = wf_confinement[nl]
-        else:
-            msg = "Don't know what to do with the provided wf_confinement:\n"
-            msg += str(wf_confinement)
-            raise ValueError(msg)
+        self.set_confinement(confinement)
+        self.set_wf_confinement(wf_confinement)
 
         self.timer = Timer('Atomic', txt=self.txt, enabled=self.timing)
         self.timer.start('init')
@@ -153,6 +135,29 @@ class AtomicBase:
             else:
                 conf = {term[:2]: float(term[2:])}
             self.configuration.update(conf)
+
+    def set_confinement(self, confinement):
+        if confinement is None:
+            self.confinement = ZeroConfinement()
+        else:
+            self.confinement = confinement
+
+    def set_wf_confinement(self, wf_confinement):
+        if wf_confinement is None:
+            self.wf_confinement = {}
+        elif isinstance(wf_confinement, Confinement):
+            self.wf_confinement = {nl: wf_confinement for nl in self.valence}
+        elif isinstance(wf_confinement, dict):
+            self.wf_confinement = {}
+            for nl in self.valence:
+                if nl not in wf_confinement or wf_confinement[nl] is None:
+                    self.wf_confinement[nl] = ZeroConfinement()
+                else:
+                    self.wf_confinement[nl] = wf_confinement[nl]
+        else:
+            msg = "Don't know what to do with the provided wf_confinement:\n"
+            msg += str(wf_confinement)
+            raise ValueError(msg)
 
     def run(self, **kwargs):
         """ Child classes must implement a run() method which,
