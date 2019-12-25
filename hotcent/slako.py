@@ -300,7 +300,9 @@ class SlaterKosterTable:
                 optimal (with fixed grid size)
                 with ntheta=150, nr=50 you get~1E-4 accuracy for H-elements
                 (beyond that, gain is slow with increasing grid size)
-        wflimit: use max range for wfs such that at R(rmax)<wflimit*max(R(r))
+        wflimit: value below which the radial wave functions are considered
+                to be negligible. This determines how far the polar grids
+                around the atomic centers extend in space.
         superposition: 'density' or 'potential': whether to use the density
                 superposition or potential superposition approach for the 
                 Hamiltonian integrals.
