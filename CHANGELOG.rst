@@ -32,6 +32,9 @@ Development version
   Slater-Koster integrals are tabulated (rmin being the minimal
   distance, dr the grid spacing dr, and N the number of grid points).
 
+* Major restructuring of hotcent.tools for fitting the confinement
+  parameters, with also a new tutorial on this topic (`tutorial_2.ipynb`).
+
 
 Version 0.9
 ===========

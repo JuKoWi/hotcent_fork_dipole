@@ -7,3 +7,4 @@ examples/*
 !examples/*.py
 tutorials/*
 !tutorials/*.ipynb
+!tutorials/*.json
