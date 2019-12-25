@@ -30,6 +30,7 @@ class AtomicDFT(AtomicBase):
                  symbol,
                  xcname='LDA',
                  convergence={'density':1e-7, 'energies':1e-7},
+                 perturbative_confinement=False,
                  **kwargs):
         """ Run Kohn-Sham all-electron calculations for a given atom.
 
@@ -59,6 +60,26 @@ class AtomicDFT(AtomicBase):
         convergence:    convergence criterion dictionary
                         * density: max change for integrated |n_old-n_new|
                         * energies: max change in single-particle energy (Ha)
+
+        perturbative_confinement: determines which type of self-
+            consistent calculation is performed when applying each
+            of the orbital- or density-confinement potentials:
+
+            False: apply the confinement potential in a conventional
+                  calculation with self-consistency between
+                  the density and the effective potential,
+
+            True: add the confinement potential to the effective
+                  potential of the free (nonconfined) atom and
+                  solve for the eigenstate(s)* while keeping this
+                  potential fixed.
+
+            * i.e. all valence orbitals when confining the density and
+            only the orbital in question in wave function confinement
+
+            The perturbative scheme is e.g. how basis sets are
+            generated in GPAW. This option is also faster than the
+            self-consistent one, in particular for heavier atoms.
         """
         AtomicBase.__init__(self, symbol, **kwargs)
 
@@ -69,6 +90,7 @@ class AtomicDFT(AtomicBase):
 
         self.xcname = xcname
         self.convergence = convergence
+        self.perturbative_confinement = perturbative_confinement
 
         if self.xcname in ['PW92', 'LDA']:
             self.xc = XC_PW92()
@@ -205,30 +227,10 @@ class AtomicDFT(AtomicBase):
         dens = dens / self.grid.integrate(dens, use_dV=True) * nel
         return dens
 
-    def run(self, perturbative_confinement=False, write=None):
+    def run(self, write=None):
         """ Execute the required atomic DFT calculations
 
         Parameters:
-
-        perturbative_confinement: determines which type of self-
-            consistent calculation is performed when applying each
-            of the orbital- or density-confinement potentials:
-
-            False: apply the confinement potential in a conventional
-                  calculation with self-consistency between
-                  the density and the effective potential,
-
-            True: add the confinement potential to the effective
-                  potential of the free (nonconfined) atom and
-                  solve for the eigenstate(s)* while keeping this
-                  potential fixed.
-
-            * i.e. all valence orbitals when confining the density and
-            only the orbital in question in wave function confinement
-
-            The perturbative scheme is e.g. how basis sets are
-            generated in GPAW. This option is also faster than the
-            self-consistent one, in particular for heavier atoms.
 
         write: None or a filename for saving the rgrid, effective
                potential and electron density.
@@ -251,7 +253,7 @@ class AtomicDFT(AtomicBase):
         self.unl_fct = {nl: None for nl in self.configuration}
         self.Rnl_fct = {nl: None for nl in self.configuration}
 
-        if perturbative_confinement:
+        if self.perturbative_confinement:
             self.confinement = ZeroConfinement()
             header('Initial run without any confinement',
                    'for pre-converging orbitals and eigenvalues')
@@ -265,7 +267,7 @@ class AtomicDFT(AtomicBase):
             header('Applying %s' % self.confinement,
                    'to get a confined %s orbital' % nl)
 
-            if perturbative_confinement:
+            if self.perturbative_confinement:
                 veff = veff_free + self.confinement(self.rgrid)
                 enl = {nl: enl_free[nl]}
                 itmax, enl, d_enl, unlg, Rnlg = self.inner_scf(0, veff, enl,
@@ -287,7 +289,7 @@ class AtomicDFT(AtomicBase):
         header('Applying %s' % self.confinement,
                'to get the confined electron density%s' % extra)
 
-        if perturbative_confinement:
+        if self.perturbative_confinement:
             veff = veff_free + self.confinement(self.rgrid)
             enl = {nl_: enl_free[nl_] for nl_ in val}
             itmax, enl, d_enl, unlg, Rnlg = self.inner_scf(0, veff, enl, {},
@@ -297,12 +299,12 @@ class AtomicDFT(AtomicBase):
 
         for n, l, nl in self.list_states():
             if nl not in self.wf_confinement:
-                assert nl in enl or perturbative_confinement
+                assert nl in enl or self.perturbative_confinement
                 self.enl[nl] = enl[nl] if nl in enl else enl_free[nl]
                 self.unlg[nl] = unlg[nl] if nl in enl else unlg_free[nl]
                 self.Rnlg[nl] = Rnlg[nl] if nl in enl else Rnlg_free[nl]
 
-        if perturbative_confinement:
+        if self.perturbative_confinement:
             self.dens = self.calculate_density(self.unlg)
 
         self.veff = self.calculate_veff(self.dens)
