@@ -5,5 +5,5 @@ build
 hotcent/*.html
 examples/*
 !examples/*.py
-tutorial/*
-!tutorial/*.ipynb
+tutorials/*
+!tutorials/*.ipynb
