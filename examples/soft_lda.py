@@ -2,7 +2,7 @@ from ase.units import Ha
 from hotcent.confinement import SoftConfinement
 from hotcent.atomic_dft import AtomicDFT
 
-kwargs = {'xcname': 'LDA',
+kwargs = {'xc': 'LDA',
           'configuration': '[Ne] 3s2 3p2',
           'valence': ['3s', '3p'],
           'confinement': None,

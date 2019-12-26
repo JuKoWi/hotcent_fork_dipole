@@ -8,12 +8,14 @@ Development version
 
 * The GPAW-based atomic DFT calculator has been removed, as it was
   simply no longer needed (the native calculator now runs as
-  fast and is easier to extend with more functionality)
+  fast and is easier to extend with more functionality).
 
 * The native atomic DFT calculator has been renamed to 'AtomicDFT'
-  and now resides in hotcent.atomic_dft.py
+  and now resides in hotcent.atomic_dft.py. Its 'xcname' keyword
+  argument (for the exchange-correlation functional) has furthermore
+  been shortened to 'xc'.
 
-* Calculation of Hubbard values (see examples/hubbard.py)
+* Calculation of Hubbard values (see examples/hubbard.py).
 
 * Optional C-extensions allow for significantly faster atomic
   atomic DFT calculations (8-10x speedup) and construction of

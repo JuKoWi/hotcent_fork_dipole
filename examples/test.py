@@ -16,7 +16,7 @@ def check_abs(x, y, eps):
 
 # Check confined boron atom
 atom1 = AtomicDFT('B',
-                  xcname='LDA',
+                  xc='LDA',
                   confinement=PowerConfinement(r0=2.9, s=2),
                   configuration='[He] 2s2 2p1',
                   valence=['2s', '2p'],
@@ -33,7 +33,7 @@ print('B -- E_2p  | %s' % check(e_2p, 0.47362603289831301, eps))
 
 # Check confined hydrogen atom
 atom2 = AtomicDFT('H',
-                  xcname='LDA',
+                  xc='LDA',
                   confinement=PowerConfinement(r0=1.1, s=2),
                   configuration='1s1',
                   valence=['1s'],

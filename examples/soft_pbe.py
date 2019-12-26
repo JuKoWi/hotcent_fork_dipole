@@ -7,7 +7,7 @@ except ImportError:
     print('Need PyLibXC to run this test!')
     raise
 
-kwargs = {'xcname': 'GGA_X_PBE+GGA_C_PBE',
+kwargs = {'xc': 'GGA_X_PBE+GGA_C_PBE',
           'configuration': '[Ar] 3d6 4s2 4p0',
           'valence': ['3d', '4s'],
           'confinement': None,

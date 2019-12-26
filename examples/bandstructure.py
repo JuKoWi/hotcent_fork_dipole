@@ -85,7 +85,7 @@ for element in elements:
     atom = AtomicDFT(element,
                     configuration='[He] 2s2 2p%d' % occ_2p,
                     valence=['2s', '2p'],
-                    xcname='LDA',
+                    xc='LDA',
                     scalarrel=False,
                     confinement=PowerConfinement(r0=40., s=4),
                     txt='atomic.out')

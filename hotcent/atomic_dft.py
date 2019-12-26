@@ -28,7 +28,7 @@ except ModuleNotFoundError:
 class AtomicDFT(AtomicBase):
     def __init__(self,
                  symbol,
-                 xcname='LDA',
+                 xc='LDA',
                  convergence={'density':1e-7, 'energies':1e-7},
                  perturbative_confinement=False,
                  **kwargs):
@@ -39,7 +39,7 @@ class AtomicDFT(AtomicBase):
         from hotcent.atomic_dft import AtomicDFT
         from hotcent.confinement import PowerConfinement
         atom = AtomicDFT('C',
-                         xcname='GGA_C_PBE+GGA_X_PBE',
+                         xc='GGA_C_PBE+GGA_X_PBE',
                          configuration='[He] 2s2 2p2',
                          valence=['2s', '2p'],
                          confinement=PowerConfinement(r0=3.0, s=2))
@@ -47,17 +47,16 @@ class AtomicDFT(AtomicBase):
 
         Parameters:
         -----------
-        xcname:         Name of the XC functional. If 'LDA' or 'PW92' are
-                        provided, then Hotcent's native LDA implementation
-                        will be used. For all other functionals, the PyLibXC
-                        module is required, which is bundled with LibXC.
-                        The names of the implemented functionals can be found
-                        on https://www.tddft.org/programs/libxc/functionals/
-                        Often one needs to combine different LibXC functionals,
-                        for example:
-                          xcname='GGA_X_PBE+GGA_C_PBE'  # for PBE XC
+        xc: Name of the XC functional. If 'LDA' or 'PW92' are provided,
+            then Hotcent's native LDA implementation will be used.
+            For all other functionals, the PyLibXC module is required,
+            which is bundled with LibXC.
+            The names of the implemented functionals can be found
+            on https://www.tddft.org/programs/libxc/functionals/
+            Often one needs to combine different LibXC functionals, e.g.
+                xc='GGA_X_PBE+GGA_C_PBE'  # for PBE XC
 
-        convergence:    convergence criterion dictionary
+        convergence: convergence criterion dictionary
                         * density: max change for integrated |n_old-n_new|
                         * energies: max change in single-particle energy (Ha)
 
@@ -88,14 +87,13 @@ class AtomicDFT(AtomicBase):
               file=self.txt)
         print('*******************************************', file=self.txt)
 
-        self.xcname = xcname
-        self.convergence = convergence
-        self.perturbative_confinement = perturbative_confinement
-
-        if self.xcname in ['PW92', 'LDA']:
+        if xc in ['PW92', 'LDA']:
             self.xc = XC_PW92()
         else:
-            self.xc = LibXC(self.xcname)
+            self.xc = LibXC(xc)
+
+        self.convergence = convergence
+        self.perturbative_confinement = perturbative_confinement
 
         if self.scalarrel:
             print('Using scalar relativistic corrections.', file=self.txt)

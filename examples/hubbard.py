@@ -3,7 +3,7 @@ from hotcent.atomic_dft import AtomicDFT
 from hotcent.confinement import PowerConfinement
 
 atom = AtomicDFT('C',
-                 xcname='LDA',
+                 xc='LDA',
                  confinement=PowerConfinement(r0=40., s=4),
                  configuration='[He] 2s2 2p2',
                  valence=['2s', '2p'],

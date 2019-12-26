@@ -1,7 +1,7 @@
 from hotcent.atomic_dft import AtomicDFT
  
 atom = AtomicDFT('Sn',
-                 xcname='LDA',
+                 xc='LDA',
                  configuration='[Kr] 4d10 5s2 5p2',
                  valence=['5s', '5p', '4d'],
                  scalarrel=True,

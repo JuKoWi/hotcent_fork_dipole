@@ -15,7 +15,7 @@ wf_conf = {'5d': PowerConfinement(r0=6.50, s=2),
            '6p': PowerConfinement(r0=4.51, s=2),
            }
 atom = AtomicDFT(element,
-                 xcname=xc,
+                 xc=xc,
                  confinement=conf,
                  wf_confinement=wf_conf,
                  configuration='[Xe] 4f14 5d10 6s1 6p0',
