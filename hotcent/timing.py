@@ -224,9 +224,9 @@ class Timer:
 
     def human_readable_time(self, seconds):
         seconds = int(round(seconds))
-        hours = seconds / 3600
+        hours = seconds // 3600
         seconds -= hours * 3600
-        mins = seconds / 60
+        mins = seconds // 60
         seconds -= mins * 60
         return "%i h  %i min  %i sec" % (hours, mins, seconds)
 
