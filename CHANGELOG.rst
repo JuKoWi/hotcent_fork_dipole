@@ -6,6 +6,12 @@ Release notes
 Development version
 ===================
 
+
+Version 1.0
+===========
+
+26 December 2019
+
 * The GPAW-based atomic DFT calculator has been removed, as it was
   simply no longer needed (the native calculator now runs as
   fast and is easier to extend with more functionality).
