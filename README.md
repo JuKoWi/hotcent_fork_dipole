@@ -1,9 +1,9 @@
 # Hotcent
 
 Calculating one- and two-center Slater-Koster integrals,
-based on parts of the [Hotbit](https://github.com/pekkosk/hotbit/) 
+based on parts of the [Hotbit](https://github.com/pekkosk/hotbit/)
 code. The development of Hotcent was started as part of the
-following study: 
+following study:
 
 M. Van den Bossche, J. Chem. Phys. A. **2019**, 123 (13), 3038-3045
 [(doi)](https://dx.doi.org/10.1021/acs.jpca.9b00927).
@@ -16,12 +16,12 @@ typically in the [".skf"](https://www.dftb.org/fileadmin/DFTB/public/misc/slakof
 format to be used with DFTB codes such as DFTB+.
 
 * The code allows to use different confinement potentials for
-the different valence wave functions and for the electron density 
-(which determines the effective potential used in the Hamiltonian 
-integrals). 
+the different valence wave functions and for the electron density
+(which determines the effective potential used in the Hamiltonian
+integrals).
 
 * Both the potential superposition and density superposition
-schemes are available. 
+schemes are available.
 
 * With regards to exchange-correlation functionals, the PW92
 (LDA) functional is natively available, and other LDA/GGA
@@ -33,7 +33,7 @@ Hotcent.
 
 ## Installation
 
-* Set up the [ASE](https://wiki.fysik.dtu.dk/ase/) Python module. 
+* Set up the [ASE](https://wiki.fysik.dtu.dk/ase/) Python module.
 
 * Clone / download the Hotcent repository and update the
 `$PYTHONPATH` accordingly, e.g. like this:

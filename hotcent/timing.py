@@ -1,7 +1,7 @@
 """ Definition of the Timer class used for
 timing summaries.
 
-The code below draws heavily from the Hotbit code 
+The code below draws heavily from the Hotbit code
 written by Pekka Koskinen (https://github.com/pekkosk/
 hotbit/blob/master/box/timing.py).
 """
@@ -11,7 +11,7 @@ import numpy as np
 
 
 class Timer:
-    """ Class for making timing in nested fashion. 
+    """ Class for making timing in nested fashion.
 
     txt = open(...)
     tm = Timer('main program', txt)
@@ -127,7 +127,7 @@ class Timer:
                             child timers; itself is not running!' % self.label)
             if tr is None:
                 outmost = self.get_outmost_running()
-                tr = Timer(label, txt=self.txt, level=outmost.get_level()+1)
+                tr = Timer(label, txt=self.txt, level=outmost.get_level() + 1)
                 outmost.add_subtimer(tr)
             if tr.is_running():
                 raise AssertionError('Timer %s is already running!' % label)

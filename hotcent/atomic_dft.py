@@ -569,7 +569,7 @@ class RadialGrid:
         return self.r0
 
     def get_dvolumes(self):
-        """ Return dV(r)'s=4*pi*r**2*dr. """
+        """ Return dV(r) = 4 * pi * r ** 2 * dr. """
         return self.dV
 
     def plot(self, screen=True):

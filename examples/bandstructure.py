@@ -1,7 +1,7 @@
 """ Note: currently only works with DFTB+ 17.1
 because newer versions do not include eigenvalues,
 Fermi levels, ... in the 'results.tag' file,
-which the ASE interface relies upon. 
+which the ASE interface relies upon.
 """
 import os
 import numpy as np
@@ -59,8 +59,8 @@ if not os.path.exists('bs_dft.json'):
 
 
 bs_dft = read_json('bs_dft.json')
-bs_dft.plot(filename='bs_dft.png', show=False, emax=bs_dft.reference+10,
-            emin=bs_dft.reference-20)
+bs_dft.plot(filename='bs_dft.png', show=False, emax=bs_dft.reference + 10,
+            emin=bs_dft.reference - 20)
 
 dpbs = DftbPlusBandStructure(Hamiltonian_SCC='Yes',
                              Hamiltonian_OrbitalResolvedSCC='No',
@@ -105,13 +105,13 @@ initial_guess = {}
 for element in elements:
     rcov = covalent_radii[atomic_numbers[element]] / Bohr
     initial_guess['%s_2s,%s_2p' % (element, element)] = \
-                  PowerConfinement(r0=2*rcov, s=2, adjustable=['r0'])
-    initial_guess['%s_n' % element] = PowerConfinement(r0=3*rcov, s=2,
+                  PowerConfinement(r0=2 * rcov, s=2, adjustable=['r0'])
+    initial_guess['%s_n' % element] = PowerConfinement(r0=3 * rcov, s=2,
                                                        adjustable=['r0'])
 
 vconf = confopt.run(dpbs.get_residual, initial_guess=initial_guess, tol=1e-2,
                     method='COBYLA', options={'maxiter':1, 'rhobeg': 0.2})
 
 bs_dftb = dpbs.calculate_bandstructure(bs_dft)
-bs_dftb.plot(filename='bs_dftb.png', emax=bs_dftb.reference+10,
-             emin=bs_dftb.reference-20)
+bs_dftb.plot(filename='bs_dftb.png', emax=bs_dftb.reference + 10,
+             emin=bs_dftb.reference - 20)

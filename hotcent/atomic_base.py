@@ -225,7 +225,7 @@ class AtomicBase:
 
     def get_wf_range(self, nl, fractional_limit=1e-7):
         """ Return the maximum r for which |R(r)| is
-        less than fractional_limit*max(|R(r)|) """
+        less than fractional_limit * max(|R(r)|) """
         assert self.solved, not_solved_message
         wfmax = np.nanmax(np.abs(self.Rnlg[nl]))
         for r, wf in zip(self.rgrid[-1::-1], self.Rnlg[nl][-1::-1]):
@@ -240,7 +240,7 @@ class AtomicBase:
         return self.Rnl_fct[nl](r, der=der)
 
     def unl(self, r, nl, der=0):
-        """ unl(r, '2p') = Rnl(r,'2p') / r """
+        """ unl(r, '2p') = Rnl(r, '2p') / r """
         assert self.solved, not_solved_message
         if self.unl_fct[nl] is None:
             self.unl_fct[nl] = CubicSplineFunction(self.rgrid, self.unlg[nl])
@@ -309,7 +309,7 @@ class AtomicBase:
             if ax.is_first_col():
                 plt.ylabel(r'$R_{nl}(i)$', size=8)
             i += 1
-            
+
         # as a function of radius
         i = p ** 2 + 1
         for nl in states:

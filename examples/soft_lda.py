@@ -16,8 +16,8 @@ atom = AtomicDFT('Si',
 atom.run()
 eps_free = {nl: atom.get_eigenvalue(nl) for nl in atom.valence}
 
-wf_confinement = {'3s':SoftConfinement(amp=12., rc=6.74, x_ri=0.6),
-                  '3p':SoftConfinement(amp=12., rc=8.70, x_ri=0.6)}
+wf_confinement = {'3s': SoftConfinement(amp=12., rc=6.74, x_ri=0.6),
+                  '3p': SoftConfinement(amp=12., rc=8.70, x_ri=0.6)}
 atom = AtomicDFT('Si',
                  wf_confinement=wf_confinement,
                  perturbative_confinement=True,

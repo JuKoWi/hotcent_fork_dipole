@@ -2,7 +2,7 @@
 supporting methods) for calculating Slater-Koster
 integrals.
 
-The code below draws heavily from the Hotbit code 
+The code below draws heavily from the Hotbit code
 written by Pekka Koskinen (https://github.com/pekkosk/
 hotbit/blob/master/hotbit/parametrization/slako.py).
 """
@@ -237,9 +237,9 @@ class SlaterKosterTable:
                     if not ax.is_first_col():
                         plt.yticks([], [])
                 else:
-                    plt.plot(self.Rgrid, self.tables[p][:, i] , c='r', 
+                    plt.plot(self.Rgrid, self.tables[p][:, i] , c='r',
                              ls=s, lw=lw, alpha=alpha)
-                    plt.plot(self.Rgrid, self.tables[p][:, i + 10], c='b', 
+                    plt.plot(self.Rgrid, self.tables[p][:, i + 10], c='b',
                              ls=s, lw=lw, alpha=alpha)
                     plt.axhline(0, c='k', ls='--')
                     ax.text(0.8, 0.1 + p * 0.15, name, size=10,
@@ -304,7 +304,7 @@ class SlaterKosterTable:
                 to be negligible. This determines how far the polar grids
                 around the atomic centers extend in space.
         superposition: 'density' or 'potential': whether to use the density
-                superposition or potential superposition approach for the 
+                superposition or potential superposition approach for the
                 Hamiltonian integrals.
         xc:     name of the exchange-correlation functional to be used
                 in calculating the effective potential in the density
@@ -401,11 +401,11 @@ class SlaterKosterTable:
 
         parameters:
         -----------
-        selected: list of [('dds','3d','4d'),(...)]
+        selected: list of [('dds', '3d', '4d'), (...)]
         e1: <bra| element
         e2: |ket> element
         R: e1 is at origin, e2 at z=R
-        grid: list of grid points on (d,z)-plane
+        grid: list of grid points on (d, z)-plane
         area: d-z areas of the grid points.
         superposition: 'density' or 'potential' superposition scheme
         xc: exchange-correlation functional (see description in self.run())
@@ -417,18 +417,18 @@ class SlaterKosterTable:
         and can be used for error estimation. This is not available
         for the density superposition scheme, where simply H2=0 is returned.
 
-        S: simply R1*R2*angle-part
+        S: simply R1 * R2 * angle_part
 
-        H: operate (derivate) R2 <R1|t+Veff-Conf1-Conf2|R2>.
+        H: operate (derivate) R2 <R1 | t + Veff - Conf1 - Conf2 | R2>.
            With potential superposition: Veff = Veff1 + Veff2
-           With density superposition: Veff = Vxc(n1 + n2)  (XC=PW92)
+           With density superposition: Veff = Vxc(n1 + n2)
 
-        H2: operate with full h2 and hence use eigenvalue of |R2> 
+        H2: operate with full h2 and hence use eigenvalue of | R2>
             with full Veff2:
-              <R1|(t1+Veff1)+Veff2-Conf1-Conf2|R2> 
-            = <R1|h1+Veff2-Conf1-Conf2|R2> (operate with h1 on left)
-            = <R1|e1+Veff2-Conf1-Conf2|R2> 
-            = e1*S + <R1|Veff2-Conf1-Conf2|R2> 
+              <R1 | (t1 + Veff1) + Veff2 - Conf1 - Conf2 | R2>
+            = <R1 | h1 + Veff2 - Conf1 - Conf2 | R2> (operate with h1 on left)
+            = <R1 | e1 + Veff2 - Conf1 - Conf2 | R2>
+            = e1 * S + <R1 | Veff2 - Conf1 - Conf2 | R2>
             -> H and H2 can be compared and error estimated
         """
         self.timer.start('calculate_mels')
@@ -506,7 +506,7 @@ class SlaterKosterTable:
             ddunl2 = e2.unl(r2, nl2, der=2)
 
             S = np.sum(Rnl1 * Rnl2 * aux)
-            H = np.sum(Rnl1 * (-0.5* ddunl2 / r2 + (veff + \
+            H = np.sum(Rnl1 * (-0.5 * ddunl2 / r2 + (veff + \
                        l2 * (l2 + 1) / (2 * r2 ** 2)) * Rnl2) * aux)
 
             if superposition == 'potential':
@@ -530,10 +530,10 @@ class SlaterKosterTable:
         Rz: element 1 is at origin, element 2 at z=Rz
         nt: number of theta grid points
         nr: number of radial grid points
-        p: power describing the angular distribution of grid points 
+        p: power describing the angular distribution of grid points
            (larger puts more weight towards theta=0)
-        q: power describing the radial disribution of grid points 
-           (larger puts more weight towards centers)   
+        q: power describing the radial disribution of grid points
+           (larger puts more weight towards centers)
         view: view the distribution of grid points with matplotlib
 
         Plane at R/2 divides two polar grids.
@@ -543,7 +543,7 @@ class SlaterKosterTable:
          |--------_____               phi_j
          |       /     ----__         *
          |      /            \       /  *
-         |     /               \    /  X *                X=coordinates of the center of area element(z,d), 
+         |     /               \    /  X *                X=coordinates of the center of area element(z,d),
          |    /                  \  \-----* phi_(j+1)     area=(r_(i+1)**2-r_i**2)*(phi_(j+1)-phi_j)/2
          |   /                    \  r_i   r_(i+1)
          |  /                      \
@@ -686,12 +686,12 @@ class SlaterKosterTable:
 
 integrals = ['dds', 'ddp', 'ddd', 'pds', 'pdp', 'pps', 'ppp', 
              'sds', 'sps', 'sss']
-angular_momentum = {'s':0, 'p':1, 'd':2}
+angular_momentum = {'s': 0, 'p': 1, 'd': 2}
 
 
 def select_orbitals(val1, val2, integral):
     """ Select orbitals from given valences to calculate given integral.
-    e.g. ['2s','2p'],['4s','3d'],'sds' --> ('2s', '3d')
+    e.g. ['2s', '2p'], ['4s', '3d'], 'sds' --> ('2s', '3d')
     """
     nl1 = None
     for nl in val1:
@@ -712,9 +712,8 @@ def select_integrals(e1, e2):
     selected = []
     val1, val2 = e1.get_valence_orbitals(), e2.get_valence_orbitals()
 
-    for ii, integral in enumerate(integrals):
+    for integral in integrals:
         nl1, nl2 = select_orbitals(val1 , val2 , integral)
-
         if nl1 is None or nl2 is None:
             continue
         else:
@@ -744,7 +743,7 @@ def g(t1, t2):
 
 def tail_smoothening(x, y):
     """ For given grid-function y(x), make smooth tail.
-    
+
     Aim is to get (e.g. for Slater-Koster tables and repulsions) smoothly
     behaving energies and forces near cutoff region.
     
@@ -752,7 +751,7 @@ def tail_smoothening(x, y):
     Method: take largest neighboring points y_k and y_(k+1) (k<N-3) such
     that line through them passes zero below x_(N-1). Then fit
     third-order polynomial through points y_k, y_k+1 and y_N-1.
-    
+
     Return:
     smoothed y-function on same grid.
     """
@@ -781,7 +780,7 @@ def tail_smoothening(x, y):
             print(x[i], y[i])
         raise RuntimeError('Problem with tail smoothening')
 
-    if k < N/4:
+    if k < N / 4:
         for i in range(N):
             print(x[i], y[i])
         msg = 'Problem with tail smoothening: requires too large tail.'

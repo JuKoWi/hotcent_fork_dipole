@@ -1,8 +1,8 @@
-""" This example aims to reproduce the Au-Au 
+""" This example aims to reproduce the Au-Au
 Slater-Koster table generation procedure by
 Fihey and coworkers (doi:10.1002/jcc.24046). """
 from hotcent.slako import SlaterKosterTable
-from hotcent.confinement import PowerConfinement 
+from hotcent.confinement import PowerConfinement
 from hotcent.atomic_dft import AtomicDFT
 
 element = 'Au'
@@ -31,7 +31,7 @@ atom.plot_Rnl()
 atom.plot_density()
 
 # Compute Slater-Koster integrals:
-rmin, dr, N = 0.4, 0.02, 900  
+rmin, dr, N = 0.4, 0.02, 900
 sk = SlaterKosterTable(atom, atom, timing=True)
 sk.run(rmin, dr, N, superposition='density', xc=xc)
 sk.write('Au-Au_no_repulsion.par')
