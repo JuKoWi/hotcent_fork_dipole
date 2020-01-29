@@ -167,8 +167,6 @@ class SlaterKosterTable:
             if theader != '':
                 ct = 0
                 line += theader
-                theader = ''
-                line += '{0: 1.12e}  '.format(self.tables[index][i, j])
 
             print(line, file=handle)
 
