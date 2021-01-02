@@ -186,7 +186,7 @@ class AtomicDFT(AtomicBase):
         N = self.N
         n0 = 0.5 * (dens[1:] + dens[:-1])
         nel = self.get_number_of_electrons()
-        n0 *= nel / np.sum(n0 * dV)
+        n0 *= nel / np.sum(n0 * dV) if nel > 0 else 0.
 
         if _hotcent is not None:
             vhar = _hotcent.hartree(n0, dV, r, r0, N)
@@ -575,7 +575,7 @@ class RadialGrid:
     def plot(self, screen=True):
         rgrid = self.get_grid()
         plt.scatter(list(range(len(rgrid))), rgrid)
-        if screen: 
+        if screen:
             plt.show()
 
     def integrate(self, f, use_dV=False):
