@@ -457,19 +457,17 @@ class SlaterKosterTable:
             -> H and H2 can be compared and error estimated
         """
         self.timer.start('calculate_mels')
-        Sl, Hl, H2l = np.zeros(NUMSK), np.zeros(NUMSK), np.zeros(NUMSK)
 
         # common for all integrals (not wf-dependent parts)
         self.timer.start('prelude')
-        N = len(grid)
-        x = grid[:N, 0]
-        y = grid[:N, 1]
-        r1 = np.sqrt(x ** 2 + y ** 2)
-        r2 = np.sqrt(x ** 2 + (R - y) ** 2)
-        t1 = np.arccos(y / r1)
-        t2 = np.arccos((y - R) / r2)
-        radii = np.array([r1, r2]).T
-        gphi = g(t1, t2).T
+        x = grid[:, 0]
+        y = grid[:, 1]
+        r1 = np.sqrt(x**2 + y**2)
+        r2 = np.sqrt(x**2 + (R - y)**2)
+        c1 = y / r1  # cosine of theta_1
+        c2 = (y - R) / r2  # cosine of theta_2
+        s1 = np.sqrt(1. - c1**2)  # sine of theta_1
+        s2 = np.sqrt(1. - c2**2)  # sine of theta_2
 
         if superposition == 'potential':
             self.timer.start('vrho')
@@ -490,11 +488,11 @@ class SlaterKosterTable:
                 xc = LibXC(xc)
                 drho1 = e1.electron_density(r1, der=1)
                 drho2 = e2.electron_density(r2, der=1)
-                grad_x = drho1 * np.sin(t1)
-                grad_x += drho2 * np.sin(t2)
-                grad_y = drho1 * np.cos(t1)
-                grad_y += drho2 * np.cos(t2)
-                sigma = np.sqrt(grad_x ** 2 + grad_y ** 2) ** 2
+                grad_x = drho1 * s1
+                grad_x += drho2 * s2
+                grad_y = drho1 * c1
+                grad_y += drho2 * c2
+                sigma = np.sqrt(grad_x**2 + grad_y**2)**2
                 out = xc.compute_all(rho, sigma)
                 veff += out['vrho']
                 self.timer.stop('vrho')
@@ -510,22 +508,18 @@ class SlaterKosterTable:
                     veff += -2. * sply(x, y, dx=0, dy=1, grid=False)
                 self.timer.stop('vsigma')
 
-        assert np.shape(gphi) == (N, NUMSK)
-        assert np.shape(radii) == (N, 2)
-        assert np.shape(veff) == (N,)
+        assert np.shape(veff) == (len(grid),)
         self.timer.stop('prelude')
 
         # calculate all selected integrals
+        Sl, Hl, H2l = np.zeros(NUMSK), np.zeros(NUMSK), np.zeros(NUMSK)
+
         for integral, nl1, nl2 in selected:
-            index = INTEGRALS.index(integral)
-            S, H, H2 = 0., 0., 0.
             l2 = ANGULAR_MOMENTUM[nl2[1]]
 
-            nA = len(area)
-            r1 = radii[:nA, 0]
-            r2 = radii[:nA, 1]
-            d, z = grid[:nA, 0], grid[:nA, 1]
-            aux = gphi[:nA, index] * area * d
+            gphi = g(c1, c2, s1, s2, integral)
+            aux = gphi * area * x
+
             Rnl1 = e1.Rnl(r1, nl1)
             Rnl2 = e2.Rnl(r2, nl2)
             ddunl2 = e2.unl(r2, nl2, der=2)
@@ -540,6 +534,7 @@ class SlaterKosterTable:
             elif superposition == 'density':
                 H2 = 0
 
+            index = INTEGRALS.index(integral)
             Sl[index] = S
             Hl[index] = H
             H2l[index] = H2
@@ -752,34 +747,52 @@ def select_integrals(e1, e2):
     return selected
 
 
-def g(t1, t2):
-    """ Return the angle-dependent parts of the two-center integrals
-    with t1=theta_1 (atom at origin) and t2=theta2 (atom at z=Rz).
-    These dependencies come after integrating analytically over phi.
+def g(c1, c2, s1, s2, integral):
+    """ Returns the angle-dependent part of the given two-center integral,
+    with c1 and s1 (c2 and s2) the sine and cosine of theta_1 (theta_2)
+    for the atom at origin (atom at z=Rz). These expressions are obtained
+    by integrating analytically over phi.
     """
-    c1, c2, s1, s2 = np.cos(t1), np.cos(t2), np.sin(t1), np.sin(t2)
-    return np.array([
-             7. / 8 * c1 * (5 * c1**2 - 3) * c2 * (5 * c2**2 - 3),      # ffs
-             21. / 32 * (5 * c1**2 - 1) * s1 * (5 * c2**2 - 1) * s2,    # ffp
-             105. / 16 * s1**2 * c1 * s2**2 * c2,                       # ffd
-             35. / 32 * s1**3 * s2**3,                                  # fff
-             np.sqrt(35.) / 8 * (3 * c1**2 - 1) * c2 * (5 * c2**2 - 3), # dfs
-             3. / 8 * np.sqrt(17.5) * s1 * c1 * s2 * (5 * c2**2 - 1),   # dfp
-             15. / 16 * np.sqrt(7.) * s1**2 * s2**2 * c2,               # dfd
-             5. / 8 * (3 * c1**2 - 1) * (3 * c2**2 - 1),                # dds
-             15. / 4 * s1 * c1 * s2 * c2,                               # ddp
-             15. / 16 * s1**2 * s2**2,                                  # ddd
-             np.sqrt(21.) / 4 * c1 * c2 * (5 * c2**2 - 3),              # pfs
-             3. / 8 * np.sqrt(3.5) * s1 * s2 * (5 * c2**2 - 1),         # pfp
-             np.sqrt(15.) / 4 * c1 * (3 * c2**2 - 1),                   # pds
-             np.sqrt(45.) / 4 * s1 * s2 * c2,                           # pdp
-             3. / 2 * c1 * c2,                                          # pps
-             3. / 4 * s1 * s2,                                          # ppp
-             np.sqrt(7.) / 4 * c2 * (5 * c2**2 - 3),                    # sfs
-             np.sqrt(5.) / 4 * (3 * c2**2 - 1),                         # sds
-             np.sqrt(3.) / 2 * c2,                                      # sps
-             0.5*np.ones_like(t1),                                      # sss
-             ])
+    if integral == 'ffs':
+        return 7. / 8 * c1 * (5 * c1**2 - 3) * c2 * (5 * c2**2 - 3)
+    elif integral == 'ffp':
+        return 21. / 32 * (5 * c1**2 - 1) * s1 * (5 * c2**2 - 1) * s2
+    elif integral == 'ffd':
+        return 105. / 16 * s1**2 * c1 * s2**2 * c2
+    elif integral == 'fff':
+        return 35. / 32 * s1**3 * s2**3
+    elif integral == 'dfs':
+        return np.sqrt(35.) / 8 * (3 * c1**2 - 1) * c2 * (5 * c2**2 - 3)
+    elif integral == 'dfp':
+        return 3. / 8 * np.sqrt(17.5) * s1 * c1 * s2 * (5 * c2**2 - 1)
+    elif integral == 'dfd':
+        return 15. / 16 * np.sqrt(7.) * s1**2 * s2**2 * c2
+    elif integral == 'dds':
+        return 5. / 8 * (3 * c1**2 - 1) * (3 * c2**2 - 1)
+    elif integral == 'ddp':
+        return 15. / 4 * s1 * c1 * s2 * c2
+    elif integral == 'ddd':
+        return 15. / 16 * s1**2 * s2**2
+    elif integral == 'pfs':
+        return np.sqrt(21.) / 4 * c1 * c2 * (5 * c2**2 - 3)
+    elif integral == 'pfp':
+        return 3. / 8 * np.sqrt(3.5) * s1 * s2 * (5 * c2**2 - 1)
+    elif integral == 'pds':
+        return np.sqrt(15.) / 4 * c1 * (3 * c2**2 - 1)
+    elif integral == 'pdp':
+        return np.sqrt(45.) / 4 * s1 * s2 * c2
+    elif integral == 'pps':
+        return 3. / 2 * c1 * c2
+    elif integral == 'ppp':
+        return 3. / 4 * s1 * s2
+    elif integral == 'sfs':
+        return np.sqrt(7.) / 4 * c2 * (5 * c2**2 - 3)
+    elif integral == 'sds':
+        return np.sqrt(5.) / 4 * (3 * c2**2 - 1)
+    elif integral == 'sps':
+        return np.sqrt(3.) / 2 * c2
+    elif integral == 'sss':
+        return 0.5 * np.ones_like(c1)
 
 
 def tail_smoothening(x, y):
