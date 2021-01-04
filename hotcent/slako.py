@@ -169,7 +169,7 @@ class SlaterKosterTable:
         if extended_format:
             indices = range(2*NUMSK)
         else:
-            indices = [integrals.index(name) for name in integrals
+            indices = [INTEGRALS.index(name) for name in INTEGRALS
                        if 'f' not in name[:2]]
             indices.extend([j+NUMSK for j in indices])
 
@@ -237,7 +237,7 @@ class SlaterKosterTable:
             ymax = max(ymax, self.tables[1].max())
 
         for i in range(NUMSK):
-            name = integrals[i]
+            name = INTEGRALS[i]
             ax = plt.subplot(NUMSK/2, 2, i + 1)
 
             for p, (e1, e2) in enumerate(self.pairs):
@@ -517,9 +517,9 @@ class SlaterKosterTable:
 
         # calculate all selected integrals
         for integral, nl1, nl2 in selected:
-            index = integrals.index(integral)
+            index = INTEGRALS.index(integral)
             S, H, H2 = 0., 0., 0.
-            l2 = angular_momentum[nl2[1]]
+            l2 = ANGULAR_MOMENTUM[nl2[1]]
 
             nA = len(area)
             r1 = radii[:nA, 0]
@@ -709,14 +709,14 @@ class SlaterKosterTable:
         return grid, area
 
 
-integrals = ['ffs', 'ffp', 'ffd', 'fff',
+INTEGRALS = ['ffs', 'ffp', 'ffd', 'fff',
              'dfs', 'dfp', 'dfd', 'dds', 'ddp', 'ddd',
              'pfs', 'pfp', 'pds', 'pdp', 'pps', 'ppp',
              'sfs', 'sds', 'sps', 'sss']
 
-NUMSK = len(integrals)
+NUMSK = len(INTEGRALS)
 
-angular_momentum = {'s': 0, 'p': 1, 'd': 2, 'f': 3}
+ANGULAR_MOMENTUM = {'s': 0, 'p': 1, 'd': 2, 'f': 3}
 
 
 def select_orbitals(val1, val2, integral):
@@ -742,7 +742,7 @@ def select_integrals(e1, e2):
     selected = []
     val1, val2 = e1.get_valence_orbitals(), e2.get_valence_orbitals()
 
-    for integral in integrals:
+    for integral in INTEGRALS:
         nl1, nl2 = select_orbitals(val1 , val2 , integral)
         if nl1 is None or nl2 is None:
             continue

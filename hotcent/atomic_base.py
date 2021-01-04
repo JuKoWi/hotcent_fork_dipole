@@ -27,7 +27,7 @@ except:
     plt = None
 
 
-not_solved_message = 'A required attribute is missing. ' \
+NOT_SOLVED_MESSAGE = 'A required attribute is missing. ' \
                      'Please call the run() method first.'
 
 class AtomicBase:
@@ -213,17 +213,17 @@ class AtomicBase:
         return self.valence
 
     def get_energy(self):
-        assert self.solved, not_solved_message
+        assert self.solved, NOT_SOLVED_MESSAGE
         return self.total_energy
 
     def get_epsilon(self, nl):
         """ E.g. get_eigenvalue('2p') """
-        assert self.solved, not_solved_message
+        assert self.solved, NOT_SOLVED_MESSAGE
         return self.enl[nl]
 
     def get_valence_energies(self):
         """ Return list of valence eigenenergies. """
-        assert self.solved, not_solved_message
+        assert self.solved, NOT_SOLVED_MESSAGE
         return [(nl, self.enl[nl]) for nl in self.valence]
 
     def get_eigenvalue(self, nl):
@@ -232,7 +232,7 @@ class AtomicBase:
     def get_wf_range(self, nl, fractional_limit=1e-7):
         """ Return the maximum r for which |R(r)| is
         less than fractional_limit * max(|R(r)|) """
-        assert self.solved, not_solved_message
+        assert self.solved, NOT_SOLVED_MESSAGE
         wfmax = np.nanmax(np.abs(self.Rnlg[nl]))
         for r, wf in zip(self.rgrid[-1::-1], self.Rnlg[nl][-1::-1]):
             if abs(wf) > fractional_limit * wfmax:
@@ -240,21 +240,21 @@ class AtomicBase:
 
     def Rnl(self, r, nl, der=0):
         """ Rnl(r, '2p') """
-        assert self.solved, not_solved_message
+        assert self.solved, NOT_SOLVED_MESSAGE
         if self.Rnl_fct[nl] is None:
             self.Rnl_fct[nl] = CubicSplineFunction(self.rgrid, self.Rnlg[nl])
         return self.Rnl_fct[nl](r, der=der)
 
     def unl(self, r, nl, der=0):
         """ unl(r, '2p') = Rnl(r, '2p') / r """
-        assert self.solved, not_solved_message
+        assert self.solved, NOT_SOLVED_MESSAGE
         if self.unl_fct[nl] is None:
             self.unl_fct[nl] = CubicSplineFunction(self.rgrid, self.unlg[nl])
         return self.unl_fct[nl](r, der=der)
 
     def electron_density(self, r, der=0):
         """ Return the all-electron density at r. """
-        assert self.solved, not_solved_message
+        assert self.solved, NOT_SOLVED_MESSAGE
         if self.dens_fct is None:
             self.dens_fct = CubicSplineFunction(self.rgrid, self.dens)
         return self.dens_fct(r, der=der)
@@ -264,14 +264,14 @@ class AtomicBase:
 
     def effective_potential(self, r, der=0):
         """ Return effective potential at r or its derivatives. """
-        assert self.solved, not_solved_message
+        assert self.solved, NOT_SOLVED_MESSAGE
         if self.veff_fct is None:
             self.veff_fct = CubicSplineFunction(self.rgrid, self.veff)
         return self.veff_fct(r, der=der)
 
     def hartree_potential(self, r):
         """ Return the Hartree potential at r. """
-        assert self.solved, not_solved_message
+        assert self.solved, NOT_SOLVED_MESSAGE
         if self.vhar_fct is None:
             self.vhar_fct = CubicSplineFunction(self.rgrid, self.vhar)
         return self.vhar_fct(r)
@@ -284,7 +284,7 @@ class AtomicBase:
         only_valence: whether to only plot the valence states or all of them
         """
         assert plt is not None, 'Matplotlib could not be imported!'
-        assert self.solved, not_solved_message
+        assert self.solved, NOT_SOLVED_MESSAGE
 
         rmax = 3 * covalent_radii[self.Z] / Bohr
         ri = np.where(self.rgrid < rmax)[0][-1]
@@ -357,7 +357,7 @@ class AtomicBase:
                    default = <Element>_rho.pdf
         """
         assert plt is not None, 'Matplotlib could not be imported!'
-        assert self.solved, not_solved_message
+        assert self.solved, NOT_SOLVED_MESSAGE
 
         rmax = 3 * covalent_radii[self.Z] / Bohr
         ri = np.where(self.rgrid > rmax)[0][0]
@@ -409,7 +409,7 @@ class AtomicBase:
         only_valence:     output of only valence orbitals
         step:             step size for output grid
         """
-        assert self.solved, not_solved_message
+        assert self.solved, NOT_SOLVED_MESSAGE
         if only_valence:
             orbitals = self.valence
         else:
@@ -437,7 +437,7 @@ class AtomicBase:
                          and STO-fitted orbitals (to verify that the
                          fit is decent)
         """
-        assert self.solved, not_solved_message
+        assert self.solved, NOT_SOLVED_MESSAGE
         print('Fitting Slater-type orbitals to eigenstate %s' % nl,
               file=self.txt)
         r = self.rgrid
@@ -545,7 +545,7 @@ class AtomicBase:
                     which will be where the orbital tail goes
                     below wfthr in absolute value
         """
-        assert self.solved, not_solved_message
+        assert self.solved, NOT_SOLVED_MESSAGE
         if filename is None:
             filename = 'wfc.%s.hsd' % self.symbol
 
@@ -643,12 +643,14 @@ class AtomicBase:
         return U
 
 
-angular_momenta = ['s', 'p', 'd', 'f', 'g', 'h', 'i', 'j', 'k', 'l']
+SUBSHELLS = ['s', 'p', 'd', 'f', 'g', 'h', 'i', 'j', 'k', 'l']
+
 
 def nl2tuple(nl):
     """ Transforms e.g. '2p' into (2, 1) """
-    return (int(nl[0]), angular_momenta.index(nl[1]))
+    return (int(nl[0]), SUBSHELLS.index(nl[1]))
+
 
 def tuple2nl(n, l):
     """ Transforms e.g. (2, 1) into '2p' """
-    return '%i%s' % (n, angular_momenta[l])
+    return '%i%s' % (n, SUBSHELLS[l])
