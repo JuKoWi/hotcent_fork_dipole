@@ -70,7 +70,7 @@ class ConfinementOptimizer:
             In case the same confinement should be applied to both, set e.g.
             {'O_2s,O_2p': PowerConfinement(r0=3., s=2, adjustable=['r0'])}
 
-        args: arguments that need to be passed to func 
+        args: arguments that need to be passed to func
 
         opt_kwargs: extra options for scipy.optimize.minimize, see:
             https://docs.scipy.org/doc/scipy/reference/generated/

@@ -105,7 +105,7 @@ class SlaterKosterTable:
 
     def _write_skf(self, handle, pair, eigval, hubval, occup, spe):
         """ Write to SKF file format; this function
-        is an adaptation of hotbit.io.hbskf 
+        is an adaptation of hotbit.io.hbskf
         """
         symbols = (self.ela.get_symbol(), self.elb.get_symbol())
         if pair == symbols:
@@ -216,11 +216,11 @@ class SlaterKosterTable:
             for p, (e1, e2) in enumerate(self.pairs):
                 s1, s2 = e1.get_symbol(), e2.get_symbol()
 
-                if p == 0: 
+                if p == 0:
                     s = '-'
                     lw = 1
                     alpha = 1.0
-                else: 
+                else:
                     s = '--'
                     lw = 4
                     alpha = 0.2
@@ -259,7 +259,7 @@ class SlaterKosterTable:
         e1, e2 = self.ela.get_symbol(), self.elb.get_symbol()
         plt.figtext(0.3, 0.92, '(thin solid: <%s|%s>, wide dashed: <%s|%s>)' \
                     % (e1, e2, e2, e1), size=10)
-        
+
         if filename is None:
             filename = '%s-%s_slako.pdf' % (e1, e2)
         plt.savefig(filename, bbox_inches='tight')
@@ -271,7 +271,7 @@ class SlaterKosterTable:
         wf_range = 0.
 
         for el in self.elements:
-            r = max([el.get_wf_range(nl, fractional_limit) 
+            r = max([el.get_wf_range(nl, fractional_limit)
                      for nl in el.get_valence_orbitals()])
             print('Wave function range for %s = %.5f a0' % (el.get_symbol(), r),
                   file=self.txt)
@@ -280,7 +280,7 @@ class SlaterKosterTable:
         assert wf_range < 20, 'Wave function range exceeds 20 Bohr radii. ' \
                               'Decrease wflimit?'
         return wf_range
-        
+
     def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
             superposition='potential', xc='LDA', stride=1):
         """ Calculate the Slater-Koster table.
@@ -294,7 +294,7 @@ class SlaterKosterTable:
                 (more dense towards bonding region).
         nr:     number of radial divisions in polar grid
                 (more dense towards origins).
-                with p=q=2 (powers in polar grid) ntheta~3*nr is 
+                with p=q=2 (powers in polar grid) ntheta~3*nr is
                 optimal (with fixed grid size)
                 with ntheta=150, nr=50 you get~1E-4 accuracy for H-elements
                 (beyond that, gain is slow with increasing grid size)
@@ -682,7 +682,7 @@ class SlaterKosterTable:
         return grid, area
 
 
-integrals = ['dds', 'ddp', 'ddd', 'pds', 'pdp', 'pps', 'ppp', 
+integrals = ['dds', 'ddp', 'ddd', 'pds', 'pdp', 'pps', 'ppp',
              'sds', 'sps', 'sss']
 angular_momentum = {'s': 0, 'p': 1, 'd': 2}
 
@@ -698,14 +698,14 @@ def select_orbitals(val1, val2, integral):
 
     nl2 = None
     for nl in val2:
-        if nl[1] == integral[1]: 
+        if nl[1] == integral[1]:
             nl2 = nl
 
     return nl1, nl2
 
 
 def select_integrals(e1, e2):
-    """ Return list of integrals (integral,nl1,nl2) 
+    """ Return list of integrals (integral,nl1,nl2)
     to be done for element pair e1, e2. """
     selected = []
     val1, val2 = e1.get_valence_orbitals(), e2.get_valence_orbitals()
@@ -744,7 +744,7 @@ def tail_smoothening(x, y):
 
     Aim is to get (e.g. for Slater-Koster tables and repulsions) smoothly
     behaving energies and forces near cutoff region.
-    
+
     Make is such that y and y' go smoothly exactly to zero at last point.
     Method: take largest neighboring points y_k and y_(k+1) (k<N-3) such
     that line through them passes zero below x_(N-1). Then fit
@@ -789,7 +789,7 @@ def tail_smoothening(x, y):
         y = np.append(y, np.zeros(Nzero))
         return y
     else:
-        # g(x)=c2*(xmax-x)**m + c3*(xmax-x)**(m+1) goes through 
+        # g(x)=c2*(xmax-x)**m + c3*(xmax-x)**(m+1) goes through
         # (xk,yk),(xk+1,yk+1) and (xmax,0)
         # Try different m if g(x) should change sign (this we do not want)
         sgn = np.sign(y[k])

@@ -1,7 +1,7 @@
 """ Definition of spline functions used by the
 AtomicDFT class.
 
-The code below draws heavily from the Hotbit code 
+The code below draws heavily from the Hotbit code
 written by Pekka Koskinen (https://github.com/pekkosk/
 hotbit/blob/master/box/interpolation.py).
 """

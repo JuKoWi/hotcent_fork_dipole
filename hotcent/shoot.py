@@ -24,7 +24,7 @@ def shoot(u, dx, c2, c1, c0, N):
     fp = c2 / dx ** 2 + 0.5 * c1 / dx
     fm = c2 / dx ** 2 - 0.5 * c1 / dx
     f0 = c0 - 2 * c2 / dx ** 2
- 
+
     # backward integration down to classical turning point ctp
     # (or one point beyond to get derivative)
     # If no ctp, integrate half-way

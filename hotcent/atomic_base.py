@@ -1,7 +1,7 @@
 """ Definition of the base class for atomic DFT
 calculations.
 
-The code below draws heavily from the Hotbit code 
+The code below draws heavily from the Hotbit code
 written by Pekka Koskinen (https://github.com/pekkosk/
 hotbit/blob/master/hotbit/parametrization/atom.py).
 """
@@ -44,7 +44,7 @@ class AtomicBase:
         symbol:         chemical symbol
         configuration:  e.g. '[He] 2s2 2p2'
         valence:        valence orbitals, e.g. ['2s','2p'].
-        confinement:    confinement potential for the electron density 
+        confinement:    confinement potential for the electron density
                         (see hotcent.confinement). The default None
                         means no confinement will be applied.
         wf_confinement: dictionary with confinement potentials for the
@@ -272,7 +272,7 @@ class AtomicBase:
 
     def plot_Rnl(self, filename=None, only_valence=True):
         """ Plot radial wave functions with matplotlib.
-        
+
         filename:  output file name + extension (extension used in matplotlib)
                    default = <Element>_Rnl.pdf
         only_valence: whether to only plot the valence states or all of them
@@ -320,7 +320,7 @@ class AtomicBase:
 
             # annotate
             c = 'k'
-            if nl in self.valence: 
+            if nl in self.valence:
                 c = 'r'
             plt.text(0.5, 0.4, r'$R_{%s}(r)$' % nl, transform=ax.transAxes,
                      size=15, color=c)

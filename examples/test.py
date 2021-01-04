@@ -60,7 +60,7 @@ print('B-H sps S  | %s' % check_abs(S[9], -0.34627316, eps))
 print('B-H sps H  | %s' % check_abs(H[9], 0.29069894, eps))
 print('B-H sps H2 | %s' % check_abs(H2[9], 0.29077536, eps))
 
-S, H, H2 = sk.calculate_mels([('sps', '1s', '2p')], atom2, atom1, 
+S, H, H2 = sk.calculate_mels([('sps', '1s', '2p')], atom2, atom1,
                              R, grid, areas)
 
 print('H-B sps S  | %s' % check_abs(S[8], -0.47147340, eps))
