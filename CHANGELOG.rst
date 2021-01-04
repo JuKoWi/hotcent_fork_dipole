@@ -6,6 +6,11 @@ Release notes
 Development version
 ===================
 
+* Extended the Slater-Koster tabulation procedure to *f* electrons.
+  If one of the two atoms contains *f* electrons in the valence,
+  the SKF files are now written in the 'extended' format instead
+  of the 'simple' format.
+
 
 Version 1.0
 ===========

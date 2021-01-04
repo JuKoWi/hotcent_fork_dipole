@@ -106,6 +106,10 @@ class SlaterKosterTable:
     def _write_skf(self, handle, pair, eigval, hubval, occup, spe):
         """ Write to SKF file format; this function
         is an adaptation of hotbit.io.hbskf
+
+        By default the 'simple' format is chosen, and the 'extended'
+        format is only used when necessary (i.e. when there are f-electrons
+        included in the valence of one of the elements).
         """
         symbols = (self.ela.get_symbol(), self.elb.get_symbol())
         if pair == symbols:
@@ -117,6 +121,11 @@ class SlaterKosterTable:
              msg += 'is restricted to the %s-%s pair.' % symbols
              raise ValueError(msg)
 
+        extended_format = any(['f' in nl
+                               for nl in (self.ela.valence + self.elb.valence)])
+        if extended_format:
+            print('@', file=handle)
+
         grid_dist = self.Rgrid[1] - self.Rgrid[0]
         grid_npts = len(self.tables[index])
         grid_npts += int(self.Rgrid[0] / (self.Rgrid[1] - self.Rgrid[0]))
@@ -124,37 +133,49 @@ class SlaterKosterTable:
 
         el1, el2 = self.ela.get_symbol(), self.elb.get_symbol()
         if el1 == el2:
-            line = 'E_d   E_p   E_s   SPE   U_d   U_p   U_s   f_d   f_p   f_s  '
-            labels = {x: 0 for x in line.split()}
-            labels['SPE'] = spe
+            fields = ['E_f', 'E_d', 'E_p', 'E_s', 'SPE', 'U_f', 'U_d',
+                      'U_p', 'U_s', 'f_f', 'f_d', 'f_p', 'f_s']
+
+            if not extended_format:
+                fields = [field for field in fields if field[-1] != 'f']
+
+            labels = {'SPE': spe}
             for prefix, d in zip(['E', 'U', 'f'], [eigval, hubval, occup]):
                 keys = list(d.keys())
-                for l in ['s', 'p', 'd']:
-                    check = [l in key for key in keys]
-                    if any(check):
+                for l in ['s', 'p', 'd', 'f']:
+                    check = [key[-1] == l for key in keys]
+                    assert sum(check) in [0, 1], (keys, l)
+                    if sum(check) == 1:
                         key = keys[check.index(True)]
                         labels['%s_%s' % (prefix, l)] = d[key]
 
-            for label, value in labels.items():
-                s = '%d' % value if isinstance(value, int) else '%.6f' % value
-                line = line.replace(label + '  ', s)
+            line = ' '.join(fields)
+            for field in fields:
+                val = labels[field] if field in labels else 0
+                s = '%d' % val if isinstance(val, int) else '%.6f' % val
+                line = line.replace(field, s)
             print(line, file=handle)
 
         m = atomic_masses[atomic_numbers[symbols[index]]]
         print("%.3f, 19*0.0" % m, file=handle)
 
-        # Integral table containing the DFTB Hamiltonian
+        # Table containing the Slater-Koster integrals
+        if extended_format:
+            indices = range(2*NUMSK)
+        else:
+            indices = [integrals.index(name) for name in integrals
+                       if 'f' not in name[:2]]
+            indices.extend([j+NUMSK for j in indices])
 
         if self.Rgrid[0] != 0:
             n = int(self.Rgrid[0] / (self.Rgrid[1] - self.Rgrid[0]))
             for i in range(n):
-                print('%d*0.0,' % len(self.tables[0][0]), file=handle)
+                print('%d*0.0,' % len(indices), file=handle)
 
         ct, theader = 0, ''
         for i in range(len(self.tables[index])):
             line = ''
-
-            for j in range(len(self.tables[index][i])):
+            for j in indices:
                 if self.tables[index][i, j] == 0:
                     ct += 1
                     theader = str(ct) + '*0.0 '
@@ -178,7 +199,7 @@ class SlaterKosterTable:
             for i, R in enumerate(self.Rgrid):
                 print('%.6e' % R, end=' ', file=handle)
 
-                for t in range(20):
+                for t in range(2*NUMSK):
                     x = self.tables[p][i, t]
                     if abs(x) < 1e-90:
                         print('0.', end=' ', file=handle)
@@ -209,9 +230,9 @@ class SlaterKosterTable:
             rmax = max(rmax, 6 * covalent_radii[atomic_numbers[el2]] / Bohr)
             ymax = max(ymax, self.tables[1].max())
 
-        for i in range(10):
+        for i in range(NUMSK):
             name = integrals[i]
-            ax = plt.subplot(5, 2, i + 1)
+            ax = plt.subplot(NUMSK/2, 2, i + 1)
 
             for p, (e1, e2) in enumerate(self.pairs):
                 s1, s2 = e1.get_symbol(), e2.get_symbol()
@@ -237,7 +258,7 @@ class SlaterKosterTable:
                 else:
                     plt.plot(self.Rgrid, self.tables[p][:, i] , c='r',
                              ls=s, lw=lw, alpha=alpha)
-                    plt.plot(self.Rgrid, self.tables[p][:, i + 10], c='b',
+                    plt.plot(self.Rgrid, self.tables[p][:, i+NUMSK], c='b',
                              ls=s, lw=lw, alpha=alpha)
                     plt.axhline(0, c='k', ls='--')
                     ax.text(0.8, 0.1 + p * 0.15, name, size=10,
@@ -335,7 +356,7 @@ class SlaterKosterTable:
         self.wf_range = self.get_range(wflimit)
         Nsub = N // stride
         Rgrid = rmin + stride * dr * np.arange(Nsub)
-        tables = [np.zeros((Nsub, 20)) for i in range(self.nel)]
+        tables = [np.zeros((Nsub, 2*NUMSK)) for i in range(self.nel)]
         dH = 0.
         Hmax = 0.
 
@@ -365,8 +386,8 @@ class SlaterKosterTable:
                                                    superposition=superposition)
                     Hmax = max(Hmax, max(abs(H)))
                     dH = max(dH, max(abs(H - H2)))
-                tables[p][i, :10] = H
-                tables[p][i, 10:] = S
+                tables[p][i, :NUMSK] = H
+                tables[p][i, NUMSK:] = S
 
         if superposition == 'potential':
             print('Maximum value for H=%.2g' % Hmax, file=self.txt)
@@ -377,9 +398,9 @@ class SlaterKosterTable:
         self.Rgrid = rmin + dr * np.arange(N)
 
         if stride > 1:
-            self.tables = [np.zeros((N, 20)) for i in range(self.nel)]
+            self.tables = [np.zeros((N, 2*NUMSK)) for i in range(self.nel)]
             for p in range(self.nel):
-                for i in range(20):
+                for i in range(2*NUMSK):
                     spl = CubicSplineFunction(Rgrid, tables[p][:, i])
                     self.tables[p][:, i] = spl(self.Rgrid)
         else:
@@ -387,7 +408,7 @@ class SlaterKosterTable:
 
         # Smooth the curves near the cutoff
         for p in range(self.nel):
-            for i in range(20):
+            for i in range(2*NUMSK):
                 self.tables[p][:, i] = tail_smoothening(self.Rgrid,
                                                         self.tables[p][:, i])
 
@@ -430,7 +451,7 @@ class SlaterKosterTable:
             -> H and H2 can be compared and error estimated
         """
         self.timer.start('calculate_mels')
-        Sl, Hl, H2l = np.zeros(10), np.zeros(10), np.zeros(10)
+        Sl, Hl, H2l = np.zeros(NUMSK), np.zeros(NUMSK), np.zeros(NUMSK)
 
         # common for all integrals (not wf-dependent parts)
         self.timer.start('prelude')
@@ -483,7 +504,7 @@ class SlaterKosterTable:
                     veff += -2. * sply(x, y, dx=0, dy=1, grid=False)
                 self.timer.stop('vsigma')
 
-        assert np.shape(gphi) == (N, 10)
+        assert np.shape(gphi) == (N, NUMSK)
         assert np.shape(radii) == (N, 2)
         assert np.shape(veff) == (N,)
         self.timer.stop('prelude')
@@ -682,9 +703,14 @@ class SlaterKosterTable:
         return grid, area
 
 
-integrals = ['dds', 'ddp', 'ddd', 'pds', 'pdp', 'pps', 'ppp',
-             'sds', 'sps', 'sss']
-angular_momentum = {'s': 0, 'p': 1, 'd': 2}
+integrals = ['ffs', 'ffp', 'ffd', 'fff',
+             'dfs', 'dfp', 'dfd', 'dds', 'ddp', 'ddd',
+             'pfs', 'pfp', 'pds', 'pdp', 'pps', 'ppp',
+             'sfs', 'sds', 'sps', 'sss']
+
+NUMSK = len(integrals)
+
+angular_momentum = {'s': 0, 'p': 1, 'd': 2, 'f': 3}
 
 
 def select_orbitals(val1, val2, integral):
@@ -705,7 +731,7 @@ def select_orbitals(val1, val2, integral):
 
 
 def select_integrals(e1, e2):
-    """ Return list of integrals (integral,nl1,nl2)
+    """ Return list of integrals (integral, nl1, nl2)
     to be done for element pair e1, e2. """
     selected = []
     val1, val2 = e1.get_valence_orbitals(), e2.get_valence_orbitals()
@@ -721,22 +747,33 @@ def select_integrals(e1, e2):
 
 
 def g(t1, t2):
-    """ Return the angle-dependent part of the two-center
-    integral (it) with t1=theta_1 (atom at origin)
-    and t2=theta2 (atom at z=Rz). These dependencies
-    come after integrating analytically over phi.
+    """ Return the angle-dependent parts of the two-center integrals
+    with t1=theta_1 (atom at origin) and t2=theta2 (atom at z=Rz).
+    These dependencies come after integrating analytically over phi.
     """
     c1, c2, s1, s2 = np.cos(t1), np.cos(t2), np.sin(t1), np.sin(t2)
-    return np.array([5. / 8 * (3 * c1 ** 2 - 1) * (3 * c2 ** 2 - 1),\
-                     15. / 4 * s1 * c1 * s2 * c2,\
-                     15. / 16 * s1 ** 2 * s2 ** 2,\
-                     np.sqrt(15.) / 4 * c1 * (3 * c2 ** 2 - 1),\
-                     np.sqrt(45.) / 4 * s1 * s2 * c2,\
-                     3. / 2 * c1 * c2,\
-                     3. / 4 * s1 * s2,\
-                     np.sqrt(5.) / 4 * (3 * c2 ** 2 - 1),\
-                     np.sqrt(3.) / 2 * c2,\
-                     0.5*np.ones_like(t1)])
+    return np.array([
+             7. / 8 * c1 * (5 * c1**2 - 3) * c2 * (5 * c2**2 - 3),      # ffs
+             21. / 32 * (5 * c1**2 - 1) * s1 * (5 * c2**2 - 1) * s2,    # ffp
+             105. / 16 * s1**2 * c1 * s2**2 * c2,                       # ffd
+             35. / 32 * s1**3 * s2**3,                                  # fff
+             np.sqrt(35.) / 8 * (3 * c1**2 - 1) * c2 * (5 * c2**2 - 3), # dfs
+             3. / 8 * np.sqrt(17.5) * s1 * c1 * s2 * (5 * c2**2 - 1),   # dfp
+             15. / 16 * np.sqrt(7.) * s1**2 * s2**2 * c2,               # dfd
+             5. / 8 * (3 * c1**2 - 1) * (3 * c2**2 - 1),                # dds
+             15. / 4 * s1 * c1 * s2 * c2,                               # ddp
+             15. / 16 * s1**2 * s2**2,                                  # ddd
+             np.sqrt(21.) / 4 * c1 * c2 * (5 * c2**2 - 3),              # pfs
+             3. / 8 * np.sqrt(3.5) * s1 * s2 * (5 * c2**2 - 1),         # pfp
+             np.sqrt(15.) / 4 * c1 * (3 * c2**2 - 1),                   # pds
+             np.sqrt(45.) / 4 * s1 * s2 * c2,                           # pdp
+             3. / 2 * c1 * c2,                                          # pps
+             3. / 4 * s1 * s2,                                          # ppp
+             np.sqrt(7.) / 4 * c2 * (5 * c2**2 - 3),                    # sfs
+             np.sqrt(5.) / 4 * (3 * c2**2 - 1),                         # sds
+             np.sqrt(3.) / 2 * c2,                                      # sps
+             0.5*np.ones_like(t1),                                      # sss
+             ])
 
 
 def tail_smoothening(x, y):

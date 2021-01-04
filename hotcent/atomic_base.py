@@ -289,7 +289,7 @@ class AtomicBase:
             states = [x[2] for x in self.list_states()]
 
         p = np.ceil(np.sqrt(len(states)))
-        q = 2 * p - 1 if len(states) % 2 == 0 else 2 * p
+        q = 2 * p
 
         fig = plt.figure(dpi=400)
         i = 1
@@ -330,7 +330,7 @@ class AtomicBase:
                 plt.xlabel('r (Bohr)', size=8)
             i += 1
 
-        fig.subplots_adjust(hspace=0.2, wspace=0.2)
+        fig.subplots_adjust(hspace=0.3, wspace=0.3)
         plt.figtext(0.4, 0.95, r'$R_{nl}(r)$ for %s' % self.symbol)
 
         if filename is None:
@@ -359,7 +359,8 @@ class AtomicBase:
         fig = plt.figure(figsize=(6.4, 4.8), dpi=400)
 
         core_dens = 0
-        colors = ['red', 'green', 'blue']  # s, p , d
+        colors = ['red', 'green', 'blue', 'purple']  # for s/p/d/f
+
         for n, l, nl in self.list_states():
             if nl not in self.valence:
                 continue
