@@ -7,6 +7,7 @@
 import numpy as np
 try:
     from pylibxc import LibXCFunctional
+    from pylibxc.version import __version__ as pylibxc_version
     has_pylibxc = True
 except ImportError:
     print('Warning -- could not load LibXC')
@@ -55,10 +56,15 @@ class LibXC:
 
         for i, func in enumerate(self.functionals):
             out = func.compute(inp)
-            zk += out['zk'][0]
-            vrho += out['vrho'][0]
+
+            if pylibxc_version.startswith('4.'):
+                for key in out:
+                    out[key] = out[key].T
+
+            zk += out['zk'][:, 0]
+            vrho += out['vrho'][:, 0]
             if self.types[i] == 'GGA':
-                vsigma += out['vsigma'][0]
+                vsigma += out['vsigma'][:, 0]
 
         return {'zk': zk, 'vrho': vrho, 'vsigma': vsigma}
 
