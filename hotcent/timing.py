@@ -218,8 +218,8 @@ class Timer:
         print('-' * 79, file=f)
         print(txt, end=' ', file=f)
         print('-' * 79, file=f)
-        print('total time %12.3f seconds      %s' % (total, self.human_readable_time(total)),
-              file=f)
+        print('total time %12.3f seconds      %s' % \
+              (total, self.human_readable_time(total)), file=f)
         print(asctime(), file=f)
         self.smry = True
 

@@ -30,6 +30,7 @@ except:
 NOT_SOLVED_MESSAGE = 'A required attribute is missing. ' \
                      'Please call the run() method first.'
 
+
 class AtomicBase:
     def __init__(self,
                  symbol,
@@ -66,8 +67,8 @@ class AtomicBase:
         mix:            effective potential mixing constant
         maxiter:          maximum number of iterations for self-consistency.
         rmax:           radial cutoff in Bohr
-        nodegpts:       total number of grid points is nodegpts times the max number
-                        of antinodes for all orbitals
+        nodegpts:       total number of grid points is nodegpts times the max
+                        number of antinodes for all orbitals
         timing:         output of timing summary
         verbose:        increase verbosity during iterations
         txt:            where output should be printed

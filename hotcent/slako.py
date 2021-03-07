@@ -738,7 +738,7 @@ def select_integrals(e1, e2):
     val1, val2 = e1.get_valence_orbitals(), e2.get_valence_orbitals()
 
     for integral in INTEGRALS:
-        nl1, nl2 = select_orbitals(val1 , val2 , integral)
+        nl1, nl2 = select_orbitals(val1, val2, integral)
         if nl1 is None or nl2 is None:
             continue
         else:
