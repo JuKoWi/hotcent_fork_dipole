@@ -11,6 +11,8 @@ Development version
   the SKF files are now written in the 'extended' format instead
   of the 'simple' format.
 
+* Maintenance related to changes in ASE, Matplotlib and LibXC.
+
 
 Version 1.0
 ===========
