@@ -33,7 +33,8 @@ Hotcent.
 
 ## Installation
 
-* Set up the [ASE](https://wiki.fysik.dtu.dk/ase/) Python module.
+* Set up the [ASE](https://wiki.fysik.dtu.dk/ase/) Python module
+  (version 3.21.1 or newer).
 
 * Clone / download the Hotcent repository and update the
 `$PYTHONPATH` accordingly, e.g. like this:
