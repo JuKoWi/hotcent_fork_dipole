@@ -10,7 +10,7 @@ import copy
 import numpy as np
 from scipy.optimize import minimize
 from ase.io import read
-from ase.dft.band_structure import BandStructure
+from ase.spectrum.band_structure import BandStructure
 from ase.calculators.dftb import Dftb
 from hotcent.atomic_base import AtomicBase
 from hotcent.slako import SlaterKosterTable
