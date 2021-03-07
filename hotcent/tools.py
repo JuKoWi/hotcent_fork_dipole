@@ -331,13 +331,13 @@ class DftbPlusBandStructure:
         # Update the reference level, k-points,
         # and eigenenergies
         bs_new = copy.deepcopy(bs)
-        bs_new.reference = eref
-        bs_new.kpts = calc.get_ibz_k_points()
-        bs_new.energies = []
+        bs_new._reference = eref
+        bs_new._kpts = calc.get_ibz_k_points()
+        bs_new._energies = []
 
         for s in range(calc.get_number_of_spins()):
-            bs_new.energies.append([calc.get_eigenvalues(kpt=k, spin=s)
-                                    for k in range(len(bs_new.kpts))])
-        bs_new.energies = np.array(bs_new.energies)
+            bs_new._energies.append([calc.get_eigenvalues(kpt=k, spin=s)
+                                     for k in range(len(bs_new._kpts))])
+        bs_new._energies = np.array(bs_new.energies)
 
         return bs_new
