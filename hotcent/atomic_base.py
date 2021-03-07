@@ -295,7 +295,7 @@ class AtomicBase:
         else:
             states = [x[2] for x in self.list_states()]
 
-        p = np.ceil(np.sqrt(len(states)))
+        p = int(np.ceil(np.sqrt(len(states))))
         q = 2 * p
 
         fig = plt.figure(dpi=400)

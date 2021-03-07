@@ -238,7 +238,7 @@ class SlaterKosterTable:
 
         for i in range(NUMSK):
             name = INTEGRALS[i]
-            ax = plt.subplot(NUMSK/2, 2, i + 1)
+            ax = plt.subplot(NUMSK//2, 2, i + 1)
 
             for p, (e1, e2) in enumerate(self.pairs):
                 s1, s2 = e1.get_symbol(), e2.get_symbol()
