@@ -492,7 +492,7 @@ class SlaterKosterTable:
                 grad_x += drho2 * s2
                 grad_y = drho1 * c1
                 grad_y += drho2 * c2
-                sigma = np.sqrt(grad_x**2 + grad_y**2)**2
+                sigma = grad_x**2 + grad_y**2
                 out = xc.compute_all(rho, sigma)
                 veff += out['vrho']
                 self.timer.stop('vrho')
