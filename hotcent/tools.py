@@ -235,9 +235,12 @@ class DftbPlusBandStructure:
                    'vbm': the valence band maximum, generally the best
                           choice, in particular when a band gap is present
                    'fermi': the Fermi level
-        nsemicore: if the reference calculation included e.g. semicore
-                   states that are not included in the DFTB model, the
-                   number of semicore bands need to be specified here.
+        nsemicore: if the reference calculation included (semi)core
+                   states that are not included in the DFTB valence, the
+                   number of (semi)core bands need to be specified here.
+                   The lowest *nsemicore* bands in the reference band
+                   structure will then be discarded in the calculation of
+                   the residuals.
         weight: the weight relative to other reference band structures
                 in the calculation of the total residual.
         distribution: how to weigh the deviations of the DFTB eigenvalues
