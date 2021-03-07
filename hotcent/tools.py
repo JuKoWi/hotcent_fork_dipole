@@ -5,6 +5,7 @@
 #   SPDX-License-Identifier: GPL-3.0-or-later                                 #
 #-----------------------------------------------------------------------------#
 """ Tools for optimizing confinement parameters. """
+import os
 import copy
 import numpy as np
 from scipy.optimize import minimize
@@ -311,7 +312,9 @@ class DftbPlusBandStructure:
         # to converge the charges and get the
         # reference energy
         atoms = bs.atoms.copy()
-        calc = Dftb(atoms=atoms, kpts=bs.kpts_scf, **self.dftbplus_kwargs)
+        slako_dir = os.getcwd() + '/'
+        calc = Dftb(atoms=atoms, kpts=bs.kpts_scf, slako_dir=slako_dir,
+                    **self.dftbplus_kwargs)
         atoms.set_calculator(calc)
         etot = atoms.get_potential_energy()
 
@@ -327,7 +330,8 @@ class DftbPlusBandStructure:
         kwargs.update({'Hamiltonian_MaxSCCIterations': 1,
                        'Hamiltonian_ReadInitialCharges': 'Yes',
                        'Hamiltonian_SCCTolerance': 1e6})
-        calc = Dftb(atoms=atoms, kpts=bs.path.kpts, **kwargs)
+        calc = Dftb(atoms=atoms, kpts=bs.path.kpts, slako_dir=slako_dir,
+                    **kwargs)
         atoms.set_calculator(calc)
         etot = atoms.get_potential_energy()
 
