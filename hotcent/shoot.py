@@ -39,11 +39,16 @@ def shoot(u, dx, c2, c1, c0, N):
     all_negative = np.all(c0 < 0)
     for i in range(N - 2 , 0, -1):
         u[i - 1] = (-fp[i] * u[i + 1] - f0[i] * u[i]) / fm[i]
+
+        # numerical stability
         if abs(u[i - 1]) > 1e10:
-            u[i - 1:] *= 1e-10  # numerical stability
+            for j in range(N-1, i-2, -1):
+                u[j] /= u[i-1]
+
         if c0[i] > 0:
             ctp = i
             break
+
         if all_negative and i == N // 2:
             ctp = N // 2
             break

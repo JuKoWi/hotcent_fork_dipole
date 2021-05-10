@@ -50,12 +50,16 @@ def shoot(double[:] u, double dx, double[:] c2, double[:] c1, double[:] c0,
     for i in range(N - 2 , 0, -1):
         u_view[i - 1] = -fp_view[i] * u_view[i + 1] - f0_view[i] * u_view[i]
         u_view[i - 1] /= fm_view[i]
+
+        # numerical stability
         if abs(u_view[i - 1]) > 1e10:
-            for j in range(i - 1, N):
-                u_view[j] *= 1e-10  # numerical stability
+            for j in range(N-1, i-2, -1):
+                u_view[j] /= u_view[i-1]
+
         if c0[i] > 0:
             ctp = i
             break
+
         if all_negative > 0 and i == N // 2:
             ctp = N // 2
             break
