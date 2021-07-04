@@ -5,6 +5,7 @@ matrix elements, respectively).
 import numpy as np
 from hotcent.atomic_dft import AtomicDFT
 from hotcent.confinement import SoftConfinement
+from hotcent.slako import SlaterKosterTable
 from hotcent.offsite_threecenter import Offsite3cTable
 from hotcent.onsite_twocenter import Onsite2cTable
 from hotcent.onsite_threecenter import Onsite3cTable
@@ -29,6 +30,10 @@ atom.run()
 
 eigenvalues = {nl: atom.get_eigenvalue(nl) for nl in valence}
 on1c = {nl: atom.get_onecenter_integral(nl) for nl in valence}
+
+off2c = SlaterKosterTable(atom, atom)
+off2c.run_repulsion(rmin=1.2, dr=0.1, N=46, xc='LDA')
+print(off2c.get_repulsion_spline_block())
 
 rmin, dr, N = 0.4, 0.04, 300
 on2c = Onsite2cTable(atom, atom)
