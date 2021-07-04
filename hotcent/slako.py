@@ -15,7 +15,7 @@ hotbit/blob/master/hotbit/parametrization/slako.py).
 import os
 import sys
 import numpy as np
-from scipy.interpolate import SmoothBivariateSpline
+from scipy.interpolate import CubicSpline, SmoothBivariateSpline
 from ase.units import Bohr
 from ase.data import atomic_numbers, atomic_masses, covalent_radii
 from hotcent.orbitals import ANGULAR_MOMENTUM
@@ -542,6 +542,169 @@ class SlaterKosterTable:
 
         self.timer.stop('calculate_mels')
         return Sl, Hl, H2l
+
+    def run_repulsion(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50,
+                      wflimit=1e-7, smoothen_tails=True, xc='LDA'):
+        """ Calculates the 'repulsive' contributions to the total energy
+        (i.e. the double-counting and ion-ion interaction terms), which
+        are stored in self.erep.
+
+        parameters:
+        ------------
+        Same as in the run() method.
+        """
+        print('\n\n', file=self.txt)
+        print('***********************************************', file=self.txt)
+        print('Repulsion calculation for %s and %s' % \
+              (self.ela.get_symbol(), self.elb.get_symbol()), file=self.txt)
+        print('***********************************************', file=self.txt)
+        self.txt.flush()
+
+        assert N is not None, 'Need to set number of grid points N!'
+        assert rmin >= 1e-3, 'For stability, please set rmin >= 1e-3'
+        assert xc == 'LDA', 'Functionals other than LDA are not yet implemented'
+
+        self.timer.start('run_repulsion')
+        wf_range = self.get_range(wflimit)
+        self.Rgrid = rmin + dr * np.arange(N)
+        self.erep = np.zeros(N)
+
+        for i, R in enumerate(self.Rgrid):
+            self.wf_range = wf_range + R
+            grid, area = self.make_grid(R, nt=ntheta, nr=nr)
+
+            if  i == N - 1 or N // 10 == 0 or i % (N // 10) == 0:
+                print('R=%8.2f, %i grid points ...' % (R, len(grid)),
+                      file=self.txt, flush=True)
+
+            self.erep[i] = self.calculate_repulsion(self.ela, self.elb, R, grid,
+                                                    area, xc=xc)
+
+        if smoothen_tails:
+            # Smooth the curves near the cutoff
+            self.erep = tail_smoothening(self.Rgrid, self.erep)
+
+        self.timer.stop('run_repulsion')
+
+    def get_repulsion_spline_block(self):
+        """ Returns a string with the Spline block for the repulsive energy
+        (in SKF format). """
+        lines = 'Spline\n'
+
+        dr = self.Rgrid[1] - self.Rgrid[0]
+        n = len(self.Rgrid) - 1
+        lines += '%d %.6f\n' % (n, self.Rgrid[-1])
+
+        # Fit the exponential function for radii below self.Rgrid[0]
+        r0 = self.Rgrid[0]
+        f0 = self.erep[0]
+        f1 = (self.erep[1] - self.erep[0]) / dr
+        f2 = (self.erep[2] - 2.*self.erep[1] + self.erep[0]) / dr**2
+        assert f1 < 0, 'Cannot fit exponential repulsion when derivative > 0'
+        assert f2 > 0, 'Cannot fit exponential repulsion when curvature < 0'
+
+        a1 = -f2 / f1
+        a2 = np.log(-f1) - np.log(a1) + a1 * r0
+        a3 = f0 - np.exp(-a1*r0 + a2)
+        assert np.abs(-a1 * np.exp(-a1*r0 + a2) - f1) < 1e-8
+        assert np.abs(a1**2 * np.exp(-a1*r0 + a2) - f2) < 1e-8
+        lines += '%.6f %.6f %.6f\n' % (a1, a2, a3)
+
+        # Set up the cubic spline function spanning self.Rgrid
+        # and matching the exponential function on its left
+        spl = CubicSpline(self.Rgrid, self.erep, bc_type=((1, f1), 'natural'))
+        assert np.abs(spl(r0, nu=0) - f0) < 1e-8
+        assert np.abs(spl(r0, nu=1) - f1) < 1e-8
+
+        # Fit the additional coefficients for the 5th-order spline at the end
+        r0 = self.Rgrid[-1]
+        f0 = spl(r0, nu=0)
+        f1 = spl(r0, nu=1)
+        v = -f0 / dr**4
+        w = -f1 / dr**3
+        c4 = 5.*v - w
+        c5 = (v - c4) / dr
+        assert np.abs(spl.c[3][-1] + spl.c[2][-1]*dr + spl.c[1][-1]*dr**2 \
+                      + spl.c[0][-1]*dr**3 + c4*dr**4 + c5*dr**5) < 1e-8
+        assert np.abs(spl.c[2][-1] + 2.*spl.c[1][-1]*dr + 3.*spl.c[0][-1]*dr**2\
+                      + 4.*c4*dr**3 + 5.*c5*dr**4) < 1e-8
+
+        # Now add all the spline lines
+        for i in range(n):
+            items = [self.Rgrid[i], self.Rgrid[i]+dr, spl.c[3][i],
+                     spl.c[2][i], spl.c[1][i], spl.c[0][i]]
+            if i == n-1:
+                items += [c4, c5]
+            lines += ' '.join(map(lambda x: '%.6f' % x, items)) + '\n'
+
+        return lines
+
+    def calculate_repulsion(self, e1, e2, R, grid, area, xc='LDA'):
+        """ Returns the 'repulsive' contribution to the total energy for the
+        given interatomic distance, with a two-center approximation for the
+        exchange-correlation terms.
+
+        NOTE: one-center terms are substracted (as these only shift the
+        atom energies). The repulsion should hence decay to 0 for large R.
+
+        parameters:
+        -----------
+        e1: <bra| element
+        e2: |ket> element
+        R: e1 is at origin, e2 at z=R
+        grid: list of grid points on (d, z)-plane
+        area: d-z areas of the grid points.
+        xc: exchange-correlation functional (see description in self.run())
+        """
+        self.timer.start('calculate_repulsion')
+
+        # TODO: boilerplate
+        # common for all integrals (not wf-dependent parts)
+        self.timer.start('prelude')
+        x = grid[:, 0]
+        y = grid[:, 1]
+        r1 = np.sqrt(x**2 + y**2)
+        r2 = np.sqrt(x**2 + (R - y)**2)
+        c1 = y / r1  # cosine of theta_1
+        c2 = (y - R) / r2  # cosine of theta_2
+        s1 = np.sqrt(1. - c1**2)  # sine of theta_1
+        s2 = np.sqrt(1. - c2**2)  # sine of theta_2
+
+        rho1 = e1.electron_density(r1, only_valence=True)
+        rho2 = e2.electron_density(r2, only_valence=True)
+        rho12 = rho1 + rho2
+
+        if xc in ['LDA', 'PW92']:
+            self.timer.start('vrho')
+            xc = XC_PW92()
+            exc1 = xc.exc(rho1)
+            exc2 = xc.exc(rho2)
+            exc12 = xc.exc(rho12)
+            vxc1 = xc.vxc(rho1)
+            vxc2 = xc.vxc(rho2)
+            vxc12 = xc.vxc(rho12)
+            self.timer.stop('vrho')
+        else:
+            pass  # TODO
+        self.timer.stop('prelude')
+
+        aux = 2 * np.pi * area * x
+
+        vhar1 = e1.hartree_potential(r1, only_valence=True)
+        vhar2 = e2.hartree_potential(r2, only_valence=True)
+        Ehar = np.sum(vhar1 * rho2 * aux)
+        Ehar += np.sum(vhar2 * rho1 * aux)
+
+        Z1 = e1.get_number_of_electrons(only_valence=True)
+        Z2 = e2.get_number_of_electrons(only_valence=True)
+        Enuc = Z1 * Z2 / R
+
+        Exc = np.sum((exc12 * rho12 - exc1 * rho1 - exc2 * rho2) * aux)
+        Evxc = np.sum((vxc12 * rho12 - vxc1 * rho1 - vxc2 * rho2) * aux)
+
+        Erep = Enuc - 0.5*Ehar + Exc - Evxc
+        self.timer.stop('calculate_repulsion')
+        return Erep
 
     def make_grid(self, Rz, nt, nr, p=2, q=2, view=False):
         """ Construct a double-polar grid.
