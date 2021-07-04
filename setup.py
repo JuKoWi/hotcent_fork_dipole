@@ -9,7 +9,12 @@ if '--use-cython' in sys.argv:
 
 ext = '.pyx' if USE_CYTHON else '.c'
 
-extensions = [Extension('_hotcent', ['hotcent/extensions' + ext]),
+extensions = [Extension('_hotcent',
+                        sources=['hotcent/extensions' + ext],
+                        language='c',
+                        extra_compile_args=['-O3', '-ffast-math',
+                                            '-march=native'],
+                        ),
               ]
 
 if USE_CYTHON:
