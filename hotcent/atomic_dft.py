@@ -163,17 +163,19 @@ class AtomicDFT(AtomicBase):
 
         self.timer.stop('energies')
 
-    def calculate_density(self, unlg):
+    def calculate_density(self, unlg, only_valence=False):
         """ Calculate the radial electron density:
         sum_nl occ_nl |Rnl(r)|**2 / (4*pi)
         """
         self.timer.start('density')
         dens = np.zeros_like(self.rgrid)
         for n, l, nl in self.list_states():
+            if only_valence and nl not in self.valence:
+                continue
             dens += self.configuration[nl] * (unlg[nl] ** 2)
 
         nel1 = self.grid.integrate(dens)
-        nel2 = self.get_number_of_electrons()
+        nel2 = self.get_number_of_electrons(only_valence=only_valence)
 
         if abs(nel1 - nel2) > 1e-10:
             err = 'Integrated density %.3g' % nel1
@@ -185,14 +187,14 @@ class AtomicDFT(AtomicBase):
         self.timer.stop('density')
         return dens
 
-    def calculate_hartree_potential(self, dens):
+    def calculate_hartree_potential(self, dens, only_valence=False):
         """ Calculate the Hartree potential. """
         self.timer.start('Hartree')
         dV = self.grid.get_dvolumes()
         r, r0 = self.rgrid, self.grid.get_r0grid()
         N = self.N
         n0 = 0.5 * (dens[1:] + dens[:-1])
-        nel = self.get_number_of_electrons()
+        nel = self.get_number_of_electrons(only_valence=only_valence)
         n0 *= nel / np.sum(n0 * dV) if nel > 0 else 0.
 
         if _hotcent is not None:
@@ -314,6 +316,9 @@ class AtomicDFT(AtomicBase):
 
         self.veff = self.calculate_veff(self.dens)
         self.vhar = self.calculate_hartree_potential(self.dens)
+        self.densval = self.calculate_density(self.unlg, only_valence=True)
+        self.vharval = self.calculate_hartree_potential(self.densval,
+                                                        only_valence=True)
         exc, self.vxc = self.xc.evaluate(self.dens, self.grid)
 
         if write is not None:

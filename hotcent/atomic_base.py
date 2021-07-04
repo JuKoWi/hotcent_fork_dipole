@@ -115,7 +115,9 @@ class AtomicBase:
         self.Rnl_fct = {nl: None for nl in self.configuration}
         self.veff_fct = None
         self.dens_fct = None
+        self.densval_fct = None
         self.vhar_fct = None
+        self.vharval_fct = None
         self.solved = False
 
     def set_configuration(self, configuration):
@@ -196,8 +198,11 @@ class AtomicBase:
         """ Return atom's chemical symbol. """
         return self.symbol
 
-    def get_number_of_electrons(self):
-        return sum(self.configuration.values())
+    def get_number_of_electrons(self, only_valence=False):
+        if only_valence:
+            return sum([self.configuration[nl] for nl in self.valence])
+        else:
+            return sum(self.configuration.values())
 
     def list_states(self):
         """ List all potential states {(n,l,'nl')}. """
@@ -253,12 +258,17 @@ class AtomicBase:
             self.unl_fct[nl] = CubicSplineFunction(self.rgrid, self.unlg[nl])
         return self.unl_fct[nl](r, der=der)
 
-    def electron_density(self, r, der=0):
+    def electron_density(self, r, der=0, only_valence=False):
         """ Return the all-electron density at r. """
         assert self.solved, NOT_SOLVED_MESSAGE
-        if self.dens_fct is None:
-            self.dens_fct = CubicSplineFunction(self.rgrid, self.dens)
-        return self.dens_fct(r, der=der)
+        if only_valence:
+            if self.densval_fct is None:
+                self.densval_fct = CubicSplineFunction(self.rgrid, self.densval)
+            return self.densval_fct(r, der=der)
+        else:
+            if self.dens_fct is None:
+                self.dens_fct = CubicSplineFunction(self.rgrid, self.dens)
+            return self.dens_fct(r, der=der)
 
     def nuclear_potential(self,r):
         return -self.Z / r
@@ -270,12 +280,17 @@ class AtomicBase:
             self.veff_fct = CubicSplineFunction(self.rgrid, self.veff)
         return self.veff_fct(r, der=der)
 
-    def hartree_potential(self, r):
+    def hartree_potential(self, r, only_valence=False):
         """ Return the Hartree potential at r. """
         assert self.solved, NOT_SOLVED_MESSAGE
-        if self.vhar_fct is None:
-            self.vhar_fct = CubicSplineFunction(self.rgrid, self.vhar)
-        return self.vhar_fct(r)
+        if only_valence:
+            if self.vharval_fct is None:
+                self.vharval_fct = CubicSplineFunction(self.rgrid, self.vharval)
+            return self.vharval_fct(r)
+        else:
+            if self.vhar_fct is None:
+                self.vhar_fct = CubicSplineFunction(self.rgrid, self.vhar)
+            return self.vhar_fct(r)
 
     def plot_Rnl(self, filename=None, only_valence=True):
         """ Plot radial wave functions with matplotlib.
