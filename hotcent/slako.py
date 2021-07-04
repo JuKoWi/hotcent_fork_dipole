@@ -18,6 +18,7 @@ import numpy as np
 from scipy.interpolate import SmoothBivariateSpline
 from ase.units import Bohr
 from ase.data import atomic_numbers, atomic_masses, covalent_radii
+from hotcent.orbitals import ANGULAR_MOMENTUM
 from hotcent.timing import Timer
 from hotcent.xc import XC_PW92, LibXC
 from hotcent.interpolation import CubicSplineFunction
@@ -711,7 +712,34 @@ INTEGRALS = ['ffs', 'ffp', 'ffd', 'fff',
 
 NUMSK = len(INTEGRALS)
 
-ANGULAR_MOMENTUM = {'s': 0, 'p': 1, 'd': 2, 'f': 3}
+INTEGRAL_PAIRS = {
+    'sss': ('s', 's'),
+    'sps': ('s', 'pz'),
+    'sds': ('s', 'dz2'),
+    'pps': ('pz', 'pz'),
+    'ppp': ('px', 'px'),
+    'pds': ('pz', 'dz2'),
+    'pdp': ('px', 'dxz'),
+    'dds': ('dz2', 'dz2'),
+    'ddp': ('dxz', 'dxz'),
+    'ddd': ('dxy', 'dxy'),
+}
+
+
+def search_integrals(lm1, lm2):
+    """ Returns the sigma/pi/... integrals to be considered for the
+    given pair of orbitals. """
+    integrals, ordered = [], []
+
+    for integral, pair in INTEGRAL_PAIRS.items():
+        if pair == (lm1, lm2):
+            integrals.append(integral)
+            ordered.append(True)
+        elif pair == (lm2, lm1):
+            integrals.append(integral)
+            ordered.append(False)
+
+    return integrals, ordered
 
 
 def select_orbitals(val1, val2, integral):

@@ -18,6 +18,7 @@ from ase.units import Bohr
 from hotcent.interpolation import CubicSplineFunction
 from hotcent.atomic_base import AtomicBase, nl2tuple
 from hotcent.confinement import ZeroConfinement
+from hotcent.orbitals import ANGULAR_MOMENTUM
 from hotcent.xc import XC_PW92, LibXC
 try:
     import matplotlib.pyplot as plt
@@ -324,6 +325,16 @@ class AtomicDFT(AtomicBase):
         self.solved = True
         self.timer.summary()
         self.txt.flush()
+
+    def get_onecenter_integral(self, nl):
+        """ Returns the chosen one-center integral (<phi|H|phi>). """
+        assert nl in self.valence
+
+        l = ANGULAR_MOMENTUM[nl[1]]
+        e = self.grid.integrate(self.unlg[nl] \
+            * ((self.veff + l * (l+1) / (2. * self.rgrid**2)) * self.unlg[nl] \
+                - 0.5 * self.unl(self.rgrid, nl, der=2)))
+        return e
 
     def outer_scf(self):
         """ Solve the self-consistent potential. """
