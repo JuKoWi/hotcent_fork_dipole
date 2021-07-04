@@ -6,7 +6,9 @@
 #-----------------------------------------------------------------------------#
 #cython: language_level=3
 import numpy as np
-from libc.math cimport sin, cos, tan, acos, sqrt
+from libc.math cimport sin, cos, tan, acos, sqrt, exp, pi, log
+cimport cython
+from cython.parallel import prange
 
 
 DTYPE = np.float64
@@ -242,3 +244,47 @@ def construct_coefficients(int l, double eps, double[:] veff, double[:] dveff,
             c1_view[i] = dveff[i] * rgrid[i] / (2 * ScR_mass * c ** 2) - 1
 
     return c0, c1, c2
+
+
+@cython.boundscheck(False)
+@cython.cdivision(True)
+@cython.wraparound(False)
+@cython.nonecheck(False)
+def vxc_lda(double[::1] rho, double[::1] vxc):
+    """ Calculate LDA exchange-correlation potential from the density """
+    cdef int N = rho.shape[0]
+    cdef double small = 1e-16
+    cdef double a1 = 0.21370
+    cdef double c0 = 0.031091
+    cdef double c1 = 0.046644
+    cdef double b1 = 0.5 / c0 * exp(-c1 / 2.0 / c0)
+    cdef double b2 = 2 * c0 * b1**2
+    cdef double b3 = 1.6382
+    cdef double b4 = 0.49294
+    cdef double aux
+    cdef double rs
+    cdef Py_ssize_t i
+
+    for i in prange(N, nogil=True):
+        if rho[i] < small:
+            vxc[i] = 0.
+        else:
+            # Exchange (der=0)
+            vxc[i] = -0.75 * (3 * rho[i] / pi)**(1. / 3)
+
+            # Exchange (der=1)
+            vxc[i] += rho[i] * -3. / (4 * pi) * (3 * rho[i] / pi)**(-2. / 3)
+
+            rs = (3. / (4 * pi * rho[i]))**(1. / 3)
+            aux = 2 * c0 * (b1 * sqrt(rs) + b2 * rs + b3 * rs**1.5 + b4 * rs**2)
+
+            # Correlation (der=0)
+            vxc[i] += -2 * c0 * (1 + a1 * rs) * log(1 + 1./aux)
+
+            # Correlation (der=1)
+            vxc[i] += 0.5 * c0 / (pi * rho[i] * rs**2) \
+                      * (a1 * log(1 + 1./aux) \
+                         + (1 + a1 * rs) * (1 + 1./aux)**-1 * (-aux**-2) \
+                           * 2 * c0 * (b1 / (2 * sqrt(rs)) + b2 \
+                                       + 3 * b3 * sqrt(rs) / 2 + 2 * b4 * rs))
+    return vxc
