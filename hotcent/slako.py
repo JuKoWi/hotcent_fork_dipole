@@ -635,7 +635,7 @@ class SlaterKosterTable:
                      spl.c[2][i], spl.c[1][i], spl.c[0][i]]
             if i == n-1:
                 items += [c4, c5]
-            lines += ' '.join(map(lambda x: '%.6f' % x, items)) + '\n'
+            lines += ' '.join(map(lambda x: '%.9f' % x, items)) + '\n'
 
         return lines
 
