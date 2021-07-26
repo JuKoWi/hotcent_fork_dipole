@@ -412,16 +412,19 @@ class AtomicDFT(AtomicBase):
                solve = [nl1, nl2, ...] -> only the given subset
         """
         self.timer.start('inner_scf')
+
+        N = np.argmax(veff == np.inf)
+        N = self.N if N == 0 else N
+
         if self.scalarrel and dveff is None:
-            spl = CubicSplineFunction(self.rgrid, veff)
-            dveff = spl(self.rgrid, der=1)
+            spl = CubicSplineFunction(self.rgrid[:N], veff[:N])
+            dveff = spl(self.rgrid[:N], der=1)
         elif not self.scalarrel:
             dveff = np.array([])
 
         rgrid = self.rgrid
         xgrid = self.xgrid
         dx = xgrid[1] - xgrid[0]
-        N = self.N
         unlg, Rnlg = {}, {}
 
         for n, l, nl in self.list_states():
@@ -441,19 +444,23 @@ class AtomicDFT(AtomicBase):
                 delta = d_enl[nl]
 
             direction = 'none'
-            epsmax = veff[-1] - l * (l + 1) / (2 * self.rgrid[-1] ** 2)
+            if np.isfinite(veff[-1]):
+                epsmax = veff[-1] - l * (l + 1) / (2 * self.rgrid[-1] ** 2)
+            else:
+                epsmax = None
+
             it = 0
-            u = np.zeros(N)
+            u = np.zeros(self.N)
             hist = []
 
             while True:
                 eps0 = eps
                 self.timer.start('coeff')
                 if _hotcent is not None:
-                    c0, c1, c2 = _hotcent.construct_coefficients(l, eps, veff,
-                                                             dveff, self.rgrid)
+                    c0, c1, c2 = _hotcent.construct_coefficients(l, eps,
+                                                veff[:N], dveff, self.rgrid[:N])
                 else:
-                    c0, c1, c2 = self.construct_coefficients(l, eps, veff,
+                    c0, c1, c2 = self.construct_coefficients(l, eps, veff[:N],
                                                              dveff=dveff)
                 assert c0[-2] < 0 and c0[-1] < 0
                 self.timer.stop('coeff')
@@ -464,11 +471,13 @@ class AtomicDFT(AtomicBase):
                 # u(r)~exp( -sqrt(c0(r)) ) (set u[-1]=1
                 # and use expansion to avoid overflows)
                 u[0:2] = rgrid[0:2] ** (l + 1)
+                u[N-1] = 0.
                 self.timer.start('shoot')
                 if _hotcent is not None:
-                    u, nodes, A, ctp = _hotcent.shoot(u, dx, c2, c1, c0, N)
+                    u[:N], nodes, A, ctp = _hotcent.shoot(u[:N], dx, c2, c1,
+                                                          c0, N)
                 else:
-                    u, nodes, A, ctp = shoot(u, dx, c2, c1, c0, N)
+                    u[:N], nodes, A, ctp = shoot(u[:N], dx, c2, c1, c0, N)
                 self.timer.stop('shoot')
 
                 self.timer.start('norm')
@@ -498,7 +507,10 @@ class AtomicDFT(AtomicBase):
                         direction = 'down'
                     eps += shift
 
-                if eps > epsmax:
+                if epsmax is None:
+                    if abs(eps - eps0) > 0.5*abs(eps0):
+                        eps = eps0 + np.sign(eps - eps0) * 0.5*abs(eps0)
+                elif eps > epsmax:
                     eps = 0.5 * (epsmax + eps0)
                 hist.append(eps)
 

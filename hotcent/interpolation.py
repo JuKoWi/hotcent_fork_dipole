@@ -22,8 +22,8 @@ except:
 
 
 class CubicSplineFunction(CubicSpline):
-    def __init__(self, x, y):
-        CubicSpline.__init__(self, x, y, bc_type='natural', extrapolate=False)
+    def __init__(self, x, y, bc_type='natural'):
+        CubicSpline.__init__(self, x, y, bc_type=bc_type, extrapolate=False)
 
     def __call__(self, x, der=0):
         if isinstance(x, np.ndarray):

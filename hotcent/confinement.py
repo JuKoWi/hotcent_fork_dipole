@@ -78,7 +78,7 @@ class SoftConfinement(Confinement):
         ri = self.x_ri * self.rc
         condlist = [r < ri, np.logical_and(ri <= r, r < self.rc), r >= self.rc]
         funclist = [0., lambda x: self.amp * np.exp(-(self.rc - ri) / (x - ri)) \
-                                  / (self.rc - x), lambda x: 0., np.inf]
+                                  / (self.rc - x), np.inf]
         return np.piecewise(r, condlist, funclist)
 
     def __str__(self):

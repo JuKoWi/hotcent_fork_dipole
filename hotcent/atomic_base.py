@@ -244,18 +244,39 @@ class AtomicBase:
             if abs(wf) > fractional_limit * wfmax:
                 return r
 
+    def construct_wfn_interpolator(self, x, y, nl):
+        """ Returns a (cubic) interpolator for wave functions, taking
+        into account the cut-off radii of certain confinement schemes.
+        """
+        rc = None
+        if nl in self.wf_confinement:
+            if hasattr(self.wf_confinement[nl], 'rc'):
+                rc = self.wf_confinement[nl].rc
+
+        if rc is None:
+            fct = CubicSplineFunction(x, y)
+        else:
+            N = np.argmax(x > rc)
+            fct = CubicSplineFunction(x[:N], y[:N],
+                                      bc_type=('natural', 'clamped'))
+        return fct
+
     def Rnl(self, r, nl, der=0):
         """ Rnl(r, '2p') """
         assert self.solved, NOT_SOLVED_MESSAGE
         if self.Rnl_fct[nl] is None:
-            self.Rnl_fct[nl] = CubicSplineFunction(self.rgrid, self.Rnlg[nl])
+            self.Rnl_fct[nl] = self.construct_wfn_interpolator(self.rgrid,
+                                                               self.Rnlg[nl],
+                                                               nl)
         return self.Rnl_fct[nl](r, der=der)
 
     def unl(self, r, nl, der=0):
         """ unl(r, '2p') = Rnl(r, '2p') / r """
         assert self.solved, NOT_SOLVED_MESSAGE
         if self.unl_fct[nl] is None:
-            self.unl_fct[nl] = CubicSplineFunction(self.rgrid, self.unlg[nl])
+            self.unl_fct[nl] = self.construct_wfn_interpolator(self.rgrid,
+                                                               self.unlg[nl],
+                                                               nl)
         return self.unl_fct[nl](r, der=der)
 
     def electron_density(self, r, der=0, only_valence=False):
