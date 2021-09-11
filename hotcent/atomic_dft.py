@@ -334,11 +334,34 @@ class AtomicDFT(AtomicBase):
     def get_onecenter_integral(self, nl):
         """ Returns the chosen one-center integral (<phi|H|phi>). """
         assert nl in self.valence
-
         l = ANGULAR_MOMENTUM[nl[1]]
-        e = self.grid.integrate(self.unlg[nl] \
-            * ((self.veff + l * (l+1) / (2. * self.rgrid**2)) * self.unlg[nl] \
-                - 0.5 * self.unl(self.rgrid, nl, der=2)))
+
+        if not self.scalarrel:
+            hpsi = -0.5 * self.unl(self.rgrid, nl, der=2)
+            hpsi += (self.veff + l*(l+1) / (2. * self.rgrid**2)) * self.unlg[nl]
+            e = self.grid.integrate(self.unlg[nl] * hpsi)
+        else:
+            spl = CubicSplineFunction(self.rgrid, self.veff)
+            dveff = spl(self.rgrid, der=1)
+
+            c = 137.036
+            eps = self.get_eigenvalue(nl)  # initial guess
+
+            while True:
+                M = 1. - (self.veff - eps) / (2. * c**2)
+                hpsi = -0.5 * self.unl(self.rgrid, nl, der=2)
+                hpsi += (l*(l+1) / (2. * self.rgrid**2) \
+                         + M * (self.veff - eps) + eps) * self.unlg[nl]
+                hpsi -= 1. / (4. * M * c**2) * dveff \
+                        * (self.unl(self.rgrid, nl, der=1) \
+                           - self.unlg[nl] / self.rgrid)
+
+                e = self.grid.integrate(self.unlg[nl] * hpsi)
+                de = eps - e
+                if abs(de) < 1e-8:
+                    break
+                else:
+                    eps = self.mix * e + (1. - self.mix) * eps
         return e
 
     def outer_scf(self):
