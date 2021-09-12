@@ -422,7 +422,7 @@ class AtomicDFT(AtomicBase):
         return dens, veff, enl, unlg, Rnlg
 
     def inner_scf(self, iteration, veff, enl, d_enl, dveff=None, itmax=100,
-                  solve='all'):
+                  solve='all', ae=True):
         """ Solve the eigenstates for given effective potential.
 
         u''(r) - 2*(v_eff(r)+l*(l+1)/(2r**2)-e)*u(r)=0
@@ -438,6 +438,8 @@ class AtomicDFT(AtomicBase):
         itmax: maximum number of optimization steps per eigenstate
         solve: which eigenstates to solve: solve='all' -> all states;
                solve = [nl1, nl2, ...] -> only the given subset
+        ae: whether this is an all-electron calculation,
+            which determines the expected number of nodes.
         """
         self.timer.start('inner_scf')
 
@@ -459,7 +461,7 @@ class AtomicDFT(AtomicBase):
             if solve != 'all' and nl not in solve:
                 continue
 
-            nodes_nl = n - l - 1
+            nodes_nl = n - l - 1 if ae else 0
 
             if iteration == 0:
                 eps = -1.0 * self.Z ** 2 / n ** 2
