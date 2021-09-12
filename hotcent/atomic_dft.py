@@ -38,6 +38,7 @@ class AtomicDFT(AtomicBase):
                  xc='LDA',
                  convergence={'density':1e-7, 'energies':1e-7},
                  perturbative_confinement=False,
+                 rmin=None,
                  **kwargs):
         """ Run Kohn-Sham all-electron calculations for a given atom.
 
@@ -86,6 +87,10 @@ class AtomicDFT(AtomicBase):
             The perturbative scheme is e.g. how basis sets are
             generated in GPAW. This option is also faster than the
             self-consistent one, in particular for heavier atoms.
+
+        rmin: smallest radius in the radial grid (default: 1e-2 / Z).
+              For heavier elements, smaller rmin values (e.g. 1e-4 / Z)
+              can be needed for high precision.
         """
         AtomicBase.__init__(self, symbol, **kwargs)
 
@@ -106,7 +111,7 @@ class AtomicDFT(AtomicBase):
             print('Using scalar relativistic corrections.', file=self.txt)
 
         maxnodes = max([n - l - 1 for n, l, nl in self.list_states()])
-        self.rmin = 1e-2 / self.Z
+        self.rmin = 1e-2 / self.Z if rmin is None else rmin
         self.N = (maxnodes + 1) * self.nodegpts
         print('max %i nodes, %i grid points' % (maxnodes, self.N),
               file=self.txt)
