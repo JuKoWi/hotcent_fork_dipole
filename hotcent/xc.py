@@ -5,6 +5,7 @@
 #   SPDX-License-Identifier: GPL-3.0-or-later                                 #
 #-----------------------------------------------------------------------------#
 import numpy as np
+from scipy.interpolate import CubicSpline
 try:
     from pylibxc import LibXCFunctional
     from pylibxc.version import __version__ as pylibxc_version
@@ -144,3 +145,15 @@ class XC_PW92:
             n: array-like, the electron density
         """
         return self.exc(n), self.vxc(n)
+
+
+class VXC_PW92_Spline(CubicSpline):
+    def __init__(self, rho_min=1e-16, rho_max=1e12, num=10000):
+        """ The Perdew-Wang 1992 LDA exchange-correlation potential,
+            evaluated by cubic interpolation. """
+        x = np.exp(np.linspace(np.log(rho_min), np.log(rho_max), num=num,
+                               endpoint=True))
+        f = XC_PW92()
+        y = f.vxc(x)
+        CubicSpline.__init__(self, x, y, bc_type=('clamped', 'natural'),
+                             extrapolate=False)

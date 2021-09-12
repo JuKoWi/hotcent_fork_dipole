@@ -8,7 +8,7 @@ from hotcent.slako import SlaterKosterTable
 from hotcent.slako import INTEGRALS as INTEGRALS_2c
 from hotcent.threecenter import (INTEGRALS, INTEGRAL_PAIRS, select_integrals,
                                  select_orbitals, sph_nophi, sph_phi)
-from hotcent.xc import XC_PW92, LibXC
+from hotcent.xc import LibXC, VXC_PW92_Spline, XC_PW92
 import _hotcent
 
 
@@ -106,8 +106,8 @@ class Offsite3cTable(SlaterKosterTable):
         self.timer.start('vrho')
         rho = e1.electron_density(r1) + e2.electron_density(r2)
         if xc in ['LDA', 'PW92']:
-            xc = XC_PW92()
-            vxc = xc.vxc(rho)
+            xc = VXC_PW92_Spline()
+            vxc = xc(rho)
             self.timer.stop('vrho')
         else:
             xc = LibXC(xc)
@@ -147,6 +147,8 @@ class Offsite3cTable(SlaterKosterTable):
             if isinstance(xc, XC_PW92):
                 _hotcent.vxc_lda(rho123, vxc123)
                 V += vxc123
+            elif isinstance(xc, VXC_PW92_Spline):
+                V += xc(rho123)
             V *= area * x
 
             vals = np.zeros(len(selected))
