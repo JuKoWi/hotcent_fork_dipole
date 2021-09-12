@@ -13,6 +13,10 @@ Development version
 
 * Maintenance related to changes in ASE, Matplotlib and LibXC.
 
+* Bugfix: there was an off-by-one error in the number of zero-valued
+  integrals printed in the Slater-Koster files for distances below
+  'rmin'.
+
 
 Version 1.0
 ===========

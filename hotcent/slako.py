@@ -176,7 +176,7 @@ class SlaterKosterTable:
 
         if self.Rgrid[0] != 0:
             n = int(self.Rgrid[0] / (self.Rgrid[1] - self.Rgrid[0]))
-            for i in range(n):
+            for i in range(n-1):
                 print('%d*0.0,' % len(indices), file=handle)
 
         ct, theader = 0, ''
