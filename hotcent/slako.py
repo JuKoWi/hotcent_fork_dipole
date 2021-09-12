@@ -310,7 +310,7 @@ class SlaterKosterTable:
         return wf_range
 
     def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
-            superposition='potential', xc='LDA', stride=1):
+            superposition='potential', xc='LDA', stride=1, smoothen_tails=True):
         """ Calculate the Slater-Koster table.
 
         parameters:
@@ -347,6 +347,8 @@ class SlaterKosterTable:
                 the expensive integrations to a subset N' = N // stride,
                 and map the resulting curves on the N-grid afterwards.
                 The default stride = 1 means that N' = N (no shortcut).
+        smoothen_tails: whether to modify the 'tails' of the Slater-Koster
+                integrals so that they smoothly decay to zero.
         """
         print('\n\n', file=self.txt)
         print('***********************************************', file=self.txt)
@@ -413,10 +415,11 @@ class SlaterKosterTable:
         else:
             self.tables = tables
 
-        # Smooth the curves near the cutoff
-        for p in range(self.nel):
-            for i in range(2*NUMSK):
-                self.tables[p][:, i] = tail_smoothening(self.Rgrid,
+        if smoothen_tails:
+            # Smooth the curves near the cutoff
+            for p in range(self.nel):
+                for i in range(2*NUMSK):
+                    self.tables[p][:, i] = tail_smoothening(self.Rgrid,
                                                         self.tables[p][:, i])
 
         self.timer.stop('calculate_tables')
