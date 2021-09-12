@@ -302,7 +302,6 @@ class Offsite3cTable(SlaterKosterTable):
                     sval = []
                     for r13 in rval:
                         grid, area = self.make_grid(r13, nt=150, nr=50)
-                        assert len(grid) > 0
                         # TODO: H integrals are not needed here
                         if l1 < l3:
                             s, h, h2 = self.calculate_mels(sk_selected, e1, e3,
@@ -310,6 +309,8 @@ class Offsite3cTable(SlaterKosterTable):
                         else:
                             s, h, h2 = self.calculate_mels(sk_selected, e3, e1,
                                                         r13, grid, area, xc=xc)
+                        if len(grid) == 0:
+                            assert abs(s[iint]) < 1e-24
                         sval.append(s[iint])
 
                     self.overlap_fct[key] = CubicSplineFunction(rval, sval)
