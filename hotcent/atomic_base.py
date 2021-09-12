@@ -349,7 +349,7 @@ class AtomicBase:
                 c = 'r'
             plt.text(0.5, 0.4, r'$R_{%s}(i)$' % nl, transform=ax.transAxes,
                      size=15, color=c)
-            if ax.is_first_col():
+            if ax.get_subplotspec().is_first_col():
                 plt.ylabel(r'$R_{nl}(i)$', size=8)
             i += 1
 
@@ -367,9 +367,9 @@ class AtomicBase:
                 c = 'r'
             plt.text(0.5, 0.4, r'$R_{%s}(r)$' % nl, transform=ax.transAxes,
                      size=15, color=c)
-            if ax.is_first_col():
+            if ax.get_subplotspec().is_first_col():
                 plt.ylabel(r'$R_{nl}(r)$', size=8)
-            if ax.is_last_row():
+            if ax.get_subplotspec().is_last_row():
                 plt.xlabel('r (Bohr)', size=8)
             i += 1
 

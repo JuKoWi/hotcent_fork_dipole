@@ -258,9 +258,9 @@ class SlaterKosterTable:
                             'No %s integrals for <%s|%s>' % (name, s1, s2),
                             transform=ax.transAxes, size=10, va='center')
 
-                    if not ax.is_last_row():
+                    if not ax.get_subplotspec().is_last_row():
                         plt.xticks([], [])
-                    if not ax.is_first_col():
+                    if not ax.get_subplotspec().is_first_col():
                         plt.yticks([], [])
                 else:
                     plt.plot(self.Rgrid, self.tables[p][:, i] , c='r',
@@ -271,11 +271,11 @@ class SlaterKosterTable:
                     ax.text(0.8, 0.1 + p * 0.15, name, size=10,
                             transform=ax.transAxes)
 
-                    if ax.is_last_row():
+                    if ax.get_subplotspec().is_last_row():
                         plt.xlabel('r (Bohr)')
                     else:
                         plt.xticks([], [])
-                    if not ax.is_first_col():
+                    if not ax.get_subplotspec().is_first_col():
                         plt.yticks([],[])
 
                 plt.xlim([0, rmax])
