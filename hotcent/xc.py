@@ -148,12 +148,14 @@ class XC_PW92:
 
 
 class VXC_PW92_Spline(CubicSpline):
-    def __init__(self, rho_min=1e-16, rho_max=1e12, num=10000):
+    def __init__(self, rho_min=1e-18, rho_max=1e12, num=10000):
         """ The Perdew-Wang 1992 LDA exchange-correlation potential,
             evaluated by cubic interpolation. """
         x = np.exp(np.linspace(np.log(rho_min), np.log(rho_max), num=num,
                                endpoint=True))
         f = XC_PW92()
         y = f.vxc(x)
+        x = np.insert(x, 0, [-rho_min, 0.])
+        y = np.insert(y, 0, [0., 0.])
         CubicSpline.__init__(self, x, y, bc_type=('clamped', 'natural'),
                              extrapolate=False)
