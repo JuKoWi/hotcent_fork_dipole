@@ -5,14 +5,12 @@
 #   SPDX-License-Identifier: GPL-3.0-or-later                                 #
 #-----------------------------------------------------------------------------#
 import numpy as np
-from scipy.integrate import quad
 from scipy.interpolate import SmoothBivariateSpline
 from ase.data import atomic_numbers, atomic_masses
-from hotcent.orbitals import ANGULAR_MOMENTUM, ORBITALS
 from hotcent.xc import XC_PW92, LibXC
 from hotcent.slako import (g, INTEGRAL_PAIRS, INTEGRALS, NUMSK,
-                           search_integrals, select_integrals,
-                           SlaterKosterTable, tail_smoothening)
+                           select_integrals, SlaterKosterTable,
+                           tail_smoothening)
 
 
 class Onsite2cTable(SlaterKosterTable):
@@ -160,6 +158,8 @@ class Onsite2cTable(SlaterKosterTable):
                   superposition='potential', xc='LDA'):
         self.timer.start('calculate_onsite2c')
 
+        assert superposition == 'density'
+
         # TODO: boilerplate
         # common for all integrals (not wf-dependent parts)
         self.timer.start('prelude')
@@ -172,52 +172,43 @@ class Onsite2cTable(SlaterKosterTable):
         s1 = np.sqrt(1. - c1**2)  # sine of theta_1
         s2 = np.sqrt(1. - c2**2)  # sine of theta_2
 
-        if superposition == 'potential':
-            self.timer.start('vrho')
-            v1 = e1a.effective_potential(r1) - e1a.confinement(r1)
-            v2 = e2.effective_potential(r2) - e2.confinement(r2)
-            veff = v1 + v2
+        self.timer.start('vrho')
+        rho = e1a.electron_density(r1) + e2.electron_density(r2)
+        veff = e1a.nuclear_potential(r1) + e1a.hartree_potential(r1)
+        veff += e2.nuclear_potential(r2) + e2.hartree_potential(r2)
+        if xc in ['LDA', 'PW92']:
+            xc = XC_PW92()
+            veff += xc.vxc(rho)
             self.timer.stop('vrho')
-        elif superposition == 'density':
-            self.timer.start('vrho')
-            rho = e1a.electron_density(r1) + e2.electron_density(r2)
-            veff = e1a.nuclear_potential(r1) + e1a.hartree_potential(r1)
-            veff += e2.nuclear_potential(r2) + e2.hartree_potential(r2)
-            if xc in ['LDA', 'PW92']:
-                xc = XC_PW92()
-                veff += xc.vxc(rho)
-                self.timer.stop('vrho')
-            else:
-                xc = LibXC(xc)
-                drho1 = e1a.electron_density(r1, der=1)
-                drho2 = e2.electron_density(r2, der=1)
-                grad_x = drho1 * s1
-                grad_x += drho2 * s2
-                grad_y = drho1 * c1
-                grad_y += drho2 * c2
-                sigma = np.sqrt(grad_x**2 + grad_y**2)**2
-                out = xc.compute_all(rho, sigma)
-                veff += out['vrho']
-                self.timer.stop('vrho')
-                self.timer.start('vsigma')
-                # add gradient corrections to vxc
-                # provided that we have enough points
-                # (otherwise we get "dfitpack.error:
-                # (m>=(kx+1)*(ky+1)) failed for hidden m")
-                if out['vsigma'] is not None and len(x) > 16:
-                    splx = SmoothBivariateSpline(x, y, out['vsigma'] * grad_x)
-                    sply = SmoothBivariateSpline(x, y, out['vsigma'] * grad_y)
-                    veff += -2. * splx(x, y, dx=1, dy=0, grid=False)
-                    veff += -2. * sply(x, y, dx=0, dy=1, grid=False)
-                self.timer.stop('vsigma')
+        else:
+            xc = LibXC(xc)
+            drho1 = e1a.electron_density(r1, der=1)
+            drho2 = e2.electron_density(r2, der=1)
+            grad_x = drho1 * s1
+            grad_x += drho2 * s2
+            grad_y = drho1 * c1
+            grad_y += drho2 * c2
+            sigma = np.sqrt(grad_x**2 + grad_y**2)**2
+            out = xc.compute_all(rho, sigma)
+            veff += out['vrho']
+            self.timer.stop('vrho')
+            self.timer.start('vsigma')
+            # add gradient corrections to vxc
+            # provided that we have enough points
+            # (otherwise we get "dfitpack.error:
+            # (m>=(kx+1)*(ky+1)) failed for hidden m")
+            if out['vsigma'] is not None and len(x) > 16:
+                splx = SmoothBivariateSpline(x, y, out['vsigma'] * grad_x)
+                sply = SmoothBivariateSpline(x, y, out['vsigma'] * grad_y)
+                veff += -2. * splx(x, y, dx=1, dy=0, grid=False)
+                veff += -2. * sply(x, y, dx=0, dy=1, grid=False)
+            self.timer.stop('vsigma')
 
         assert np.shape(veff) == (len(grid),)
         self.timer.stop('prelude')
 
-        if superposition == 'density':
-            V = veff - e1a.effective_potential(r1)
-        elif superposition == 'potential':
-            V = e2.effective_potential(r2)
+        V = veff - e1a.effective_potential(r1)
+        sym1a, sym1b, sym2 = e1a.get_symbol(), e1b.get_symbol(), e2.get_symbol()
 
         results = {}
         for key in selected:
@@ -229,47 +220,9 @@ class Onsite2cTable(SlaterKosterTable):
             aux = gphi * area * x
             val = np.sum(Rnl1 * Rnl2 * V * aux)
 
-            pseudo = 0.
             lm1, lm2 = INTEGRAL_PAIRS[integral]
-            l1 = 'spdf'.index(lm1[0])
-            l2 = 'spdf'.index(lm2[0])
-
-            for n3, l3, nl3 in e2.list_states():
-                if nl3 not in e2.valence:
-                    Rnl3 = e2.Rnl(r2, nl3)
-
-                    for lm3 in ORBITALS[l3]:
-                        term = e2.get_eigenvalue(nl3)
-
-                        # first atom
-                        integrals, ordered = search_integrals(lm1, lm3)
-                        S3 = 0.
-                        for integral3, ord in zip(integrals, ordered):
-                            if ord:
-                                gphi = g(c1, c2, s1, s2, integral3)
-                            else:
-                                gphi = g(c2, c1, s2, s1, integral3)
-
-                            aux = gphi * area * x
-                            S3 += np.sum(Rnl1 * Rnl3 * aux)
-                        term *= S3
-
-                        # second atom
-                        integrals, ordered = search_integrals(lm3, lm2)
-                        S3 = 0.
-                        for integral3, ord in zip(integrals, ordered):
-                            if ord:
-                                gphi = g(c2, c1, s2, s1, integral3)
-                            else:
-                                gphi = g(c1, c2, s1, s2, integral3)
-
-                            aux = gphi * area * x
-                            S3 += np.sum(Rnl2 * Rnl3 * aux)
-                        term *= S3
-
-                        pseudo += term
-
-            val -= pseudo
+            val += e2.pp.get_nonlocal_integral(sym1a, sym1b, sym2, 0., R, 0.,
+                                               nl1, nl2, lm1, lm2)
             results[key] = val
 
         self.timer.stop('calculate_onsite2c')

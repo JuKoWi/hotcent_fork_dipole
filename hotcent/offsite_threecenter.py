@@ -7,22 +7,13 @@
 import numpy as np
 from scipy.integrate import quad_vec
 from scipy.interpolate import SmoothBivariateSpline
-from hotcent.interpolation import CubicSplineFunction
-from hotcent.orbitals import (calculate_slako_coeff, ANGULAR_MOMENTUM,
-                              ORBITAL_LABELS, ORBITALS)
 from hotcent.slako import SlaterKosterTable
-from hotcent.slako import INTEGRALS as INTEGRALS_2c
-from hotcent.threecenter import (INTEGRALS, INTEGRAL_PAIRS, select_integrals,
-                                 select_orbitals, sph_nophi, sph_phi)
+from hotcent.threecenter import select_integrals, sph_nophi, sph_phi
 from hotcent.xc import LibXC, VXC_PW92_Spline, XC_PW92
 import _hotcent
 
 
 class Offsite3cTable(SlaterKosterTable):
-    def __init__(self, *args, **kwargs):
-        SlaterKosterTable.__init__(self, *args, **kwargs)
-        self.overlap_fct = {}  # dictionary with core-valence overlap functions
-
     def run(self, e3, Rgrid, Sgrid, Tgrid, ntheta=150, nr=50, wflimit=1e-7,
             xc='LDA'):
         """ Calculates off-site three-center integrals.
@@ -60,10 +51,6 @@ class Offsite3cTable(SlaterKosterTable):
             for s in selected:
                 print(s[0], end=' ', file=self.txt)
             print(file=self.txt, flush=True)
-
-            rmin, rmax = 0., np.max(Sgrid) + 0.5*np.max(Rgrid)
-            self.build_core_valence_overlap(e1, e3, rmin, rmax, numr=100)
-            self.build_core_valence_overlap(e2, e3, rmin, rmax, numr=100)
 
             with open(filename, 'w') as f:
                 f.write('%.6f %.6f %d\n' % (Rgrid[0], Rgrid[-1], len(Rgrid)))
@@ -143,6 +130,7 @@ class Offsite3cTable(SlaterKosterTable):
         self.timer.stop('prelude')
 
         vxc123 = np.zeros_like(r1)
+        sym1, sym2, sym3 = e1.get_symbol(), e2.get_symbol(), e3.get_symbol()
 
         def integrands(phi):
             rA = np.sqrt((x0*np.cos(phi) - x)**2 + (y0 - y)**2 \
@@ -163,70 +151,6 @@ class Offsite3cTable(SlaterKosterTable):
                 vals[i] = np.dot(Rnl12[(integral, nl1, nl2)], V)
                 vals[i] *= sph_phi(lm1, phi) * sph_phi(lm2, phi)
             return vals
-
-
-        def get_pseudopotential_term(integral, nl1, nl2, phi):
-            x3 = x0 * np.cos(phi)
-            y3 = x0 * np.sin(phi)
-            z3 = y0
-            v13 = np.array([x3, y3, z3])
-            r13 = np.linalg.norm(v13)
-            v13 /= r13
-            v23 = np.array([x3, y3, z3-R])
-            r23 = np.linalg.norm(v23)
-            v23 /= r23
-            pseudo = 0.
-            lm1, lm2 = INTEGRAL_PAIRS[integral]
-            l1 = 'spdf'.index(lm1[0])
-            l2 = 'spdf'.index(lm2[0])
-            sym1 = e1.get_symbol()
-            sym2 = e2.get_symbol()
-            sym3 = e3.get_symbol()
-
-            for n3, l3, nl3 in e3.list_states():
-                if nl3 in e3.valence:
-                    continue
-
-                for lm3 in ORBITALS[l3]:
-                    term = e3.get_eigenvalue(nl3)
-                    ilm3 = ORBITAL_LABELS.index(lm3)
-
-                    # first atom
-                    S3 = 0.
-                    x, y, z = v13
-                    ilm = ORBITAL_LABELS.index(lm1)
-                    minl = min(l1, l3)
-                    for tau in range(minl+1):
-                        skint = self.get_overlap(sym1, sym3, nl1, nl3, tau, r13)
-                        if ilm3 >= ilm:
-                            coef = calculate_slako_coeff(x, y, z, ilm+1,
-                                                         ilm3+1, tau+1)
-                        else:
-                            coef = calculate_slako_coeff(x, y, z, ilm3+1,
-                                                         ilm+1, tau+1)
-                            coef *= (-1)**(l1 + l3)
-                        S3 += coef * skint
-                    term *= S3
-
-                    # second atom
-                    S3 = 0.
-                    x, y, z = v23
-                    ilm = ORBITAL_LABELS.index(lm2)
-                    minl = min(l2, l3)
-                    for tau in range(minl+1):
-                        skint = self.get_overlap(sym2, sym3, nl2, nl3, tau, r23)
-                        if ilm3 >= ilm:
-                            coef = calculate_slako_coeff(x, y, z, ilm+1,
-                                                         ilm3+1, tau+1)
-                        else:
-                            coef = calculate_slako_coeff(x, y, z, ilm3+1,
-                                                         ilm+1, tau+1)
-                            coef *= (-1)**(l2 + l3)
-                        S3 += coef * skint
-                    term *= S3
-
-                    pseudo += term
-            return pseudo
 
         # Pre-calculate the phi-indedendent wave function products
         Rnl12 = {}
@@ -250,8 +174,10 @@ class Offsite3cTable(SlaterKosterTable):
 
         results = {key: [] for key in selected}
         for i, key in enumerate(selected):
-            pseudo = get_pseudopotential_term(*key, phi=0.)
-            vals[i] -= pseudo
+            integral, nl1, nl2 = key
+            lm1, lm2 = integral.split('_')
+            vals[i] += e3.pp.get_nonlocal_integral(sym1, sym2, sym3, x0, y0, R,
+                                                   nl1, nl2, lm1, lm2)
             results[key].append(vals[i])
 
         # Now the actual grid
@@ -270,59 +196,14 @@ class Offsite3cTable(SlaterKosterTable):
                                          points=break_points)
 
                     for i, key in enumerate(selected):
-                        pseudo = get_pseudopotential_term(*key, phi=0.)
-                        vals[i] -= pseudo
+                        integral, nl1, nl2 = key
+                        lm1, lm2 = integral.split('_')
+                        vals[i] += e3.pp.get_nonlocal_integral(sym1, sym2, sym3,
+                                                               x0, y0, R, nl1,
+                                                               nl2, lm1, lm2)
 
                 for i, key in enumerate(selected):
                     results[key].append(vals[i])
 
         self.timer.stop('calculate_offsite3c')
         return results
-
-    def build_core_valence_overlap(self, e1, e3, rmin, rmax, numr, xc='LDA'):
-        """ Builds the core-valence overlap integral interpolators. """
-        for nl1 in e1.valence:
-            l1 = 'spdf'.index(nl1[1])
-
-            for n3, l3, nl3 in e3.list_states():
-                if nl3 in e3.valence:
-                    continue
-
-                for tau in range(min(l1, l3) + 1):
-                    key = (e1.get_symbol(), e3.get_symbol(), nl1, nl3, tau)
-                    if key in self.overlap_fct:
-                        continue
-
-                    print('Calculating overlaps for ', key)
-                    rval = np.linspace(rmin, rmax, num=numr, endpoint=True)
-
-                    if l1 < l3:
-                        sk_integral = nl1[1] + nl3[1] + 'spdf'[tau]
-                        sk_selected = [(sk_integral, nl1, nl3)]
-                    else:
-                        sk_integral = nl3[1] + nl1[1] + 'spdf'[tau]
-                        sk_selected = [(sk_integral, nl3, nl1)]
-
-                    iint = INTEGRALS_2c.index(sk_integral)
-
-                    sval = []
-                    for r13 in rval:
-                        grid, area = self.make_grid(r13, nt=150, nr=50)
-                        # TODO: H integrals are not needed here
-                        if l1 < l3:
-                            s, h, h2 = self.calculate_mels(sk_selected, e1, e3,
-                                                        r13, grid, area, xc=xc)
-                        else:
-                            s, h, h2 = self.calculate_mels(sk_selected, e3, e1,
-                                                        r13, grid, area, xc=xc)
-                        if len(grid) == 0:
-                            assert abs(s[iint]) < 1e-24
-                        sval.append(s[iint])
-
-                    self.overlap_fct[key] = CubicSplineFunction(rval, sval)
-
-    def get_overlap(self, sym1, sym2, nl1, nl2, tau, r):
-        """ Returns the orbital overlap, evaluated by interpolation. """
-        key = (sym1, sym2, nl1, nl2, tau)
-        s = self.overlap_fct[key](r, der=0)
-        return s

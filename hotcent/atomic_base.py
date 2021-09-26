@@ -21,6 +21,7 @@ from ase.units import Bohr, Ha
 from hotcent.interpolation import CubicSplineFunction
 from hotcent.timing import Timer
 from hotcent.confinement import Confinement, ZeroConfinement
+from hotcent.phillips_kleinman import PhillipsKleinmanPP
 try:
     import matplotlib.pyplot as plt
 except:
@@ -119,6 +120,9 @@ class AtomicBase:
         self.vhar_fct = None
         self.vharval_fct = None
         self.solved = False
+
+        # Set default 'pseudopotential':
+        self.pp = PhillipsKleinmanPP(self.symbol)
 
     def set_configuration(self, configuration):
         """ Set the electron configuration
