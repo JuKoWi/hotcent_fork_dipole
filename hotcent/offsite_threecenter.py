@@ -136,7 +136,7 @@ class Offsite3cTable(SlaterKosterTable):
             rA = np.sqrt((x0*np.cos(phi) - x)**2 + (y0 - y)**2 \
                          + (x0*np.sin(phi))**2)
 
-            V = e3.nuclear_potential(rA) + e3.hartree_potential(rA) - vxc
+            V = e3.neutral_atom_potential(rA) - vxc
             rho123 = rho + e3.electron_density(rA)
             if isinstance(xc, XC_PW92):
                 _hotcent.vxc_lda(rho123, vxc123)

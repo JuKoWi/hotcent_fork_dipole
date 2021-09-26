@@ -174,8 +174,8 @@ class Onsite2cTable(SlaterKosterTable):
 
         self.timer.start('vrho')
         rho = e1a.electron_density(r1) + e2.electron_density(r2)
-        veff = e1a.nuclear_potential(r1) + e1a.hartree_potential(r1)
-        veff += e2.nuclear_potential(r2) + e2.hartree_potential(r2)
+        veff = e1a.neutral_atom_potential(r1)
+        veff += e2.neutral_atom_potential(r2)
         if xc in ['LDA', 'PW92']:
             xc = XC_PW92()
             veff += xc.vxc(rho)

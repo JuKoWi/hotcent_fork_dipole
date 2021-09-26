@@ -298,6 +298,16 @@ class AtomicBase:
     def nuclear_potential(self,r):
         return -self.Z / r
 
+    def neutral_atom_potential(self, r):
+        """ Return the so-called 'neutral atom potential' at r, defined as
+        the sum of the Hartree potential and the local pseudopotential
+        (doi:10.1103/PhysRevB.40.3979).
+        """
+        assert self.solved, NOT_SOLVED_MESSAGE
+        vna = self.hartree_potential(r, only_valence=False)
+        vna += self.pp.local_potential(r)
+        return vna
+
     def effective_potential(self, r, der=0):
         """ Return effective potential at r or its derivatives. """
         assert self.solved, NOT_SOLVED_MESSAGE
