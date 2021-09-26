@@ -425,7 +425,8 @@ class SlaterKosterTable:
         self.timer.stop('calculate_tables')
 
     def calculate_mels(self, selected, e1, e2, R, grid, area,
-                       superposition='potential', xc='LDA'):
+                       superposition='potential', xc='LDA',
+                       only_overlap=False):
         """ Perform integration for selected H and S integrals.
 
         parameters:
@@ -438,6 +439,9 @@ class SlaterKosterTable:
         area: d-z areas of the grid points.
         superposition: 'density' or 'potential' superposition scheme
         xc: exchange-correlation functional (see description in self.run())
+        only_overlap: whether to only evaluate the overlap integrals
+                      (in which case the 'xc' and 'superposition' keywords
+                      are ignored)
 
         return:
         -------
@@ -473,13 +477,13 @@ class SlaterKosterTable:
         s1 = np.sqrt(1. - c1**2)  # sine of theta_1
         s2 = np.sqrt(1. - c2**2)  # sine of theta_2
 
-        if superposition == 'potential':
+        if not only_overlap and superposition == 'potential':
             self.timer.start('vrho')
             v1 = e1.effective_potential(r1) - e1.confinement(r1)
             v2 = e2.effective_potential(r2) - e2.confinement(r2)
             veff = v1 + v2
             self.timer.stop('vrho')
-        elif superposition == 'density':
+        elif not only_overlap and superposition == 'density':
             self.timer.start('vrho')
             rho = e1.electron_density(r1) + e2.electron_density(r2)
             veff = e1.nuclear_potential(r1) + e1.hartree_potential(r1)
@@ -512,39 +516,53 @@ class SlaterKosterTable:
                     veff += -2. * sply(x, y, dx=0, dy=1, grid=False)
                 self.timer.stop('vsigma')
 
-        assert np.shape(veff) == (len(grid),)
+        if not only_overlap:
+            assert np.shape(veff) == (len(grid),)
         self.timer.stop('prelude')
 
         # calculate all selected integrals
-        Sl, Hl, H2l = np.zeros(NUMSK), np.zeros(NUMSK), np.zeros(NUMSK)
+        Sl = np.zeros(NUMSK)
+        if not only_overlap:
+            Hl, H2l = np.zeros(NUMSK), np.zeros(NUMSK)
 
         for integral, nl1, nl2 in selected:
-            l2 = ANGULAR_MOMENTUM[nl2[1]]
-
+            index = INTEGRALS.index(integral)
             gphi = g(c1, c2, s1, s2, integral)
             aux = gphi * area * x
 
             Rnl1 = e1.Rnl(r1, nl1)
             Rnl2 = e2.Rnl(r2, nl2)
-            ddunl2 = e2.unl(r2, nl2, der=2)
-
             S = np.sum(Rnl1 * Rnl2 * aux)
-            H = np.sum(Rnl1 * (-0.5 * ddunl2 / r2 + (veff + \
-                       l2 * (l2 + 1) / (2 * r2 ** 2)) * Rnl2) * aux)
-
-            if superposition == 'potential':
-                H2 = np.sum(Rnl1 * Rnl2 * aux * (v2 - e1.confinement(r1)))
-                H2 += e1.get_epsilon(nl1) * S
-            elif superposition == 'density':
-                H2 = 0
-
-            index = INTEGRALS.index(integral)
             Sl[index] = S
-            Hl[index] = H
-            H2l[index] = H2
+
+            if not only_overlap:
+                l2 = ANGULAR_MOMENTUM[nl2[1]]
+                ddunl2 = e2.unl(r2, nl2, der=2)
+
+                H = np.sum(Rnl1 * (-0.5 * ddunl2 / r2 + (veff + \
+                           l2 * (l2 + 1) / (2 * r2 ** 2)) * Rnl2) * aux)
+
+                sym1, sym2 = e1.get_symbol(), e2.get_symbol()
+                lm1, lm2 = INTEGRAL_PAIRS[integral]
+                H += e1.pp.get_nonlocal_integral(sym1, sym2, sym1, 0., 0., R,
+                                                 nl1, nl2, lm1, lm2)
+                H += e2.pp.get_nonlocal_integral(sym1, sym2, sym2, 0., R, R,
+                                                 nl1, nl2, lm1, lm2)
+
+                if superposition == 'potential':
+                    H2 = np.sum(Rnl1 * Rnl2 * aux * (v2 - e1.confinement(r1)))
+                    H2 += e1.get_epsilon(nl1) * S
+                elif superposition == 'density':
+                    H2 = 0
+
+                Hl[index] = H
+                H2l[index] = H2
 
         self.timer.stop('calculate_mels')
-        return Sl, Hl, H2l
+        if only_overlap:
+            return Sl
+        else:
+            return Sl, Hl, H2l
 
     def run_repulsion(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50,
                       wflimit=1e-7, smoothen_tails=True, xc='LDA'):
