@@ -135,7 +135,9 @@ class SlaterKosterTable:
 
         grid_dist = self.Rgrid[1] - self.Rgrid[0]
         grid_npts = len(self.tables[index])
-        grid_npts += int(self.Rgrid[0] / (self.Rgrid[1] - self.Rgrid[0]))
+        nzeros = int(np.round(self.Rgrid[0] / grid_dist)) - 1
+        assert nzeros >= 0
+        grid_npts += nzeros
         print("%.12f, %d" % (grid_dist, grid_npts), file=handle)
 
         el1, el2 = self.ela.get_symbol(), self.elb.get_symbol()
@@ -174,10 +176,8 @@ class SlaterKosterTable:
                        if 'f' not in name[:2]]
             indices.extend([j+NUMSK for j in indices])
 
-        if self.Rgrid[0] != 0:
-            n = int(self.Rgrid[0] / (self.Rgrid[1] - self.Rgrid[0]))
-            for i in range(n-1):
-                print('%d*0.0,' % len(indices), file=handle)
+        for i in range(nzeros):
+            print('%d*0.0,' % len(indices), file=handle)
 
         ct, theader = 0, ''
         for i in range(len(self.tables[index])):
@@ -359,6 +359,8 @@ class SlaterKosterTable:
 
         assert N is not None, 'Need to set number of grid points N!'
         assert rmin >= 1e-3, 'For stability, please set rmin >= 1e-3'
+        assert np.isclose(rmin / dr, np.round(rmin / dr)), \
+               'rmin must be a multiple of dr'
         assert superposition in ['density', 'potential']
 
         self.timer.start('calculate_tables')
