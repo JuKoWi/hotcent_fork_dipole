@@ -893,13 +893,23 @@ INTEGRAL_PAIRS = {
     'sss': ('s', 's'),
     'sps': ('s', 'pz'),
     'sds': ('s', 'dz2'),
+    'sfs': ('s', 'fz3'),
     'pps': ('pz', 'pz'),
     'ppp': ('px', 'px'),
     'pds': ('pz', 'dz2'),
     'pdp': ('px', 'dxz'),
+    'pfs': ('pz', 'fz3'),
+    'pfp': ('px', 'fxz2'),
     'dds': ('dz2', 'dz2'),
     'ddp': ('dxz', 'dxz'),
     'ddd': ('dxy', 'dxy'),
+    'dfs': ('dz2', 'fz3'),
+    'dfp': ('dxz', 'fxz2'),
+    'dfd': ('dxy', 'fxyz'),
+    'ffs': ('fz3', 'fz3'),
+    'ffp': ('fxz2', 'fxz2'),
+    'ffd': ('fxyz', 'fxyz'),
+    'fff': ('fx(x2-3y2)', 'fx(x2-3y2)'),
 }
 
 
