@@ -566,7 +566,7 @@ class SlaterKosterTable:
         else:
             return Sl, Hl, H2l
 
-    def run_repulsion(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50,
+    def run_repulsion(self, rmin=0.4, dr=0.02, N=None, ntheta=600, nr=100,
                       wflimit=1e-7, smoothen_tails=True, xc='LDA'):
         """ Calculates the 'repulsive' contributions to the total energy
         (i.e. the double-counting and ion-ion interaction terms), which
