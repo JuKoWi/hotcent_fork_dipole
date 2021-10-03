@@ -413,9 +413,7 @@ class AtomicBase:
         rmax = 3 * covalent_radii[self.Z] / Bohr
         ri = np.where(self.rgrid > rmax)[0][0]
 
-        fig = plt.figure(figsize=(6.4, 4.8), dpi=400)
-
-        core_dens = 0
+        plt.figure(figsize=(6.4, 4.8), dpi=400)
         colors = ['red', 'green', 'blue', 'purple']  # for s/p/d/f
 
         for n, l, nl in self.list_states():

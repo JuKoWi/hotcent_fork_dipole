@@ -12,9 +12,8 @@ written by Pekka Koskinen (https://github.com/pekkosk/
 hotbit/blob/master/box/interpolation.py).
 """
 import numpy as np
-from scipy.linalg import norm
-from scipy.optimize import fminbound, brentq
-from scipy.interpolate import splprep, splrep, splev, splint, CubicSpline
+from scipy.optimize import brentq
+from scipy.interpolate import splrep, splev, splint, CubicSpline
 try:
     import matplotlib.pyplot as plt
 except:

@@ -682,16 +682,11 @@ class SlaterKosterTable:
         self.timer.start('calculate_repulsion')
 
         # TODO: boilerplate
-        # common for all integrals (not wf-dependent parts)
         self.timer.start('prelude')
         x = grid[:, 0]
         y = grid[:, 1]
         r1 = np.sqrt(x**2 + y**2)
         r2 = np.sqrt(x**2 + (R - y)**2)
-        c1 = y / r1  # cosine of theta_1
-        c2 = (y - R) / r2  # cosine of theta_2
-        s1 = np.sqrt(1. - c1**2)  # sine of theta_1
-        s2 = np.sqrt(1. - c2**2)  # sine of theta_2
 
         rho1 = e1.electron_density(r1, only_valence=True)
         rho2 = e2.electron_density(r2, only_valence=True)
@@ -795,13 +790,9 @@ class SlaterKosterTable:
 
             for i in range(nr - 1):
                 # corners of area element
-                d1 = R[i + 1] * np.sin(Tj0)
                 z1 = R[i + 1] * np.cos(Tj0)
-                d2 = R[i] * np.sin(Tj0)
                 z2 = R[i] * np.cos(Tj0)
-                d3 = R[i] * np.sin(Tj1)
                 z3 = R[i] * np.cos(Tj1)
-                d4 = R[i + 1] * np.sin(Tj1)
                 z4 = R[i + 1] * np.cos(Tj1)
 
                 cond_list = [z1 <= h,  # area fully inside region

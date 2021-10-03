@@ -7,12 +7,8 @@
 import numpy as np
 from scipy.integrate import quad_vec
 from scipy.interpolate import SmoothBivariateSpline
-from hotcent.orbitals import (calculate_slako_coeff, ANGULAR_MOMENTUM,
-                              ORBITAL_LABELS, ORBITALS)
 from hotcent.slako import SlaterKosterTable
-from hotcent.slako import INTEGRALS as INTEGRALS_2c
-from hotcent.threecenter import (INTEGRALS, INTEGRAL_PAIRS, select_integrals,
-                                 select_orbitals, sph_nophi, sph_phi)
+from hotcent.threecenter import select_integrals, sph_nophi, sph_phi
 from hotcent.xc import LibXC, VXC_PW92_Spline, XC_PW92
 import _hotcent
 

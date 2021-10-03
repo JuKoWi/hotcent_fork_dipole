@@ -13,10 +13,8 @@ hotbit/blob/master/hotbit/parametrization/atom.py).
 """
 import pickle
 import numpy as np
-from ase.data import atomic_numbers, covalent_radii
-from ase.units import Bohr
 from hotcent.interpolation import CubicSplineFunction
-from hotcent.atomic_base import AtomicBase, nl2tuple
+from hotcent.atomic_base import AtomicBase
 from hotcent.confinement import ZeroConfinement
 from hotcent.orbitals import ANGULAR_MOMENTUM
 from hotcent.xc import XC_PW92, LibXC
@@ -603,8 +601,6 @@ class RadialGrid:
 
            dV[i] is volume element of shell between r[i] and r[i+1]
         """
-
-        rmin, rmax = grid[0], grid[-1]
         N = len(grid)
         self.N = N
         self.grid = grid
@@ -612,6 +608,7 @@ class RadialGrid:
         self.r0 = self.grid[0:N - 1] + self.dr / 2
         # first dV is sphere (treat separately), others are shells
         self.dV = 4 * np.pi * self.r0 ** 2 * self.dr
+        rmax = grid[-1]
         self.dV *= (4 * np.pi * rmax ** 3 / 3) / sum(self.dV)
 
     def get_grid(self):

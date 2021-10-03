@@ -57,7 +57,7 @@ class ConfinementOptimizer:
                         s2 = self.atoms[j].symbol
                         prefix1, prefix2 = s1 + '-' + s2, s2 + '-' + s1
                         assert prefix1 in val or prefix2 in val, \
-                               msg % (pair1, pair2, key)
+                               msg % (prefix1, prefix2, key)
         self.sk_kwargs = sk_kwargs
 
     def run(self, func, initial_guess={}, args=(), **opt_kwargs):
@@ -316,7 +316,7 @@ class DftbPlusBandStructure:
         calc = Dftb(atoms=atoms, kpts=bs.kpts_scf, slako_dir=slako_dir,
                     **self.dftbplus_kwargs)
         atoms.set_calculator(calc)
-        etot = atoms.get_potential_energy()
+        atoms.get_potential_energy()
 
         efermi = calc.get_fermi_level()
         if bs.reference_level == 'vbm':
@@ -333,7 +333,7 @@ class DftbPlusBandStructure:
         calc = Dftb(atoms=atoms, kpts=bs.path.kpts, slako_dir=slako_dir,
                     **kwargs)
         atoms.set_calculator(calc)
-        etot = atoms.get_potential_energy()
+        atoms.get_potential_energy()
 
         # Update the reference level, k-points,
         # and eigenenergies

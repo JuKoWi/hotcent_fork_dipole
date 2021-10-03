@@ -46,8 +46,6 @@ class Onsite2cTable(SlaterKosterTable):
         grid_npts += nzeros
         print("%.12f, %d" % (grid_dist, grid_npts), file=handle)
 
-        el1, el2 = self.ela.get_symbol(), self.elb.get_symbol()
-
         m = atomic_masses[atomic_numbers[symbols[index]]]
         print("%.3f, 19*0.0" % m, file=handle)
 
