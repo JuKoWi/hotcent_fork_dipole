@@ -56,3 +56,4 @@ on3c.run(atom, atom, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc)
 
 off3c = Offsite3cTable(atom, atom)
 off3c.run(atom, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc)
+off3c.run_repulsion(atom, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc)

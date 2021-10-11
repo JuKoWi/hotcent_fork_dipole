@@ -9,7 +9,7 @@ from scipy.integrate import quad_vec
 from scipy.interpolate import SmoothBivariateSpline
 from hotcent.slako import SlaterKosterTable
 from hotcent.threecenter import select_integrals, sph_nophi, sph_phi
-from hotcent.xc import LibXC, VXC_PW92_Spline, XC_PW92
+from hotcent.xc import EXC_PW92_Spline, LibXC, VXC_PW92_Spline, XC_PW92
 import _hotcent
 
 
@@ -206,4 +206,140 @@ class Offsite3cTable(SlaterKosterTable):
                     results[key].append(vals[i])
 
         self.timer.stop('calculate_offsite3c')
+        return results
+
+    def run_repulsion(self, e3, Rgrid, Sgrid, Tgrid, ntheta=150, nr=50,
+                      wflimit=1e-7, xc='LDA'):
+        """ Calculates the three-center repulsive energy contribution.
+
+        parameters:
+        ------------
+        see run()
+        """
+        assert xc == 'LDA', 'Functionals other than LDA are not yet implemented'
+
+        print('\n\n', file=self.txt)
+        print('***********************************************', file=self.txt)
+        print('Three-center repulsion with %s' % e3.get_symbol(), file=self.txt)
+        print('***********************************************', file=self.txt)
+        self.txt.flush()
+
+        self.timer.start('run_3c_repulsion')
+        self.wf_range = self.get_range(wflimit)
+        numST = len(Sgrid) * len(Tgrid)
+
+        for p, (e1, e2) in enumerate(self.pairs):
+            filename = '%s-%s_repulsion3c_%s.3cf' % \
+                       (e1.get_symbol(), e2.get_symbol(), e3.get_symbol())
+            print('Writing to %s' % filename, file=self.txt, flush=True)
+
+            with open(filename, 'w') as f:
+                f.write('%.6f %.6f %d\n' % (Rgrid[0], Rgrid[-1], len(Rgrid)))
+                f.write('%.6f %.6f %d\n' % (Sgrid[0], Sgrid[-1], len(Sgrid)))
+                f.write('%d\n' % len(Tgrid))
+                f.write('s_s\n')
+
+            for i, R in enumerate(Rgrid):
+                print('Starting for R=%.3f' % R, file=self.txt, flush=True)
+
+                d = None
+                if R < 2 * self.wf_range:
+                    grid, area = self.make_grid(R, nt=ntheta, nr=nr)
+                    if len(grid) > 0:
+                        d = self.calculate_repulsion(e1, e2, e3, R, grid, area,
+                                                Sgrid=Sgrid, Tgrid=Tgrid, xc=xc)
+
+                if d is None:
+                    d = np.zeros(1 + numST)
+
+                with open(filename, 'a') as f:
+                    for j in range(1 + numST):
+                        f.write('%.8e\n' % d[j])
+
+        self.timer.stop('run_3c_repulsion')
+
+    def calculate_repulsion(self, e1, e2, e3, R, grid, area, Sgrid,
+                            Tgrid, xc='LDA'):
+        self.timer.start('calculate_3c_repulsion')
+        assert xc == 'LDA', 'Functionals other than LDA are not yet implemented'
+
+        self.timer.start('prelude')
+        x = grid[:, 0]
+        y = grid[:, 1]
+        r1 = np.sqrt(x**2 + y**2)
+        r2 = np.sqrt(x**2 + (R - y)**2)
+
+        self.timer.start('vrho')
+        rho1 = e1.electron_density(r1, only_valence=True)
+        rho2 = e2.electron_density(r2, only_valence=True)
+        rho12 = rho1 + rho2
+
+        if xc in ['LDA', 'PW92']:
+            exc = EXC_PW92_Spline()
+            exc1 = np.sum(rho1 * exc(rho1) * area * x)
+            exc2 = np.sum(rho2 * exc(rho2) * area * x)
+            exc12 = np.sum(rho12 * exc(rho12) * area * x)
+
+            vxc = VXC_PW92_Spline()
+            evxc1 = np.sum(rho1 * vxc(rho1) * area * x)
+            evxc2 = np.sum(rho2 * vxc(rho2) * area * x)
+            evxc12 = np.sum(rho12 * vxc(rho12) * area * x)
+
+        self.timer.stop('vrho')
+        self.timer.stop('prelude')
+
+        def integrands(phi):
+            rA = np.sqrt((x0*np.cos(phi) - x)**2 + (y0 - y)**2 \
+                         + (x0*np.sin(phi))**2)
+
+            rho3 = e3.electron_density(rA, only_valence=True)
+            rho13 = rho1 + rho3
+            rho23 = rho2 + rho3
+            rho123 = rho12 + rho3
+
+            exc3 = np.sum(rho3 * exc(rho3) * area * x)
+            exc13 = np.sum(rho13 * exc(rho13) * area * x)
+            exc23 = np.sum(rho23 * exc(rho23) * area * x)
+            exc123 = np.sum(rho123 * exc(rho123) * area * x)
+            evxc3 = np.sum(rho3 * vxc(rho3) * area * x)
+            evxc13 = np.sum(rho13 * vxc(rho13) * area * x)
+            evxc23 = np.sum(rho23 * vxc(rho23) * area * x)
+            evxc123 = np.sum(rho123 * vxc(rho123) * area * x)
+
+            Exc = exc123 - exc12 - exc13 - exc23 + exc1 + exc2 + exc3
+            Evxc = evxc123 - evxc12 - evxc13 - evxc23 + evxc1 + evxc2 + evxc3
+            vals = np.array([Exc, -Evxc])
+            return vals
+
+        # Breakpoints and precision thresholds for the integration
+        break_points = 2 * np.pi * np.linspace(0., 1., num=5, endpoint=True)
+        epsrel = 1e-2
+        epsabs = 1e-5
+
+        # First the values for rCM = 0
+        x0 = 0.
+        y0 = 0.5 * R
+        vals, err = quad_vec(integrands, 0., 2*np.pi,
+                             epsrel=epsrel, epsabs=epsabs,
+                             points=break_points)
+        results = [sum(vals)]
+
+        # Now the actual grid
+        rmin = 1e-2
+
+        for r in Sgrid:
+            for a in Tgrid:
+                x0 = r * np.sin(a)
+                y0 = 0.5 * R + r * np.cos(a)
+                if ((x0**2 + y0**2) < rmin or (x0**2 + (y0-R)**2) < rmin):
+                    # Third atom too close to one of the first two atoms
+                    vals = [0.]*2
+                else:
+                    vals, err = quad_vec(integrands, 0., 2*np.pi,
+                                         epsrel=epsrel, epsabs=epsabs,
+                                         points=break_points)
+
+                results.append(sum(vals))
+
+        self.timer.stop('calculate_3c_repulsion')
         return results
