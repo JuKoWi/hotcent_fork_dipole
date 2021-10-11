@@ -36,7 +36,8 @@ atom.pp.build_overlaps(atom, atom, rmin=0.05, rmax=8.)
 
 off2c = SlaterKosterTable(atom, atom)
 off2c.run_repulsion(rmin=1.2, dr=0.1, N=46, xc='LDA')
-print(off2c.get_repulsion_spline_block())
+with open('C-C.spl', 'w') as f:
+    f.write(off2c.get_repulsion_spline_block())
 
 rmin, dr, N = 0.4, 0.04, 300
 on2c = Onsite2cTable(atom, atom)
