@@ -286,13 +286,32 @@ class AtomicBase:
     def electron_density(self, r, der=0, only_valence=False):
         """ Return the all-electron density at r. """
         assert self.solved, NOT_SOLVED_MESSAGE
+
+        # Find the largest wave-function cutoff radius (if any)
+        rcmax = 0
+        nlmax = None
+        for nl in self.wf_confinement:
+            if hasattr(self.wf_confinement[nl], 'rc'):
+                rc = self.wf_confinement[nl].rc
+                if rc > rcmax:
+                    rcmax = rc
+                    nlmax = nl
+
         if only_valence:
-            if self.densval_fct is None:
+            if self.densval_fct is None and nlmax is None:
                 self.densval_fct = CubicSplineFunction(self.rgrid, self.densval)
+            elif self.densval_fct is None:
+                self.densval_fct = self.construct_wfn_interpolator(self.rgrid,
+                                                                   self.densval,
+                                                                   nlmax)
             return self.densval_fct(r, der=der)
         else:
-            if self.dens_fct is None:
+            if self.dens_fct is None and nlmax is None:
                 self.dens_fct = CubicSplineFunction(self.rgrid, self.dens)
+            elif self.dens_fct is None:
+                self.dens_fct = self.construct_wfn_interpolator(self.rgrid,
+                                                                self.dens,
+                                                                nlmax)
             return self.dens_fct(r, der=der)
 
     def nuclear_potential(self,r):

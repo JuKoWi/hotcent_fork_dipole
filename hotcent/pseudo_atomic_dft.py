@@ -9,7 +9,6 @@ import numpy as np
 from hotcent.atomic_base import NOT_SOLVED_MESSAGE
 from hotcent.atomic_dft import AtomicDFT
 from hotcent.confinement import ZeroConfinement
-from hotcent.interpolation import CubicSplineFunction
 from hotcent.orbitals import ANGULAR_MOMENTUM
 try:
     import matplotlib.pyplot as plt
@@ -32,27 +31,9 @@ class PseudoAtomicDFT(AtomicDFT):
         self.pp = pp
 
     def electron_density(self, r, der=0, only_valence=True):
-        """ Return the all-electron density at r. """
-        assert self.solved, NOT_SOLVED_MESSAGE
-        assert only_valence
-
-        if self.densval_fct is None:
-            rcmax = 0
-            nlmax = None
-            for nl in self.wf_confinement:
-                if hasattr(self.wf_confinement[nl], 'rc'):
-                    rc = self.wf_confinement[nl].rc
-                    if rc > rcmax:
-                        rcmax = rc
-                        nlmax = nl
-
-            if nlmax is None:
-                self.densval_fct = CubicSplineFunction(self.rgrid, self.dens)
-            else:
-                self.densval_fct = self.construct_wfn_interpolator(self.rgrid,
-                                                                   self.dens,
-                                                                   nlmax)
-        return self.densval_fct(r, der=der)
+        assert only_valence, 'PseudoAtomicDFT calculator does not have ' + \
+                             'access to the all-electron electron density'
+        return AtomicDFT.electron_density(self, r, der=der, only_valence=True)
 
     def calculate_veff(self, dens):
         """ Returns the effective potential (without nonlocal
