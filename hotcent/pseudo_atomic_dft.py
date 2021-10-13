@@ -151,9 +151,9 @@ class PseudoAtomicDFT(AtomicDFT):
         # The eigenvalues in self.enl, by contrast, are 'perturbative' in
         # character, calculated with V_eff = V_eff,free + V_confinement.
         enl_sc = {nl: self.get_onecenter_integral(nl) for nl in self.valence}
-        self.calculate_energies(enl_sc, self.dens, echo='valence',
-                                only_valence=True)
-
+        self.energies = self.calculate_energies(enl_sc, self.dens,
+                                                echo='valence',
+                                                only_valence=True)
         self.timer.summary()
         self.txt.flush()
 

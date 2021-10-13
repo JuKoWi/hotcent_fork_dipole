@@ -119,6 +119,7 @@ class AtomicBase:
         self.densval_fct = None
         self.vhar_fct = None
         self.vharval_fct = None
+        self.energies = {}
         self.solved = False
 
         # Set default 'pseudopotential':
@@ -177,7 +178,7 @@ class AtomicBase:
         in turn, is supposed to set the following attributes:
 
         self.solved: whether the calculations are considered to be done
-        self.total_energy: the total energy
+        self.energies: a dictionary with the total energy and its contributions
         self.rgrid: an array with the radial grid points g
         self.dens: an array with the electron density on the radial grid
         self.vhar: an array with the Hartree potential on the radial grid
@@ -224,7 +225,7 @@ class AtomicBase:
 
     def get_energy(self):
         assert self.solved, NOT_SOLVED_MESSAGE
-        return self.total_energy
+        return self.energies['total']
 
     def get_epsilon(self, nl):
         """ E.g. get_eigenvalue('2p') """

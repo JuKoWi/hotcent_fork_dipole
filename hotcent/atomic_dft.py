@@ -120,29 +120,27 @@ class AtomicDFT(AtomicBase):
         self.timer.stop('init')
 
     def calculate_energies(self, enl, dens, echo='valence', only_valence=False):
-        """ Calculate energy contributions. """
+        """ Returns a dictionary with the total energy and its contributions,
+        which also get printed out.
+        """
         self.timer.start('energies')
         assert echo in [None, 'valence', 'all']
+        assert not (only_valence and echo == 'all')
 
-        self.bs_energy = 0.0
+        band_energy = 0.0
         for n, l, nl in self.list_states():
             if only_valence and nl not in self.valence:
                 continue
-            self.bs_energy += self.configuration[nl] * enl[nl]
+            band_energy += self.configuration[nl] * enl[nl]
 
         vhar = self.calculate_hartree_potential(dens, only_valence=only_valence)
-        self.vhar_energy = 0.5 * self.grid.integrate(vhar * dens, use_dV=True)
+        har_energy = 0.5 * self.grid.integrate(vhar * dens, use_dV=True)
 
         exc, vxc = self.xc.evaluate(dens, self.grid)
-        self.vxc_energy = self.grid.integrate(vxc * dens, use_dV=True)
-        self.exc_energy = self.grid.integrate(exc * dens, use_dV=True)
+        vxc_energy = self.grid.integrate(vxc * dens, use_dV=True)
+        exc_energy = self.grid.integrate(exc * dens, use_dV=True)
 
-        vconf = self.confinement(self.rgrid)
-        self.confinement_energy = self.grid.integrate(vconf * dens,
-                                                      use_dV=True)
-
-        self.total_energy = self.bs_energy - self.vhar_energy
-        self.total_energy += -self.vxc_energy + self.exc_energy
+        total_energy = band_energy - har_energy - vxc_energy + exc_energy
 
         if echo is not None:
             line = '%s orbital eigenvalues:' % echo
@@ -154,19 +152,22 @@ class AtomicDFT(AtomicBase):
 
             print('\nenergy contributions:', file=self.txt)
             print('----------------------------------------', file=self.txt)
-            print('sum of eigenvalues:     %.12f' % self.bs_energy,
-                  file=self.txt)
-            print('Hartree energy:         %.12f' % self.vhar_energy,
-                  file=self.txt)
-            print('vxc correction:         %.12f' % self.vxc_energy,
-                  file=self.txt)
-            print('exchange + corr energy: %.12f' % self.exc_energy,
-                  file=self.txt)
+            print('sum of eigenvalues:     %.12f' % band_energy, file=self.txt)
+            print('Hartree energy:         %.12f' % har_energy, file=self.txt)
+            print('vxc correction:         %.12f' % vxc_energy, file=self.txt)
+            print('exchange-corr. energy:  %.12f' % exc_energy, file=self.txt)
             print('----------------------------------------', file=self.txt)
-            print('total energy:           %.12f\n' % self.total_energy,
-                  file=self.txt)
+            print('total energy:           %.12f' % total_energy, file=self.txt)
+            print(file=self.txt)
+
+        energies = {'total': total_energy,
+                    'band': band_energy,
+                    'hartree': har_energy,
+                    'vxc': vxc_energy,
+                    'exc': exc_energy}
 
         self.timer.stop('energies')
+        return energies
 
     def calculate_density(self, unlg, only_valence=False):
         """ Calculate the radial electron density:
@@ -411,7 +412,7 @@ class AtomicDFT(AtomicBase):
                 err = 'Density not converged in %i iterations' % (it + 1)
                 raise RuntimeError(err)
 
-        self.calculate_energies(enl, dens, echo='valence')
+        self.energies = self.calculate_energies(enl, dens, echo='valence')
         print('converged in %i iterations' % it, file=self.txt)
         nel = self.get_number_of_electrons()
         line = '%9.4f electrons, should be %9.4f' % \
