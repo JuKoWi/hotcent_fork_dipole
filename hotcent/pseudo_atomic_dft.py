@@ -29,11 +29,21 @@ class PseudoAtomicDFT(AtomicDFT):
         """
         AtomicDFT.__init__(self, symbol, *args, **kwargs)
         self.pp = pp
+        self.Rnl_free_fct = {nl: None for nl in self.pp.get_subshells()}
 
     def electron_density(self, r, der=0, only_valence=True):
         assert only_valence, 'PseudoAtomicDFT calculator does not have ' + \
                              'access to the all-electron electron density'
         return AtomicDFT.electron_density(self, r, der=der, only_valence=True)
+
+    def Rnl_free(self, r, nl, der=0):
+        """ Rnl_free(r, '2p') """
+        assert self.solved, NOT_SOLVED_MESSAGE
+        if self.Rnl_free_fct[nl] is None:
+            self.Rnl_free_fct[nl] = self.construct_wfn_interpolator(self.rgrid,
+                                                           self.Rnlg_free[nl],
+                                                           nl)
+        return self.Rnl_free_fct[nl](r, der=der)
 
     def calculate_veff(self, dens):
         """ Returns the effective potential (without nonlocal
@@ -129,11 +139,22 @@ class PseudoAtomicDFT(AtomicDFT):
         self.Rnlg = {}
         self.unl_fct = {nl: None for nl in val}
         self.Rnl_fct = {nl: None for nl in val}
+        self.Rnl_free_fct = {nl: None for nl in self.pp.get_subshells()}
 
         header('Initial run without any confinement',
                'for pre-converging orbitals and eigenvalues')
         self.confinement = ZeroConfinement()
-        dens_free, veff_free, enl_free, unlg_free, Rnlg_free = self.outer_scf()
+        # Using the pseudopotential states to ensure that we have all
+        # the required unconfined orbitals for building the projectors
+        self.valence = self.pp.get_subshells()
+        print('Pseudopotential subshells: ' + ' '.join(self.valence))
+        configuration = self.configuration
+        self.configuration.update({nl: 0 for nl in self.valence
+                                   if nl not in self.configuration})
+        dens_free, veff_free, enl_free, unlg_free, self.Rnlg_free = \
+                                                                self.outer_scf()
+        self.configuration = configuration
+        self.valence = val
 
         for nl, wf_confinement in self.wf_confinement.items():
             self.confinement = wf_confinement
@@ -159,7 +180,7 @@ class PseudoAtomicDFT(AtomicDFT):
             if nl not in self.wf_confinement:
                 self.enl[nl] = enl_free[nl]
                 self.unlg[nl] = unlg_free[nl]
-                self.Rnlg[nl] = Rnlg_free[nl]
+                self.Rnlg[nl] = self.Rnlg_free[nl]
 
         self.dens = self.calculate_density(self.unlg, only_valence=True)
         self.vhar = self.calculate_hartree_potential(self.dens,

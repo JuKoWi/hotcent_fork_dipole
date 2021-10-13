@@ -31,6 +31,7 @@ class KleinmanBylanderPP:
                  for setting the maximal angular momentum.
         """
         self.symbol = None
+        self.subshells = []
         self.rcore = {}
         self.Vl = {}
         self.rgrid = []
@@ -41,6 +42,7 @@ class KleinmanBylanderPP:
         self.projectors = {}
         self.energies = {}
         self.overlap_fct = {}  # dict with projector-valence overlap functions
+        self.overlap_onsite = {}
 
         if filename.endswith('.psf'):
             self.initialize_from_psf(filename)
@@ -85,6 +87,7 @@ class KleinmanBylanderPP:
                     nl = nlocc[:2]
                     occ = nlocc[2:]
 
+                self.subshells.append(nl)
                 l = ANGULAR_MOMENTUM[nl[1]]
                 occup[l] = float(occ)
                 self.rcore[l] = float(rc)
@@ -155,6 +158,10 @@ class KleinmanBylanderPP:
         assert np.allclose(self.rho_core, 0.), \
                'Non-zero core densities are not yet implemented'
 
+    def get_subshells(self):
+        return [nl for nl in self.subshells
+                if ANGULAR_MOMENTUM[nl[1]] <= self.lmax]
+
     def set_lmax(self, valence):
         """ Sets self.lmax to the highest angular momentum  among
         the given valence states.
@@ -162,6 +169,9 @@ class KleinmanBylanderPP:
         Note: V_loc is taken equal to V_l[lmax+1]. Hence, only projectors
         up to self.lmax will be considered.
         """
+        assert all([nl in self.subshells for nl in valence]), \
+               'Not all valence states are supported by this pseudopotential'
+
         lmax = max([ANGULAR_MOMENTUM[nl[1]] for nl in valence])
 
         assert lmax <= 4, 'Can only handle projectors with angular momenta ' \
@@ -248,18 +258,25 @@ class KleinmanBylanderPP:
         self.projectors = {}
 
         for l in range(self.lmax+1):
-            for nl in e3.valence:
+            for nl in self.subshells:
                 if nl[1] == 'spdf'[l]:
                     break
             else:
                 raise ValueError('Could not find valence state for l=%d' % l)
 
-            Rnl = e3.Rnl(e3.rgrid, nl)
+            Rnl_free = e3.Rnl_free(e3.rgrid, nl)
             dVl = self.nonlocal_potential(e3.rgrid, l)
 
-            self.projectors[l] = CubicSplineFunction(e3.rgrid, Rnl * dVl)
-            self.energies[l] = e3.grid.integrate(Rnl * Rnl * dVl * e3.rgrid**2,
-                                                 use_dV=False)
+            self.projectors[l] = CubicSplineFunction(e3.rgrid, Rnl_free * dVl)
+            integrand = Rnl_free**2 * dVl * e3.rgrid**2
+            self.energies[l] = e3.grid.integrate(integrand, use_dV=False)
+
+            if nl in e3.valence:
+                integrand = Rnl_free * dVl * e3.rgrid**2 * e3.Rnl(e3.rgrid, nl)
+                self.overlap_onsite[l] = e3.grid.integrate(integrand,
+                                                           use_dV=False)
+            else:
+                self.overlap_onsite[l] = self.energies[l]
 
     def build_overlaps(self, e1, e3, rmin=1e-2, rmax=None, dr=0.1,
                        wflimit=1e-7):
@@ -396,7 +413,7 @@ class KleinmanBylanderPP:
 
                 # Atom1
                 if coincide13:
-                    S3 = self.energies[l3] if lm1 == lm3 else 0.
+                    S3 = self.overlap_onsite[l3] if lm1 == lm3 else 0.
                 else:
                     S3 = 0.
                     x, y, z = v13
@@ -416,7 +433,7 @@ class KleinmanBylanderPP:
 
                 # Atom2
                 if coincide23:
-                    S3 = self.energies[l3] if lm2 == lm3 else 0.
+                    S3 = self.overlap_onsite[l3] if lm2 == lm3 else 0.
                 else:
                     S3 = 0.
                     x, y, z = v23
