@@ -662,6 +662,19 @@ class AtomicBase:
         """
         assert scheme in [None, 'central', 'forward', 'backward']
 
+        def get_total_energy(configuration):
+            if self.perturbative_confinement:
+                raise ValueError('Hubbard calculations not yet implemented for '
+                                 'the perturbative confinement scheme')
+            else:
+                configuration_original = self.configuration.copy()
+                self.configuration = configuration.copy()
+                self.run()
+                self.configuration = configuration_original
+                e = self.get_energy()
+                self.solved = False
+            return e
+
         if scheme is None:
             n, l = nl2tuple(nl)
             max_occup = 2 * (2 * l + 1)
@@ -679,17 +692,20 @@ class AtomicBase:
         delta = maxstep if scheme == 'central' else 0.5 * maxstep
 
         configuration = self.configuration.copy()
-
         energies = {}
         bar = '+' * 12
+
         for direction in directions[scheme]:
-            self.configuration = configuration.copy()
-            self.configuration[nl] += direction * delta
-            s = ' '.join([nl + '%.1f' % self.configuration[nl]
+            diff = direction * delta
+            configuration[nl] += diff
+            s = ' '.join([nl + '%.1f' % configuration[nl]
                           for nl in self.valence])
             print('\n%s Configuration %s %s' % (bar, s, bar), file=self.txt)
-            self.run()
-            energies[direction] = self.total_energy
+            energies[direction] = get_total_energy(configuration)
+            configuration[nl] -= diff
+
+        # Check that the original electronic configuration is restored
+        assert self.configuration[nl] == configuration[nl]
 
         if scheme in ['forward', 'central']:
             EA = (energies[0] - energies[1]) / delta
@@ -704,9 +720,6 @@ class AtomicBase:
         for i, d in enumerate(directions[scheme]):
             factor = 1 if i % 2 == 0 else -2
             U += energies[d] * factor / (delta ** 2)
-
-        self.configuration = configuration.copy()
-        self.solved = False
 
         return U
 
