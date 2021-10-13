@@ -60,60 +60,6 @@ class PseudoAtomicDFT(AtomicDFT):
         dens = self.pp.get_valence_density(self.rgrid)
         return dens
 
-    def calculate_energies(self, enl, unlg, dens, echo='valence'):
-        """ Calculate the different contributions to the total energy. """
-        self.timer.start('energies')
-        assert echo in [None, 'valence']
-
-        self.bs_energy = 0.0
-        self.pp_energy = 0.0
-        for nl in self.valence:
-            self.bs_energy += self.configuration[nl] * enl[nl]
-            l = ANGULAR_MOMENTUM[nl[1]]
-            vpseudo = self.pp.local_potential(self.rgrid) \
-                      + self.pp.nonlocal_potential(self.rgrid, l)
-            self.pp_energy += self.grid.integrate(vpseudo * unlg[nl]**2,
-                                                  use_dV=True)
-
-        vhar = self.calculate_hartree_potential(dens, only_valence=True)
-        self.vhar_energy = 0.5 * self.grid.integrate(vhar * dens, use_dV=True)
-
-        exc, vxc = self.xc.evaluate(dens, self.grid)
-        self.vxc_energy = self.grid.integrate(vxc * dens, use_dV=True)
-        self.exc_energy = self.grid.integrate(exc * dens, use_dV=True)
-
-        vconf = self.confinement(self.rgrid)
-        self.confinement_energy = self.grid.integrate(vconf * dens,
-                                                      use_dV=True)
-
-        self.total_energy = self.bs_energy - self.vhar_energy + self.pp_energy
-        self.total_energy += -self.vxc_energy + self.exc_energy
-
-        if echo is not None:
-            line = '%s orbital eigenvalues:' % echo
-            print('\n'+line, file=self.txt)
-            print('-' * len(line), file=self.txt)
-            for n, l, nl in self.list_states():
-                if nl in self.valence:
-                    print('  %s:   %.12f' % (nl, enl[nl]), file=self.txt)
-
-            print('\nenergy contributions:', file=self.txt)
-            print('----------------------------------------', file=self.txt)
-            print('sum of eigenvalues:     %.12f' % self.bs_energy,
-                  file=self.txt)
-            print('Hartree energy:         %.12f' % self.vhar_energy,
-                  file=self.txt)
-            print('pseudopotential energy: %.12f' % self.pp_energy,
-                  file=self.txt)
-            print('vxc correction:         %.12f' % self.vxc_energy,
-                  file=self.txt)
-            print('exchange + corr energy: %.12f' % self.exc_energy,
-                  file=self.txt)
-            print('----------------------------------------', file=self.txt)
-            print('total energy:           %.12f\n' % self.total_energy,
-                  file=self.txt)
-        self.timer.stop('energies')
-
     def run(self, write=None):
         """ Execute the required atomic DFT calculations
 
@@ -198,6 +144,16 @@ class PseudoAtomicDFT(AtomicDFT):
                 pickle.dump(self.dens, f)
 
         self.solved = True
+
+        # Calculate and print the total energy contributions
+        # Note: we need to pass the eigenvalues calculated with a V_eff
+        # that is consistent with the density as a sum of orbital densities.
+        # The eigenvalues in self.enl, by contrast, are 'perturbative' in
+        # character, calculated with V_eff = V_eff,free + V_confinement.
+        enl_sc = {nl: self.get_onecenter_integral(nl) for nl in self.valence}
+        self.calculate_energies(enl_sc, self.dens, echo='valence',
+                                only_valence=True)
+
         self.timer.summary()
         self.txt.flush()
 
@@ -260,8 +216,6 @@ class PseudoAtomicDFT(AtomicDFT):
                     self.timer.summary()
                 err = 'Density not converged in %i iterations' % (it + 1)
                 raise RuntimeError(err)
-
-        self.calculate_energies(enl, unlg, dens, echo='valence')
 
         print('converged in %i iterations' % it, file=self.txt)
         nel = self.get_number_of_electrons(only_valence=True)

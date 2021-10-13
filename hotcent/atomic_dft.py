@@ -119,16 +119,18 @@ class AtomicDFT(AtomicBase):
         self.grid = RadialGrid(self.rgrid)
         self.timer.stop('init')
 
-    def calculate_energies(self, enl, dens, echo='valence'):
+    def calculate_energies(self, enl, dens, echo='valence', only_valence=False):
         """ Calculate energy contributions. """
         self.timer.start('energies')
         assert echo in [None, 'valence', 'all']
 
         self.bs_energy = 0.0
         for n, l, nl in self.list_states():
+            if only_valence and nl not in self.valence:
+                continue
             self.bs_energy += self.configuration[nl] * enl[nl]
 
-        vhar = self.calculate_hartree_potential(dens)
+        vhar = self.calculate_hartree_potential(dens, only_valence=only_valence)
         self.vhar_energy = 0.5 * self.grid.integrate(vhar * dens, use_dV=True)
 
         exc, vxc = self.xc.evaluate(dens, self.grid)
