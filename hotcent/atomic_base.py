@@ -651,6 +651,12 @@ class AtomicBase:
         """ Calculates the Hubbard value of an orbital using
         (second order) finite differences.
 
+        Note: when using perturbative confinement, the run() method
+        has to be called first, because the radial functions are needed
+        (and are kept fixed). This is not the case with the non-
+        perturbative scheme, where a self-consistent solution is sought
+        for every orbital occupancy.
+
         nl:      e.g. '2p'
         maxstep: the maximal step size in the orbital occupancy;
                  the default value of 1 means not going further
@@ -663,10 +669,34 @@ class AtomicBase:
         """
         assert scheme in [None, 'central', 'forward', 'backward']
 
+        if self.perturbative_confinement:
+            assert self.solved, NOT_SOLVED_MESSAGE
+            assert nl in self.valence
+
         def get_total_energy(configuration):
             if self.perturbative_confinement:
-                raise ValueError('Hubbard calculations not yet implemented for '
-                                 'the perturbative confinement scheme')
+                configuration_original = self.configuration.copy()
+                veff_original = np.copy(self.veff)
+                only_valence = not isinstance(self.pp, PhillipsKleinmanPP)
+
+                # Obtain dens & veff for the given electronic configuration
+                self.configuration = configuration.copy()
+                dens = self.calculate_density(self.unlg,
+                                              only_valence=only_valence)
+                self.veff = self.calculate_veff(dens)
+
+                # Update the valence eigenvalues
+                enl = self.enl.copy()
+                for nl in self.valence:
+                    enl[nl] = self.get_onecenter_integral(nl)
+
+                # Get the total energy
+                energies = self.calculate_energies(enl, dens, echo='valence',
+                                                   only_valence=only_valence)
+                e = energies['total']
+
+                self.configuration = configuration_original
+                self.veff = veff_original
             else:
                 configuration_original = self.configuration.copy()
                 self.configuration = configuration.copy()
@@ -705,7 +735,7 @@ class AtomicBase:
             energies[direction] = get_total_energy(configuration)
             configuration[nl] -= diff
 
-        # Check that the original electronic configuration is restored
+        # Check that the original electronic configuration has been restored
         assert self.configuration[nl] == configuration[nl]
 
         if scheme in ['forward', 'central']:

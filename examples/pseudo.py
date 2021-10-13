@@ -28,8 +28,10 @@ e = atom.get_energy()
 e_ref = -273.865791 / Ha
 e_tol = 1e-3
 e_diff = e - e_ref
-items = (e, e_ref, e_diff, 'OK' if abs(e_diff) < e_tol else 'FAIL')
+is_ok = abs(e_diff) < e_tol
+items = (e, e_ref, e_diff, 'OK' if is_ok else 'FAIL')
 print('E_tot [Ha] = %.6f   ref = %.6f    diff = %.6f\t| %s' % items)
+assert is_ok
 
 # Compare the individual eigenvalues with those from Siesta v4.1.5
 e_ref = {'3s': -0.163276829e+02 / Ha,
@@ -38,5 +40,17 @@ e_tol = 1e-4
 for nl in valence:
     e = atom.get_onecenter_integral(nl)
     e_diff = e - e_ref[nl]
-    items = (nl, e, e_ref[nl], e_diff, 'OK' if abs(e_diff) < e_tol else 'FAIL')
+    is_ok = abs(e_diff) < e_tol
+    items = (nl, e, e_ref[nl], e_diff, 'OK' if is_ok else 'FAIL')
     print('E_%s  [Ha] = %.6f    ref = %.6f     diff = %.6f\t| %s' % items)
+    assert is_ok
+
+# Compare the 3p Hubbard parameter with one obtained with Siesta v4.1.5
+U = atom.get_hubbard_value('3p', scheme='central', maxstep=1.)
+U_ref = (2*273.865791 - 261.846966 - 274.229224) / Ha
+U_tol = 1e-3
+U_diff = U - U_ref
+is_ok = abs(U_diff) < U_tol
+items = (U, U_ref, U_diff, 'OK' if is_ok else 'FAIL')
+print('U_3p  [Ha] = %.6f   ref = %.6f    diff = %.6f\t| %s' % items)
+assert is_ok
