@@ -5,10 +5,10 @@
 #   SPDX-License-Identifier: GPL-3.0-or-later                                 #
 #-----------------------------------------------------------------------------#
 import numpy as np
-from hotcent.atomic_dft import RadialGrid
 from hotcent.interpolation import CubicSplineFunction
 from hotcent.orbitals import (ANGULAR_MOMENTUM, calculate_slako_coeff,
                               ORBITALS, ORBITAL_LABELS)
+from hotcent.radial_grid import RadialGrid
 from hotcent.slako import INTEGRALS as INTEGRALS_2c, SlaterKosterTable
 try:
     import matplotlib.pyplot as plt
