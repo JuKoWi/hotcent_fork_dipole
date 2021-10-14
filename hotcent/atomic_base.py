@@ -100,7 +100,6 @@ class AtomicBase:
         self.set_wf_confinement(wf_confinement)
 
         self.timer = Timer('Atomic', txt=self.txt, enabled=self.timing)
-        self.timer.start('init')
 
         self.Z = atomic_numbers[self.symbol]
         assert len(self.valence) > 0

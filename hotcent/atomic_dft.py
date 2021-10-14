@@ -91,6 +91,7 @@ class AtomicDFT(AtomicBase):
               can be needed for high precision.
         """
         AtomicBase.__init__(self, symbol, **kwargs)
+        self.timer.start('init')
 
         print('*******************************************', file=self.txt)
         print('Kohn-Sham all-electron calculator for %s' % self.symbol,
