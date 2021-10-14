@@ -372,7 +372,9 @@ class SlaterKosterTable:
         Hmax = 0.
 
         for p, (e1, e2) in enumerate(self.pairs):
-            print('Integrals:', end=' ', file=self.txt)
+            sym1, sym2 = e1.get_symbol(), e2.get_symbol()
+            print('Integrals for %s-%s pair:' % (sym1, sym2), end=' ',
+                  file=self.txt)
             selected = select_integrals(e1, e2)
             for s in selected:
                 print(s[0], end=' ', file=self.txt)

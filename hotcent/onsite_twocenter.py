@@ -111,9 +111,11 @@ class Onsite2cTable(SlaterKosterTable):
                        for i in range(self.nel)]
 
         for p, (e1a, e1b) in enumerate(self.pairs):
-            selected = select_integrals(e1a, e1b)
+            sym1a, sym1b = e1a.get_symbol(), e1b.get_symbol()
 
-            print('Integrals:', end=' ', file=self.txt)
+            print('Integrals for %s-%s pair:' % (sym1a, sym1b), end=' ',
+                  file=self.txt)
+            selected = select_integrals(e1a, e1b)
             for s in selected:
                 print(s[0], end=' ', file=self.txt)
             print(file=self.txt, flush=True)
@@ -149,10 +151,9 @@ class Onsite2cTable(SlaterKosterTable):
                 else:
                     self.tables[p][:, index] = data[key]
 
-            pair = (e1a.get_symbol(), e1b.get_symbol())
-            fn = '%s-%s_onsite2c_%s.skf' % (pair[0], pair[1], e2.get_symbol())
+            fn = '%s-%s_onsite2c_%s.skf' % (sym1a, sym1b, e2.get_symbol())
             with open(fn, 'w') as handle:
-                self._write_skf(handle, pair)
+                self._write_skf(handle, (sym1a, sym1b))
 
         self.timer.stop('run_onsite2c')
 
