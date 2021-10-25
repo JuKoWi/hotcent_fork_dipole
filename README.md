@@ -58,10 +58,10 @@ python setup.py build_ext --inplace --use-cython
 * If you want to use functionals other than the PW92 LDA (again, who doesn't?),
 the [PyLibXC](https://www.tddft.org/programs/libxc/installation/#python-library)
 module needs to be available, which provides a Python interface to all
-LibXC functionals. A recent LibXC version is required (>= 4.3.4).
+LibXC functionals. A recent LibXC version is required (>= v5.1).
 Installing this module can e.g. be done as follows (modify as needed):
 ```shell
 cd <your_libxc_directory>
-export PYTHONPATH=$PWD/lib/python3.8/site-packages/:$PYTHONPATH
-python setup.py install --prefix=$PWD
+python setup.py develop --prefix=$PWD
+export PYTHONPATH=$PWD:$PYTHONPATH
 ```

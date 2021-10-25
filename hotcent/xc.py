@@ -10,6 +10,8 @@ try:
     from pylibxc import LibXCFunctional
     from pylibxc.version import __version__ as pylibxc_version
     has_pylibxc = True
+    assert int(pylibxc_version[0]) >= 5, \
+           'PyLibXC >= v5 is needed (found {0})'.format(pylibxc_version)
 except ImportError:
     print('Warning -- could not load LibXC')
     has_pylibxc = False
@@ -17,10 +19,13 @@ except ImportError:
 
 class LibXC:
     def __init__(self, xcname):
-        """ Interface to PyLibXC
+        """ Interface to PyLibXC.
 
-        xcname:  str with combination of LibXC functional names,
-                 e.g. xcname='GGA_X_PBE+GGA_C_PBE'
+        Parameters
+        ----------
+        xcname : str
+            Combination of LibXC functional names,
+            e.g. 'GGA_X_PBE+GGA_C_PBE'.
         """
         assert has_pylibxc, 'Using XC other than LDA requires PyLibXC!'
 
@@ -49,32 +54,99 @@ class LibXC:
             else:
                 raise ValueError('XC func %s is not LDA or GGA' % name)
 
-    def compute_all(self, rho, sigma):
+    def compute_exc(self, rho, sigma=None):
+        """ Returns the exchange-correlation energy density.
+
+        Parameters
+        ----------
+        rho : np.ndarray
+            Electron density.
+        sigma : np.ndarray, optional
+            Norm of the electron density gradient
+            (only needed if GGA functionals are involved).
+
+        Returns
+        -------
+        exc: np.ndarray
+            Exchange-correlation energy density.
+        """
         inp = {'rho': rho, 'sigma': sigma}
-        zk = np.zeros_like(rho)
-        vrho = np.zeros_like(rho)
-        vsigma = np.zeros_like(rho) if self.add_gradient_corrections else None
+        exc = np.zeros_like(rho)
 
         for i, func in enumerate(self.functionals):
-            out = func.compute(inp)
+            out = func.compute(inp, do_exc=True, do_vxc=False)
+            exc += out['zk'][:, 0]
 
-            if pylibxc_version.startswith('4.'):
-                for key in out:
-                    out[key] = out[key].T
+        return exc
 
-            zk += out['zk'][:, 0]
-            vrho += out['vrho'][:, 0]
-            if self.types[i] == 'GGA':
-                vsigma += out['vsigma'][:, 0]
+    def compute_vxc(self, rho, sigma=None, fxc=False):
+        """ Returns a dictionary with the arrays needed to compute
+        the XC potential.
 
-        return {'zk': zk, 'vrho': vrho, 'vsigma': vsigma}
+        Parameters
+        ----------
+        rho : np.ndarray
+            Electron density.
+        sigma : np.ndarray, optional
+            Norm of the electron density gradient
+            (only needed if GGA functionals are involved).
+        fxc : bool, optional
+            Whether to also compute selected second derivatives
+            with respect to the electron density.
+
+        Returns
+        -------
+        results: dict of np.ndarray
+            Dictionary with 'vrho' and 'vsigma' and (if fxc=True)
+            'v2rhosigma' and 'v2sigma2'.
+        """
+        inp = {'rho': rho, 'sigma': sigma}
+        results = {'vrho': np.zeros_like(rho)}
+        if self.add_gradient_corrections:
+            grad_keys = ['vsigma']
+            if fxc:
+                grad_keys.extend(['v2rhosigma', 'v2sigma2'])
+
+            for key in grad_keys:
+                results[key] = np.copy(results['vrho'])
+
+        for i, func in enumerate(self.functionals):
+            is_gga = self.types[i] == 'GGA'
+            do_fxc = fxc and is_gga
+            out = func.compute(inp, do_exc=False, do_vxc=True, do_fxc=do_fxc)
+
+            results['vrho'] += out['vrho'][:, 0]
+            if self.add_gradient_corrections and is_gga:
+                for key in grad_keys:
+                    results[key] += out[key][:, 0]
+
+        return results
+
+    def compute_all(self, rho, sigma=None):
+        """ Returns the results of self.compute_vxc() together
+        with a 'zk' entry with the result from self.compute_exc().
+        """
+        results = self.compute_vxc(rho, sigma=sigma)
+        results['zk'] = self.compute_exc(rho, sigma=sigma)
+        return results
 
     def evaluate(self, rho, gd):
-        """ Returns XC energy and potential given:
+        """ Returns the XC energy density and the XC potential.
 
-        rho:  array-like, the electron density
-        gd:   an object that can carry out gradient and divergence
-              operations on a grid-based array
+        Parameters
+        ----------
+        rho : np.ndarray
+            Electron density.
+        gd : Grid
+            An object that can carry out gradient and divergence
+            operations on a grid-based array.
+
+        Returns
+        -------
+        exc : np.ndarray
+            XC energy density.
+        vxc : np.ndarray
+            XC potential.
         """
         grad = gd.gradient(rho)
         sigma = grad ** 2
@@ -98,6 +170,7 @@ class XC_PW92:
         self.b2 = 2 * self.c0 * self.b1 ** 2
         self.b3 = 1.6382
         self.b4 = 0.49294
+        self.add_gradient_corrections = False
 
     def exc(self, n, der=0):
         """ Exchange-correlation with electron density n. """
@@ -159,6 +232,7 @@ class EXC_PW92_Spline(CubicSpline):
         y = np.insert(y, 0, [0., 0.])
         CubicSpline.__init__(self, x, y, bc_type=('clamped', 'natural'),
                              extrapolate=False)
+        self.add_gradient_corrections = False
 
 
 class VXC_PW92_Spline(CubicSpline):
@@ -173,3 +247,4 @@ class VXC_PW92_Spline(CubicSpline):
         y = np.insert(y, 0, [0., 0.])
         CubicSpline.__init__(self, x, y, bc_type=('clamped', 'natural'),
                              extrapolate=False)
+        self.add_gradient_corrections = False
