@@ -5,10 +5,9 @@
 #   SPDX-License-Identifier: GPL-3.0-or-later                                 #
 #-----------------------------------------------------------------------------#
 import numpy as np
-from scipy.interpolate import SmoothBivariateSpline
 from ase.data import atomic_numbers, atomic_masses
 from hotcent.xc import XC_PW92, LibXC
-from hotcent.slako import (g, INTEGRAL_PAIRS, INTEGRALS, NUMSK,
+from hotcent.slako import (dg, g, INTEGRAL_PAIRS, INTEGRALS, NUMSK,
                            select_integrals, SlaterKosterTable,
                            tail_smoothening)
 
@@ -102,7 +101,7 @@ class Onsite2cTable(SlaterKosterTable):
                'rmin must be a multiple of dr'
         assert N is not None, 'Need to set number of grid points N!'
         assert rmin >= 1e-3, 'For stability, please set rmin >= 1e-3'
-        assert superposition in ['density']
+        assert superposition == 'density'
 
         self.timer.start('run_onsite2c')
         self.wf_range = self.get_range(wflimit)
@@ -158,7 +157,7 @@ class Onsite2cTable(SlaterKosterTable):
         self.timer.stop('run_onsite2c')
 
     def calculate(self, selected, e1a, e1b, e2, R, grid, area,
-                  superposition='potential', xc='LDA'):
+                  superposition='density', xc='LDA'):
         self.timer.start('calculate_onsite2c')
 
         assert superposition == 'density'
@@ -169,49 +168,44 @@ class Onsite2cTable(SlaterKosterTable):
         x = grid[:, 0]
         y = grid[:, 1]
         r1 = np.sqrt(x**2 + y**2)
-        r2 = np.sqrt(x**2 + (R - y)**2)
+        r2 = np.sqrt(x**2 + (y - R)**2)
         c1 = y / r1  # cosine of theta_1
         c2 = (y - R) / r2  # cosine of theta_2
-        s1 = np.sqrt(1. - c1**2)  # sine of theta_1
-        s2 = np.sqrt(1. - c2**2)  # sine of theta_2
+        s1 = x / r1  # sine of theta_1
+        s2 = x / r2  # sine of theta_2
 
-        self.timer.start('vrho')
         rho = e1a.electron_density(r1) + e2.electron_density(r2)
         veff = e1a.neutral_atom_potential(r1)
         veff += e2.neutral_atom_potential(r2)
+
+        self.timer.start('vxc')
         if xc in ['LDA', 'PW92']:
             xc = XC_PW92()
             veff += xc.vxc(rho)
-            self.timer.stop('vrho')
         else:
             xc = LibXC(xc)
             drho1 = e1a.electron_density(r1, der=1)
             drho2 = e2.electron_density(r2, der=1)
-            grad_x = drho1 * s1
-            grad_x += drho2 * s2
-            grad_y = drho1 * c1
-            grad_y += drho2 * c2
-            sigma = np.sqrt(grad_x**2 + grad_y**2)**2
-            out = xc.compute_all(rho, sigma)
+            # TODO: boilerplate
+            grad_rho_x = drho1 * s1 + drho2 * s2
+            grad_rho_y = drho1 * c1 + drho2 * c2
+            sigma = grad_rho_x**2 + grad_rho_y**2
+            out = xc.compute_vxc(rho, sigma)
             veff += out['vrho']
-            self.timer.stop('vrho')
-            self.timer.start('vsigma')
-            # add gradient corrections to vxc
-            # provided that we have enough points
-            # (otherwise we get "dfitpack.error:
-            # (m>=(kx+1)*(ky+1)) failed for hidden m")
-            if out['vsigma'] is not None and len(x) > 16:
-                splx = SmoothBivariateSpline(x, y, out['vsigma'] * grad_x)
-                sply = SmoothBivariateSpline(x, y, out['vsigma'] * grad_y)
-                veff += -2. * splx(x, y, dx=1, dy=0, grid=False)
-                veff += -2. * sply(x, y, dx=0, dy=1, grid=False)
-            self.timer.stop('vsigma')
+            if xc.add_gradient_corrections:
+                vsigma = out['vsigma']
+                dr1dx = x/r1
+                dc1dx = -y*dr1dx / r1**2
+                ds1dx = (r1 - x*dr1dx) / r1**2
+                dr1dy = y/r1
+                dc1dy = (r1 - y*dr1dy) / r1**2
+                ds1dy = -x*dr1dy / r1**2
+        self.timer.stop('vxc')
 
         assert np.shape(veff) == (len(grid),)
-        self.timer.stop('prelude')
-
         V = veff - e1a.effective_potential(r1)
         sym1a, sym1b, sym2 = e1a.get_symbol(), e1b.get_symbol(), e2.get_symbol()
+        self.timer.stop('prelude')
 
         results = {}
         for key in selected:
@@ -226,6 +220,25 @@ class Onsite2cTable(SlaterKosterTable):
             lm1, lm2 = INTEGRAL_PAIRS[integral]
             val += e2.pp.get_nonlocal_integral(sym1a, sym1b, sym2, 0., R, 0.,
                                                nl1, nl2, lm1, lm2)
+
+            if xc.add_gradient_corrections:
+                self.timer.start('vsigma')
+                dRnl1 = e1a.Rnl(r1, nl1, der=1)
+                dRnl2 = e1b.Rnl(r1, nl2, der=1)
+                dgphi = dg(c1, c1, s1, s1, integral)
+                dgphidx = (dgphi[0] + dgphi[1]) * dc1dx \
+                          + (dgphi[2] + dgphi[3]) * ds1dx
+                dgphidy = (dgphi[0] + dgphi[1]) * dc1dy \
+                          + (dgphi[2] + dgphi[3]) * ds1dy
+                grad_phi_x = (dRnl1 * Rnl2 + Rnl1 * dRnl2) * s1 * gphi
+                grad_phi_x += Rnl1 * Rnl2 * dgphidx
+                grad_phi_y = (dRnl1 * Rnl2 + Rnl1 * dRnl2) * c1 * gphi
+                grad_phi_y += Rnl1 * Rnl2 * dgphidy
+                grad_rho_grad_phi = grad_rho_x * grad_phi_x \
+                                    + grad_rho_y * grad_phi_y
+                val += 2. * np.sum(vsigma * grad_rho_grad_phi * area * x)
+                self.timer.stop('vsigma')
+
             results[key] = val
 
         self.timer.stop('calculate_onsite2c')

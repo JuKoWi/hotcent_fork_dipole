@@ -604,7 +604,6 @@ class SlaterKosterTable:
 
         assert N is not None, 'Need to set number of grid points N!'
         assert rmin >= 1e-3, 'For stability, please set rmin >= 1e-3'
-        assert xc == 'LDA', 'Functionals other than LDA are not yet implemented'
 
         self.timer.start('run_repulsion')
         wf_range = self.get_range(wflimit)
@@ -705,27 +704,54 @@ class SlaterKosterTable:
         x = grid[:, 0]
         y = grid[:, 1]
         r1 = np.sqrt(x**2 + y**2)
-        r2 = np.sqrt(x**2 + (R - y)**2)
+        r2 = np.sqrt(x**2 + (y - R)**2)
 
+        aux = 2 * np.pi * area * x
         rho1 = e1.electron_density(r1, only_valence=True)
         rho2 = e2.electron_density(r2, only_valence=True)
         rho12 = rho1 + rho2
-
-        if xc in ['LDA', 'PW92']:
-            self.timer.start('vrho')
-            xc = XC_PW92()
-            exc1 = xc.exc(rho1)
-            exc2 = xc.exc(rho2)
-            exc12 = xc.exc(rho12)
-            vxc1 = xc.vxc(rho1)
-            vxc2 = xc.vxc(rho2)
-            vxc12 = xc.vxc(rho12)
-            self.timer.stop('vrho')
-        else:
-            pass  # TODO
         self.timer.stop('prelude')
 
-        aux = 2 * np.pi * area * x
+        self.timer.start('xc')
+        if xc in ['LDA', 'PW92']:
+            xc = XC_PW92()
+            Exc = -np.sum((rho1 * xc.exc(rho1) + rho2 * xc.exc(rho2)) * aux)
+            Evxc = -np.sum((rho1 * xc.vxc(rho1) + rho2 * xc.vxc(rho2)) * aux)
+            exc12 = xc.exc(rho12)
+            vxc12 = xc.vxc(rho12)
+        else:
+            xc = LibXC(xc)
+
+            sigma = e1.electron_density(r1, der=1, only_valence=True)**2
+            out = xc.compute_all(rho1, sigma)
+            Exc = -np.sum(rho1 * out['zk'] * aux)
+            Evxc = -np.sum(rho1 * out['vrho'] * aux)
+            if xc.add_gradient_corrections:
+                Evxc -= 2. * np.sum(out['vsigma'] * sigma * aux)
+
+            sigma = e2.electron_density(r2, der=1, only_valence=True)**2
+            out = xc.compute_all(rho2, sigma)
+            Exc -= np.sum(rho2 * out['zk'] * aux)
+            Evxc -= np.sum(rho2 * out['vrho'] * aux)
+            if xc.add_gradient_corrections:
+                Evxc -= 2. * np.sum(out['vsigma'] * sigma * aux)
+
+            c1 = y / r1  # cosine of theta_1
+            c2 = (y - R) / r2  # cosine of theta_2
+            s1 = x / r1  # sine of theta_1
+            s2 = x / r2  # sine of theta_2
+            drho1 = e1.electron_density(r1, der=1, only_valence=True)
+            drho2 = e2.electron_density(r2, der=1, only_valence=True)
+            sigma = (drho1*s1 + drho2*s2)**2 + (drho1*c1 + drho2*c2)**2
+            out = xc.compute_all(rho12, sigma)
+            exc12 = out['zk']
+            vxc12 = out['vrho']
+            if xc.add_gradient_corrections:
+                Evxc += 2. * np.sum(out['vsigma'] * sigma * aux)
+
+        Exc += np.sum(exc12 * rho12 * aux)
+        Evxc += np.sum(vxc12 * rho12 * aux)
+        self.timer.stop('xc')
 
         vhar1 = e1.hartree_potential(r1, only_valence=True)
         vhar2 = e2.hartree_potential(r2, only_valence=True)
@@ -735,9 +761,6 @@ class SlaterKosterTable:
         Z1 = e1.get_number_of_electrons(only_valence=True)
         Z2 = e2.get_number_of_electrons(only_valence=True)
         Enuc = Z1 * Z2 / R
-
-        Exc = np.sum((exc12 * rho12 - exc1 * rho1 - exc2 * rho2) * aux)
-        Evxc = np.sum((vxc12 * rho12 - vxc1 * rho1 - vxc2 * rho2) * aux)
 
         Erep = Enuc - 0.5*Ehar + Exc - Evxc
         self.timer.stop('calculate_repulsion')
