@@ -12,14 +12,24 @@ from hotcent.slako import INTEGRALS as INTEGRALS_2c, SlaterKosterTable
 
 
 class SeparablePP:
-    """ Abstract class representing a separable pseudopotential. """
-    def __init__(self):
+    """
+    Abstract class representing a separable pseudopotential.
+
+    Parameters
+    ----------
+    symbol : str
+        The chemical symbol.
+    verbose : bool, optional
+        Verbosity flag (default: False).
+    """
+    def __init__(self, verbose=False):
         self.symbol = None
         self.projectors = {}
         self.energies = {}
         self.overlap_fct = {}  # dict with core-valence overlap functions
         self.overlap_onsite = {}
         self.initialized_elements = []
+        self.verbose = verbose
 
     def all_zero_onsite_overlaps(self):
         """ Returns whether all on-site overlaps of the (valence)
@@ -71,7 +81,8 @@ class SeparablePP:
                     if key in self.overlap_fct:
                         continue
 
-                    print('Calculating overlaps for ', key)
+                    if self.verbose:
+                        print('Calculating overlaps for ', key)
 
                     if l1 < l3:
                         sk_integral = nl1[1] + nl3[-1] + 'spdf'[tau]

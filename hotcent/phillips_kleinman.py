@@ -9,17 +9,19 @@ from hotcent.separable_pseudopotential import SeparablePP
 
 
 class PhillipsKleinmanPP(SeparablePP):
-    """ Class representing a Phillips-Kleinman(-like) pseudopotential
-    (doi:10.1103/PhysRev.116.287).
     """
-    def __init__(self, symbol):
-        """ Initializes a PhillipsKleinmanPP object.
+    Class representing a Phillips-Kleinman(-like) pseudopotential
+    (doi:10.1103/PhysRev.116.287).
 
-        Arguments:
-
-        symbol: the chemical symbol
-        """
-        SeparablePP.__init__(self)
+    Parameters
+    ----------
+    symbol : str
+        The chemical symbol.
+    verbose : bool, optional
+        Verbosity flag (default: False).
+    """
+    def __init__(self, symbol, verbose=False):
+        SeparablePP.__init__(self, verbose=verbose)
         self.symbol = symbol
         self.Z = atomic_numbers[self.symbol]
 

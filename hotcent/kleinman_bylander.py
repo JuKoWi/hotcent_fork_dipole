@@ -16,20 +16,23 @@ except:
 
 
 class KleinmanBylanderPP(SeparablePP):
-    """ Class representing a Kleinman-Bylander type pseudopotential
+    """
+    Class representing a Kleinman-Bylander type pseudopotential
     (i.e. a norm-conserving pseudopotential in fully separable form;
     doi:10.1103/PhysRevLett.48.1425).
+
+    Parameters
+    ----------
+    filename : str
+        name of a pseudopotential file in '.psf' format.
+    valence : list of str
+        set of nl values defining the set of valence orbitals,
+        for setting the maximal angular momentum.
+    verbose : bool, optional
+        Verbosity flag (default: False).
     """
-    def __init__(self, filename, valence):
-        """ Initializes a KleinmanBylanderPP object.
-
-        Arguments:
-
-        filename: name of a pseudopotential file in '.psf' format.
-        valence: set of nl values defining the set of valence orbitals,
-                 for setting the maximal angular momentum.
-        """
-        SeparablePP.__init__(self)
+    def __init__(self, filename, valence, verbose=False):
+        SeparablePP.__init__(self, verbose=verbose)
         self.subshells = []
         self.rcore = {}
         self.Vl = {}
