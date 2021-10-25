@@ -65,3 +65,17 @@ cd <your_libxc_directory>
 python setup.py develop --prefix=$PWD
 export PYTHONPATH=$PWD:$PYTHONPATH
 ```
+
+## Testing
+
+The test suite makes use of the [pytest](https://docs.pytest.org) framework
+and requires that PyLibXC is installed.
+
+Example usage:
+```shell
+cd tests
+pytest              # run all the tests with default options
+pytest -s           # show test stdout/sterr output (disable capturing)
+pytest test_S.py    # only run the tests in the test_S.py file
+pytest -k on1c      # only run the tests with names matching '*on1c*'
+```

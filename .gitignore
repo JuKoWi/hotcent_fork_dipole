@@ -6,6 +6,9 @@ hotcent/*.html
 examples/*
 !examples/*.py
 !examples/*.psf
+tests/*.skf
+tests/*.3cf
+tests/*.spl
 tutorials/*
 !tutorials/*.ipynb
 !tutorials/*.json

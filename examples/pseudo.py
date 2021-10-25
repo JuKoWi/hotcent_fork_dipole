@@ -8,7 +8,7 @@ valence = ['3s', '3p']
 wf_confinement = {'3s': SoftConfinement(rc=5.550736),
                   '3p': SoftConfinement(rc=7.046078)}
 
-pp = KleinmanBylanderPP('S.pbe.psf', valence)
+pp = KleinmanBylanderPP('../tests/pseudos/S.psf', valence)
 pp.plot_Vl(filename='S_Vl.png')
 pp.plot_valence_density(filename='S_dens.png')
 
