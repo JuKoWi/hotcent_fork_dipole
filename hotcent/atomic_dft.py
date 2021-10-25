@@ -95,6 +95,7 @@ class AtomicDFT(AtomicBase):
               file=self.txt)
         print('*******************************************', file=self.txt)
 
+        self.xcname = xc
         if xc in ['PW92', 'LDA']:
             self.xc = XC_PW92()
         else:
