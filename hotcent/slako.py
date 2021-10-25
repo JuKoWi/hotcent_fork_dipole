@@ -15,7 +15,7 @@ hotbit/blob/master/hotbit/parametrization/slako.py).
 import os
 import sys
 import numpy as np
-from scipy.interpolate import CubicSpline, SmoothBivariateSpline
+from scipy.interpolate import CubicSpline
 from ase.units import Bohr
 from ase.data import atomic_numbers, atomic_masses, covalent_radii
 from hotcent.orbitals import ANGULAR_MOMENTUM
@@ -475,50 +475,49 @@ class SlaterKosterTable:
         x = grid[:, 0]
         y = grid[:, 1]
         r1 = np.sqrt(x**2 + y**2)
-        r2 = np.sqrt(x**2 + (R - y)**2)
+        r2 = np.sqrt(x**2 + (y - R)**2)
         c1 = y / r1  # cosine of theta_1
         c2 = (y - R) / r2  # cosine of theta_2
-        s1 = np.sqrt(1. - c1**2)  # sine of theta_1
-        s2 = np.sqrt(1. - c2**2)  # sine of theta_2
+        s1 = x / r1  # sine of theta_1
+        s2 = x / r2  # sine of theta_2
 
+        self.timer.start('veff')
         if not only_overlap and superposition == 'potential':
-            self.timer.start('vrho')
             v1 = e1.effective_potential(r1) - e1.confinement(r1)
             v2 = e2.effective_potential(r2) - e2.confinement(r2)
             veff = v1 + v2
-            self.timer.stop('vrho')
         elif not only_overlap and superposition == 'density':
-            self.timer.start('vrho')
             rho = e1.electron_density(r1) + e2.electron_density(r2)
             veff = e1.neutral_atom_potential(r1)
             veff += e2.neutral_atom_potential(r2)
             if xc in ['LDA', 'PW92']:
                 xc = XC_PW92()
                 veff += xc.vxc(rho)
-                self.timer.stop('vrho')
+                vsigma = None
             else:
                 xc = LibXC(xc)
                 drho1 = e1.electron_density(r1, der=1)
                 drho2 = e2.electron_density(r2, der=1)
-                grad_x = drho1 * s1
-                grad_x += drho2 * s2
-                grad_y = drho1 * c1
-                grad_y += drho2 * c2
-                sigma = grad_x**2 + grad_y**2
-                out = xc.compute_all(rho, sigma)
+                grad_rho_x = drho1 * s1 + drho2 * s2
+                grad_rho_y = drho1 * c1 + drho2 * c2
+                sigma = grad_rho_x**2 + grad_rho_y**2
+                out = xc.compute_vxc(rho, sigma)
                 veff += out['vrho']
-                self.timer.stop('vrho')
-                self.timer.start('vsigma')
-                # add gradient corrections to vxc
-                # provided that we have enough points
-                # (otherwise we get "dfitpack.error:
-                # (m>=(kx+1)*(ky+1)) failed for hidden m")
-                if out['vsigma'] is not None and len(x) > 16:
-                    splx = SmoothBivariateSpline(x, y, out['vsigma'] * grad_x)
-                    sply = SmoothBivariateSpline(x, y, out['vsigma'] * grad_y)
-                    veff += -2. * splx(x, y, dx=1, dy=0, grid=False)
-                    veff += -2. * sply(x, y, dx=0, dy=1, grid=False)
-                self.timer.stop('vsigma')
+                if xc.add_gradient_corrections:
+                    vsigma = out['vsigma']
+                    dr1dx = x/r1
+                    dc1dx = -y*dr1dx / r1**2
+                    ds1dx = (r1 - x*dr1dx) / r1**2
+                    dr2dx = x/r2
+                    dc2dx = -(y - R)*dr2dx / r2**2
+                    ds2dx = (r2 - x*dr2dx) / r2**2
+                    dr1dy = y/r1
+                    dc1dy = (r1 - y*dr1dy) / r1**2
+                    ds1dy = -x*dr1dy / r1**2
+                    dr2dy = (y - R)/r2
+                    dc2dy = (r2 - (y - R)*dr2dy) / r2**2
+                    ds2dy = -x*dr2dy / r2**2
+        self.timer.stop('veff')
 
         if not only_overlap:
             assert np.shape(veff) == (len(grid),)
@@ -558,6 +557,24 @@ class SlaterKosterTable:
                     H2 += e1.get_epsilon(nl1) * S
                 elif superposition == 'density':
                     H2 = 0
+
+                if superposition == 'density' and xc.add_gradient_corrections:
+                    self.timer.start('vsigma')
+                    dRnl1 = e1.Rnl(r1, nl1, der=1)
+                    dRnl2 = e2.Rnl(r2, nl2, der=1)
+                    dgphi = dg(c1, c2, s1, s2, integral)
+                    dgphidx = dgphi[0]*dc1dx + dgphi[1]*dc2dx \
+                              + dgphi[2]*ds1dx + dgphi[3]*ds2dx
+                    dgphidy = dgphi[0]*dc1dy + dgphi[1]*dc2dy \
+                              + dgphi[2]*ds1dy + dgphi[3]*ds2dy
+                    grad_phi_x = (dRnl1 * s1 * Rnl2 + Rnl1 * dRnl2 * s2) * gphi
+                    grad_phi_x += Rnl1 * Rnl2 * dgphidx
+                    grad_phi_y = (dRnl1 * c1 * Rnl2 + Rnl1 * dRnl2 * c2) * gphi
+                    grad_phi_y += Rnl1 * Rnl2 * dgphidy
+                    grad_rho_grad_phi = grad_rho_x * grad_phi_x \
+                                        + grad_rho_y * grad_phi_y
+                    H += 2. * np.sum(vsigma * grad_rho_grad_phi * area * x)
+                    self.timer.stop('vsigma')
 
                 Hl[index] = H
                 H2l[index] = H2
@@ -1010,6 +1027,65 @@ def g(c1, c2, s1, s2, integral):
         return np.sqrt(3.) / 2 * c2
     elif integral == 'sss':
         return 0.5 * np.ones_like(c1)
+
+
+def dg(c1, c2, s1, s2, integral):
+    """ Returns an array with the c1, c2, s1 and s2 derivatives
+    of g(c1, c2, s1, s2) for the given integral.
+    """
+    if integral == 'sss':
+        return [0, 0, 0, 0]
+    elif integral == 'sps':
+        return [0, np.sqrt(3)/2, 0, 0]
+    elif integral == 'sds':
+        return [0, 3*np.sqrt(5)*c2/2, 0, 0]
+    elif integral == 'sfs':
+        return [0, 3*np.sqrt(7)*(5*c2**2 - 1)/4, 0, 0]
+    elif integral == 'pps':
+        return [3*c2/2, 3*c1/2, 0, 0]
+    elif integral == 'ppp':
+        return [0, 0, 3*s2/4, 3*s1/4]
+    elif integral == 'pds':
+        return [np.sqrt(15)*(3*c2**2 - 1)/4, 3*np.sqrt(15)*c1*c2/2, 0, 0]
+    elif integral == 'pdp':
+        return [0, 3*np.sqrt(5)*s1*s2/4, 3*np.sqrt(5)*c2*s2/4,
+                3*np.sqrt(5)*c2*s1/4]
+    elif integral == 'pfs':
+        return [np.sqrt(21)*c2*(5*c2**2 - 3)/4,
+                3*np.sqrt(21)*c1*(5*c2**2 - 1)/4, 0, 0]
+    elif integral == 'pfp':
+        return [0, 15*np.sqrt(14)*c2*s1*s2/8,
+                3*np.sqrt(14)*s2*(5*c2**2 - 1)/16,
+                3*np.sqrt(14)*s1*(5*c2**2 - 1)/16]
+    elif integral == 'dds':
+        return [15*c1*(3*c2**2 - 1)/4, 15*c2*(3*c1**2 - 1)/4, 0, 0]
+    elif integral == 'ddp':
+        return [15*c2*s1*s2/4, 15*c1*s1*s2/4, 15*c1*c2*s2/4, 15*c1*c2*s1/4]
+    elif integral == 'ddd':
+        return [0, 0, 15*s1*s2**2/8, 15*s1**2*s2/8]
+    elif integral == 'dfs':
+        return [3*np.sqrt(35)*c1*c2*(5*c2**2 - 3)/4,
+                3*np.sqrt(35)*(3*c1**2 - 1)*(5*c2**2 - 1)/8, 0, 0]
+    elif integral == 'dfp':
+        return [3*np.sqrt(70)*s1*s2*(5*c2**2 - 1)/16,
+                15*np.sqrt(70)*c1*c2*s1*s2/8,
+                3*np.sqrt(70)*c1*s2*(5*c2**2 - 1)/16,
+                3*np.sqrt(70)*c1*s1*(5*c2**2 - 1)/16]
+    elif integral == 'dfd':
+        return [0, 15*np.sqrt(7)*s1**2*s2**2/16, 15*np.sqrt(7)*c2*s1*s2**2/8,
+                15*np.sqrt(7)*c2*s1**2*s2/8]
+    elif integral == 'ffs':
+        return [21*c2*(5*c1**2 - 1)*(5*c2**2 - 3)/8,
+                21*c1*(5*c1**2 - 3)*(5*c2**2 - 1)/8, 0, 0]
+    elif integral == 'ffp':
+        return [105*c1*s1*s2*(5*c2**2 - 1)/16, 105*c2*s1*s2*(5*c1**2 - 1)/16,
+                21*s2*(5*c1**2 - 1)*(5*c2**2 - 1)/32,
+                21*s1*(5*c1**2 - 1)*(5*c2**2 - 1)/32]
+    elif integral == 'ffd':
+        return [105*c2*s1**2*s2**2/16, 105*c1*s1**2*s2**2/16,
+                105*c1*c2*s1*s2**2/8, 105*c1*c2*s1**2*s2/8]
+    elif integral == 'fff':
+        return [0, 0, 105*s1**2*s2**3/32, 105*s1**3*s2**2/32]
 
 
 def tail_smoothening(x, y):

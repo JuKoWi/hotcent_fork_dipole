@@ -17,6 +17,11 @@ Development version
   integrals printed in the Slater-Koster files for distances below
   'rmin'.
 
+* The (optional) PyLibXC dependency now needs to be v5 or above.
+
+* Bugfix: gradient corrections to the exchange-correlation potential
+  for two-center integrals were wrong.
+
 
 Version 1.0
 ===========
