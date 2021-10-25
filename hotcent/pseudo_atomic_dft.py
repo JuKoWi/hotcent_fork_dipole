@@ -93,7 +93,8 @@ class PseudoAtomicDFT(AtomicDFT):
         # Using the pseudopotential states to ensure that we have all
         # the required unconfined orbitals for building the projectors
         self.valence = self.pp.get_subshells()
-        print('Pseudopotential subshells: ' + ' '.join(self.valence))
+        print('Pseudopotential subshells: ' + ' '.join(self.valence),
+              file=self.txt)
         configuration = self.configuration
         self.configuration.update({nl: 0 for nl in self.valence
                                    if nl not in self.configuration})
