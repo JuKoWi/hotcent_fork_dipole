@@ -151,6 +151,12 @@ class KleinmanBylanderPP(SeparablePP):
         assert np.allclose(self.rho_core, 0.), \
                'Non-zero core densities are not yet implemented'
 
+    def all_zero_onsite_overlaps(self):
+        """ Returns whether all on-site overlaps of the (valence)
+        states with the PP projectors are zero.
+        """
+        return False
+
     def get_subshells(self):
         return [nl for nl in self.subshells
                 if ANGULAR_MOMENTUM[nl[1]] <= self.lmax]

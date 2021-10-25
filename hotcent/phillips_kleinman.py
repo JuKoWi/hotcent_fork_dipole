@@ -23,6 +23,12 @@ class PhillipsKleinmanPP(SeparablePP):
         self.symbol = symbol
         self.Z = atomic_numbers[self.symbol]
 
+    def all_zero_onsite_overlaps(self):
+        """ Returns whether all on-site overlaps of the (valence)
+        states with the PP projectors are zero.
+        """
+        return True
+
     def local_potential(self, r):
         """ Returns the local part of the pseudopotential at r. """
         return -self.Z / r

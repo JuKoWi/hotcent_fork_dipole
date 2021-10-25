@@ -21,6 +21,12 @@ class SeparablePP:
         self.overlap_onsite = {}
         self.initialized_elements = []
 
+    def all_zero_onsite_overlaps(self):
+        """ Returns whether all on-site overlaps of the (valence)
+        states with the PP projectors are zero.
+        """
+        raise NotImplementedError
+
     def build_overlaps(self, e1, e3, rmin=1e-2, rmax=None, dr=0.1,
                        wflimit=1e-7):
         """ Builds the projector-valence overlap integral interpolators.
@@ -101,6 +107,15 @@ class SeparablePP:
         s = self.overlap_fct[key](r, der=0)
         return s
 
+    def assert_initialized(self, sym):
+        """ Checks whether the PP has been initialized
+        for the given element.
+        """
+        msg = 'Pseudopotential for {0} has not been initialized for use ' \
+              'together with element {1}. Please apply the build_overlaps() ' \
+              'and build_projectors() functions.'
+        assert sym in self.initialized_elements, msg.format(self.symbol, sym)
+
     def get_nonlocal_integral(self, sym1, sym2, sym3, x0, z0, R, nl1, nl2,
                               lm1, lm2):
         """ Returns the nonlocal pseudopotential integral involving
@@ -143,14 +158,12 @@ class SeparablePP:
         else:
             v23 /= r23
 
-        all_zero_onsite_overlaps = all([abs(self.overlap_onsite[nl3]) < tol
-                                        for nl3 in self.energies])
-        if all_zero_onsite_overlaps and (coincide13 or coincide23):
+        if self.all_zero_onsite_overlaps() and (coincide13 or coincide23):
             # Quick return
             return 0.
 
-        assert sym1 in self.initialized_elements
-        assert sym2 in self.initialized_elements
+        self.assert_initialized(sym1)
+        self.assert_initialized(sym2)
 
         l1 = ANGULAR_MOMENTUM[nl1[1]]
         l2 = ANGULAR_MOMENTUM[nl2[1]]
