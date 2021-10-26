@@ -57,50 +57,6 @@ def select_orbitals(val1, val2, integral):
     return nl1, nl2
 
 
-def sph_nophi(lm, c, s):
-    """ Spherical harmonics without phi-dependent factors. """
-    if lm == 's':
-        return 0.5 / np.sqrt(np.pi)
-    elif lm == 'px':
-        return 0.5 * np.sqrt(3. / np.pi) * s
-    elif lm == 'py':
-        return 0.5 * np.sqrt(3. / np.pi) * s
-    elif lm == 'pz':
-        return 0.5 * np.sqrt(3. / np.pi) * c
-    elif lm == 'dxy':
-        return 0.25 * np.sqrt(15. / np.pi) * s**2
-    elif lm == 'dyz':
-        return 0.5 * np.sqrt(15. / np.pi) * s * c
-    elif lm == 'dxz':
-        return 0.5 * np.sqrt(15. / np.pi) * s * c
-    elif lm == 'dx2-y2':
-        return 0.25 * np.sqrt(15. / np.pi) * s**2
-    elif lm == 'dz2':
-        return 0.25 * np.sqrt(5. / np.pi) * (3*c**2 - 1.)
-
-
-def sph_phi(lm, phi):
-    """ Phi-dependent spherical harmonics factors. """
-    if lm == 's':
-        return 1.
-    elif lm == 'px':
-        return np.cos(phi)
-    elif lm == 'py':
-        return np.sin(phi)
-    elif lm == 'pz':
-        return 1.
-    elif lm == 'dxy':
-        return np.sin(2*phi)
-    elif lm == 'dyz':
-        return np.sin(phi)
-    elif lm == 'dxz':
-        return np.cos(phi)
-    elif lm == 'dx2-y2':
-        return np.cos(2*phi)
-    elif lm == 'dz2':
-        return 1.
-
-
 def write_3cf(filename, Rgrid, Sgrid, Tgrid, data, fmt='%.8e'):
     """
     Writes a parameter file in '.3cf' format.
