@@ -9,23 +9,37 @@ from scipy.integrate import quad_vec
 from hotcent.slako import SlaterKosterTable
 from hotcent.spherical_harmonics import (sph_nophi, sph_nophi_der,
                                          sph_phi, sph_phi_der)
-from hotcent.threecenter import select_integrals
+from hotcent.threecenter import select_integrals, write_3cf
 from hotcent.xc import LibXC, VXC_PW92_Spline
 
 
 class Onsite3cTable(SlaterKosterTable):
     def run(self, e2, e3, Rgrid, Sgrid, Tgrid, ntheta=150, nr=50, wflimit=1e-7,
-            xc='LDA'):
-        """ Calculates on-site three-center integrals.
+            xc='LDA', write=True, filename=None):
+        """
+        Calculates on-site three-center Hamiltonian integrals.
 
-        parameters:
-        ------------
-        e3: AtomicDFT object for the third atom
-        Rgrid, Sgrid, Tgrid: lists defining the three-atom geometries
+        Parameters
+        ----------
+        e2, e3 : AtomicBase-like object
+            Objects with atomic properties for the second and third atoms.
+        Rgrid, Sgrid, Tgrid : list or array
+            Lists with distances defining the three-atom geometries.
+        write : bool, optional
+            Whether to write the integrals to file (the default)
+            or return them as a dictionary instead.
+        filename : str, optional
+            File name to use in case write=True. The default (None)
+            implies that a '<el1a>-<el1b>_onsite3c_<el2>-<el3>.3cf'
+            template is used.
+        ntheta, nr, wflimit, xc :
+            See SlaterKosterTable.run().
 
-        other parameters:
-        -----------------
-        see SlaterKosterTable.run()
+        Returns
+        -------
+        output : dict of dict of np.ndarray, optional
+            Dictionary with the values for each el2-el3 pair
+            and integral type. Only returned if write=False.
         """
         print('\n\n', file=self.txt)
         print('***********************************************', file=self.txt)
@@ -49,16 +63,14 @@ class Onsite3cTable(SlaterKosterTable):
         else:
             pairs = [(e2, e3), (e3, e2)]
 
-        for elc, eld in pairs:
-            filename = '%s-%s_onsite3c_%s-%s.3cf' % (self.ela.get_symbol(),
-                   self.elb.get_symbol(), elc.get_symbol(), eld.get_symbol())
-            print('Writing to %s' % filename, file=self.txt, flush=True)
+        output = {}
+        sym1a, sym1b = self.ela.get_symbol(), self.elb.get_symbol()
 
-            with open(filename, 'w') as f:
-                f.write('%.6f %.6f %d\n' % (Rgrid[0], Rgrid[-1], len(Rgrid)))
-                f.write('%.6f %.6f %d\n' % (Sgrid[0], Sgrid[-1], len(Sgrid)))
-                f.write('%d\n' % len(Tgrid))
-                f.write(' '.join([key[0] for key in selected]) + '\n')
+        for elc, eld in pairs:
+            symc, symd = elc.get_symbol(), eld.get_symbol()
+
+            output[(symc, symd)] = {integral: []
+                                    for (integral, nl1, nl2) in selected}
 
             for i, R in enumerate(Rgrid):
                 print('Starting for R=%.3f' % R, file=self.txt, flush=True)
@@ -74,13 +86,22 @@ class Onsite3cTable(SlaterKosterTable):
                 if d is None:
                     d = {key: np.zeros(1 + numST) for key in selected}
 
-                with open(filename, 'a') as f:
-                    for j in range(1 + numST):
-                        f.write(' '.join(['%.6e' % d[key][j]
-                                          for key in selected]))
-                        f.write('\n')
+                for key in selected:
+                    integral, nl1, nl2 = key
+                    output[(symc, symd)][integral].append(d[key])
+
+            if write:
+                if filename is None:
+                    items = (sym1a, sym1b, symc, symd)
+                    fname = '%s-%s_onsite3c_%s-%s.3cf' % items
+                else:
+                    fname = filename
+                print('Writing to %s' % fname, file=self.txt, flush=True)
+                write_3cf(fname, Rgrid, Sgrid, Tgrid, output[(symc, symd)])
 
         self.timer.stop('run_onsite3c')
+        if not write:
+            return output
 
     def calculate(self, selected, e1a, e1b, e2, e3, R, grid, area, Sgrid, Tgrid,
                   xc='LDA'):

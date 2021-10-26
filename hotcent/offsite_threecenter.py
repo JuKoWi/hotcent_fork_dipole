@@ -9,23 +9,37 @@ from scipy.integrate import quad_vec
 from hotcent.slako import SlaterKosterTable
 from hotcent.spherical_harmonics import (sph_nophi, sph_nophi_der,
                                          sph_phi, sph_phi_der)
-from hotcent.threecenter import select_integrals
+from hotcent.threecenter import select_integrals, write_3cf
 from hotcent.xc import EXC_PW92_Spline, LibXC, VXC_PW92_Spline
 
 
 class Offsite3cTable(SlaterKosterTable):
     def run(self, e3, Rgrid, Sgrid, Tgrid, ntheta=150, nr=50, wflimit=1e-7,
-            xc='LDA'):
-        """ Calculates off-site three-center integrals.
+            xc='LDA', write=True, filename=None):
+        """
+        Calculates off-site three-center Hamiltonian integrals.
 
-        parameters:
-        ------------
-        e3: AtomicDFT object for the third atom
-        Rgrid, Sgrid, Tgrid: lists defining the three-atom geometries
+        Parameters
+        ----------
+        e3 : AtomicBase-like object
+            Object with atomic properties for the third atom.
+        Rgrid, Sgrid, Tgrid : list or array
+            Lists with distances defining the three-atom geometries.
+        write : bool, optional
+            Whether to write the integrals to file (the default)
+            or return them as a dictionary instead.
+        filename : str, optional
+            File name to use in case write=True. The default (None)
+            implies that a '<el1>-<el2>_offsite3c_<el3>.3cf'
+            template is used.
+        ntheta, nr, wflimit, xc :
+            See SlaterKosterTable.run().
 
-        other parameters:
-        -----------------
-        see SlaterKosterTable.run()
+        Returns
+        -------
+        output : dict of dict of np.ndarray, optional
+            Dictionary with the values for each el1-el2 pair
+            and integral type. Only returned if write=False.
         """
         print('\n\n', file=self.txt)
         print('***********************************************', file=self.txt)
@@ -37,24 +51,19 @@ class Offsite3cTable(SlaterKosterTable):
         self.timer.start('run_offsite3c')
         self.wf_range = self.get_range(wflimit)
         numST = len(Sgrid) * len(Tgrid)
+        output = {}
 
         for p, (e1, e2) in enumerate(self.pairs):
-            filename = '%s-%s_offsite3c_%s.3cf' % \
-                       (e1.get_symbol(), e2.get_symbol(), e3.get_symbol())
-            print('Writing to %s' % filename, file=self.txt, flush=True)
+            sym1, sym2, sym3 = e1.get_symbol(), e2.get_symbol(), e3.get_symbol()
 
             selected = select_integrals(e1, e2)
-
             print('Integrals:', end=' ', file=self.txt)
             for s in selected:
                 print(s[0], end=' ', file=self.txt)
             print(file=self.txt, flush=True)
 
-            with open(filename, 'w') as f:
-                f.write('%.6f %.6f %d\n' % (Rgrid[0], Rgrid[-1], len(Rgrid)))
-                f.write('%.6f %.6f %d\n' % (Sgrid[0], Sgrid[-1], len(Sgrid)))
-                f.write('%d\n' % len(Tgrid))
-                f.write(' '.join([key[0] for key in selected]) + '\n')
+            output[(sym1, sym2)] = {integral: []
+                                    for (integral, nl1, nl2) in selected}
 
             for i, R in enumerate(Rgrid):
                 print('Starting for R=%.3f' % R, file=self.txt, flush=True)
@@ -69,13 +78,22 @@ class Offsite3cTable(SlaterKosterTable):
                 if d is None:
                     d = {key: np.zeros(1 + numST) for key in selected}
 
-                with open(filename, 'a') as f:
-                    for j in range(1 + numST):
-                        f.write(' '.join(['%.6e' % d[key][j]
-                                          for key in selected]))
-                        f.write('\n')
+                for key in selected:
+                    integral, nl1, nl2 = key
+                    output[(sym1, sym2)][integral].append(d[key])
+
+            if write:
+                if filename is None:
+                    fname = '%s-%s_offsite3c_%s.3cf' % (sym1, sym2, sym3)
+                else:
+                    fname = filename
+                print('Writing to %s' % fname, file=self.txt, flush=True)
+                write_3cf(fname, Rgrid, Sgrid, Tgrid, output[(sym1, sym2)])
 
         self.timer.stop('run_offsite3c')
+        if not write:
+            return output
+
 
     def calculate(self, selected, e1, e2, e3, R, grid, area, Sgrid, Tgrid,
                   xc='LDA'):
@@ -266,12 +284,32 @@ class Offsite3cTable(SlaterKosterTable):
         return results
 
     def run_repulsion(self, e3, Rgrid, Sgrid, Tgrid, ntheta=150, nr=50,
-                      wflimit=1e-7, xc='LDA'):
-        """ Calculates the three-center repulsive energy contribution.
+                      wflimit=1e-7, xc='LDA', write=True, filename=None):
+        """
+        Calculates the three-center repulsive energy contribution.
 
-        parameters:
-        ------------
-        see run()
+        Parameters
+        ----------
+        e3 : AtomicBase-like object
+            Object with atomic properties for the third atom.
+        Rgrid, Sgrid, Tgrid : list or array
+            Lists with distances defining the three-atom geometries.
+        write : bool, optional
+            Whether to write the integrals to file (the default)
+            or return them as a dictionary instead.
+        filename : str, optional
+            File name to use in case write=True. The default (None)
+            implies that a '<el1>-<el2>_repulsion3c_<el3>.3cf'
+            template is used.
+        ntheta, nr, wflimit, xc :
+            See SlaterKosterTable.run().
+
+        Returns
+        -------
+        output : dict of dict of np.ndarray, optional
+            Dictionary with the values for each el1-el2 pair
+            and integral type (only 's_s' in this case).
+            Only returned if write=False.
         """
         print('\n\n', file=self.txt)
         print('***********************************************', file=self.txt)
@@ -279,20 +317,15 @@ class Offsite3cTable(SlaterKosterTable):
         print('***********************************************', file=self.txt)
         self.txt.flush()
 
-        self.timer.start('run_3c_repulsion')
+        self.timer.start('run_repulsion3c')
         self.wf_range = self.get_range(wflimit)
         numST = len(Sgrid) * len(Tgrid)
+        output = {}
 
         for p, (e1, e2) in enumerate(self.pairs):
-            filename = '%s-%s_repulsion3c_%s.3cf' % \
-                       (e1.get_symbol(), e2.get_symbol(), e3.get_symbol())
-            print('Writing to %s' % filename, file=self.txt, flush=True)
+            sym1, sym2, sym3 = e1.get_symbol(), e2.get_symbol(), e3.get_symbol()
 
-            with open(filename, 'w') as f:
-                f.write('%.6f %.6f %d\n' % (Rgrid[0], Rgrid[-1], len(Rgrid)))
-                f.write('%.6f %.6f %d\n' % (Sgrid[0], Sgrid[-1], len(Sgrid)))
-                f.write('%d\n' % len(Tgrid))
-                f.write('s_s\n')
+            output[(sym1, sym2)] = {'s_s': []}
 
             for i, R in enumerate(Rgrid):
                 print('Starting for R=%.3f' % R, file=self.txt, flush=True)
@@ -307,15 +340,23 @@ class Offsite3cTable(SlaterKosterTable):
                 if d is None:
                     d = np.zeros(1 + numST)
 
-                with open(filename, 'a') as f:
-                    for j in range(1 + numST):
-                        f.write('%.8e\n' % d[j])
+                output[(sym1, sym2)]['s_s'].append(d)
 
-        self.timer.stop('run_3c_repulsion')
+            if write:
+                if filename is None:
+                    fname = '%s-%s_repulsion3c_%s.3cf' % (sym1, sym2, sym3)
+                else:
+                    fname = filename
+                print('Writing to %s' % fname, file=self.txt, flush=True)
+                write_3cf(fname, Rgrid, Sgrid, Tgrid, output[(sym1, sym2)])
+
+        self.timer.stop('run_repulsion3c')
+        if not write:
+            return output
 
     def calculate_repulsion(self, e1, e2, e3, R, grid, area, Sgrid,
                             Tgrid, xc='LDA'):
-        self.timer.start('calculate_3c_repulsion')
+        self.timer.start('calculate_repulsion3c')
 
         self.timer.start('prelude')
         x = grid[:, 0]
@@ -474,5 +515,5 @@ class Offsite3cTable(SlaterKosterTable):
 
                 results.append(sum(vals))
 
-        self.timer.stop('calculate_3c_repulsion')
+        self.timer.stop('calculate_repulsion3c')
         return results

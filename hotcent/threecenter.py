@@ -99,3 +99,38 @@ def sph_phi(lm, phi):
         return np.cos(2*phi)
     elif lm == 'dz2':
         return 1.
+
+
+def write_3cf(filename, Rgrid, Sgrid, Tgrid, data, fmt='%.8e'):
+    """
+    Writes a parameter file in '.3cf' format.
+
+    Parameters
+    ----------
+    filename : str
+        File name.
+    Rgrid, Sgrid, Tgrid : list or array
+        Lists with distances defining the three-atom geometries.
+    data : dict
+        Dictionary with the tabulated values for each integral type.
+    fmt : str, optional
+        Formatting string for the integrals.
+    """
+    numR = len(Rgrid)
+    numS = len(Sgrid)
+    numT = len(Tgrid)
+
+    with open(filename, 'w') as f:
+        # Header
+        f.write('%.6f %.6f %d\n' % (Rgrid[0], Rgrid[-1], numR))
+        f.write('%.6f %.6f %d\n' % (Sgrid[0], Sgrid[-1], numS))
+        f.write('%d\n' % numT)
+
+        keys = list(data.keys())
+        f.write(' '.join(keys) + '\n')
+
+        # Body
+        for i in range(numR):
+            for j in range(1 + numS*numT):
+                f.write(' '.join([fmt % data[key][i][j] for key in keys]))
+                f.write('\n')
