@@ -220,31 +220,63 @@ class XC_PW92:
         return self.exc(n), self.vxc(n)
 
 
-class EXC_PW92_Spline(CubicSpline):
-    def __init__(self, rho_min=1e-18, rho_max=1e12, num=10000):
-        """ The Perdew-Wang 1992 LDA exchange-correlation energy,
-            evaluated by cubic interpolation. """
+class LDA_Spline(CubicSpline):
+    """
+    Class for representing LDA functionals using a (cubic) spline.
+
+    Parameters
+    ----------
+    func : function
+        Function for evaluating the functional when constructing
+        the spline.
+    rho_min, rho_max : float, optional
+        Lower and upper bounds for the electron density. Zero will
+        be returned for electron densities outside these bounds.
+    num : int, optional
+        The number of grid points to use in the spline.
+    """
+    def __init__(self, func, rho_min=1e-12, rho_max=1e12, num=1000):
+        self.rho_min = rho_min
+        self.rho_max = rho_max
         x = np.exp(np.linspace(np.log(rho_min), np.log(rho_max), num=num,
                                endpoint=True))
-        f = XC_PW92()
-        y = f.exc(x)
-        x = np.insert(x, 0, [-rho_min, 0.])
-        y = np.insert(y, 0, [0., 0.])
+        y = func(x)
         CubicSpline.__init__(self, x, y, bc_type=('clamped', 'natural'),
                              extrapolate=False)
         self.add_gradient_corrections = False
 
+    def __call__(self, rho, **kwargs):
+        """
+        Evaluates the exchange-correlation functional.
 
-class VXC_PW92_Spline(CubicSpline):
-    def __init__(self, rho_min=1e-18, rho_max=1e12, num=10000):
-        """ The Perdew-Wang 1992 LDA exchange-correlation potential,
-            evaluated by cubic interpolation. """
-        x = np.exp(np.linspace(np.log(rho_min), np.log(rho_max), num=num,
-                               endpoint=True))
-        f = XC_PW92()
-        y = f.vxc(x)
-        x = np.insert(x, 0, [-rho_min, 0.])
-        y = np.insert(y, 0, [0., 0.])
-        CubicSpline.__init__(self, x, y, bc_type=('clamped', 'natural'),
-                             extrapolate=False)
-        self.add_gradient_corrections = False
+        Parameters
+        ----------
+        rho : float or np.ndarray
+            The electron density.
+
+        Returns
+        -------
+        y : float or np.ndarray
+            The interpolated function value.
+        """
+        y = CubicSpline.__call__(self, rho, **kwargs)
+        np.nan_to_num(y, copy=False)
+        return y
+
+
+class EXC_PW92_Spline(LDA_Spline):
+    """
+    The Perdew-Wang 1992 LDA exchange-correlation energy density
+    represented by a cubic spline.
+    """
+    def __init__(self, **kwargs):
+        LDA_Spline.__init__(self, XC_PW92().exc, **kwargs)
+
+
+class VXC_PW92_Spline(LDA_Spline):
+    """
+    The Perdew-Wang 1992 LDA exchange-correlation potential
+    represented by a cubic spline.
+    """
+    def __init__(self, **kwargs):
+        LDA_Spline.__init__(self, XC_PW92().vxc, **kwargs)
