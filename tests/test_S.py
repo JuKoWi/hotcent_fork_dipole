@@ -1,9 +1,10 @@
-""" Basic tests with one element (S), a KB pseudopotential,
-and LDA and GGA functionals.
+""" Tests with one element (S), a KB pseudopotential, and LDA
+and GGA functionals.
 
 Reference values come from the BeckeHarris tool, unless mentioned otherwise.
 """
 import pytest
+import numpy as np
 from hotcent.confinement import SoftConfinement
 from hotcent.kleinman_bylander import KleinmanBylanderPP
 from hotcent.pseudo_atomic_dft import PseudoAtomicDFT
@@ -193,3 +194,119 @@ def test_rep2c(atom):
     E_diff = abs(E - E_ref)
     msg = 'Too large error for E_rep (value={0})'
     assert E_diff < etol, msg.format(E)
+
+
+@pytest.mark.parametrize('atom', [PBE_LibXC, LDA, LDA_LibXC], indirect=True)
+def test_off3c(atom):
+    from hotcent.offsite_threecenter import Offsite3cTable
+
+    xc = atom.xcname
+
+    off3c = Offsite3cTable(atom, atom)
+    Rgrid, Sgrid, Tgrid = np.array([2.4]), np.array([1.2]), np.array([np.pi/2])
+    H = off3c.run(atom, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc,
+                  ntheta=300, nr=100, write=False)
+
+    if xc == PBE_LibXC:
+        H_ref = {
+            's_s': -0.20053906,
+            's_px': -0.06779262,
+            's_pz': 0.23955519,
+            'px_s': -0.06779262,
+            'px_px': -0.12579070,
+            'px_pz': 0.08002509,
+            'py_py': -0.15488882,
+            'pz_s': -0.23955519,
+            'pz_px': -0.08002509,
+            'pz_pz': 0.19302398,
+        }
+    elif xc in [LDA, LDA_LibXC]:
+        H_ref = {
+            's_s': -0.20386829,
+            's_px': -0.06891501,
+            's_pz': 0.24284765,
+            'px_s': -0.06891501,
+            'px_px': -0.12838952,
+            'px_pz': 0.08132246,
+            'py_py': -0.15680802,
+            'pz_s': -0.24284765,
+            'pz_px': -0.08132246,
+            'pz_pz': 0.19281687,
+        }
+
+    msg = 'Too large error for H_{0} (value={1})'
+
+    for integral, ref in H_ref.items():
+        pair = ('S', 'S')
+        val = H[pair][integral][0][1]
+        diff = abs(val - ref)
+        assert diff < 5e-4, msg.format(integral, val)
+
+
+@pytest.mark.parametrize('atom', [PBE_LibXC, LDA, LDA_LibXC], indirect=True)
+def test_on3c(atom):
+    from hotcent.onsite_threecenter import Onsite3cTable
+
+    xc = atom.xcname
+
+    on3c = Onsite3cTable(atom, atom)
+    Rgrid, Sgrid, Tgrid = np.array([2.4]), np.array([1.2]), np.array([np.pi/2])
+    H = on3c.run(atom, atom, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc,
+                 ntheta=300, nr=100, write=False)
+
+    if xc == PBE_LibXC:
+        H_ref = {
+            's_s': 0.01211108,
+            's_px': 0.00435683,
+            's_pz': 0.01536382,
+            'px_s': 0.00435683,
+            'px_px': 0.00899474,
+            'px_pz': 0.00509048,
+            'py_py': 0.00899400,
+            'pz_s': 0.01536382,
+            'pz_px': 0.00509048,
+            'pz_pz': 0.02464206,
+        }
+    elif xc in [LDA, LDA_LibXC]:
+        H_ref = {
+            's_s': 0.01312961,
+            's_px': 0.00466226,
+            's_pz': 0.01602638,
+            'px_s': 0.00466226,
+            'px_px': 0.01015447,
+            'px_pz': 0.00505369,
+            'py_py': 0.00997600,
+            'pz_s': 0.01602638,
+            'pz_px': 0.00505369,
+            'pz_pz': 0.02542100,
+        }
+
+    msg = 'Too large error for H_{0} (value={1})'
+
+    for integral, ref in H_ref.items():
+        pair = ('S', 'S')
+        val = H[pair][integral][0][1]
+        diff = abs(val - ref)
+        assert diff < 1e-5, msg.format(integral, H[index])
+
+
+@pytest.mark.parametrize('atom', [PBE_LibXC, LDA, LDA_LibXC], indirect=True)
+def test_rep3c(atom):
+    from hotcent.offsite_threecenter import Offsite3cTable
+
+    xc = atom.xcname
+
+    off3c = Offsite3cTable(atom, atom)
+    Rgrid, Sgrid, Tgrid = np.array([2.4]), np.array([1.2]), np.array([np.pi/2])
+    E = off3c.run_repulsion(atom, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc,
+                            write=False)
+
+    if xc == PBE_LibXC:
+        E_ref = -0.06149970
+    elif xc in [LDA, LDA_LibXC]:
+        E_ref = -0.05907971
+
+    val = E[('S', 'S')]['s_s'][0][1]
+    diff = abs(val - E_ref)
+    msg = 'Too large error for E_rep (value={0})'
+    assert diff < 5e-5, msg.format(val)

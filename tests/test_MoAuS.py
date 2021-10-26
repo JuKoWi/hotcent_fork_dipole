@@ -1,9 +1,10 @@
-""" Basic tests with three different elements (Mo/Au/S), KB pseudopotentials
+""" Tests with three different elements (Mo/Au/S), KB pseudopotentials
 and LDA and GGA functionals.
 
 Reference values come from the BeckeHarris tool, unless mentioned otherwise.
 """
 import pytest
+import numpy as np
 from hotcent.confinement import SoftConfinement
 from hotcent.kleinman_bylander import KleinmanBylanderPP
 from hotcent.pseudo_atomic_dft import PseudoAtomicDFT
@@ -235,3 +236,233 @@ def test_rep2c(atoms):
         E_diff = abs(E - E_ref)
         msg = 'Too large error for E_rep (value={0})'
         assert E_diff < etol, msg.format(E)
+
+
+@pytest.mark.parametrize('atoms', [PBE_LibXC, LDA], indirect=True)
+def test_off3c(atoms):
+    from hotcent.offsite_threecenter import Offsite3cTable
+
+    atom_Mo, atom_Au, atom_S = atoms
+    xc = atom_Mo.xcname
+
+    off3c = Offsite3cTable(atom_Mo, atom_Au)
+    Rgrid, Sgrid, Tgrid = np.array([4.]), np.array([2.]), np.array([np.pi*0.6])
+    H = off3c.run(atom_S, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc,
+                  write=False)
+
+    if xc == PBE_LibXC:
+        H_ref = {
+            's_s': -0.08474124,
+            's_dxz': 0.05222017,
+            's_dx2-y2': -0.01594812,
+            's_dz2': -0.03377308,
+            'px_s': -0.05533098,
+            'px_dxz': 0.03389649,
+            'px_dx2-y2': -0.01536485,
+            'px_dz2': -0.00753834,
+            'py_dxy': -0.01073777,
+            'py_dyz': 0.01680702,
+            'pz_s': -0.06610126,
+            'pz_dxz': 0.04847177,
+            'pz_dx2-y2': -0.01792681,
+            'pz_dz2': -0.02419966,
+            'dxy_dxy': -0.01195056,
+            'dxy_dyz': 0.01995707,
+            'dyz_dxy': -0.01576844,
+            'dyz_dyz': 0.03873723,
+            'dxz_s': -0.07971265,
+            'dxz_dxz': 0.05792652,
+            'dxz_dx2-y2': -0.01510574,
+            'dxz_dz2': -0.04361923,
+            'dx2-y2_s': -0.02447859,
+            'dx2-y2_dxz': 0.01270348,
+            'dx2-y2_dx2-y2': -0.00795919,
+            'dx2-y2_dz2': -0.00534208,
+            'dz2_s': -0.04457528,
+            'dz2_dxz': 0.03950836,
+            'dz2_dx2-y2': -0.00842968,
+            'dz2_dz2': -0.05899668,
+        }
+    elif xc == LDA:
+        H_ref = {
+            's_s': -0.08505762,
+            's_dxz': 0.05275620,
+            's_dx2-y2': -0.01605709,
+            's_dz2': -0.03426070,
+            'px_s': -0.05601983,
+            'px_dxz': 0.03479452,
+            'px_dx2-y2': -0.01575772,
+            'px_dz2': -0.00774840,
+            'py_dxy': -0.01108928,
+            'py_dyz': 0.01740890,
+            'pz_s': -0.06763416,
+            'pz_dxz': 0.04980483,
+            'pz_dx2-y2': -0.01837093,
+            'pz_dz2': -0.02490493,
+            'dxy_dxy': -0.01221202,
+            'dxy_dyz': 0.02033114,
+            'dyz_dxy': -0.01608626,
+            'dyz_dyz': 0.03961876,
+            'dxz_s': -0.08023384,
+            'dxz_dxz': 0.05914376,
+            'dxz_dx2-y2': -0.01546334,
+            'dxz_dz2': -0.04429537,
+            'dx2-y2_s': -0.02438830,
+            'dx2-y2_dxz': 0.01304442,
+            'dx2-y2_dx2-y2': -0.00819303,
+            'dx2-y2_dz2': -0.00548303,
+            'dz2_s': -0.04517071,
+            'dz2_dxz': 0.04018504,
+            'dz2_dx2-y2': -0.00862280,
+            'dz2_dz2': -0.05983252,
+        }
+
+    msg = 'Too large error for H_{0} (value={1})'
+
+    for integral, ref in H_ref.items():
+        pair = ('Mo', 'Au')
+        val = H[pair][integral][0][1]
+        diff = abs(val - ref)
+        assert diff < 5e-4, msg.format(integral, val)
+
+
+@pytest.mark.parametrize('atoms', [PBE_LibXC, LDA], indirect=True)
+def test_on3c(atoms):
+    from hotcent.onsite_threecenter import Onsite3cTable
+
+    atom_Mo, atom_Au, atom_S = atoms
+    xc = atom_Mo.xcname
+
+    on3c = Onsite3cTable(atom_Mo, atom_Mo)
+    Rgrid, Sgrid, Tgrid = np.array([4.]), np.array([2.]), np.array([np.pi*0.6])
+    H = on3c.run(atom_Au, atom_S, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc,
+                 write=False)
+
+    if xc == PBE_LibXC:
+        H_ref = {
+            's_s': 0.00829577,
+            's_px': 0.00380357,
+            's_pz': 0.01007909,
+            's_dxz': 0.00404084,
+            's_dx2-y2': 0.00039111,
+            's_dz2': 0.00641591,
+            'px_s': 0.00380357,
+            'px_px': 0.00362646,
+            'px_pz': 0.00491688,
+            'px_dxz': 0.00290991,
+            'px_dx2-y2': 0.00065705,
+            'px_dz2': 0.00169039,
+            'py_py': 0.00234985,
+            'py_dxy': 0.00075148,
+            'py_dyz': 0.00213596,
+            'pz_s': 0.01007909,
+            'pz_px': 0.00491688,
+            'pz_pz': 0.01368827,
+            'pz_dxz': 0.00433637,
+            'pz_dx2-y2': 0.00038697,
+            'pz_dz2': 0.00745141,
+            'dxy_py': 0.00075148,
+            'dxy_dxy': 0.00082934,
+            'dxy_dyz': 0.00101106,
+            'dyz_py': 0.00213596,
+            'dyz_dxy': 0.00101106,
+            'dyz_dyz': 0.00344459,
+            'dxz_s': 0.00404084,
+            'dxz_px': 0.00290991,
+            'dxz_pz': 0.00433637,
+            'dxz_dxz': 0.00432475,
+            'dxz_dx2-y2': 0.00078149,
+            'dxz_dz2': 0.00292772,
+            'dx2-y2_s': 0.00039111,
+            'dx2-y2_px': 0.00065705,
+            'dx2-y2_pz': 0.00038697,
+            'dx2-y2_dxz': 0.00078149,
+            'dx2-y2_dx2-y2': 0.00068368,
+            'dx2-y2_dz2': 0.00010435,
+            'dz2_s': 0.00641591,
+            'dz2_px': 0.00169039,
+            'dz2_pz': 0.00745141,
+            'dz2_dxz': 0.00292772,
+            'dz2_dx2-y2': 0.00010435,
+            'dz2_dz2': 0.00775556,
+        }
+    elif xc == LDA:
+        H_ref = {
+            's_s': 0.00898654,
+            's_px': 0.00410273,
+            's_pz': 0.01078539,
+            's_dxz': 0.00421723,
+            's_dx2-y2': 0.00039659,
+            's_dz2': 0.00665361,
+            'px_s': 0.00410273,
+            'px_px': 0.00418072,
+            'px_pz': 0.00515865,
+            'px_dxz': 0.00337534,
+            'px_dx2-y2': 0.00081077,
+            'px_dz2': 0.00159929,
+            'py_py': 0.00283963,
+            'py_dxy': 0.00089537,
+            'py_dyz': 0.00261155,
+            'pz_s': 0.01078539,
+            'pz_px': 0.00515865,
+            'pz_pz': 0.01456810,
+            'pz_dxz': 0.00447619,
+            'pz_dx2-y2': 0.00038190,
+            'pz_dz2': 0.00785794,
+            'dxy_py': 0.00089537,
+            'dxy_dxy': 0.00125161,
+            'dxy_dyz': 0.00118733,
+            'dyz_py': 0.00261155,
+            'dyz_dxy': 0.00118733,
+            'dyz_dyz': 0.00458365,
+            'dxz_s': 0.00421723,
+            'dxz_px': 0.00337534,
+            'dxz_pz': 0.00447619,
+            'dxz_dxz': 0.00545781,
+            'dxz_dx2-y2': 0.00101080,
+            'dxz_dz2': 0.00293144,
+            'dx2-y2_s': 0.00039659,
+            'dx2-y2_px': 0.00081077,
+            'dx2-y2_pz': 0.00038190,
+            'dx2-y2_dxz': 0.00101080,
+            'dx2-y2_dx2-y2': 0.00114567,
+            'dx2-y2_dz2': 0.00008670,
+            'dz2_s': 0.00665361,
+            'dz2_px': 0.00159929,
+            'dz2_pz': 0.00785794,
+            'dz2_dxz': 0.00293144,
+            'dz2_dx2-y2': 0.00008670,
+            'dz2_dz2': 0.00893035,
+        }
+
+    msg = 'Too large error for H_{0} (value={1})'
+
+    for integral, ref in H_ref.items():
+        pair = ('Au', 'S')
+        val = H[pair][integral][0][1]
+        diff = abs(val - ref)
+        assert diff < 1e-5, msg.format(integral, val)
+
+
+@pytest.mark.parametrize('atoms', [PBE_LibXC, LDA], indirect=True)
+def test_rep3c(atoms):
+    from hotcent.offsite_threecenter import Offsite3cTable
+
+    atom_Mo, atom_Au, atom_S = atoms
+    xc = atom_Mo.xcname
+
+    off3c = Offsite3cTable(atom_Mo, atom_Au)
+    Rgrid, Sgrid, Tgrid = np.array([4.]), np.array([2.]), np.array([np.pi*0.6])
+    E = off3c.run_repulsion(atom_S, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc,
+                            write=False)
+
+    if xc == PBE_LibXC:
+        E_ref = -0.01991227
+    elif xc == LDA:
+        E_ref = -0.01891973
+
+    tol = 1e-5
+    val = E[('Mo', 'Au')]['s_s'][0][1]
+    diff = abs(val - E_ref)
+    msg = 'Too large error for E_rep (value={0})'
+    assert diff < tol, msg.format(val)
