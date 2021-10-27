@@ -186,11 +186,11 @@ def test_rep2c(atom):
     E = off2c.erep[0]
 
     if xc == PBE_LibXC:
-        E_ref = 2.40955060
+        E_ref = 2.40963669
     elif xc in [LDA, LDA_LibXC]:
-        E_ref = 2.44177361
+        E_ref = 2.44188747
 
-    etol = 5e-4
+    etol = 2e-4
     E_diff = abs(E - E_ref)
     msg = 'Too large error for E_rep (value={0})'
     assert E_diff < etol, msg.format(E)
