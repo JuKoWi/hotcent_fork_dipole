@@ -172,13 +172,11 @@ def test_on2c(atoms):
 
     rmin, dr, N = 4.0, 4.0, 2
     on2c = Onsite2cTable(atom_Mo, atom_Mo)
-    on2c.run(atom_Au, rmin=rmin, dr=dr, N=N, superposition='density', xc=xc,
-             smoothen_tails=False, ntheta=300, nr=100)
-
-    H, S = on2c.tables[0][0, :20], on2c.tables[0][0, 20:41]
+    H = on2c.run(atom_Au, rmin=rmin, dr=dr, N=N, superposition='density', xc=xc,
+                 smoothen_tails=False, ntheta=300, nr=100, write=False)
 
     if xc == PBE_LibXC:
-        HS_ref = {
+        H_ref = {
             'sss': -0.03075806,
             'sps': -0.03831150,
             'sds': -0.01811909,
@@ -191,7 +189,7 @@ def test_on2c(atoms):
             'ddd': -0.00867295,
         }
     elif xc == LDA:
-        HS_ref = {
+        H_ref = {
             'sss': -0.03277479,
             'sps': -0.04063762,
             'sds': -0.01913406,
@@ -207,10 +205,11 @@ def test_on2c(atoms):
     htol = 2e-4
     msg = 'Too large error for H_{0} (value={1})'
 
-    for integral, ref in HS_ref.items():
-        index = INTEGRALS.index(integral)
-        H_diff = abs(H[index] - ref)
-        assert H_diff < htol, msg.format(integral, H[index])
+    for integral, ref in H_ref.items():
+        pair = ('Mo', 'Mo')
+        val = H[pair][integral][0]
+        diff = abs(val - ref)
+        assert diff < 5e-4, msg.format(integral, val)
 
 
 @pytest.mark.parametrize('atoms', [PBE_LibXC, LDA], indirect=True)

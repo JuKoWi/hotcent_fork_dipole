@@ -145,9 +145,8 @@ def test_on2c(atom):
 
     rmin, dr, N = 2.4, 2.4, 2
     on2c = Onsite2cTable(atom, atom)
-    on2c.run(atom, rmin=rmin, dr=dr, N=N, superposition='density', xc=xc,
-             smoothen_tails=False, ntheta=300, nr=100)
-    H = on2c.tables[0][0, :20]
+    H = on2c.run(atom, rmin=rmin, dr=dr, N=N, superposition='density', xc=xc,
+                 smoothen_tails=False, ntheta=300, nr=100, write=False)
 
     if xc == PBE_LibXC:
         H_ref = {
@@ -164,13 +163,13 @@ def test_on2c(atom):
             'ppp': -0.13063231,
         }
 
-    htol = 5e-4
     msg = 'Too large error for H_{0} (value={1})'
 
     for integral, ref in H_ref.items():
-        index = INTEGRALS.index(integral)
-        H_diff = abs(H[index] - ref)
-        assert H_diff < htol, msg.format(integral, H[index])
+        pair = ('S', 'S')
+        val = H[pair][integral][0]
+        diff = abs(val - ref)
+        assert diff < 5e-4, msg.format(integral, val)
 
 
 @pytest.mark.parametrize('atom', [PBE_LibXC, LDA, LDA_LibXC], indirect=True)

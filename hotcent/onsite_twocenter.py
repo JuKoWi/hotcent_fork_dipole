@@ -79,16 +79,29 @@ class Onsite2cTable(SlaterKosterTable):
 
     def run(self, e2, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50,
             wflimit=1e-7, smoothen_tails=True, superposition='density',
-            xc='LDA'):
-        """ Calculates on-site two-center integrals.
+            xc='LDA', write=True, filename=None):
+        """
+        Calculates on-site two-center Hamiltonian integrals.
 
-        parameters:
-        ------------
-        e2: AtomicDFT object for the second atom
+        Parameters
+        ----------
+        e2 : AtomicBase-like object
+            Object with atomic properties for the second atom.
+        write : bool, optional
+            Whether to write the integrals to file (the default)
+            or return them as a dictionary instead.
+        filename : str, optional
+            File name to use in case write=True. The default (None)
+            implies that a '<el1a>-<el1b>_onsite2c_<el2>.skf'
+            template is used.
+        rmin, dr, N, ntheta, nr, wflimit, smoothen_tails, superposition, xc :
+            See SlaterKosterTable.run().
 
-        other parameters:
-        -----------------
-        see SlaterKosterTable.run()
+        Returns
+        -------
+        output : dict of dict of np.ndarray, optional
+            Dictionary with the values for each el1a-el1b pair
+            and integral type. Only returned if write=False.
         """
         print('\n\n', file=self.txt)
         print('***********************************************', file=self.txt)
@@ -108,6 +121,7 @@ class Onsite2cTable(SlaterKosterTable):
         self.Rgrid = rmin + dr * np.arange(N)
         self.tables = [np.zeros((len(self.Rgrid), NUMSK))
                        for i in range(self.nel)]
+        output = {}
 
         for p, (e1a, e1b) in enumerate(self.pairs):
             sym1a, sym1b = e1a.get_symbol(), e1b.get_symbol()
@@ -119,7 +133,8 @@ class Onsite2cTable(SlaterKosterTable):
                 print(s[0], end=' ', file=self.txt)
             print(file=self.txt, flush=True)
 
-            data = {key: [] for key in selected}
+            output[(sym1a, sym1b)] = {integral: []
+                                      for (integral, nl1, nl2) in selected}
 
             for i, R in enumerate(self.Rgrid):
                 d = None
@@ -137,24 +152,33 @@ class Onsite2cTable(SlaterKosterTable):
                     d = {key: 0. for key in selected}
 
                 for key in selected:
-                    data[key].append(d[key])
+                    integral, nl1, nl2 = key
+                    output[(sym1a, sym1b)][integral].append(d[key])
 
             for key in selected:
-                data[key] = np.array(data[key])
                 integral, nl1, nl2 = key
-                index = INTEGRALS.index(integral)
+                output[(sym1a, sym1b)][integral] = np.array(
+                                            output[(sym1a, sym1b)][integral])
                 if smoothen_tails:
-                    # Smooth the curves near the cutoff
-                    self.tables[p][:, index] = tail_smoothening(self.Rgrid,
-                                                                data[key])
-                else:
-                    self.tables[p][:, index] = data[key]
+                    output[(sym1a, sym1b)][integral] = tail_smoothening(
+                                self.Rgrid, output[(sym1a, sym1b)][integral])
 
-            fn = '%s-%s_onsite2c_%s.skf' % (sym1a, sym1b, e2.get_symbol())
-            with open(fn, 'w') as handle:
-                self._write_skf(handle, (sym1a, sym1b))
+                index = INTEGRALS.index(integral)
+                self.tables[p][:, index] = output[(sym1a, sym1b)][integral]
+
+            if write:
+                if filename is None:
+                    items = (sym1a, sym1b, e2.get_symbol())
+                    fname = '%s-%s_onsite2c_%s.3cf' % items
+                else:
+                    fname = filename
+                print('Writing to %s' % fname, file=self.txt, flush=True)
+                with open(fname, 'w') as f:
+                    self._write_skf(f, (sym1a, sym1b))
 
         self.timer.stop('run_onsite2c')
+        if not write:
+            return output
 
     def calculate(self, selected, e1a, e1b, e2, R, grid, area,
                   superposition='density', xc='LDA'):
