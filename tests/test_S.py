@@ -11,6 +11,8 @@ from hotcent.pseudo_atomic_dft import PseudoAtomicDFT
 from hotcent.slako import INTEGRALS
 
 
+R1 = 2.4
+
 LDA = 'LDA'
 LDA_LibXC = 'LDA_X+LDA_C_PW'
 PBE_LibXC = 'GGA_X_PBE+GGA_C_PBE'
@@ -77,57 +79,60 @@ def test_energies(atom):
 def test_on1c(atom):
     xc = atom.xcname
 
-    if xc == PBE_LibXC:
-        H_ref = {
+    H_ref = {
+        PBE_LibXC: {
             '3s': -0.60003476,
             '3p': -0.22792440,
-        }
-    elif xc in [LDA, LDA_LibXC]:
-        H_ref = {
+        },
+        LDA_LibXC: {
             '3s': -0.60021238,
             '3p': -0.22965093,
-        }
+        },
+    }
+    H_ref[LDA] = H_ref[LDA_LibXC]
 
     htol = 1e-5
     msg = 'Too large error for H_{0} (value={1})'
-    for nl, ref in H_ref.items():
+    for nl, ref in H_ref[xc].items():
         H = atom.get_onecenter_integral(nl)
         H_diff = abs(H - ref)
         assert H_diff < htol, msg.format(nl, H)
 
 
+@pytest.mark.parametrize('R', [R1])
 @pytest.mark.parametrize('atom', [PBE_LibXC, LDA, LDA_LibXC], indirect=True)
-def test_off2c(atom):
+def test_off2c(R, atom):
     from hotcent.slako import SlaterKosterTable
 
     xc = atom.xcname
 
-    rmin, dr, N = 2.4, 2.4, 2
+    rmin, dr, N = R, R, 2
     off2c = SlaterKosterTable(atom, atom)
     off2c.run(rmin=rmin, dr=dr, N=N, superposition='density', xc=xc,
               smoothen_tails=False, ntheta=300, nr=100)
     H, S = off2c.tables[0][0, :20], off2c.tables[0][0, 20:41]
 
-    if xc == PBE_LibXC:
-        HS_ref = {
+    HS_ref = {
+        (R1, PBE_LibXC): {
             'sss': (-0.56677916,  0.49949084),
             'sps': ( 0.54239200, -0.56984428),
             'pps': ( 0.23153307, -0.18330357),
             'ppp': (-0.29839091,  0.46900432),
-        }
-    elif xc in [LDA, LDA_LibXC]:
-        HS_ref = {
+        },
+        (R1, LDA_LibXC): {
             'sss': (-0.57099349,  0.50148895),
             'sps': ( 0.54669416, -0.57206251),
             'pps': ( 0.23101831, -0.17645402),
             'ppp': (-0.30160739,  0.47370130),
-        }
+        },
+    }
+    HS_ref[(R1, LDA)] = HS_ref[(R1, LDA_LibXC)]
 
     htol = 5e-4
     stol = 1e-4
     msg = 'Too large error for {0}_{1} (value={2})'
 
-    for integral, ref in HS_ref.items():
+    for integral, ref in HS_ref[(R, xc)].items():
         index = INTEGRALS.index(integral)
 
         H_diff = abs(H[index] - ref[0])
@@ -137,77 +142,90 @@ def test_off2c(atom):
         assert S_diff < stol, msg.format('S', integral, S[index])
 
 
+@pytest.mark.parametrize('R', [R1])
 @pytest.mark.parametrize('atom', [PBE_LibXC, LDA, LDA_LibXC], indirect=True)
-def test_on2c(atom):
+def test_on2c(R, atom):
     from hotcent.onsite_twocenter import Onsite2cTable
 
     xc = atom.xcname
 
-    rmin, dr, N = 2.4, 2.4, 2
+    rmin, dr, N = R, R, 2
     on2c = Onsite2cTable(atom, atom)
     H = on2c.run(atom, rmin=rmin, dr=dr, N=N, superposition='density', xc=xc,
                  smoothen_tails=False, ntheta=300, nr=100, write=False)
 
-    if xc == PBE_LibXC:
-        H_ref = {
+    H_ref = {
+        (R1, PBE_LibXC): {
             'sss': -0.20686456,
             'sps': -0.23146656,
             'pps': -0.32711570,
             'ppp': -0.12725461,
-        }
-    elif xc in [LDA, LDA_LibXC]:
-        H_ref = {
+        },
+        (R1, LDA_LibXC): {
             'sss': -0.21148071,
             'sps': -0.23413930,
             'pps': -0.33049489,
             'ppp': -0.13063231,
         }
+    }
+    H_ref[(R1, LDA)] = H_ref[(R1, LDA_LibXC)]
 
     msg = 'Too large error for H_{0} (value={1})'
 
-    for integral, ref in H_ref.items():
+    for integral, ref in H_ref[(R, xc)].items():
         pair = ('S', 'S')
         val = H[pair][integral][0]
         diff = abs(val - ref)
         assert diff < 5e-4, msg.format(integral, val)
 
 
+@pytest.mark.parametrize('R', [R1])
 @pytest.mark.parametrize('atom', [PBE_LibXC, LDA, LDA_LibXC], indirect=True)
-def test_rep2c(atom):
+def test_rep2c(R, atom):
     from hotcent.slako import SlaterKosterTable
 
     xc = atom.xcname
 
-    rmin, dr, N = 2.4, 2.4, 3
+    rmin, dr, N = R, R, 3
     off2c = SlaterKosterTable(atom, atom)
     off2c.run_repulsion(rmin=rmin, dr=dr, N=N, xc=xc, smoothen_tails=False,
                         ntheta=600, nr=200)
     E = off2c.erep[0]
 
-    if xc == PBE_LibXC:
-        E_ref = 2.40963669
-    elif xc in [LDA, LDA_LibXC]:
-        E_ref = 2.44188747
+    E_ref = {
+        (R1, PBE_LibXC): 2.40963669,
+        (R1, LDA_LibXC): 2.44188747,
+    }
+    E_ref[(R1, LDA)] = E_ref[(R1, LDA_LibXC)]
 
     etol = 2e-4
-    E_diff = abs(E - E_ref)
+    E_diff = abs(E - E_ref[(R, xc)])
     msg = 'Too large error for E_rep (value={0})'
     assert E_diff < etol, msg.format(E)
 
 
+@pytest.fixture(scope='module')
+def grids(request):
+    all_grids = {
+        R1: (R1, np.array([R1]), np.array([1.2]), np.array([np.pi/2])),
+    }
+    return all_grids[request.param]
+
+
+@pytest.mark.parametrize('grids', [R1], indirect=True)
 @pytest.mark.parametrize('atom', [PBE_LibXC, LDA, LDA_LibXC], indirect=True)
-def test_off3c(atom):
+def test_off3c(grids, atom):
     from hotcent.offsite_threecenter import Offsite3cTable
 
+    R, Rgrid, Sgrid, Tgrid = grids
     xc = atom.xcname
 
     off3c = Offsite3cTable(atom, atom)
-    Rgrid, Sgrid, Tgrid = np.array([2.4]), np.array([1.2]), np.array([np.pi/2])
     H = off3c.run(atom, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc,
                   ntheta=300, nr=100, write=False)
 
-    if xc == PBE_LibXC:
-        H_ref = {
+    H_ref = {
+        (R1, PBE_LibXC): {
             's_s': -0.20053906,
             's_px': -0.06779262,
             's_pz': 0.23955519,
@@ -218,9 +236,8 @@ def test_off3c(atom):
             'pz_s': -0.23955519,
             'pz_px': -0.08002509,
             'pz_pz': 0.19302398,
-        }
-    elif xc in [LDA, LDA_LibXC]:
-        H_ref = {
+        },
+        (R1, LDA_LibXC): {
             's_s': -0.20386829,
             's_px': -0.06891501,
             's_pz': 0.24284765,
@@ -231,30 +248,33 @@ def test_off3c(atom):
             'pz_s': -0.24284765,
             'pz_px': -0.08132246,
             'pz_pz': 0.19281687,
-        }
+        },
+    }
+    H_ref[(R1, LDA)] = H_ref[(R1, LDA_LibXC)]
 
     msg = 'Too large error for H_{0} (value={1})'
 
-    for integral, ref in H_ref.items():
+    for integral, ref in H_ref[(R, xc)].items():
         pair = ('S', 'S')
         val = H[pair][integral][0][1]
         diff = abs(val - ref)
         assert diff < 5e-4, msg.format(integral, val)
 
 
+@pytest.mark.parametrize('grids', [R1], indirect=True)
 @pytest.mark.parametrize('atom', [PBE_LibXC, LDA, LDA_LibXC], indirect=True)
-def test_on3c(atom):
+def test_on3c(grids, atom):
     from hotcent.onsite_threecenter import Onsite3cTable
 
+    R, Rgrid, Sgrid, Tgrid = grids
     xc = atom.xcname
 
     on3c = Onsite3cTable(atom, atom)
-    Rgrid, Sgrid, Tgrid = np.array([2.4]), np.array([1.2]), np.array([np.pi/2])
     H = on3c.run(atom, atom, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc,
                  ntheta=300, nr=100, write=False)
 
-    if xc == PBE_LibXC:
-        H_ref = {
+    H_ref = {
+        (R1, PBE_LibXC): {
             's_s': 0.01211108,
             's_px': 0.00435683,
             's_pz': 0.01536382,
@@ -265,9 +285,8 @@ def test_on3c(atom):
             'pz_s': 0.01536382,
             'pz_px': 0.00509048,
             'pz_pz': 0.02464206,
-        }
-    elif xc in [LDA, LDA_LibXC]:
-        H_ref = {
+        },
+        (R1, LDA_LibXC): {
             's_s': 0.01312961,
             's_px': 0.00466226,
             's_pz': 0.01602638,
@@ -278,34 +297,38 @@ def test_on3c(atom):
             'pz_s': 0.01602638,
             'pz_px': 0.00505369,
             'pz_pz': 0.02542100,
-        }
+        },
+    }
+    H_ref[(R1, LDA)] = H_ref[(R1, LDA_LibXC)]
 
     msg = 'Too large error for H_{0} (value={1})'
 
-    for integral, ref in H_ref.items():
+    for integral, ref in H_ref[(R, xc)].items():
         pair = ('S', 'S')
         val = H[pair][integral][0][1]
         diff = abs(val - ref)
         assert diff < 1e-5, msg.format(integral, H[index])
 
 
+@pytest.mark.parametrize('grids', [R1], indirect=True)
 @pytest.mark.parametrize('atom', [PBE_LibXC, LDA, LDA_LibXC], indirect=True)
-def test_rep3c(atom):
+def test_rep3c(grids, atom):
     from hotcent.offsite_threecenter import Offsite3cTable
 
+    R, Rgrid, Sgrid, Tgrid = grids
     xc = atom.xcname
 
     off3c = Offsite3cTable(atom, atom)
-    Rgrid, Sgrid, Tgrid = np.array([2.4]), np.array([1.2]), np.array([np.pi/2])
     E = off3c.run_repulsion(atom, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc,
                             write=False)
 
-    if xc == PBE_LibXC:
-        E_ref = -0.06149970
-    elif xc in [LDA, LDA_LibXC]:
-        E_ref = -0.05907971
+    E_ref = {
+        (R1, PBE_LibXC): -0.06149970,
+        (R1, LDA_LibXC): -0.05907971,
+    }
+    E_ref[(R1, LDA)] = E_ref[(R1, LDA_LibXC)]
 
     val = E[('S', 'S')]['s_s'][0][1]
-    diff = abs(val - E_ref)
+    diff = abs(val - E_ref[(R, xc)])
     msg = 'Too large error for E_rep (value={0})'
     assert diff < 5e-5, msg.format(val)
