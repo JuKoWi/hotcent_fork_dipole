@@ -6,14 +6,17 @@
 #-----------------------------------------------------------------------------#
 import numpy as np
 from scipy.integrate import quad_vec
-from hotcent.slako import SlaterKosterTable
+from hotcent.multiatom_integrator import MultiAtomIntegrator
 from hotcent.spherical_harmonics import (sph_nophi, sph_nophi_der,
                                          sph_phi, sph_phi_der)
 from hotcent.threecenter import select_integrals, write_3cf
 from hotcent.xc import EXC_PW92_Spline, LibXC, VXC_PW92_Spline
 
 
-class Offsite3cTable(SlaterKosterTable):
+class Offsite3cTable(MultiAtomIntegrator):
+    def __init__(self, *args, **kwargs):
+        MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
+
     def run(self, e3, Rgrid, Sgrid, Tgrid, ntheta=150, nr=50, wflimit=1e-7,
             xc='LDA', write=True, filename=None):
         """

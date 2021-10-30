@@ -6,13 +6,16 @@
 #-----------------------------------------------------------------------------#
 import numpy as np
 from ase.data import atomic_numbers, atomic_masses
-from hotcent.xc import XC_PW92, LibXC
+from hotcent.multiatom_integrator import MultiAtomIntegrator
 from hotcent.slako import (dg, g, INTEGRAL_PAIRS, INTEGRALS, NUMSK,
-                           select_integrals, SlaterKosterTable,
-                           tail_smoothening)
+                           select_integrals, tail_smoothening)
+from hotcent.xc import XC_PW92, LibXC
 
 
-class Onsite2cTable(SlaterKosterTable):
+class Onsite2cTable(MultiAtomIntegrator):
+    def __init__(self, *args, **kwargs):
+        MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
+
     def _write_skf(self, handle, pair):
         """ Write to SKF file format; this function
         is an adaptation of hotbit.io.hbskf

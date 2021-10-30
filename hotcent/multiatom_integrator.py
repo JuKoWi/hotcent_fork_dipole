@@ -4,7 +4,10 @@
 #   Copyright 2018-2021 Maxime Van den Bossche                                #
 #   SPDX-License-Identifier: GPL-3.0-or-later                                 #
 #-----------------------------------------------------------------------------#
+import os
+import sys
 import numpy as np
+from hotcent.timing import Timer
 try:
     import matplotlib.pyplot as plt
 except ImportError:
@@ -14,6 +17,96 @@ try:
 except ModuleNotFoundError:
     print('Warning: C-extensions not available')
     _hotcent = None
+
+
+class MultiAtomIntegrator:
+    """
+    A base class for integrations involving multiple atoms.
+
+    Parameters
+    ----------
+    ela, elb : AtomicBase-like objects
+        Objects with atomic properties for two atoms.
+    grid_type : str
+        Type of 2D integration grid in the XZ plane.
+        Currently only a 'bipolar' type can be chosen.
+    txt : str, optional
+        Where output should be printed.
+        Use '-' for stdout (default), None for /dev/null,
+        any other string for a text file, or a file handle,
+    timing : bool, optional
+        Whether to print a timing summary before destruction
+        (default: False).
+    """
+    def __init__(self, ela, elb, grid_type, txt='-', timing=False):
+        self.ela = ela
+        self.elb = elb
+
+        assert grid_type in ['bipolar']
+        self.grid_type = grid_type
+
+        if ela.get_symbol() != elb.get_symbol():
+            self.nel = 2
+            self.pairs = [(ela, elb), (elb, ela)]
+            self.elements = [ela, elb]
+        else:
+            self.nel = 1
+            self.pairs = [(ela, elb)]
+            self.elements = [ela]
+
+        if txt is None:
+            self.txt = open(os.devnull, 'w')
+        elif isinstance(txt, str):
+            if txt == '-':
+                self.txt = sys.stdout
+            else:
+                self.txt = open(txt, 'a')
+        else:
+            self.txt = txt
+
+        self.timer = Timer('MultiAtomIntegrator', txt=self.txt, enabled=timing)
+
+    def __del__(self):
+        self.timer.summary()
+
+    def get_range(self, wf_limit):
+        """
+        Get the maximal radius beyond which all involved valence
+        orbitals magnitudes are below the given value.
+
+        Parameters
+        ----------
+        wf_limit : float
+            Threshold for the radial components of the valence
+            orbitals.
+
+        Returns
+        -------
+        wf_range : float
+            The largest radius r such that Rnl(r) < wf_limit.
+        """
+        wf_range = 0.
+
+        for el in self.elements:
+            r = max([el.get_wf_range(nl, wf_limit)
+                     for nl in el.get_valence_orbitals()])
+            print('Wave function range for %s = %.5f a0' % (el.get_symbol(), r),
+                  file=self.txt)
+            wf_range = max(r, wf_range)
+
+        assert wf_range < 20, 'Wave function range exceeds 20 Bohr radii. ' \
+                              'Decrease wflimit?'
+        return wf_range
+
+    def make_grid(self, *args, **kwargs):
+        """
+        Wraps around make_bipolar_grid().
+        """
+        self.timer.start('make_grid')
+        if self.grid_type == 'bipolar':
+            grid = make_bipolar_grid(*args, **kwargs)
+        self.timer.stop('make_grid')
+        return grid
 
 
 def make_bipolar_grid(Rz, wf_range, nt, nr, p=2, q=2, view=False):

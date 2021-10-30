@@ -12,16 +12,13 @@ The code below draws heavily from the Hotbit code
 written by Pekka Koskinen (https://github.com/pekkosk/
 hotbit/blob/master/hotbit/parametrization/slako.py).
 """
-import os
-import sys
 import numpy as np
 from scipy.interpolate import CubicSpline
 from ase.units import Bohr
 from ase.data import atomic_numbers, atomic_masses, covalent_radii
 from hotcent.interpolation import CubicSplineFunction
+from hotcent.multiatom_integrator import MultiAtomIntegrator
 from hotcent.orbitals import ANGULAR_MOMENTUM
-from hotcent.timing import Timer
-from hotcent.twodimensional_grids import make_bipolar_grid
 from hotcent.xc import XC_PW92, LibXC
 try:
     import matplotlib.pyplot as plt
@@ -34,54 +31,9 @@ except ModuleNotFoundError:
     _hotcent = None
 
 
-class SlaterKosterTable:
-    def __init__(self, ela, elb, txt='-', timing=False):
-        """ Construct Slater-Koster table for given elements.
-
-        Parameters:
-        -----------
-        ela:    AtomicDFT object
-        elb:    AtomicDFT object
-        txt:    where output should be printed
-                use '-' for stdout (default), None for /dev/null,
-                any other string for a text file, or a file handle
-        timing: output of timing summary after calculation
-        """
-        self.ela = ela
-        self.elb = elb
-
-        if ela.get_symbol() != elb.get_symbol():
-            self.nel = 2
-            self.pairs = [(ela, elb), (elb, ela)]
-            self.elements = [ela, elb]
-        else:
-            self.nel = 1
-            self.pairs = [(ela, elb)]
-            self.elements = [ela]
-
-        if txt is None:
-            self.txt = open(os.devnull, 'w')
-        elif isinstance(txt, str):
-            if txt == '-':
-                self.txt = sys.stdout
-            else:
-                self.txt = open(txt, 'a')
-        else:
-            self.txt = txt
-
-        self.timer = Timer('SlaterKosterTable', txt=self.txt, enabled=timing)
-
-    def __del__(self):
-        self.timer.summary()
-
-    def make_grid(self, *args, **kwargs):
-        """
-        Wraps around make_bipolar_grid().
-        """
-        self.timer.start('make_grid')
-        grid = make_bipolar_grid(*args, **kwargs)
-        self.timer.stop('make_grid')
-        return grid
+class SlaterKosterTable(MultiAtomIntegrator):
+    def __init__(self, *args, **kwargs):
+        MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
 
     def write(self, filename=None, pair=None, eigenvalues={},
               hubbardvalues={}, occupations={}, spe=0.):
@@ -303,21 +255,6 @@ class SlaterKosterTable:
         plt.savefig(filename, bbox_inches='tight')
         plt.clf()
         self.timer.stop('plotting')
-
-    def get_range(self, fractional_limit):
-        """ Define ranges for the atoms: largest r such that Rnl(r)<limit. """
-        wf_range = 0.
-
-        for el in self.elements:
-            r = max([el.get_wf_range(nl, fractional_limit)
-                     for nl in el.get_valence_orbitals()])
-            print('Wave function range for %s = %.5f a0' % (el.get_symbol(), r),
-                  file=self.txt)
-            wf_range = max(r, wf_range)
-
-        assert wf_range < 20, 'Wave function range exceeds 20 Bohr radii. ' \
-                              'Decrease wflimit?'
-        return wf_range
 
     def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
             superposition='potential', xc='LDA', stride=1, smoothen_tails=True):
