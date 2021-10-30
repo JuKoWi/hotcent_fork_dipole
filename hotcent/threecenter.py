@@ -4,7 +4,6 @@
 #   Copyright 2018-2021 Maxime Van den Bossche                                #
 #   SPDX-License-Identifier: GPL-3.0-or-later                                 #
 #-----------------------------------------------------------------------------#
-import numpy as np
 from hotcent.orbitals import ORBITAL_LABELS
 
 
