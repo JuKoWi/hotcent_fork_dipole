@@ -49,7 +49,7 @@ class Onsite3cTable(SlaterKosterTable):
         self.txt.flush()
 
         self.timer.start('run_onsite3c')
-        self.wf_range = self.get_range(wflimit)
+        wf_range = self.get_range(wflimit)
         numST = len(Sgrid) * len(Tgrid)
 
         selected = select_integrals(self.ela, self.elb)
@@ -76,8 +76,8 @@ class Onsite3cTable(SlaterKosterTable):
                 print('Starting for R=%.3f' % R, file=self.txt, flush=True)
 
                 d = None
-                if R < 2 * self.wf_range:
-                    grid, area = self.make_grid(R, nt=ntheta, nr=nr)
+                if R < 2 * wf_range:
+                    grid, area = self.make_grid(R, wf_range, nt=ntheta, nr=nr)
                     if len(grid) > 0:
                         d = self.calculate(selected, self.ela, self.elb,
                                            elc, eld, R, grid, area,

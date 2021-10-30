@@ -60,7 +60,7 @@ class SeparablePP:
         assert len(self.projectors) > 0
 
         sk = SlaterKosterTable(e1, e3, txt=None, timing=False)
-        sk.wf_range = sk.get_range(wflimit)
+        wf_range = sk.get_range(wflimit)
 
         if rmax is None:
             rmax = 2. * sk.wf_range
@@ -95,7 +95,7 @@ class SeparablePP:
 
                     sval = []
                     for r13 in rval:
-                        grid, area = sk.make_grid(r13, nt=150, nr=50)
+                        grid, area = sk.make_grid(r13, wf_range, nt=150, nr=50)
                         if l1 < l3:
                             s = sk.calculate_mels(sk_selected, e1, e3, r13,
                                               grid, area, only_overlap=True)

@@ -117,7 +117,7 @@ class Onsite2cTable(SlaterKosterTable):
         assert superposition == 'density'
 
         self.timer.start('run_onsite2c')
-        self.wf_range = self.get_range(wflimit)
+        wf_range = self.get_range(wflimit)
         self.Rgrid = rmin + dr * np.arange(N)
         self.tables = [np.zeros((len(self.Rgrid), NUMSK))
                        for i in range(self.nel)]
@@ -138,8 +138,8 @@ class Onsite2cTable(SlaterKosterTable):
 
             for i, R in enumerate(self.Rgrid):
                 d = None
-                if R < 2 * self.wf_range:
-                    grid, area = self.make_grid(R, nt=ntheta, nr=nr)
+                if R < 2 * wf_range:
+                    grid, area = self.make_grid(R, wf_range, nt=ntheta, nr=nr)
                     if i % 10 == 0:
                         print('R=%8.2f, %i grid points ...' % (R, len(grid)),
                               file=self.txt, flush=True)

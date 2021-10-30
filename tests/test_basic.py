@@ -71,8 +71,8 @@ def test_off2c(atoms):
 
     sk = SlaterKosterTable(atom_B, atom_H, txt=None)
     R, nt, nr = 2.0, 150, 50
-    sk.wf_range = sk.get_range(1e-7)
-    grid, area = sk.make_grid(R, nt=nt, nr=nr)
+    wf_range = sk.get_range(1e-7)
+    grid, area = sk.make_grid(R, wf_range, nt=nt, nr=nr)
 
     # B-H sss integrals
     out = sk.calculate_mels([('sss', '2s', '1s')], atom_B, atom_H,

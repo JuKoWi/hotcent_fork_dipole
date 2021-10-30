@@ -49,7 +49,7 @@ class Offsite3cTable(SlaterKosterTable):
         self.txt.flush()
 
         self.timer.start('run_offsite3c')
-        self.wf_range = self.get_range(wflimit)
+        wf_range = self.get_range(wflimit)
         numST = len(Sgrid) * len(Tgrid)
         output = {}
 
@@ -69,8 +69,8 @@ class Offsite3cTable(SlaterKosterTable):
                 print('Starting for R=%.3f' % R, file=self.txt, flush=True)
 
                 d = None
-                if R < 2 * self.wf_range:
-                    grid, area = self.make_grid(R, nt=ntheta, nr=nr)
+                if R < 2 * wf_range:
+                    grid, area = self.make_grid(R, wf_range, nt=ntheta, nr=nr)
                     if len(grid) > 0:
                         d = self.calculate(selected, e1, e2, e3, R, grid, area,
                                            Sgrid=Sgrid, Tgrid=Tgrid, xc=xc)
@@ -318,7 +318,7 @@ class Offsite3cTable(SlaterKosterTable):
         self.txt.flush()
 
         self.timer.start('run_repulsion3c')
-        self.wf_range = self.get_range(wflimit)
+        wf_range = self.get_range(wflimit)
         numST = len(Sgrid) * len(Tgrid)
         output = {}
 
@@ -331,8 +331,8 @@ class Offsite3cTable(SlaterKosterTable):
                 print('Starting for R=%.3f' % R, file=self.txt, flush=True)
 
                 d = None
-                if R < 2 * self.wf_range:
-                    grid, area = self.make_grid(R, nt=ntheta, nr=nr)
+                if R < 2 * wf_range:
+                    grid, area = self.make_grid(R, wf_range, nt=ntheta, nr=nr)
                     if len(grid) > 0:
                         d = self.calculate_repulsion(e1, e2, e3, R, grid, area,
                                                 Sgrid=Sgrid, Tgrid=Tgrid, xc=xc)
