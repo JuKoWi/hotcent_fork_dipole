@@ -12,6 +12,7 @@ from hotcent.slako import INTEGRALS
 
 
 R1 = 2.4
+R2 = 6.0
 
 LDA = 'LDA'
 LDA_LibXC = 'LDA_X+LDA_C_PW'
@@ -40,7 +41,7 @@ def atom(request):
                            )
     atom.run()
     atom.pp.build_projectors(atom)
-    atom.pp.build_overlaps(atom, atom, rmin=0.5, rmax=5.)
+    atom.pp.build_overlaps(atom, atom, rmin=1., rmax=7.)
     return atom
 
 
@@ -99,7 +100,7 @@ def test_on1c(atom):
         assert H_diff < htol, msg.format(nl, H)
 
 
-@pytest.mark.parametrize('R', [R1])
+@pytest.mark.parametrize('R', [R1, R2])
 @pytest.mark.parametrize('atom', [PBE_LibXC, LDA, LDA_LibXC], indirect=True)
 def test_off2c(R, atom):
     from hotcent.slako import SlaterKosterTable
@@ -125,8 +126,21 @@ def test_off2c(R, atom):
             'pps': ( 0.23101831, -0.17645402),
             'ppp': (-0.30160739,  0.47370130),
         },
+        (R2, PBE_LibXC): {
+            'sss': (-0.01439856, 0.01201897),
+            'sps': (0.04313330, -0.05188745),
+            'pps': (0.06294089, -0.12927059),
+            'ppp': (-0.01214645, 0.02231471),
+        },
+        (R2, LDA_LibXC): {
+            'sss': (-0.01483195, 0.01231958),
+            'sps': (0.04450229, -0.05321746),
+            'pps': (0.06553380, -0.13288662),
+            'ppp': (-0.01273031, 0.02303890),
+        },
     }
     HS_ref[(R1, LDA)] = HS_ref[(R1, LDA_LibXC)]
+    HS_ref[(R2, LDA)] = HS_ref[(R2, LDA_LibXC)]
 
     htol = 5e-4
     stol = 1e-4
@@ -142,7 +156,7 @@ def test_off2c(R, atom):
         assert S_diff < stol, msg.format('S', integral, S[index])
 
 
-@pytest.mark.parametrize('R', [R1])
+@pytest.mark.parametrize('R', [R1, R2])
 @pytest.mark.parametrize('atom', [PBE_LibXC, LDA, LDA_LibXC], indirect=True)
 def test_on2c(R, atom):
     from hotcent.onsite_twocenter import Onsite2cTable
@@ -166,9 +180,22 @@ def test_on2c(R, atom):
             'sps': -0.23413930,
             'pps': -0.33049489,
             'ppp': -0.13063231,
+        },
+        (R2, PBE_LibXC): {
+            'sss': -0.00043656,
+            'sps': -0.00122881,
+            'pps': -0.00466089,
+            'ppp': -0.00035469,
+        },
+        (R2, LDA_LibXC): {
+            'sss': -0.00064243,
+            'sps': -0.00168346,
+            'pps': -0.00587112,
+            'ppp': -0.00058349,
         }
     }
     H_ref[(R1, LDA)] = H_ref[(R1, LDA_LibXC)]
+    H_ref[(R2, LDA)] = H_ref[(R2, LDA_LibXC)]
 
     msg = 'Too large error for H_{0} (value={1})'
 
@@ -179,7 +206,7 @@ def test_on2c(R, atom):
         assert diff < 5e-4, msg.format(integral, val)
 
 
-@pytest.mark.parametrize('R', [R1])
+@pytest.mark.parametrize('R', [R1, R2])
 @pytest.mark.parametrize('atom', [PBE_LibXC, LDA, LDA_LibXC], indirect=True)
 def test_rep2c(R, atom):
     from hotcent.slako import SlaterKosterTable
@@ -195,8 +222,11 @@ def test_rep2c(R, atom):
     E_ref = {
         (R1, PBE_LibXC): 2.40963669,
         (R1, LDA_LibXC): 2.44188747,
+        (R2, PBE_LibXC): 0.00626949,
+        (R2, LDA_LibXC): 0.00685124,
     }
     E_ref[(R1, LDA)] = E_ref[(R1, LDA_LibXC)]
+    E_ref[(R2, LDA)] = E_ref[(R2, LDA_LibXC)]
 
     etol = 2e-4
     E_diff = abs(E - E_ref[(R, xc)])

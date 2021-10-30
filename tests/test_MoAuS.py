@@ -12,6 +12,7 @@ from hotcent.slako import INTEGRALS
 
 
 R1 = 4.0
+R2 = 8.0
 
 LDA = 'LDA'
 PBE_LibXC = 'GGA_X_PBE+GGA_C_PBE'
@@ -65,7 +66,7 @@ def atoms(request):
 
     for atom1 in atoms:
         for atom2 in atoms:
-            atom1.pp.build_overlaps(atom2, atom1, rmin=0.5, rmax=5.)
+            atom1.pp.build_overlaps(atom2, atom1, rmin=2., rmax=9.)
     return atoms
 
 
@@ -95,7 +96,7 @@ def test_on1c(atoms):
         assert H_diff < htol, msg.format(nl, H)
 
 
-@pytest.mark.parametrize('R', [R1])
+@pytest.mark.parametrize('R', [R1, R2])
 @pytest.mark.parametrize('atoms', [PBE_LibXC, LDA], indirect=True)
 def test_off2c(R, atoms):
     from hotcent.slako import SlaterKosterTable
@@ -143,6 +144,40 @@ def test_off2c(R, atoms):
             'ddp': ( 0.11209514, -0.17544303),
             'ddd': (-0.03073530,  0.05277999),
         },
+        (R2, PBE_LibXC, 0): {
+            'sss': (-0.02623596, 0.08289264),
+            'sds': (-0.01048895, 0.02164274),
+            'pds': (-0.01321184, 0.02911574),
+            'pdp': (0.00883598, -0.01877728),
+            'dds': (-0.00592549, 0.00848859),
+            'ddp': (0.00194103, -0.00200137),
+            'ddd': (-0.00016917, 0.00013151),
+        },
+        (R2, PBE_LibXC, 1): {
+            'sss': (-0.02624584, 0.08289264),
+            'sps': (0.06448772, -0.28770736),
+            'sds': (-0.01152764, 0.02873165),
+            'dds': (-0.00606628, 0.00848859),
+            'ddp': (0.00194864, -0.00200137),
+            'ddd': (-0.00016495, 0.00013151),
+        },
+        (R2, LDA, 0): {
+            'sss': (-0.02721740, 0.08196722),
+            'sds': (-0.01088095, 0.02195029),
+            'pds': (-0.01434407, 0.03106861),
+            'pdp': (0.00899208, -0.01872935),
+            'dds': (-0.00626375, 0.00885245),
+            'ddp': (0.00205225, -0.00209347),
+            'ddd': (-0.00017877, 0.00013782),
+        },
+        (R2, LDA, 1): {
+            'sss': (-0.02722679, 0.08196722),
+            'sps': (0.06642561, -0.27886886),
+            'sds': (-0.01205394, 0.02893220),
+            'dds': (-0.00640841, 0.00885245),
+            'ddp': (0.00205986, -0.00209347),
+            'ddd': (-0.00017436, 0.00013782),
+        },
     }
 
     for i in range(2):
@@ -162,7 +197,7 @@ def test_off2c(R, atoms):
             assert S_diff < stol, msg.format('S', i, integral, S[index])
 
 
-@pytest.mark.parametrize('R', [R1])
+@pytest.mark.parametrize('R', [R1, R2])
 @pytest.mark.parametrize('atoms', [PBE_LibXC, LDA], indirect=True)
 def test_on2c(R, atoms):
     from hotcent.onsite_twocenter import Onsite2cTable
@@ -200,6 +235,30 @@ def test_on2c(R, atoms):
             'ddp': -0.03564661,
             'ddd': -0.00958009,
         },
+        (R2, PBE_LibXC): {
+            'sss': -0.00141768,
+            'sps': -0.00430863,
+            'sds': -0.00040599,
+            'pps': -0.01723770,
+            'ppp': -0.00122478,
+            'pds': -0.00095157,
+            'pdp': -0.00007427,
+            'dds': -0.00018447,
+            'ddp': -0.00002972,
+            'ddd': -0.00000131,
+        },
+        (R2, LDA): {
+            'sss': -0.00195895,
+            'sps': -0.00536222,
+            'sds': -0.00066912,
+            'pps': -0.01896093,
+            'ppp': -0.00150422,
+            'pds': -0.00142890,
+            'pdp': -0.00017212,
+            'dds': -0.00036952,
+            'ddp': -0.00007939,
+            'ddd': -0.00000628,
+        },
     }
 
     htol = 2e-4
@@ -212,7 +271,7 @@ def test_on2c(R, atoms):
         assert diff < 5e-4, msg.format(integral, val)
 
 
-@pytest.mark.parametrize('R', [R1])
+@pytest.mark.parametrize('R', [R1, R2])
 @pytest.mark.parametrize('atoms', [PBE_LibXC, LDA], indirect=True)
 def test_rep2c(R, atoms):
     from hotcent.slako import SlaterKosterTable
@@ -229,7 +288,9 @@ def test_rep2c(R, atoms):
 
         E_ref = {
             (R1, PBE_LibXC): 0.51045989,
-            (R1, LDA): 0.515162968,
+            (R1, LDA): 0.51516297,
+            (R2, PBE_LibXC): 0.00124824,
+            (R2, LDA): 0.00152799,
         }
 
         etol = 5e-5
