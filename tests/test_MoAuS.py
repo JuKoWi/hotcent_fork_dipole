@@ -302,11 +302,12 @@ def test_rep2c(R, atoms):
 def grids(request):
     all_grids = {
         R1: (R1, np.array([R1]), np.array([2.]), np.array([0.6*np.pi])),
+        R2: (R2, np.array([R2]), np.array([2.]), np.array([0.7*np.pi])),
     }
     return all_grids[request.param]
 
 
-@pytest.mark.parametrize('grids', [R1], indirect=True)
+@pytest.mark.parametrize('grids', [R1, R2], indirect=True)
 @pytest.mark.parametrize('atoms', [PBE_LibXC, LDA], indirect=True)
 def test_off3c(grids, atoms):
     from hotcent.offsite_threecenter import Offsite3cTable
@@ -383,6 +384,70 @@ def test_off3c(grids, atoms):
             'dz2_dx2-y2': -0.00863665,
             'dz2_dz2': -0.05976538,
         },
+        (R2, PBE_LibXC): {
+            's_s': -0.01592434,
+            's_dxz': 0.00158949,
+            's_dx2-y2': -0.00018950,
+            's_dz2': -0.00367117,
+            'px_s': -0.00770916,
+            'px_dxz': 0.00130119,
+            'px_dx2-y2': -0.00025552,
+            'px_dz2': -0.00121018,
+            'py_dxy': -0.00018157,
+            'py_dyz': 0.00071230,
+            'pz_s': -0.02542595,
+            'pz_dxz': 0.00335932,
+            'pz_dx2-y2': -0.00044995,
+            'pz_dz2': -0.00694902,
+            'dxy_dxy': -0.00002290,
+            'dxy_dyz': 0.00005340,
+            'dyz_dxy': -0.00006020,
+            'dyz_dyz': 0.00034577,
+            'dxz_s': -0.00524522,
+            'dxz_dxz': 0.00055231,
+            'dxz_dx2-y2': -0.00007744,
+            'dxz_dz2': -0.00066628,
+            'dx2-y2_s': -0.00050301,
+            'dx2-y2_dxz': 0.00007098,
+            'dx2-y2_dx2-y2': -0.00002511,
+            'dx2-y2_dz2': -0.00004778,
+            'dz2_s': -0.01095684,
+            'dz2_dxz': 0.00075128,
+            'dz2_dx2-y2': -0.00006418,
+            'dz2_dz2': -0.00242492,
+        },
+        (R2, LDA): {
+            's_s': -0.01574717,
+            's_dxz': 0.00161654,
+            's_dx2-y2': -0.00018972,
+            's_dz2': -0.00375603,
+            'px_s': -0.00764769,
+            'px_dxz': 0.00138523,
+            'px_dx2-y2': -0.00027380,
+            'px_dz2': -0.00121400,
+            'py_dxy': -0.00020113,
+            'py_dyz': 0.00079598,
+            'pz_s': -0.02573821,
+            'pz_dxz': 0.00349040,
+            'pz_dx2-y2': -0.00046129,
+            'pz_dz2': -0.00723964,
+            'dxy_dxy': -0.00002395,
+            'dxy_dyz': 0.00005391,
+            'dyz_dxy': -0.00006104,
+            'dyz_dyz': 0.00036002,
+            'dxz_s': -0.00513988,
+            'dxz_dxz': 0.00057138,
+            'dxz_dx2-y2': -0.00007906,
+            'dxz_dz2': -0.00067713,
+            'dx2-y2_s': -0.00049098,
+            'dx2-y2_dxz': 0.00007239,
+            'dx2-y2_dx2-y2': -0.00002630,
+            'dx2-y2_dz2': -0.00004935,
+            'dz2_s': -0.01087118,
+            'dz2_dxz': 0.00076506,
+            'dz2_dx2-y2': -0.00006536,
+            'dz2_dz2': -0.00248995,
+        },
     }
 
     msg = 'Too large error for H_{0} (value={1})'
@@ -394,7 +459,7 @@ def test_off3c(grids, atoms):
         assert diff < 5e-4, msg.format(integral, val)
 
 
-@pytest.mark.parametrize('grids', [R1], indirect=True)
+@pytest.mark.parametrize('grids', [R1, R2], indirect=True)
 @pytest.mark.parametrize('atoms', [PBE_LibXC, LDA], indirect=True)
 def test_on3c(grids, atoms):
     from hotcent.onsite_threecenter import Onsite3cTable
@@ -502,6 +567,100 @@ def test_on3c(grids, atoms):
             'dz2_dx2-y2': 0.00008667,
             'dz2_dz2': 0.00893071,
         },
+        (R2, PBE_LibXC): {
+            's_s': 0.00055953,
+            's_px': 0.00015916,
+            's_pz': 0.00155673,
+            's_dxz': 0.00002296,
+            's_dx2-y2': 0.00000030,
+            's_dz2': 0.00018498,
+            'px_s': 0.00015916,
+            'px_px': 0.00040339,
+            'px_pz': 0.00065240,
+            'px_dxz': 0.00003157,
+            'px_dx2-y2': 0.00000147,
+            'px_dz2': 0.00002676,
+            'py_py': 0.00035325,
+            'py_dxy': 0.00000146,
+            'py_dyz': 0.00003051,
+            'pz_s': 0.00155673,
+            'pz_px': 0.00065240,
+            'pz_pz': 0.00489367,
+            'pz_dxz': 0.00004928,
+            'pz_dx2-y2': 0.00000053,
+            'pz_dz2': 0.00043994,
+            'dxy_py': 0.00000146,
+            'dxy_dxy': 0.00000009,
+            'dxy_dyz': 0.00000095,
+            'dyz_py': 0.00003051,
+            'dyz_dxy': 0.00000095,
+            'dyz_dyz': 0.00000921,
+            'dxz_s': 0.00002296,
+            'dxz_px': 0.00003157,
+            'dxz_pz': 0.00004928,
+            'dxz_dxz': 0.00000925,
+            'dxz_dx2-y2': 0.00000076,
+            'dxz_dz2': 0.00001129,
+            'dx2-y2_s': 0.00000030,
+            'dx2-y2_px': 0.00000147,
+            'dx2-y2_pz': 0.00000053,
+            'dx2-y2_dxz': 0.00000076,
+            'dx2-y2_dx2-y2': 0.00000003,
+            'dx2-y2_dz2': -0.00000004,
+            'dz2_s': 0.00018498,
+            'dz2_px': 0.00002676,
+            'dz2_pz': 0.00043994,
+            'dz2_dxz': 0.00001129,
+            'dz2_dx2-y2': -0.00000004,
+            'dz2_dz2': 0.00007705,
+        },
+        (R2, LDA): {
+            's_s': 0.00090411,
+            's_px': 0.00025092,
+            's_pz': 0.00216481,
+            's_dxz': 0.00004967,
+            's_dx2-y2': -0.00000120,
+            's_dz2': 0.00038360,
+            'px_s': 0.00025092,
+            'px_px': 0.00053879,
+            'px_pz': 0.00079340,
+            'px_dxz': 0.00009485,
+            'px_dx2-y2': 0.00000706,
+            'px_dz2': 0.00004936,
+            'py_py': 0.00049521,
+            'py_dxy': 0.00000799,
+            'py_dyz': 0.00009915,
+            'pz_s': 0.00216481,
+            'pz_px': 0.00079340,
+            'pz_pz': 0.00585286,
+            'pz_dxz': 0.00010055,
+            'pz_dx2-y2': -0.00000215,
+            'pz_dz2': 0.00078130,
+            'dxy_py': 0.00000799,
+            'dxy_dxy': 0.00000345,
+            'dxy_dyz': 0.00000326,
+            'dyz_py': 0.00009915,
+            'dyz_dxy': 0.00000326,
+            'dyz_dyz': 0.00004833,
+            'dxz_s': 0.00004967,
+            'dxz_px': 0.00009485,
+            'dxz_pz': 0.00010055,
+            'dxz_dxz': 0.00004591,
+            'dxz_dx2-y2': 0.00000288,
+            'dxz_dz2': 0.00002058,
+            'dx2-y2_s': -0.00000120,
+            'dx2-y2_px': 0.00000706,
+            'dx2-y2_pz': -0.00000215,
+            'dx2-y2_dxz': 0.00000288,
+            'dx2-y2_dx2-y2': 0.00000345,
+            'dx2-y2_dz2': -0.00000061,
+            'dz2_s': 0.00038360,
+            'dz2_px': 0.00004936,
+            'dz2_pz': 0.00078130,
+            'dz2_dxz': 0.00002058,
+            'dz2_dx2-y2': -0.00000061,
+            'dz2_dz2': 0.00022791,
+        },
     }
 
     msg = 'Too large error for H_{0} (value={1})'
@@ -513,7 +672,7 @@ def test_on3c(grids, atoms):
         assert diff < 5e-6, msg.format(integral, val)
 
 
-@pytest.mark.parametrize('grids', [R1], indirect=True)
+@pytest.mark.parametrize('grids', [R1, R2], indirect=True)
 @pytest.mark.parametrize('atoms', [PBE_LibXC, LDA], indirect=True)
 def test_rep3c(grids, atoms):
     from hotcent.offsite_threecenter import Offsite3cTable
@@ -529,6 +688,8 @@ def test_rep3c(grids, atoms):
     E_ref = {
         (R1, PBE_LibXC): -0.01991109,
         (R1, LDA): -0.01891928,
+        (R2, PBE_LibXC): -0.00030410,
+        (R2, LDA): -0.00061495,
     }
 
     tol = 1e-5

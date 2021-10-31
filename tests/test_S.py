@@ -238,11 +238,12 @@ def test_rep2c(R, atom):
 def grids(request):
     all_grids = {
         R1: (R1, np.array([R1]), np.array([1.2]), np.array([np.pi/2])),
+        R2: (R2, np.array([R2]), np.array([0.]), np.array([0.])),
     }
     return all_grids[request.param]
 
 
-@pytest.mark.parametrize('grids', [R1], indirect=True)
+@pytest.mark.parametrize('grids', [R1, R2], indirect=True)
 @pytest.mark.parametrize('atom', [PBE_LibXC, LDA, LDA_LibXC], indirect=True)
 def test_off3c(grids, atom):
     from hotcent.offsite_threecenter import Offsite3cTable
@@ -279,8 +280,33 @@ def test_off3c(grids, atom):
             'pz_px': -0.08132230,
             'pz_pz': 0.19281575,
         },
+        (R2, PBE_LibXC): {
+            's_s': -0.00766461,
+            's_px': -0.00000000,
+            's_pz': 0.02727315,
+            'px_s': -0.00000000,
+            'px_px': -0.00799658,
+            'px_pz': 0.00000000,
+            'py_py': -0.00799658,
+            'pz_s': -0.02727315,
+            'pz_px': -0.00000000,
+            'pz_pz': 0.07184048,
+        },
+        (R2, LDA_LibXC): {
+            's_s': -0.00774726,
+            's_px': -0.00000000,
+            's_pz': 0.02782588,
+            'px_s': -0.00000000,
+            'px_px': -0.00815739,
+            'px_pz': 0.00000000,
+            'py_py': -0.00815739,
+            'pz_s': -0.02782588,
+            'pz_px': -0.00000000,
+            'pz_pz': 0.07331418,
+        },
     }
     H_ref[(R1, LDA)] = H_ref[(R1, LDA_LibXC)]
+    H_ref[(R2, LDA)] = H_ref[(R2, LDA_LibXC)]
 
     msg = 'Too large error for H_{0} (value={1})'
 
@@ -291,7 +317,7 @@ def test_off3c(grids, atom):
         assert diff < 5e-4, msg.format(integral, val)
 
 
-@pytest.mark.parametrize('grids', [R1], indirect=True)
+@pytest.mark.parametrize('grids', [R1, R2], indirect=True)
 @pytest.mark.parametrize('atom', [PBE_LibXC, LDA, LDA_LibXC], indirect=True)
 def test_on3c(grids, atom):
     from hotcent.onsite_threecenter import Onsite3cTable
@@ -328,8 +354,33 @@ def test_on3c(grids, atom):
             'pz_px': 0.00505370,
             'pz_pz': 0.02542099,
         },
+        (R2, PBE_LibXC): {
+            's_s': 0.00015298,
+            's_px': 0.00000000,
+            's_pz': 0.00052775,
+            'px_s': 0.00000000,
+            'px_px': 0.00016053,
+            'px_pz': 0.00000000,
+            'py_py': 0.00016053,
+            'pz_s': 0.00052775,
+            'pz_px': 0.00000000,
+            'pz_pz': 0.00216021,
+        },
+        (R2, LDA_LibXC): {
+            's_s': 0.00033167,
+            's_px': 0.00000000,
+            's_pz': 0.00092079,
+            'px_s': 0.00000000,
+            'px_px': 0.00035231,
+            'px_pz': 0.00000000,
+            'py_py': 0.00035231,
+            'pz_s': 0.00092079,
+            'pz_px': 0.00000000,
+            'pz_pz': 0.00315674,
+        },
     }
     H_ref[(R1, LDA)] = H_ref[(R1, LDA_LibXC)]
+    H_ref[(R2, LDA)] = H_ref[(R2, LDA_LibXC)]
 
     msg = 'Too large error for H_{0} (value={1})'
 
@@ -340,7 +391,7 @@ def test_on3c(grids, atom):
         assert diff < 1e-6, msg.format(integral, val)
 
 
-@pytest.mark.parametrize('grids', [R1], indirect=True)
+@pytest.mark.parametrize('grids', [R1, R2], indirect=True)
 @pytest.mark.parametrize('atom', [PBE_LibXC, LDA, LDA_LibXC], indirect=True)
 def test_rep3c(grids, atom):
     from hotcent.offsite_threecenter import Offsite3cTable
@@ -355,8 +406,11 @@ def test_rep3c(grids, atom):
     E_ref = {
         (R1, PBE_LibXC): -0.06149991,
         (R1, LDA_LibXC): -0.05907972,
+        (R2, PBE_LibXC): -0.00253134,
+        (R2, LDA_LibXC): -0.00293521,
     }
     E_ref[(R1, LDA)] = E_ref[(R1, LDA_LibXC)]
+    E_ref[(R2, LDA)] = E_ref[(R2, LDA_LibXC)]
 
     val = E[('S', 'S')]['s_s'][0][1]
     diff = abs(val - E_ref[(R, xc)])
