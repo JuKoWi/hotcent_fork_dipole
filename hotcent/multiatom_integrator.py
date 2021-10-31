@@ -29,7 +29,7 @@ class MultiAtomIntegrator:
         Objects with atomic properties for two atoms.
     grid_type : str
         Type of 2D integration grid in the XZ plane.
-        Currently only a 'bipolar' type can be chosen.
+        Choose between 'bipolar' and 'monopolar'.
     txt : str, optional
         Where output should be printed.
         Use '-' for stdout (default), None for /dev/null,
@@ -42,7 +42,7 @@ class MultiAtomIntegrator:
         self.ela = ela
         self.elb = elb
 
-        assert grid_type in ['bipolar']
+        assert grid_type in ['bipolar', 'monopolar']
         self.grid_type = grid_type
 
         if ela.get_symbol() != elb.get_symbol():
@@ -105,6 +105,8 @@ class MultiAtomIntegrator:
         self.timer.start('make_grid')
         if self.grid_type == 'bipolar':
             grid = make_bipolar_grid(*args, **kwargs)
+        elif self.grid_type == 'monopolar':
+            grid = make_monopolar_grid(*args, **kwargs)
         self.timer.stop('make_grid')
         return grid
 
@@ -275,6 +277,51 @@ def make_bipolar_grid(Rz, wf_range, nt, nr, p=2, q=2, view=False):
         assert plt is not None, 'Matplotlib could not be imported!'
         plt.plot([h, h ,h])
         plt.scatter(grid[:, 0], grid[:, 1], s=10 * area / np.max(area))
+        plt.show()
+        plt.clf()
+
+    return grid, area
+
+
+def make_monopolar_grid(wf_range, nt, nr, q=2, view=False):
+    """
+    Construct a simple monopolar grid.
+
+    Parameters
+    ----------
+    See make_bipolar_grid().
+
+    Returns
+    -------
+    See make_bipolar_grid().
+    """
+    rmin, rmax = 1e-7, wf_range
+
+    R = rmin + np.linspace(0., 1., num=nr, endpoint=True)**q * (rmax - rmin)
+
+    T = np.linspace(0.5/nt, 1.-0.5/nt, num=nt, endpoint=True) * np.pi
+    s = np.sin(T)
+    c = np.cos(T)
+
+    N = (nr - 1) * nt
+    x = np.zeros(N)
+    z = np.zeros(N)
+    area = np.zeros(N)
+
+    counter = 0
+    for i in range(nr - 1):
+        r = 0.5 * (R[i] + R[i+1])
+        x[counter:counter+nt] = r * s
+        z[counter:counter+nt] = r * c
+        area[counter:counter+nt] = np.pi * (R[i+1]**2 - R[i]**2) / (2. * nt)
+        counter += nt
+
+    grid = np.array([x, z]).T
+
+    if view:
+        assert plt is not None, 'Matplotlib could not be imported!'
+        plt.scatter(grid[:, 0], grid[:, 1], s=10 * area / np.max(area))
+        plt.grid()
         plt.show()
         plt.clf()
 

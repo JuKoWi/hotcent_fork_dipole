@@ -203,7 +203,7 @@ def test_on2c(R, atom):
         pair = ('S', 'S')
         val = H[pair][integral][0]
         diff = abs(val - ref)
-        assert diff < 5e-4, msg.format(integral, val)
+        assert diff < 1e-4, msg.format(integral, val)
 
 
 @pytest.mark.parametrize('R', [R1, R2])
@@ -337,7 +337,7 @@ def test_on3c(grids, atom):
         pair = ('S', 'S')
         val = H[pair][integral][0][1]
         diff = abs(val - ref)
-        assert diff < 1e-5, msg.format(integral, H[index])
+        assert diff < 1e-6, msg.format(integral, val)
 
 
 @pytest.mark.parametrize('grids', [R1], indirect=True)

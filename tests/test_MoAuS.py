@@ -261,14 +261,13 @@ def test_on2c(R, atoms):
         },
     }
 
-    htol = 2e-4
     msg = 'Too large error for H_{0} (value={1})'
 
     for integral, ref in H_ref[(R, xc)].items():
         pair = ('Mo', 'Mo')
         val = H[pair][integral][0]
         diff = abs(val - ref)
-        assert diff < 5e-4, msg.format(integral, val)
+        assert diff < 1e-4, msg.format(integral, val)
 
 
 @pytest.mark.parametrize('R', [R1, R2])
@@ -511,7 +510,7 @@ def test_on3c(grids, atoms):
         pair = ('Au', 'S')
         val = H[pair][integral][0][1]
         diff = abs(val - ref)
-        assert diff < 1e-5, msg.format(integral, val)
+        assert diff < 5e-6, msg.format(integral, val)
 
 
 @pytest.mark.parametrize('grids', [R1], indirect=True)

@@ -14,7 +14,8 @@ from hotcent.xc import XC_PW92, LibXC
 
 class Onsite2cTable(MultiAtomIntegrator):
     def __init__(self, *args, **kwargs):
-        MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
+        MultiAtomIntegrator.__init__(self, *args, grid_type='monopolar',
+                                     **kwargs)
 
     def _write_skf(self, handle, pair):
         """ Write to SKF file format; this function
@@ -112,6 +113,7 @@ class Onsite2cTable(MultiAtomIntegrator):
               (self.ela.get_symbol(), self.elb.get_symbol()), file=self.txt)
         print('***********************************************', file=self.txt)
         self.txt.flush()
+        self.timer.start('run_onsite2c')
 
         assert np.isclose(rmin / dr, np.round(rmin / dr)), \
                'rmin must be a multiple of dr'
@@ -119,8 +121,9 @@ class Onsite2cTable(MultiAtomIntegrator):
         assert rmin >= 1e-3, 'For stability, please set rmin >= 1e-3'
         assert superposition == 'density'
 
-        self.timer.start('run_onsite2c')
         wf_range = self.get_range(wflimit)
+        grid, area = self.make_grid(wf_range, nt=ntheta, nr=nr)
+
         self.Rgrid = rmin + dr * np.arange(N)
         self.tables = [np.zeros((len(self.Rgrid), NUMSK))
                        for i in range(self.nel)]
@@ -140,18 +143,14 @@ class Onsite2cTable(MultiAtomIntegrator):
                                       for (integral, nl1, nl2) in selected}
 
             for i, R in enumerate(self.Rgrid):
-                d = None
                 if R < 2 * wf_range:
-                    grid, area = self.make_grid(R, wf_range, nt=ntheta, nr=nr)
                     if i % 10 == 0:
                         print('R=%8.2f, %i grid points ...' % (R, len(grid)),
                               file=self.txt, flush=True)
 
-                    if len(grid) > 0:
-                        d = self.calculate(selected, e1a, e1b, e2, R, grid,
-                                    area, superposition=superposition, xc=xc)
-
-                if d is None:
+                    d = self.calculate(selected, e1a, e1b, e2, R, grid,
+                                area, superposition=superposition, xc=xc)
+                else:
                     d = {key: 0. for key in selected}
 
                 for key in selected:

@@ -15,7 +15,8 @@ from hotcent.xc import LibXC, VXC_PW92_Spline
 
 class Onsite3cTable(MultiAtomIntegrator):
     def __init__(self, *args, **kwargs):
-        MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
+        MultiAtomIntegrator.__init__(self, *args, grid_type='monopolar',
+                                     **kwargs)
 
     def run(self, e2, e3, Rgrid, Sgrid, Tgrid, ntheta=150, nr=50, wflimit=1e-7,
             xc='LDA', write=True, filename=None):
@@ -50,9 +51,11 @@ class Onsite3cTable(MultiAtomIntegrator):
               file=self.txt)
         print('***********************************************', file=self.txt)
         self.txt.flush()
-
         self.timer.start('run_onsite3c')
+
         wf_range = self.get_range(wflimit)
+        grid, area = self.make_grid(wf_range, nt=ntheta, nr=nr)
+
         numST = len(Sgrid) * len(Tgrid)
 
         selected = select_integrals(self.ela, self.elb)
@@ -78,15 +81,11 @@ class Onsite3cTable(MultiAtomIntegrator):
             for i, R in enumerate(Rgrid):
                 print('Starting for R=%.3f' % R, file=self.txt, flush=True)
 
-                d = None
                 if R < 2 * wf_range:
-                    grid, area = self.make_grid(R, wf_range, nt=ntheta, nr=nr)
-                    if len(grid) > 0:
-                        d = self.calculate(selected, self.ela, self.elb,
-                                           elc, eld, R, grid, area,
-                                           Sgrid=Sgrid, Tgrid=Tgrid, xc=xc)
-
-                if d is None:
+                    d = self.calculate(selected, self.ela, self.elb,
+                                       elc, eld, R, grid, area,
+                                       Sgrid=Sgrid, Tgrid=Tgrid, xc=xc)
+                else:
                     d = {key: np.zeros(1 + numST) for key in selected}
 
                 for key in selected:
