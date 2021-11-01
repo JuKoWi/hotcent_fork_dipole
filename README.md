@@ -74,8 +74,9 @@ and requires that PyLibXC is installed.
 Example usage:
 ```shell
 cd tests
-pytest              # run all the tests with default options
-pytest -s           # show test stdout/sterr output (disable capturing)
-pytest test_S.py    # only run the tests in the test_S.py file
-pytest -k on1c      # only run the tests with names matching '*on1c*'
+pytest                      # run all the tests with default options
+pytest -s                   # show test stdout/sterr output (disable capturing)
+pytest test_S.py            # only run the tests in the test_S.py file
+pytest --collect-only       # show all generated test IDs
+pytest -k on1c              # only run the tests with names matching '*on1c*'
 ```
