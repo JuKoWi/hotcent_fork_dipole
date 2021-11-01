@@ -137,7 +137,7 @@ class Offsite3cTable(MultiAtomIntegrator):
 
 
         def integrands(phi):
-            rA = np.sqrt((x - x0*np.cos(phi))**2 + (y - y0 )**2 \
+            rA = np.sqrt((x - x0*np.cos(phi))**2 + (y - y0)**2 \
                          + (x0*np.sin(phi))**2)
 
             V = e3.neutral_atom_potential(rA) - vxc12
@@ -236,54 +236,44 @@ class Offsite3cTable(MultiAtomIntegrator):
                             + Theta1 * (dTheta2[0]*dc2dy + dTheta2[1]*ds2dy))
 
 
-        # Breakpoints and precision thresholds for the integration
-        break_points = np.pi * np.linspace(0., 1., num=4, endpoint=False)
-        epsrel = 1e-2
-        epsabs = 1e-5
-
         sym1, sym2, sym3 = e1.get_symbol(), e2.get_symbol(), e3.get_symbol()
+
+
+        def add_integrals(results):
+            rmin = 1e-2
+            if ((x0**2 + y0**2) < rmin or (x0**2 + (y0 - R)**2) < rmin):
+                # Third atom too close to one of the first two atoms
+                vals = np.zeros(len(selected))
+            else:
+                # Breakpoints and precision thresholds for the integration
+                break_points = np.pi * np.linspace(0., 1, num=4, endpoint=False)
+                epsrel, epsabs = 1e-2, 1e-5
+                vals, err = quad_vec(integrands, 0., np.pi,
+                                     epsrel=epsrel, epsabs=epsabs,
+                                     points=break_points)
+
+            for i, key in enumerate(selected):
+                integral, nl1, nl2 = key
+                lm1, lm2 = integral.split('_')
+                vals[i] *= 2.
+                vals[i] += e3.pp.get_nonlocal_integral(sym1, sym2, sym3, x0, y0,
+                                                       R, nl1, nl2, lm1, lm2)
+                results[key].append(vals[i])
+
+
+        results = {key: [] for key in selected}
 
         # First the values for rCM = 0
         x0 = 0.
         y0 = 0.5 * R
-        vals, err = quad_vec(integrands, 0., np.pi,
-                             epsrel=epsrel, epsabs=epsabs,
-                             points=break_points)
+        add_integrals(results)
 
-        results = {key: [] for key in selected}
-        for i, key in enumerate(selected):
-            integral, nl1, nl2 = key
-            lm1, lm2 = integral.split('_')
-            vals[i] *= 2.
-            vals[i] += e3.pp.get_nonlocal_integral(sym1, sym2, sym3, x0, y0, R,
-                                                   nl1, nl2, lm1, lm2)
-            results[key].append(vals[i])
-
-        # Now the actual grid
-        rmin = 1e-2
-
+        # Now the main grid
         for r in Sgrid:
             for a in Tgrid:
                 x0 = r * np.sin(a)
                 y0 = 0.5 * R + r * np.cos(a)
-                if ((x0**2 + y0**2) < rmin or (x0**2 + (y0-R)**2) < rmin):
-                    # Third atom too close to one of the first two atoms
-                    vals = np.zeros(len(selected))
-                else:
-                    vals, err = quad_vec(integrands, 0., np.pi,
-                                         epsrel=epsrel, epsabs=epsabs,
-                                         points=break_points)
-
-                    for i, key in enumerate(selected):
-                        integral, nl1, nl2 = key
-                        lm1, lm2 = integral.split('_')
-                        vals[i] *= 2.
-                        vals[i] += e3.pp.get_nonlocal_integral(sym1, sym2, sym3,
-                                                               x0, y0, R, nl1,
-                                                               nl2, lm1, lm2)
-
-                for i, key in enumerate(selected):
-                    results[key].append(vals[i])
+                add_integrals(results)
 
         self.timer.stop('calculate_offsite3c')
         return results
@@ -490,32 +480,32 @@ class Offsite3cTable(MultiAtomIntegrator):
             vals = np.array([Exc, -Evxc])
             return vals
 
-        # Precision thresholds for the integration
-        epsrel = 1e-2
-        epsabs = 1e-5
+
+        def add_integral(results):
+            rmin = 1e-2
+            if ((x0**2 + y0**2) < rmin or (x0**2 + (y0 - R)**2) < rmin):
+                # Third atom too close to one of the first two atoms
+                vals = np.zeros(2)
+            else:
+                epsrel, epsabs = 1e-2, 1e-5
+                vals, err = quad_vec(integrands, 0., np.pi,
+                                     epsrel=epsrel, epsabs=epsabs)
+            results.append(2. * sum(vals))
+
+
+        results = []
 
         # First the values for rCM = 0
         x0 = 0.
         y0 = 0.5 * R
-        vals, err = quad_vec(integrands, 0., np.pi, epsrel=epsrel,
-                             epsabs=epsabs)
-        results = [2. * sum(vals)]
+        add_integral(results)
 
-        # Now the actual grid
-        rmin = 1e-2
-
+        # Now the main grid
         for r in Sgrid:
             for a in Tgrid:
                 x0 = r * np.sin(a)
                 y0 = 0.5 * R + r * np.cos(a)
-                if ((x0**2 + y0**2) < rmin or (x0**2 + (y0-R)**2) < rmin):
-                    # Third atom too close to one of the first two atoms
-                    vals = [0.]*2
-                else:
-                    vals, err = quad_vec(integrands, 0., np.pi,
-                                         epsrel=epsrel, epsabs=epsabs)
-
-                results.append(2. * sum(vals))
+                add_integral(results)
 
         self.timer.stop('calculate_repulsion3c')
         return results

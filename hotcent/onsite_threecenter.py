@@ -155,7 +155,7 @@ class Onsite3cTable(MultiAtomIntegrator):
 
 
         def integrands(phi):
-            rA = np.sqrt((x - x0*np.cos(phi))**2 + (y - y0 )**2 \
+            rA = np.sqrt((x - x0*np.cos(phi))**2 + (y - y0)**2 \
                          + (x0*np.sin(phi))**2)
 
             V = vxc1 - vxc12
@@ -263,38 +263,36 @@ class Onsite3cTable(MultiAtomIntegrator):
                             + Theta1 * (dTheta2[0]*dc1dy + dTheta2[1]*ds1dy))
 
 
-        # Breakpoints and precision thresholds for the integration
-        break_points = np.pi * np.linspace(0., 1., num=4, endpoint=False)
-        epsrel = 1e-2
-        epsabs = 1e-5
+        def add_integrals(results):
+            rmin = 1e-2
+            if ((x0**2 + y0**2) < rmin or (x0**2 + (y0 - R)**2) < rmin):
+                # Third atom too close to one of the first two atoms
+                vals = np.zeros(len(selected))
+            else:
+                # Breakpoints and precision thresholds for the integration
+                break_points = np.pi * np.linspace(0., 1, num=4, endpoint=False)
+                epsrel, epsabs = 1e-2, 1e-5
+                vals, err = quad_vec(integrands, 0., np.pi,
+                                     epsrel=epsrel, epsabs=epsabs,
+                                     points=break_points)
+
+            for i, key in enumerate(selected):
+                results[key].append(2. * vals[i])
+
+
+        results = {key: [] for key in selected}
 
         # First the values for rCM = 0
         x0 = 0.
         y0 = 0.5 * R
-        vals, err = quad_vec(integrands, 0., np.pi, epsrel=epsrel,
-                             epsabs=epsabs, points=break_points)
+        add_integrals(results)
 
-        results = {key: [] for key in selected}
-        for i, key in enumerate(selected):
-            results[key].append(2. * vals[i])
-
-        # Now the actual grid
-        rmin = 1e-2
-
+        # Now the main grid
         for r in Sgrid:
             for a in Tgrid:
                 x0 = r * np.sin(a)
                 y0 = 0.5 * R + r * np.cos(a)
-                if ((x0**2 + y0**2) < rmin or (x0**2 + (y0-R)**2) < rmin):
-                    # Third atom too close to one of the first two atoms
-                    vals = np.zeros(len(selected))
-                else:
-                    vals, err = quad_vec(integrands, 0., np.pi,
-                                         epsrel=epsrel, epsabs=epsabs,
-                                         points=break_points)
-
-                for i, key in enumerate(selected):
-                    results[key].append(2. * vals[i])
+                add_integrals(results)
 
         self.timer.stop('calculate_onsite3c')
         return results
