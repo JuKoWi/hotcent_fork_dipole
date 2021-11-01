@@ -18,8 +18,8 @@ class Onsite3cTable(MultiAtomIntegrator):
         MultiAtomIntegrator.__init__(self, *args, grid_type='monopolar',
                                      **kwargs)
 
-    def run(self, e2, e3, Rgrid, Sgrid, Tgrid, ntheta=150, nr=50, wflimit=1e-7,
-            xc='LDA', write=True, filename=None):
+    def run(self, e2, e3, Rgrid, Sgrid, Tgrid, ntheta=150, nr=50,
+            nphi='adaptive', wflimit=1e-7, xc='LDA', write=True, filename=None):
         """
         Calculates on-site three-center Hamiltonian integrals.
 
@@ -29,6 +29,16 @@ class Onsite3cTable(MultiAtomIntegrator):
             Objects with atomic properties for the second and third atoms.
         Rgrid, Sgrid, Tgrid : list or array
             Lists with distances defining the three-atom geometries.
+        nphi : 'adaptive' or int
+            Defines the procedure used for integrating over the 'phi'
+            angle. For the default nphi='adaptive', the adaptive method
+            in scipy.integrate.quad_vec is used. While it is reliable,
+            the number of needed function calls can be high. Setting
+            nphi to an integer value selects a simple trapezoidal method
+            which is well suited for periodic integrands (see Krylov
+            (2006), "Approximate Calculation of Integrals", pp 73-74),
+            using nphi equally spaced phi angles in the [0, pi] interval.
+            Comparatively low nphi values (e.g. 13) are often sufficient.
         write : bool, optional
             Whether to write the integrals to file (the default)
             or return them as a dictionary instead.
@@ -36,8 +46,10 @@ class Onsite3cTable(MultiAtomIntegrator):
             File name to use in case write=True. The default (None)
             implies that a '<el1a>-<el1b>_onsite3c_<el2>-<el3>.3cf'
             template is used.
-        ntheta, nr, wflimit, xc :
-            See SlaterKosterTable.run().
+
+        Other Parameters
+        ----------------
+        See SlaterKosterTable.run().
 
         Returns
         -------
@@ -52,6 +64,8 @@ class Onsite3cTable(MultiAtomIntegrator):
         print('***********************************************', file=self.txt)
         self.txt.flush()
         self.timer.start('run_onsite3c')
+
+        assert nphi == 'adaptive' or (isinstance(nphi, int) and nphi > 0), nphi
 
         wf_range = self.get_range(wflimit)
         grid, area = self.make_grid(wf_range, nt=ntheta, nr=nr)
@@ -83,8 +97,8 @@ class Onsite3cTable(MultiAtomIntegrator):
 
                 if R < 2 * wf_range:
                     d = self.calculate(selected, self.ela, self.elb,
-                                       elc, eld, R, grid, area,
-                                       Sgrid=Sgrid, Tgrid=Tgrid, xc=xc)
+                                       elc, eld, R, grid, area, Sgrid=Sgrid,
+                                       Tgrid=Tgrid, nphi=nphi, xc=xc)
                 else:
                     d = {key: np.zeros(1 + numST) for key in selected}
 
@@ -106,7 +120,7 @@ class Onsite3cTable(MultiAtomIntegrator):
             return output
 
     def calculate(self, selected, e1a, e1b, e2, e3, R, grid, area, Sgrid, Tgrid,
-                  xc='LDA'):
+                  nphi='adaptive', xc='LDA'):
         self.timer.start('calculate_onsite3c')
 
         # TODO: boilerplate
@@ -268,13 +282,22 @@ class Onsite3cTable(MultiAtomIntegrator):
             if ((x0**2 + y0**2) < rmin or (x0**2 + (y0 - R)**2) < rmin):
                 # Third atom too close to one of the first two atoms
                 vals = np.zeros(len(selected))
-            else:
+            elif nphi == 'adaptive':
                 # Breakpoints and precision thresholds for the integration
                 break_points = np.pi * np.linspace(0., 1, num=4, endpoint=False)
                 epsrel, epsabs = 1e-2, 1e-5
                 vals, err = quad_vec(integrands, 0., np.pi,
                                      epsrel=epsrel, epsabs=epsabs,
                                      points=break_points)
+            else:
+                phis = np.linspace(0., np.pi, num=nphi, endpoint=True)
+                vals = np.zeros(len(selected))
+                dphi = 2. * np.pi / (2 * (nphi - 1))
+                for i, phi in enumerate(phis):
+                    parts = integrands(phi)
+                    if i == 0 or i == nphi-1:
+                        parts *= 0.5
+                    vals += parts * dphi
 
             for i, key in enumerate(selected):
                 results[key].append(2. * vals[i])

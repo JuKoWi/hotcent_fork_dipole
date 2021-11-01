@@ -17,8 +17,8 @@ class Offsite3cTable(MultiAtomIntegrator):
     def __init__(self, *args, **kwargs):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
 
-    def run(self, e3, Rgrid, Sgrid, Tgrid, ntheta=150, nr=50, wflimit=1e-7,
-            xc='LDA', write=True, filename=None):
+    def run(self, e3, Rgrid, Sgrid, Tgrid, ntheta=150, nr=50, nphi='adaptive',
+            wflimit=1e-7, xc='LDA', write=True, filename=None):
         """
         Calculates off-site three-center Hamiltonian integrals.
 
@@ -28,6 +28,16 @@ class Offsite3cTable(MultiAtomIntegrator):
             Object with atomic properties for the third atom.
         Rgrid, Sgrid, Tgrid : list or array
             Lists with distances defining the three-atom geometries.
+        nphi : 'adaptive' or int
+            Defines the procedure used for integrating over the 'phi'
+            angle. For the default nphi='adaptive', the adaptive method
+            in scipy.integrate.quad_vec is used. While it is reliable,
+            the number of needed function calls can be high. Setting
+            nphi to an integer value selects a simple trapezoidal method
+            which is well suited for periodic integrands (see Krylov
+            (2006), "Approximate Calculation of Integrals", pp 73-74),
+            using nphi equally spaced phi angles in the [0, pi] interval.
+            Comparatively low nphi values (e.g. 13) are often sufficient.
         write : bool, optional
             Whether to write the integrals to file (the default)
             or return them as a dictionary instead.
@@ -35,8 +45,10 @@ class Offsite3cTable(MultiAtomIntegrator):
             File name to use in case write=True. The default (None)
             implies that a '<el1>-<el2>_offsite3c_<el3>.3cf'
             template is used.
-        ntheta, nr, wflimit, xc :
-            See SlaterKosterTable.run().
+
+        Other Parameters
+        ----------------
+        See SlaterKosterTable.run().
 
         Returns
         -------
@@ -50,8 +62,10 @@ class Offsite3cTable(MultiAtomIntegrator):
               file=self.txt)
         print('***********************************************', file=self.txt)
         self.txt.flush()
-
         self.timer.start('run_offsite3c')
+
+        assert nphi == 'adaptive' or (isinstance(nphi, int) and nphi > 0), nphi
+
         wf_range = self.get_range(wflimit)
         numST = len(Sgrid) * len(Tgrid)
         output = {}
@@ -76,7 +90,8 @@ class Offsite3cTable(MultiAtomIntegrator):
                     grid, area = self.make_grid(R, wf_range, nt=ntheta, nr=nr)
                     if len(grid) > 0:
                         d = self.calculate(selected, e1, e2, e3, R, grid, area,
-                                           Sgrid=Sgrid, Tgrid=Tgrid, xc=xc)
+                                           Sgrid=Sgrid, Tgrid=Tgrid, nphi=nphi,
+                                           xc=xc)
 
                 if d is None:
                     d = {key: np.zeros(1 + numST) for key in selected}
@@ -99,7 +114,7 @@ class Offsite3cTable(MultiAtomIntegrator):
 
 
     def calculate(self, selected, e1, e2, e3, R, grid, area, Sgrid, Tgrid,
-                  xc='LDA'):
+                  nphi='adaptive', xc='LDA'):
         self.timer.start('calculate_offsite3c')
 
         # TODO: boilerplate
@@ -244,13 +259,22 @@ class Offsite3cTable(MultiAtomIntegrator):
             if ((x0**2 + y0**2) < rmin or (x0**2 + (y0 - R)**2) < rmin):
                 # Third atom too close to one of the first two atoms
                 vals = np.zeros(len(selected))
-            else:
+            elif nphi == 'adaptive':
                 # Breakpoints and precision thresholds for the integration
                 break_points = np.pi * np.linspace(0., 1, num=4, endpoint=False)
                 epsrel, epsabs = 1e-2, 1e-5
                 vals, err = quad_vec(integrands, 0., np.pi,
                                      epsrel=epsrel, epsabs=epsabs,
                                      points=break_points)
+            else:
+                phis = np.linspace(0., np.pi, num=nphi, endpoint=True)
+                vals = np.zeros(len(selected))
+                dphi = 2. * np.pi / (2 * (nphi - 1))
+                for i, phi in enumerate(phis):
+                    parts = integrands(phi)
+                    if i == 0 or i == nphi-1:
+                        parts *= 0.5
+                    vals += parts * dphi
 
             for i, key in enumerate(selected):
                 integral, nl1, nl2 = key
@@ -279,7 +303,8 @@ class Offsite3cTable(MultiAtomIntegrator):
         return results
 
     def run_repulsion(self, e3, Rgrid, Sgrid, Tgrid, ntheta=150, nr=50,
-                      wflimit=1e-7, xc='LDA', write=True, filename=None):
+                      nphi='adaptive', wflimit=1e-7, xc='LDA', write=True,
+                      filename=None):
         """
         Calculates the three-center repulsive energy contribution.
 
@@ -289,6 +314,16 @@ class Offsite3cTable(MultiAtomIntegrator):
             Object with atomic properties for the third atom.
         Rgrid, Sgrid, Tgrid : list or array
             Lists with distances defining the three-atom geometries.
+        nphi : 'adaptive' or int
+            Defines the procedure used for integrating over the 'phi'
+            angle. For the default nphi='adaptive', the adaptive method
+            in scipy.integrate.quad is used. While it is reliable,
+            the number of needed function calls can be high. Setting
+            nphi to an integer value selects a simple trapezoidal method
+            which is well suited for periodic integrands (see Krylov
+            (2006), "Approximate Calculation of Integrals", pp 73-74),
+            using nphi equally spaced phi angles in the [0, pi] interval.
+            Comparatively low nphi values (e.g. 13) are often sufficient.
         write : bool, optional
             Whether to write the integrals to file (the default)
             or return them as a dictionary instead.
@@ -296,8 +331,10 @@ class Offsite3cTable(MultiAtomIntegrator):
             File name to use in case write=True. The default (None)
             implies that a '<el1>-<el2>_repulsion3c_<el3>.3cf'
             template is used.
-        ntheta, nr, wflimit, xc :
-            See SlaterKosterTable.run().
+
+        Other Parameters
+        ----------------
+        See SlaterKosterTable.run().
 
         Returns
         -------
@@ -311,8 +348,10 @@ class Offsite3cTable(MultiAtomIntegrator):
         print('Three-center repulsion with %s' % e3.get_symbol(), file=self.txt)
         print('***********************************************', file=self.txt)
         self.txt.flush()
-
         self.timer.start('run_repulsion3c')
+
+        assert nphi == 'adaptive' or (isinstance(nphi, int) and nphi > 0), nphi
+
         wf_range = self.get_range(wflimit)
         numST = len(Sgrid) * len(Tgrid)
         output = {}
@@ -330,7 +369,8 @@ class Offsite3cTable(MultiAtomIntegrator):
                     grid, area = self.make_grid(R, wf_range, nt=ntheta, nr=nr)
                     if len(grid) > 0:
                         d = self.calculate_repulsion(e1, e2, e3, R, grid, area,
-                                                Sgrid=Sgrid, Tgrid=Tgrid, xc=xc)
+                                                     Sgrid=Sgrid, Tgrid=Tgrid,
+                                                     nphi=nphi, xc=xc)
 
                 if d is None:
                     d = np.zeros(1 + numST)
@@ -349,8 +389,8 @@ class Offsite3cTable(MultiAtomIntegrator):
         if not write:
             return output
 
-    def calculate_repulsion(self, e1, e2, e3, R, grid, area, Sgrid,
-                            Tgrid, xc='LDA'):
+    def calculate_repulsion(self, e1, e2, e3, R, grid, area, Sgrid, Tgrid,
+                            nphi='adaptive', xc='LDA'):
         self.timer.start('calculate_repulsion3c')
 
         self.timer.start('prelude')
@@ -486,10 +526,20 @@ class Offsite3cTable(MultiAtomIntegrator):
             if ((x0**2 + y0**2) < rmin or (x0**2 + (y0 - R)**2) < rmin):
                 # Third atom too close to one of the first two atoms
                 vals = np.zeros(2)
-            else:
+            elif nphi == 'adaptive':
                 epsrel, epsabs = 1e-2, 1e-5
                 vals, err = quad_vec(integrands, 0., np.pi,
                                      epsrel=epsrel, epsabs=epsabs)
+            else:
+                phis = np.linspace(0., np.pi, num=nphi, endpoint=True)
+                vals = np.zeros(2)
+                dphi = 2. * np.pi / (2 * (nphi - 1))
+                for i, phi in enumerate(phis):
+                    parts = integrands(phi)
+                    if i == 0 or i == nphi-1:
+                        parts *= 0.5
+                    vals += parts * dphi
+
             results.append(2. * sum(vals))
 
 

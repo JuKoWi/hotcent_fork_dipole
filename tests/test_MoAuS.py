@@ -307,9 +307,10 @@ def grids(request):
     return all_grids[request.param]
 
 
+@pytest.mark.parametrize('nphi', ['adaptive', 13])
 @pytest.mark.parametrize('grids', [R1, R2], indirect=True)
 @pytest.mark.parametrize('atoms', [PBE_LibXC, LDA], indirect=True)
-def test_off3c(grids, atoms):
+def test_off3c(nphi, grids, atoms):
     from hotcent.offsite_threecenter import Offsite3cTable
 
     R, Rgrid, Sgrid, Tgrid = grids
@@ -317,7 +318,7 @@ def test_off3c(grids, atoms):
     xc = atom_Mo.xcname
 
     off3c = Offsite3cTable(atom_Mo, atom_Au)
-    H = off3c.run(atom_S, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc,
+    H = off3c.run(atom_S, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, nphi=nphi, xc=xc,
                   write=False)
     H_ref = {
         (R1, PBE_LibXC): {
@@ -459,9 +460,10 @@ def test_off3c(grids, atoms):
         assert diff < 5e-4, msg.format(integral, val)
 
 
+@pytest.mark.parametrize('nphi', ['adaptive', 13])
 @pytest.mark.parametrize('grids', [R1, R2], indirect=True)
 @pytest.mark.parametrize('atoms', [PBE_LibXC, LDA], indirect=True)
-def test_on3c(grids, atoms):
+def test_on3c(nphi, grids, atoms):
     from hotcent.onsite_threecenter import Onsite3cTable
 
     R, Rgrid, Sgrid, Tgrid = grids
@@ -470,7 +472,7 @@ def test_on3c(grids, atoms):
 
     on3c = Onsite3cTable(atom_Mo, atom_Mo)
     H = on3c.run(atom_Au, atom_S, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc,
-                 write=False)
+                 nphi=nphi, write=False)
 
     H_ref = {
         (R1, PBE_LibXC): {
@@ -672,9 +674,10 @@ def test_on3c(grids, atoms):
         assert diff < 5e-6, msg.format(integral, val)
 
 
+@pytest.mark.parametrize('nphi', ['adaptive', 13])
 @pytest.mark.parametrize('grids', [R1, R2], indirect=True)
 @pytest.mark.parametrize('atoms', [PBE_LibXC, LDA], indirect=True)
-def test_rep3c(grids, atoms):
+def test_rep3c(nphi, grids, atoms):
     from hotcent.offsite_threecenter import Offsite3cTable
 
     R, Rgrid, Sgrid, Tgrid = grids
@@ -683,7 +686,7 @@ def test_rep3c(grids, atoms):
 
     off3c = Offsite3cTable(atom_Mo, atom_Au)
     E = off3c.run_repulsion(atom_S, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc,
-                            write=False)
+                            nphi=nphi, write=False)
 
     E_ref = {
         (R1, PBE_LibXC): -0.01991109,
