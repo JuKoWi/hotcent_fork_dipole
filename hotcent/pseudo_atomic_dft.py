@@ -31,6 +31,13 @@ class PseudoAtomicDFT(AtomicDFT):
         self.pp = pp
         self.Rnl_free_fct = {nl: None for nl in self.pp.get_subshells()}
 
+    def print_header(self):
+        template = '{0}-relativistic pseudopotential {1} calculator for {2}'
+        header = template.format('Scalar' if self.scalarrel else 'Non',
+                                 self.xcname, self.symbol)
+        header = '\n'.join(['*' * len(header), header, '*' * len(header)])
+        print(header, file=self.txt)
+
     def electron_density(self, r, der=0, only_valence=True):
         assert only_valence, 'PseudoAtomicDFT calculator does not have ' + \
                              'access to the all-electron electron density'

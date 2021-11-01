@@ -90,22 +90,16 @@ class AtomicDFT(AtomicBase):
         AtomicBase.__init__(self, symbol, **kwargs)
         self.timer.start('init')
 
-        print('*******************************************', file=self.txt)
-        print('Kohn-Sham all-electron calculator for %s' % self.symbol,
-              file=self.txt)
-        print('*******************************************', file=self.txt)
-
         self.xcname = xc
         if xc in ['PW92', 'LDA']:
             self.xc = XC_PW92()
         else:
             self.xc = LibXC(xc)
 
+        self.print_header()
+
         self.convergence = convergence
         self.perturbative_confinement = perturbative_confinement
-
-        if self.scalarrel:
-            print('Using scalar relativistic corrections.', file=self.txt)
 
         maxnodes = max([n - l - 1 for n, l, nl in self.list_states()])
         self.rmin = 1e-2 / self.Z if rmin is None else rmin
@@ -117,6 +111,13 @@ class AtomicDFT(AtomicBase):
         self.rgrid = self.rmin * np.exp(self.xgrid)
         self.grid = RadialGrid(self.rgrid)
         self.timer.stop('init')
+
+    def print_header(self):
+        template = '{0}-relativistic all-electron {1} calculator for {2}'
+        header = template.format('Scalar' if self.scalarrel else 'Non',
+                                 self.xcname, self.symbol)
+        header = '\n'.join(['*' * len(header), header, '*' * len(header)])
+        print(header, file=self.txt)
 
     def calculate_energies(self, enl, dens, echo='valence', only_valence=False):
         """ Returns a dictionary with the total energy and its contributions,
