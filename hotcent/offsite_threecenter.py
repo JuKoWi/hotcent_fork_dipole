@@ -237,7 +237,7 @@ class Offsite3cTable(MultiAtomIntegrator):
 
 
         # Breakpoints and precision thresholds for the integration
-        break_points = 2 * np.pi * np.linspace(0., 1., num=5, endpoint=True)
+        break_points = np.pi * np.linspace(0., 1., num=4, endpoint=False)
         epsrel = 1e-2
         epsabs = 1e-5
 
@@ -246,7 +246,7 @@ class Offsite3cTable(MultiAtomIntegrator):
         # First the values for rCM = 0
         x0 = 0.
         y0 = 0.5 * R
-        vals, err = quad_vec(integrands, 0., 2*np.pi,
+        vals, err = quad_vec(integrands, 0., np.pi,
                              epsrel=epsrel, epsabs=epsabs,
                              points=break_points)
 
@@ -254,6 +254,7 @@ class Offsite3cTable(MultiAtomIntegrator):
         for i, key in enumerate(selected):
             integral, nl1, nl2 = key
             lm1, lm2 = integral.split('_')
+            vals[i] *= 2.
             vals[i] += e3.pp.get_nonlocal_integral(sym1, sym2, sym3, x0, y0, R,
                                                    nl1, nl2, lm1, lm2)
             results[key].append(vals[i])
@@ -269,13 +270,14 @@ class Offsite3cTable(MultiAtomIntegrator):
                     # Third atom too close to one of the first two atoms
                     vals = np.zeros(len(selected))
                 else:
-                    vals, err = quad_vec(integrands, 0., 2*np.pi,
+                    vals, err = quad_vec(integrands, 0., np.pi,
                                          epsrel=epsrel, epsabs=epsabs,
                                          points=break_points)
 
                     for i, key in enumerate(selected):
                         integral, nl1, nl2 = key
                         lm1, lm2 = integral.split('_')
+                        vals[i] *= 2.
                         vals[i] += e3.pp.get_nonlocal_integral(sym1, sym2, sym3,
                                                                x0, y0, R, nl1,
                                                                nl2, lm1, lm2)
@@ -488,18 +490,16 @@ class Offsite3cTable(MultiAtomIntegrator):
             vals = np.array([Exc, -Evxc])
             return vals
 
-        # Breakpoints and precision thresholds for the integration
-        break_points = 2 * np.pi * np.linspace(0., 1., num=5, endpoint=True)
+        # Precision thresholds for the integration
         epsrel = 1e-2
         epsabs = 1e-5
 
         # First the values for rCM = 0
         x0 = 0.
         y0 = 0.5 * R
-        vals, err = quad_vec(integrands, 0., 2*np.pi,
-                             epsrel=epsrel, epsabs=epsabs,
-                             points=break_points)
-        results = [sum(vals)]
+        vals, err = quad_vec(integrands, 0., np.pi, epsrel=epsrel,
+                             epsabs=epsabs)
+        results = [2. * sum(vals)]
 
         # Now the actual grid
         rmin = 1e-2
@@ -512,11 +512,10 @@ class Offsite3cTable(MultiAtomIntegrator):
                     # Third atom too close to one of the first two atoms
                     vals = [0.]*2
                 else:
-                    vals, err = quad_vec(integrands, 0., 2*np.pi,
-                                         epsrel=epsrel, epsabs=epsabs,
-                                         points=break_points)
+                    vals, err = quad_vec(integrands, 0., np.pi,
+                                         epsrel=epsrel, epsabs=epsabs)
 
-                results.append(sum(vals))
+                results.append(2. * sum(vals))
 
         self.timer.stop('calculate_repulsion3c')
         return results

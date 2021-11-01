@@ -264,19 +264,19 @@ class Onsite3cTable(MultiAtomIntegrator):
 
 
         # Breakpoints and precision thresholds for the integration
-        break_points = 2 * np.pi * np.linspace(0., 1., num=5, endpoint=True)
+        break_points = np.pi * np.linspace(0., 1., num=4, endpoint=False)
         epsrel = 1e-2
         epsabs = 1e-5
 
         # First the values for rCM = 0
         x0 = 0.
         y0 = 0.5 * R
-        vals, err = quad_vec(integrands, 0., 2*np.pi, epsrel=epsrel,
+        vals, err = quad_vec(integrands, 0., np.pi, epsrel=epsrel,
                              epsabs=epsabs, points=break_points)
 
         results = {key: [] for key in selected}
         for i, key in enumerate(selected):
-            results[key].append(vals[i])
+            results[key].append(2. * vals[i])
 
         # Now the actual grid
         rmin = 1e-2
@@ -289,12 +289,12 @@ class Onsite3cTable(MultiAtomIntegrator):
                     # Third atom too close to one of the first two atoms
                     vals = np.zeros(len(selected))
                 else:
-                    vals, err = quad_vec(integrands, 0., 2*np.pi,
+                    vals, err = quad_vec(integrands, 0., np.pi,
                                          epsrel=epsrel, epsabs=epsabs,
                                          points=break_points)
 
                 for i, key in enumerate(selected):
-                    results[key].append(vals[i])
+                    results[key].append(2. * vals[i])
 
         self.timer.stop('calculate_onsite3c')
         return results
