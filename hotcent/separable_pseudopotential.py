@@ -6,9 +6,10 @@
 #-----------------------------------------------------------------------------#
 import numpy as np
 from hotcent.interpolation import CubicSplineFunction
+from hotcent.offsite_twocenter import Offsite2cTable
 from hotcent.orbitals import (ANGULAR_MOMENTUM, calculate_slako_coeff,
                               ORBITALS, ORBITAL_LABELS)
-from hotcent.slako import INTEGRALS as INTEGRALS_2c, SlaterKosterTable
+from hotcent.slako import INTEGRALS as INTEGRALS_2c
 
 
 class SeparablePP:
@@ -59,11 +60,11 @@ class SeparablePP:
         assert len(self.energies) > 0
         assert len(self.projectors) > 0
 
-        sk = SlaterKosterTable(e1, e3, txt=None, timing=False)
-        wf_range = sk.get_range(wflimit)
+        off2c = Offsite2cTable(e1, e3, txt=None, timing=False)
+        wf_range = off2c.get_range(wflimit)
 
         if rmax is None:
-            rmax = 2. * sk.wf_range
+            rmax = 2. * off2c.wf_range
 
         numr = min(100, int(np.ceil((rmax - rmin) / dr)))
         rval = np.linspace(rmin, rmax, num=numr, endpoint=True)
@@ -95,12 +96,13 @@ class SeparablePP:
 
                     sval = []
                     for r13 in rval:
-                        grid, area = sk.make_grid(r13, wf_range, nt=150, nr=50)
+                        grid, area = off2c.make_grid(r13, wf_range, nt=150,
+                                                     nr=50)
                         if l1 < l3:
-                            s = sk.calculate_mels(sk_selected, e1, e3, r13,
+                            s = off2c.calculate_mels(sk_selected, e1, e3, r13,
                                               grid, area, only_overlap=True)
                         else:
-                            s = sk.calculate_mels(sk_selected, e3, e1, r13,
+                            s = off2c.calculate_mels(sk_selected, e3, e1, r13,
                                               grid, area, only_overlap=True)
                         if len(grid) == 0:
                             assert abs(s[iint]) < 1e-24

@@ -22,6 +22,9 @@ Development version
 * Bugfix: gradient corrections to the exchange-correlation potential
   for two-center integrals were wrong.
 
+* The hotcent.slako.SlaterKosterTable class has been moved to
+  hotcent.offsite_twocenter.Offsite2cTable.
+
 
 Version 1.0
 ===========

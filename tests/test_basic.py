@@ -64,18 +64,18 @@ def test_on1c(atoms):
 
 
 def test_off2c(atoms):
-    from hotcent.slako import SlaterKosterTable
+    from hotcent.offsite_twocenter import Offsite2cTable
 
     atom_B, atom_H = atoms
     eps = 1e-7
 
-    sk = SlaterKosterTable(atom_B, atom_H, txt=None)
+    off2c = Offsite2cTable(atom_B, atom_H, txt=None)
     R, nt, nr = 2.0, 150, 50
-    wf_range = sk.get_range(1e-7)
-    grid, area = sk.make_grid(R, wf_range, nt=nt, nr=nr)
+    wf_range = off2c.get_range(1e-7)
+    grid, area = off2c.make_grid(R, wf_range, nt=nt, nr=nr)
 
     # B-H sss integrals
-    out = sk.calculate_mels([('sss', '2s', '1s')], atom_B, atom_H,
+    out = off2c.calculate_mels([('sss', '2s', '1s')], atom_B, atom_H,
                             R, grid, area)
     results = {key: out[i][-1] for i, key in enumerate(['S', 'H', 'H2'])}
     references = {
@@ -88,7 +88,7 @@ def test_off2c(atoms):
         assert diff < eps, msg.format('B-H {0}_sss'.format(key), results[key])
 
     # H-B sps integrals
-    out = sk.calculate_mels([('sps', '1s', '2p')], atom_H, atom_B,
+    out = off2c.calculate_mels([('sps', '1s', '2p')], atom_H, atom_B,
                             R, grid, area)
     results = {key: out[i][-2] for i, key in enumerate(['S', 'H', 'H2'])}
     references = {

@@ -1,7 +1,7 @@
 """ This example aims to reproduce the Eu-Eu Slater-Koster
 table in the rare-0-2 dataset from Sanna and coworkers
 (doi:10.1103/PhysRevB.76.155128). """
-from hotcent.slako import SlaterKosterTable
+from hotcent.offsite_twocenter import Offsite2cTable
 from hotcent.confinement import PowerConfinement
 from hotcent.atomic_dft import AtomicDFT
 
@@ -33,8 +33,8 @@ atom.plot_density()
 
 # Compute Slater-Koster integrals:
 rmin, dr, N = 0.56, 0.04, 420
-sk = SlaterKosterTable(atom, atom, timing=True)
-sk.run(rmin, dr, N, superposition='potential', xc=xc)
-sk.write('Eu-Eu_no_repulsion.skf')
-sk.write('Eu-Eu_no_repulsion.par')
-sk.plot()
+off2c = Offsite2cTable(atom, atom, timing=True)
+off2c.run(rmin, dr, N, superposition='potential', xc=xc)
+off2c.write('Eu-Eu_no_repulsion.skf')
+off2c.write('Eu-Eu_no_repulsion.par')
+off2c.plot()

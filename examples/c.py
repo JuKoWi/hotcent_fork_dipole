@@ -1,7 +1,7 @@
 from optparse import OptionParser
-from ase.units import Bohr, Hartree
+from ase.units import Bohr
 from ase.data import covalent_radii, atomic_numbers
-from hotcent.slako import SlaterKosterTable
+from hotcent.offsite_twocenter import Offsite2cTable
 from hotcent.confinement import PowerConfinement
 from hotcent.atomic_dft import AtomicDFT
 
@@ -35,9 +35,9 @@ atom.plot_density()
 
 # Compute Slater-Koster integrals:
 rmin, dr, N = 0.5, 0.05, 250
-sk = SlaterKosterTable(atom, atom, timing=True)
-sk.run(rmin, dr, N, superposition=opt.superposition,
+off2c = Offsite2cTable(atom, atom, timing=True)
+off2c.run(rmin, dr, N, superposition=opt.superposition,
        xc=opt.functional, stride=opt.stride)
-sk.write('%s-%s_no_repulsion.par' % (element, element))
-sk.write('%s-%s_no_repulsion.skf' % (element, element))
-sk.plot()
+off2c.write('%s-%s_no_repulsion.par' % (element, element))
+off2c.write('%s-%s_no_repulsion.skf' % (element, element))
+off2c.plot()

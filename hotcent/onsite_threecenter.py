@@ -49,7 +49,7 @@ class Onsite3cTable(MultiAtomIntegrator):
 
         Other Parameters
         ----------------
-        See SlaterKosterTable.run().
+        See Offsite2cTable.run().
 
         Returns
         -------

@@ -25,7 +25,7 @@ class Onsite2cTable(MultiAtomIntegrator):
         format is only used when necessary (i.e. when there are f-electrons
         included in the valence of one of the elements).
         """
-        # TODO: boilerplate (similar to SlaterKosterTable.write_skf)
+        # TODO: boilerplate (similar to Offsite2cTable.write_skf)
 
         symbols = (self.ela.get_symbol(), self.elb.get_symbol())
         if pair == symbols:
@@ -99,7 +99,7 @@ class Onsite2cTable(MultiAtomIntegrator):
             implies that a '<el1a>-<el1b>_onsite2c_<el2>.skf'
             template is used.
         rmin, dr, N, ntheta, nr, wflimit, smoothen_tails, superposition, xc :
-            See SlaterKosterTable.run().
+            See Offsite2cTable.run().
 
         Returns
         -------

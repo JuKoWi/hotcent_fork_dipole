@@ -5,7 +5,7 @@ matrix elements, respectively).
 import numpy as np
 from hotcent.atomic_dft import AtomicDFT
 from hotcent.confinement import SoftConfinement
-from hotcent.slako import SlaterKosterTable
+from hotcent.offsite_twocenter import Offsite2cTable
 from hotcent.offsite_threecenter import Offsite3cTable
 from hotcent.onsite_twocenter import Onsite2cTable
 from hotcent.onsite_threecenter import Onsite3cTable
@@ -34,7 +34,7 @@ on1c = {nl: atom.get_onecenter_integral(nl) for nl in valence}
 atom.pp.build_projectors(atom)
 atom.pp.build_overlaps(atom, atom, rmin=0.05, rmax=8.)
 
-off2c = SlaterKosterTable(atom, atom)
+off2c = Offsite2cTable(atom, atom)
 off2c.run_repulsion(rmin=1.2, dr=0.1, N=46, xc='LDA')
 with open('C-C.spl', 'w') as f:
     f.write(off2c.get_repulsion_spline_block())

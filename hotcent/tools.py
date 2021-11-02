@@ -13,7 +13,7 @@ from ase.io import read
 from ase.spectrum.band_structure import BandStructure
 from ase.calculators.dftb import Dftb
 from hotcent.atomic_base import AtomicBase
-from hotcent.slako import SlaterKosterTable
+from hotcent.offsite_twocenter import Offsite2cTable
 try:
     import matplotlib
     matplotlib.use('agg')
@@ -28,13 +28,13 @@ class ConfinementOptimizer:
 
         arguments: one (or several) AtomicBase instance(s).
                    Note: the eigenvalues, hubbardvalues, occupations,
-                   and spe kwargs passed to the SlaterKosterTable.write()
+                   and spe kwargs passed to the Offsite2cTable.write()
                    function (to be included in the SKF files) need to
                    be included in the atom's info (dict) attribute, i.e.
                        atom.info = {'eigenvalues': {'2s': ...}, ...}
         verbose:   whether to print output or not
         sk_kwargs: additional keyword arguments to be passed to the
-                   SlaterKosterTable.run() method. If different arguments
+                   Offsite2cTable.run() method. If different arguments
                    need to be passed to different element pairs, these
                    can be specified using dictionaries. To e.g. set a
                    different number of grid points N for the C-C pair:
@@ -187,16 +187,16 @@ class ConfinementOptimizer:
                     else:
                         sk_kwargs[key] = val
 
-                sk = SlaterKosterTable(atom1, atom2, timing=False, txt=None)
-                sk.run(**sk_kwargs)
+                off2c = Offsite2cTable(atom1, atom2, timing=False, txt=None)
+                off2c.run(**sk_kwargs)
 
                 filename = '%s-%s.skf' % (s1, s2)
                 if s1 == s2:
-                    sk.write(filename=filename, pair=(s1, s2), **atom1.info)
+                    off2c.write(filename=filename, pair=(s1, s2), **atom1.info)
                 else:
-                    sk.write(filename=filename, pair=(s1, s2))
+                    off2c.write(filename=filename, pair=(s1, s2))
                     filename = '%s-%s.skf' % (s2, s1)
-                    sk.write(filename=filename, pair=(s2, s1))
+                    off2c.write(filename=filename, pair=(s2, s1))
         return
 
 

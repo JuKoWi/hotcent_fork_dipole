@@ -103,12 +103,12 @@ def test_on1c(atom):
 @pytest.mark.parametrize('R', [R1, R2])
 @pytest.mark.parametrize('atom', [PBE_LibXC, LDA, LDA_LibXC], indirect=True)
 def test_off2c(R, atom):
-    from hotcent.slako import SlaterKosterTable
+    from hotcent.offsite_twocenter import Offsite2cTable
 
     xc = atom.xcname
 
     rmin, dr, N = R, R, 2
-    off2c = SlaterKosterTable(atom, atom)
+    off2c = Offsite2cTable(atom, atom)
     off2c.run(rmin=rmin, dr=dr, N=N, superposition='density', xc=xc,
               smoothen_tails=False, ntheta=300, nr=100)
     H, S = off2c.tables[0][0, :20], off2c.tables[0][0, 20:41]
@@ -209,12 +209,12 @@ def test_on2c(R, atom):
 @pytest.mark.parametrize('R', [R1, R2])
 @pytest.mark.parametrize('atom', [PBE_LibXC, LDA, LDA_LibXC], indirect=True)
 def test_rep2c(R, atom):
-    from hotcent.slako import SlaterKosterTable
+    from hotcent.offsite_twocenter import Offsite2cTable
 
     xc = atom.xcname
 
     rmin, dr, N = R, R, 3
-    off2c = SlaterKosterTable(atom, atom)
+    off2c = Offsite2cTable(atom, atom)
     off2c.run_repulsion(rmin=rmin, dr=dr, N=N, xc=xc, smoothen_tails=False,
                         ntheta=600, nr=200)
     E = off2c.erep[0]

@@ -48,7 +48,7 @@ class Offsite3cTable(MultiAtomIntegrator):
 
         Other Parameters
         ----------------
-        See SlaterKosterTable.run().
+        See Offsite2cTable.run().
 
         Returns
         -------
@@ -334,7 +334,7 @@ class Offsite3cTable(MultiAtomIntegrator):
 
         Other Parameters
         ----------------
-        See SlaterKosterTable.run().
+        See Offsite2cTable.run().
 
         Returns
         -------
