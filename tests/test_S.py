@@ -209,15 +209,15 @@ def test_on2c(R, atom):
 @pytest.mark.parametrize('R', [R1, R2])
 @pytest.mark.parametrize('atom', [PBE_LibXC, LDA, LDA_LibXC], indirect=True)
 def test_rep2c(R, atom):
-    from hotcent.offsite_twocenter import Offsite2cTable
+    from hotcent.repulsion_twocenter import Repulsion2cTable
 
     xc = atom.xcname
 
     rmin, dr, N = R, R, 3
-    off2c = Offsite2cTable(atom, atom)
-    off2c.run_repulsion(rmin=rmin, dr=dr, N=N, xc=xc, smoothen_tails=False,
-                        ntheta=600, nr=200)
-    E = off2c.erep[0]
+    rep2c = Repulsion2cTable(atom, atom)
+    rep2c.run(rmin=rmin, dr=dr, N=N, xc=xc, smoothen_tails=False,
+              ntheta=600, nr=200)
+    E = rep2c.erep[0]
 
     E_ref = {
         (R1, PBE_LibXC): 2.40963669,
@@ -397,14 +397,14 @@ def test_on3c(nphi, grids, atom):
 @pytest.mark.parametrize('grids', [R1, R2], indirect=True)
 @pytest.mark.parametrize('atom', [PBE_LibXC, LDA, LDA_LibXC], indirect=True)
 def test_rep3c(nphi, grids, atom):
-    from hotcent.offsite_threecenter import Offsite3cTable
+    from hotcent.repulsion_threecenter import Repulsion3cTable
 
     R, Rgrid, Sgrid, Tgrid = grids
     xc = atom.xcname
 
-    off3c = Offsite3cTable(atom, atom)
-    E = off3c.run_repulsion(atom, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, nphi=nphi,
-                            xc=xc, write=False)
+    rep3c = Repulsion3cTable(atom, atom)
+    E = rep3c.run(atom, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, nphi=nphi, xc=xc,
+                  write=False)
 
     E_ref = {
         (R1, PBE_LibXC): -0.06149991,

@@ -99,11 +99,11 @@ class SeparablePP:
                         grid, area = off2c.make_grid(r13, wf_range, nt=150,
                                                      nr=50)
                         if l1 < l3:
-                            s = off2c.calculate_mels(sk_selected, e1, e3, r13,
-                                              grid, area, only_overlap=True)
+                            s = off2c.calculate(sk_selected, e1, e3, r13,
+                                                grid, area, only_overlap=True)
                         else:
-                            s = off2c.calculate_mels(sk_selected, e3, e1, r13,
-                                              grid, area, only_overlap=True)
+                            s = off2c.calculate(sk_selected, e3, e1, r13,
+                                                grid, area, only_overlap=True)
                         if len(grid) == 0:
                             assert abs(s[iint]) < 1e-24
                         sval.append(s[iint])

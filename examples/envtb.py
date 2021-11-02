@@ -5,10 +5,11 @@ matrix elements, respectively).
 import numpy as np
 from hotcent.atomic_dft import AtomicDFT
 from hotcent.confinement import SoftConfinement
-from hotcent.offsite_twocenter import Offsite2cTable
 from hotcent.offsite_threecenter import Offsite3cTable
 from hotcent.onsite_twocenter import Onsite2cTable
 from hotcent.onsite_threecenter import Onsite3cTable
+from hotcent.repulsion_twocenter import Repulsion2cTable
+from hotcent.repulsion_threecenter import Repulsion3cTable
 
 element = 'C'
 xc = 'LDA'
@@ -34,10 +35,9 @@ on1c = {nl: atom.get_onecenter_integral(nl) for nl in valence}
 atom.pp.build_projectors(atom)
 atom.pp.build_overlaps(atom, atom, rmin=0.05, rmax=8.)
 
-off2c = Offsite2cTable(atom, atom)
-off2c.run_repulsion(rmin=1.2, dr=0.1, N=46, xc='LDA')
-with open('C-C.spl', 'w') as f:
-    f.write(off2c.get_repulsion_spline_block())
+rep2c = Repulsion2cTable(atom, atom)
+rep2c.run(rmin=1.2, dr=0.1, N=46, xc='LDA')
+rep2c.write()
 
 rmin, dr, N = 0.4, 0.04, 300
 on2c = Onsite2cTable(atom, atom)
@@ -57,4 +57,6 @@ on3c.run(atom, atom, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc)
 
 off3c = Offsite3cTable(atom, atom)
 off3c.run(atom, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc)
-off3c.run_repulsion(atom, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc)
+
+rep3c = Repulsion3cTable(atom, atom)
+rep3c.run(atom, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc)

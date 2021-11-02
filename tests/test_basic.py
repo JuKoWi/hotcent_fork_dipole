@@ -75,8 +75,8 @@ def test_off2c(atoms):
     grid, area = off2c.make_grid(R, wf_range, nt=nt, nr=nr)
 
     # B-H sss integrals
-    out = off2c.calculate_mels([('sss', '2s', '1s')], atom_B, atom_H,
-                            R, grid, area)
+    out = off2c.calculate([('sss', '2s', '1s')], atom_B, atom_H, R,
+                          grid, area)
     results = {key: out[i][-1] for i, key in enumerate(['S', 'H', 'H2'])}
     references = {
         'S': -0.34627316,
@@ -88,8 +88,8 @@ def test_off2c(atoms):
         assert diff < eps, msg.format('B-H {0}_sss'.format(key), results[key])
 
     # H-B sps integrals
-    out = off2c.calculate_mels([('sps', '1s', '2p')], atom_H, atom_B,
-                            R, grid, area)
+    out = off2c.calculate([('sps', '1s', '2p')], atom_H, atom_B, R,
+                          grid, area)
     results = {key: out[i][-2] for i, key in enumerate(['S', 'H', 'H2'])}
     references = {
         'S': -0.47147340,
