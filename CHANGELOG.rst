@@ -23,7 +23,11 @@ Development version
   for two-center integrals were wrong.
 
 * The hotcent.slako.SlaterKosterTable class has been moved to
-  hotcent.offsite_twocenter.Offsite2cTable.
+  hotcent.offsite_twocenter.Offsite2cTable. The default
+  '<el1>-<el2>_no_repulsion.skf' template for the corresponding
+  Slater-Koster file name has furthermore been changed to
+  '<el1>-<el2>_offsite2c.skf'.
+
 
 
 Version 1.0

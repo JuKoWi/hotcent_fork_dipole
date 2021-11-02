@@ -38,6 +38,6 @@ rmin, dr, N = 0.5, 0.05, 250
 off2c = Offsite2cTable(atom, atom, timing=True)
 off2c.run(rmin, dr, N, superposition=opt.superposition,
        xc=opt.functional, stride=opt.stride)
-off2c.write('%s-%s_no_repulsion.par' % (element, element))
-off2c.write('%s-%s_no_repulsion.skf' % (element, element))
+off2c.write('%s-%s_offsite2c.par' % (element, element))
+off2c.write()  # writes to default C-C_offsite2c.skf filename
 off2c.plot()

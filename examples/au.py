@@ -34,6 +34,6 @@ atom.plot_density()
 rmin, dr, N = 0.4, 0.02, 900
 off2c = Offsite2cTable(atom, atom, timing=True)
 off2c.run(rmin, dr, N, superposition='density', xc=xc)
-off2c.write('Au-Au_no_repulsion.par')
-off2c.write('Au-Au_no_repulsion.skf')
+off2c.write('Au-Au_offsite2c.par')
+off2c.write('Au-Au_offsite2c.skf')
 off2c.plot()

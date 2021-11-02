@@ -31,28 +31,34 @@ class Offsite2cTable(MultiAtomIntegrator):
 
     def write(self, filename=None, pair=None, eigenvalues={},
               hubbardvalues={}, occupations={}, spe=0.):
-        """ Write SK tables to a file
+        """
+        Writes a Slater-Koster table to a file.
 
-        filename: str with name of file to write to.
-                  The file format is selected by the extension
-                  (.par or .skf).
-                  Defaults to self.ela-self.elb_no_repulsion.skf
-
-        pair: either (symbol_a, symbol_b) or (symbol_b, symbol_a)
-              to select which of the two SK tables to write
-
-        other kwargs: {nl: value}-dictionaries with eigenvalues,
-              hubbardvalues and valence orbital occupations, as well
-              as the spin-polarization error (all typically calculated
-              on the basis of atomic DFT calculations). These will be
-              written to the second line of a homo-nuclear .skf file.
-              Examples: hubbardvalues={'2s': 0.5}, spe=0.2,
-                        occupations={'3d':10, '4s': 1}, etc.
+        Parameters
+        ----------
+        filename : str, optional
+            Name of the file to write to. The format is selected based
+            on the extension (.par or .skf). Defaults to the
+            '<el1>-<el2>_offsite2c.skf' template.
+        pair : (str, str) tuple, optional
+            Selects which of the two Slater-Koster tables to write,
+            to be used in the heteronuclear case. Defaults to
+            the symbol pair of (self.ela, self.elb).
+        eigenvalues : dict, optional
+            {nl: value} dictionary with valence orbital eigenvalues
+            (or one-center onsite Hamiltonian integrals, if you will).
+            Only written in the homonuclear case.
+        hubbardvalues : dict, optional
+            {nl: value} dictionary with valence orbital Hubbard values
+            Only written in the homonuclear case.
+        occupations : dict, optional
+            {nl: value} dictionary with valence orbital occupations.
+            Only written in the homonuclear case.
         """
         if pair is None:
             pair = (self.ela.get_symbol(), self.elb.get_symbol())
 
-        fn = '%s-%s_no_repulsion.skf' % pair if filename is None else filename
+        fn = '%s-%s_offsite2c.skf' % pair if filename is None else filename
 
         ext = fn[-4:]
 
