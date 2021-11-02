@@ -171,7 +171,7 @@ class Onsite2cTable(MultiAtomIntegrator):
             if write:
                 if filename is None:
                     items = (sym1a, sym1b, e2.get_symbol())
-                    fname = '%s-%s_onsite2c_%s.3cf' % items
+                    fname = '%s-%s_onsite2c_%s.skf' % items
                 else:
                     fname = filename
                 print('Writing to %s' % fname, file=self.txt, flush=True)
