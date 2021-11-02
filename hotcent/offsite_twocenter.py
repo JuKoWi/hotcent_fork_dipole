@@ -29,46 +29,55 @@ class Offsite2cTable(MultiAtomIntegrator):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
 
     def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
-            superposition='potential', xc='LDA', stride=1, smoothen_tails=True):
+            superposition='density', xc='LDA', stride=1, smoothen_tails=True):
         """
         Calculates off-site two-center Hamiltonian and overlap integrals.
 
-        parameters:
-        ------------
-        rmin, dr, N: parameters defining the equidistant grid of interatomic
-                separations: the shortest distance rmin and grid spacing dr
-                (both in Bohr radii) and the number of grid points N.
-        ntheta: number of angular divisions in polar grid
-                (more dense towards bonding region).
-        nr:     number of radial divisions in polar grid
-                (more dense towards origins).
-                with p=q=2 (powers in polar grid) ntheta~3*nr is
-                optimal (with fixed grid size)
-                with ntheta=150, nr=50 you get~1E-4 accuracy for H-elements
-                (beyond that, gain is slow with increasing grid size)
-        wflimit: value below which the radial wave functions are considered
-                to be negligible. This determines how far the polar grids
-                around the atomic centers extend in space.
-        superposition: 'density' or 'potential': whether to use the density
-                superposition or potential superposition approach for the
-                Hamiltonian integrals.
-        xc:     name of the exchange-correlation functional to be used
-                in calculating the effective potential in the density
-                superposition scheme. If the PyLibXC module is available,
-                any LDA or GGA (but not hybrid or MGGA) functional available
-                via LibXC can be specified. E.g. for using the N12
-                functional, set xc='XC_GGA_X_N12+XC_GGA_C_N12'.
-                If PyLibXC is not available, only the local density
-                approximation xc='PW92' (alias: 'LDA') can be chosen.
-        stride: the desired SK-table typically has quite a large number
-                of points (N=500-1000), even though the integrals
-                themselves are comparatively smooth. To speed up the
-                construction of the SK-table, one can therefore restrict
-                the expensive integrations to a subset N' = N // stride,
-                and map the resulting curves on the N-grid afterwards.
-                The default stride = 1 means that N' = N (no shortcut).
-        smoothen_tails: whether to modify the 'tails' of the Slater-Koster
-                integrals so that they smoothly decay to zero.
+        Parameters
+        ----------
+        rmin : float, optional
+            Shortest interatomic separation to consider.
+        dr : float, optional
+            Grid spacing for the interatomic separations.
+        N : int
+            Number of grid points for the interatomic separations.
+        ntheta : int, optional
+            Number of angular divisions in polar grid (more dense towards
+            the bonding region).
+        nr : int, optional
+            Number of radial divisions in polar grid (more dense towards
+            the atomic centers). With p=q=2 (default powers in polar grid)
+            ntheta ~ 3*nr is optimal (for a given grid size).
+            With ntheta=150, nr=50 you get ~1e-4 accuracy for H integrals
+            (beyond that, gain is slow with increasing grid size).
+        wflimit : float, optional
+            Value below which the radial wave functions are considered
+            to be negligible. This determines how far the polar grids
+            around the atomic centers extend in space.
+        superposition : str, optional
+            Whether to use the density superposition ('density', default)
+            or potential superposition ('potential') scheme for the
+            Hamiltonian integrals.
+        xc : str, optional
+            Name of the exchange-correlation functional to be used
+            in calculating the effective potential in the density
+            superposition scheme (default: 'LDA').
+            If the PyLibXC module is available, any LDA or GGA (but not
+            hybrid or MGGA) functional available via LibXC can be specified.
+            To e.g. use the N12 functional, set 'XC_GGA_X_N12+XC_GGA_C_N12'.
+            If PyLibXC is not available, only the local density approximation
+            xc='LDA' (alias: 'PW92') can be chosen.
+        stride : int, optional
+            The desired Skater-Koster table typically has quite a large
+            number of points (N=500-1000), even though the integrals
+            themselves are comparatively smooth. To speed up the
+            construction of the SK-table, one can therefore restrict the
+            expensive integrations to a subset N' = N // stride and map
+            the resulting curves on the N-grid afterwards. The default
+            stride (1) means that N' = N (no shortcut).
+        smoothen_tails : bool, optional
+            Whether to modify the 'tails' of the Slater-Koster integrals
+            so that they smoothly decay to zero (default: True).
         """
         print('\n\n', file=self.txt)
         print('***********************************************', file=self.txt)
