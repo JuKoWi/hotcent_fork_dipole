@@ -33,6 +33,8 @@ Hotcent.
 
 ## Installation
 
+### Manually
+
 * Set up the [ASE](https://wiki.fysik.dtu.dk/ase/) Python module
   (version 3.21.1 or newer).
 
@@ -65,6 +67,17 @@ cd <your_libxc_directory>
 python setup.py develop --prefix=$PWD
 export PYTHONPATH=$PWD:$PYTHONPATH
 ```
+
+### With pip
+
+Hotcent (with C-extensions) and its minimal dependencies can also be
+installed via pip:
+```shell
+pip install -e .
+```
+Note that the optional PyLibXC dependency still needs to be installed
+separately.
+
 
 ## Testing
 

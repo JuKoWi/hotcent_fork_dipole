@@ -22,6 +22,9 @@ if USE_CYTHON:
     extensions = cythonize(extensions, annotate=True)
 
 setup(
-  name='Hotcent',
+  name='hotcent',
   ext_modules=extensions,
+  url='https://gitlab.com/mvdb/hotcent',
+  license='LICENSE',
+  install_requires=['numpy', 'scipy', 'matplotlib', 'ase', 'pytest'],
 )
