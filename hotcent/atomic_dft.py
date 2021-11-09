@@ -445,7 +445,8 @@ class AtomicDFT(AtomicBase):
         self.timer.start('inner_scf')
 
         N = np.argmax(veff == np.inf)
-        N = self.N if N == 0 else N
+        has_finite_range = N > 0
+        N = N if has_finite_range else self.N
 
         if self.scalarrel and dveff is None:
             spl = CubicSplineFunction(self.rgrid[:N], veff[:N])
@@ -475,10 +476,9 @@ class AtomicDFT(AtomicBase):
                 delta = d_enl[nl]
 
             direction = 'none'
-            if np.isfinite(veff[-1]):
+
+            if not has_finite_range:
                 epsmax = veff[-1] - l * (l + 1) / (2 * self.rgrid[-1] ** 2)
-            else:
-                epsmax = None
 
             it = 0
             u = np.zeros(self.N)
@@ -538,7 +538,7 @@ class AtomicDFT(AtomicBase):
                         direction = 'down'
                     eps += shift
 
-                if epsmax is None:
+                if has_finite_range:
                     if abs(eps - eps0) > 0.5*abs(eps0):
                         eps = eps0 + np.sign(eps - eps0) * 0.5*abs(eps0)
                 elif eps > epsmax:
@@ -551,11 +551,38 @@ class AtomicDFT(AtomicBase):
                     for h in hist:
                         print(h)
                     print('nl=%s, eps=%f' % (nl,eps), file=self.txt)
-                    print('max epsilon', epsmax, file=self.txt)
+                    if not has_finite_range:
+                        print('max epsilon', epsmax, file=self.txt)
                     err = 'Eigensolver out of iterations. Atom not stable?'
                     raise RuntimeError(err)
 
             itmax = max(it, itmax)
+
+            if has_finite_range:
+                # Smoothen the derivative kink near the cutoff radius
+                # by replacing the tail by a polynomial of degree 6
+                M = N - 4
+                tail_length = 0.1 * rgrid[N]
+                while (rgrid[N] - rgrid[M]) < tail_length:
+                    M -= 1
+
+                spl = CubicSplineFunction(rgrid[M-4:M+3], u[M-4:M+3],
+                                          bc_type=('not-a-knot', 'not-a-knot'))
+                dr = rgrid[N-1] - rgrid[M-1]
+                fdr = np.array([spl(rgrid[M-1], der=der) * dr**der
+                                for der in range(4)])
+                c3 = np.dot([120., 60., 12, 1.], fdr) / (6*dr**3)
+                c4 = -np.dot([90., 50., 11, 1.], fdr) / (2*dr**4)
+                c5 = np.dot([72., 42., 10., 1.], fdr) / (2*dr**5)
+                c6 = -np.dot([60., 36., 9., 1.], fdr) / (6*dr**6)
+
+                for i in range(M, N):
+                    dr = rgrid[N-1] - rgrid[i]
+                    u[i] = c3*dr**3 + c4*dr**4 + c5*dr**5 + c6*dr**6
+
+                norm = self.grid.integrate(u**2)
+                u /= np.sqrt(norm)
+
             unlg[nl] = u
             Rnlg[nl] = unlg[nl] / self.rgrid
             d_enl[nl] = abs(eps - enl[nl])
