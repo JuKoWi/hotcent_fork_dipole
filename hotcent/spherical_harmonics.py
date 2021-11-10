@@ -142,7 +142,19 @@ def sph(lm, c, s, phi):
 
 
 def sph_cartesian(x, y, z, r, lm):
-    """ Evaluates the chosen spherical harmonic in cartesian coordinates. """
+    """
+    Returns the value of the chosen spherical harmonic
+    in cartesian coordinates.
+
+    Parameters
+    ----------
+    x, y, z : float or np.ndarray
+        Cartesian coordinates.
+    r : float or np.ndarray
+        Corresponding distances from the origin.
+    lm : str
+        Orbital label (e.g. 'px').
+    """
     if lm == 's':
         return 0.5 / np.sqrt(np.pi)
     elif lm == 'px':
@@ -161,3 +173,359 @@ def sph_cartesian(x, y, z, r, lm):
         return np.sqrt(15. / (16.*np.pi)) * (x**2-y**2)/r**2
     elif lm == 'dz2':
         return np.sqrt(5. / (16.*np.pi)) * (2*z**2-x**2-y**2)/r**2
+    elif lm == 'fx(x2-3y2)':
+        return np.sqrt(35. / (32.*np.pi)) * x*(x**2 - 3*y**2)/r**3
+    elif lm == 'fy(3x2-y2)':
+        return np.sqrt(35. / (32.*np.pi)) * y*(3*x**2 - y**2)/r**3
+    elif lm == 'fz(x2-y2)':
+        return np.sqrt(105. / (16.*np.pi)) * z*(x**2 - y**2)/r**3
+    elif lm == 'fxyz':
+        return np.sqrt(105. / (4.*np.pi)) * x*y*z/r**3
+    elif lm == 'fyz2':
+        return np.sqrt(21. / (32.*np.pi)) * y*(4*z**2 - x**2 - y**2)/r**3
+    elif lm == 'fxz2':
+        return np.sqrt(21. / (32.*np.pi)) * x*(4*z**2 - x**2 - y**2)/r**3
+    elif lm == 'fz3':
+        return np.sqrt(7. / (16.*np.pi)) * z*(2*z**2 - 3*x**2 - 3*y**2)/r**3
+    else:
+        raise NotImplementedError('Unknown orbital label: ' + lm)
+
+
+
+def sph_cartesian_der(x, y, z, r, lm, der):
+    """
+    Returns the derivative of the chosen spherical harmonic
+    in cartesian coordinates.
+
+    Parameters
+    ----------
+    x, y, z : float or np.ndarray
+        Cartesian coordinates.
+    r : float or np.ndarray
+        Corresponding distances from the origin.
+    lm : str
+        Orbital label (e.g. 'px').
+    der : str
+        Derivative to evaluate ('x', 'y' or 'z').
+    """
+    sqrtpi = np.sqrt(np.pi)
+
+    if lm == "s":
+        if der == "x":
+            return 0
+        elif der == "y":
+            return 0
+        elif der == "z":
+            return 0
+    elif lm == "pz":
+        if der == "x":
+            return -np.sqrt(3)*x*z/(2*sqrtpi*r**3)
+        elif der == "y":
+            return -np.sqrt(3)*y*z/(2*sqrtpi*r**3)
+        elif der == "z":
+            return -np.sqrt(3)*z**2/(2*sqrtpi*r**3) \
+                   + np.sqrt(3)/(2*sqrtpi*r)
+    elif lm == "py":
+        if der == "x":
+            return -np.sqrt(3)*x*y/(2*sqrtpi*r**3)
+        elif der == "y":
+            return -np.sqrt(3)*y**2/(2*sqrtpi*r**3) \
+                   + np.sqrt(3)/(2*sqrtpi*r)
+        elif der == "z":
+            return -np.sqrt(3)*y*z/(2*sqrtpi*r**3)
+    elif lm == "px":
+        if der == "x":
+            return -np.sqrt(3)*x**2/(2*sqrtpi*r**3) \
+                   + np.sqrt(3)/(2*sqrtpi*r)
+        elif der == "y":
+            return -np.sqrt(3)*x*y/(2*sqrtpi*r**3)
+        elif der == "z":
+            return -np.sqrt(3)*x*z/(2*sqrtpi*r**3)
+    elif lm == "dz2":
+        if der == "x":
+            return -np.sqrt(5)*x*(-x**2 - y**2 + 2*z**2)/(2*sqrtpi*r**4) \
+                        - np.sqrt(5)*x/(2*sqrtpi*r**2)
+        elif der == "y":
+            return -np.sqrt(5)*y*(-x**2 - y**2 + 2*z**2)/(2*sqrtpi*r**4) \
+                        - np.sqrt(5)*y/(2*sqrtpi*r**2)
+        elif der == "z":
+            return -np.sqrt(5)*z*(-x**2 - y**2 + 2*z**2)/(2*sqrtpi*r**4) \
+                        + np.sqrt(5)*z/(sqrtpi*r**2)
+    elif lm == "dyz":
+        if der == "x":
+            return -np.sqrt(15)*x*y*z/(sqrtpi*r**4)
+        elif der == "y":
+            return -np.sqrt(15)*y**2*z/(sqrtpi*r**4) \
+                        + np.sqrt(15)*z/(2*sqrtpi*r**2)
+        elif der == "z":
+            return -np.sqrt(15)*y*z**2/(sqrtpi*r**4) \
+                        + np.sqrt(15)*y/(2*sqrtpi*r**2)
+    elif lm == "dxz":
+        if der == "x":
+            return -np.sqrt(15)*x**2*z/(sqrtpi*r**4) \
+                        + np.sqrt(15)*z/(2*sqrtpi*r**2)
+        elif der == "y":
+            return -np.sqrt(15)*x*y*z/(sqrtpi*r**4)
+        elif der == "z":
+            return -np.sqrt(15)*x*z**2/(sqrtpi*r**4) \
+                        + np.sqrt(15)*x/(2*sqrtpi*r**2)
+    elif lm == "dxy":
+        if der == "x":
+            return -np.sqrt(15)*x**2*y/(sqrtpi*r**4) \
+                        + np.sqrt(15)*y/(2*sqrtpi*r**2)
+        elif der == "y":
+            return -np.sqrt(15)*x*y**2/(sqrtpi*r**4) \
+                        + np.sqrt(15)*x/(2*sqrtpi*r**2)
+        elif der == "z":
+            return -np.sqrt(15)*x*y*z/(sqrtpi*r**4)
+    elif lm == "dx2-y2":
+        if der == "x":
+            return -np.sqrt(15)*x*(x**2 - y**2)/(2*sqrtpi*r**4) \
+                        + np.sqrt(15)*x/(2*sqrtpi*r**2)
+        elif der == "y":
+            return -np.sqrt(15)*y*(x**2 - y**2)/(2*sqrtpi*r**4) \
+                        - np.sqrt(15)*y/(2*sqrtpi*r**2)
+        elif der == "z":
+            return -np.sqrt(15)*z*(x**2 - y**2)/(2*sqrtpi*r**4)
+    elif lm == "fx(x2-3y2)":
+        if der == "x":
+            return -3*np.sqrt(70)*x**2*(x**2 - 3*y**2)/(8*sqrtpi*r**5) \
+                        + np.sqrt(70)*x**2/(4*sqrtpi*r**3) \
+                        + np.sqrt(70)*(x**2 - 3*y**2)/(8*sqrtpi*r**3)
+        elif der == "y":
+            return -3*np.sqrt(70)*x*y*(x**2 - 3*y**2)/(8*sqrtpi*r**5) \
+                        - 3*np.sqrt(70)*x*y/(4*sqrtpi*r**3)
+        elif der == "z":
+            return -3*np.sqrt(70)*x*z*(x**2 - 3*y**2)/(8*sqrtpi*r**5)
+    elif lm == "fy(3x2-y2)":
+        if der == "x":
+            return -3*np.sqrt(70)*x*y*(3*x**2 - y**2)/(8*sqrtpi*r**5) \
+                        + 3*np.sqrt(70)*x*y/(4*sqrtpi*r**3)
+        elif der == "y":
+            return -3*np.sqrt(70)*y**2*(3*x**2 - y**2)/(8*sqrtpi*r**5) \
+                        - np.sqrt(70)*y**2/(4*sqrtpi*r**3) \
+                        + np.sqrt(70)*(3*x**2 - y**2)/(8*sqrtpi*r**3)
+        elif der == "z":
+            return -3*np.sqrt(70)*y*z*(3*x**2 - y**2)/(8*sqrtpi*r**5)
+    elif lm == "fz(x2-y2)":
+        if der == "x":
+            return -3*np.sqrt(105)*x*z*(x**2 - y**2)/(4*sqrtpi*r**5) \
+                        + np.sqrt(105)*x*z/(2*sqrtpi*r**3)
+        elif der == "y":
+            return -3*np.sqrt(105)*y*z*(x**2 - y**2)/(4*sqrtpi*r**5) \
+                        - np.sqrt(105)*y*z/(2*sqrtpi*r**3)
+        elif der == "z":
+            return -3*np.sqrt(105)*z**2*(x**2 - y**2)/(4*sqrtpi*r**5) \
+                        + np.sqrt(105)*(x**2 - y**2)/(4*sqrtpi*r**3)
+    elif lm == "fxyz":
+        if der == "x":
+            return -3*np.sqrt(105)*x**2*y*z/(2*sqrtpi*r**5) \
+                        + np.sqrt(105)*y*z/(2*sqrtpi*r**3)
+        elif der == "y":
+            return -3*np.sqrt(105)*x*y**2*z/(2*sqrtpi*r**5) \
+                        + np.sqrt(105)*x*z/(2*sqrtpi*r**3)
+        elif der == "z":
+            return -3*np.sqrt(105)*x*y*z**2/(2*sqrtpi*r**5) \
+                        + np.sqrt(105)*x*y/(2*sqrtpi*r**3)
+    elif lm == "fyz2":
+        if der == "x":
+            return -3*np.sqrt(42)*x*y*(-x**2 - y**2 + 4*z**2) \
+                        / (8*sqrtpi*r**5) - np.sqrt(42)*x*y/(4*sqrtpi*r**3)
+        elif der == "y":
+            return -3*np.sqrt(42)*y**2*(-x**2 - y**2 + 4*z**2) \
+                        / (8*sqrtpi*r**5) - np.sqrt(42)*y**2/(4*sqrtpi*r**3) \
+                        + np.sqrt(42)*(-x**2 - y**2 + 4*z**2)/(8*sqrtpi*r**3)
+        elif der == "z":
+            return -3*np.sqrt(42)*y*z*(-x**2 - y**2 + 4*z**2) \
+                        / (8*sqrtpi*r**5) + np.sqrt(42)*y*z/(sqrtpi*r**3)
+    elif lm == "fxz2":
+        if der == "x":
+            return -3*np.sqrt(42)*x**2*(-x**2 - y**2 + 4*z**2) \
+                        / (8*sqrtpi*r**5) - np.sqrt(42)*x**2/(4*sqrtpi*r**3) \
+                        + np.sqrt(42)*(-x**2 - y**2 + 4*z**2)/(8*sqrtpi*r**3)
+        elif der == "y":
+            return -3*np.sqrt(42)*x*y*(-x**2 - y**2 + 4*z**2) \
+                        / (8*sqrtpi*r**5) - np.sqrt(42)*x*y/(4*sqrtpi*r**3)
+        elif der == "z":
+            return -3*np.sqrt(42)*x*z*(-x**2 - y**2 + 4*z**2) \
+                        / (8*sqrtpi*r**5) + np.sqrt(42)*x*z/(sqrtpi*r**3)
+    elif lm == "fz3":
+        if der == "x":
+            return -3*np.sqrt(7)*x*z*(-3*x**2 - 3*y**2 + 2*z**2) \
+                        / (4*sqrtpi*r**5) - 3*np.sqrt(7)*x*z/(2*sqrtpi*r**3)
+        elif der == "y":
+            return -3*np.sqrt(7)*y*z*(-3*x**2 - 3*y**2 + 2*z**2) \
+                        / (4*sqrtpi*r**5) - 3*np.sqrt(7)*y*z/(2*sqrtpi*r**3)
+        elif der == "z":
+            return -3*np.sqrt(7)*z**2*(-3*x**2 - 3*y**2 + 2*z**2) \
+                        / (4*sqrtpi*r**5) + np.sqrt(7)*z**2/(sqrtpi*r**3) \
+                        + np.sqrt(7)*(-3*x**2 - 3*y**2 + 2*z**2)/(4*sqrtpi*r**3)
+    else:
+        raise NotImplementedError('Unknown orbital label: ' + lm)
+
+def sph_cartesian_der2(x, y, z, r, lm, der):
+    """
+    Returns the second derivative of the chosen spherical harmonic
+    in cartesian coordinates.
+
+    Parameters
+    ----------
+    x, y, z : float or np.ndarray
+        Cartesian coordinates.
+    r : float or np.ndarray
+        Corresponding distances from the origin.
+    lm : str
+        Orbital label (e.g. 'px').
+    der : str
+        Derivative to evaluate ('x', 'y' or 'z').
+    """
+    sqrtpi = np.sqrt(np.pi)
+
+    if lm == "s":
+        if der == "x":
+            return 0
+        elif der == "y":
+            return 0
+        elif der == "z":
+            return 0
+    elif lm == "pz":
+        if der == "x":
+            return np.sqrt(3)*z*(3*x**2/r**2 - 1)/(2*sqrtpi*r**3)
+        elif der == "y":
+            return np.sqrt(3)*z*(3*y**2/r**2 - 1)/(2*sqrtpi*r**3)
+        elif der == "z":
+            return 3*np.sqrt(3)*z*(z**2/r**2 - 1)/(2*sqrtpi*r**3)
+    elif lm == "py":
+        if der == "x":
+            return np.sqrt(3)*y*(3*x**2/r**2 - 1)/(2*sqrtpi*r**3)
+        elif der == "y":
+            return 3*np.sqrt(3)*y*(y**2/r**2 - 1)/(2*sqrtpi*r**3)
+        elif der == "z":
+            return np.sqrt(3)*y*(3*z**2/r**2 - 1)/(2*sqrtpi*r**3)
+    elif lm == "px":
+        if der == "x":
+            return 3*np.sqrt(3)*x*(x**2/r**2 - 1)/(2*sqrtpi*r**3)
+        elif der == "y":
+            return np.sqrt(3)*x*(3*y**2/r**2 - 1)/(2*sqrtpi*r**3)
+        elif der == "z":
+            return np.sqrt(3)*x*(3*z**2/r**2 - 1)/(2*sqrtpi*r**3)
+    elif lm == "dz2":
+        if der == "x":
+            return np.sqrt(5)*(-4*x**2*(x**2 + y**2 - 2*z**2)/r**4 \
+                        + 4*x**2/r**2 + (x**2 + y**2 - 2*z**2)/r**2 - 1) \
+                        / (2*sqrtpi*r**2)
+        elif der == "y":
+            return np.sqrt(5)*(-4*y**2*(x**2 + y**2 - 2*z**2)/r**4 \
+                        + 4*y**2/r**2 + (x**2 + y**2 - 2*z**2)/r**2 - 1) \
+                        / (2*sqrtpi*r**2)
+        elif der == "z":
+            return np.sqrt(5)*(-4*z**2*(x**2 + y**2 - 2*z**2)/r**4 \
+                        - 8*z**2/r**2 + (x**2 + y**2 - 2*z**2)/r**2 + 2) \
+                        / (2*sqrtpi*r**2)
+    elif lm == "dyz":
+        if der == "x":
+            return np.sqrt(15)*y*z*(4*x**2/r**2 - 1)/(sqrtpi*r**4)
+        elif der == "y":
+            return np.sqrt(15)*y*z*(4*y**2/r**2 - 3)/(sqrtpi*r**4)
+        elif der == "z":
+            return np.sqrt(15)*y*z*(4*z**2/r**2 - 3)/(sqrtpi*r**4)
+    elif lm == "dxz":
+        if der == "x":
+            return np.sqrt(15)*x*z*(4*x**2/r**2 - 3)/(sqrtpi*r**4)
+        elif der == "y":
+            return np.sqrt(15)*x*z*(4*y**2/r**2 - 1)/(sqrtpi*r**4)
+        elif der == "z":
+            return np.sqrt(15)*x*z*(4*z**2/r**2 - 3)/(sqrtpi*r**4)
+    elif lm == "dxy":
+        if der == "x":
+            return np.sqrt(15)*x*y*(4*x**2/r**2 - 3)/(sqrtpi*r**4)
+        elif der == "y":
+            return np.sqrt(15)*x*y*(4*y**2/r**2 - 3)/(sqrtpi*r**4)
+        elif der == "z":
+            return np.sqrt(15)*x*y*(4*z**2/r**2 - 1)/(sqrtpi*r**4)
+    elif lm == "dx2-y2":
+        if der == "x":
+            return np.sqrt(15)*(4*x**2*(x**2 - y**2)/r**4 - 4*x**2/r**2 \
+                        - (x**2 - y**2)/r**2 + 1)/(2*sqrtpi*r**2)
+        elif der == "y":
+            return np.sqrt(15)*(4*y**2*(x**2 - y**2)/r**4 + 4*y**2/r**2 \
+                        - (x**2 - y**2)/r**2 - 1)/(2*sqrtpi*r**2)
+        elif der == "z":
+            return np.sqrt(15)*(x**2 - y**2)*(4*z**2/r**2 - 1)/(2*sqrtpi*r**4)
+    elif lm == "fx(x2-3y2)":
+        if der == "x":
+            return 3*np.sqrt(70)*x*(-4*x**2/r**2 \
+                        + (x**2 - 3*y**2)*(5*x**2/r**2 - 1)/r**2 \
+                        - 2*(x**2 - 3*y**2)/r**2 + 2)/(8*sqrtpi*r**3)
+        elif der == "y":
+            return 3*np.sqrt(70)*x*(12*y**2/r**2 \
+                        + (x**2 - 3*y**2)*(5*y**2/r**2 - 1)/r**2 - 2) \
+                        / (8*sqrtpi*r**3)
+        elif der == "z":
+            return 3*np.sqrt(70)*x*(x**2 - 3*y**2)*(5*z**2/r**2 - 1) \
+                        / (8*sqrtpi*r**5)
+    elif lm == "fy(3x2-y2)":
+        if der == "x":
+            return 3*np.sqrt(70)*y*(-12*x**2/r**2 + (3*x**2 - y**2) \
+                        * (5*x**2/r**2 - 1)/r**2 + 2)/(8*sqrtpi*r**3)
+        elif der == "y":
+            return 3*np.sqrt(70)*y*(4*y**2/r**2 + (3*x**2 - y**2) \
+                        * (5*y**2/r**2 - 1)/r**2 - 2*(3*x**2 - y**2)/r**2 - 2) \
+                        / (8*sqrtpi*r**3)
+        elif der == "z":
+            return 3*np.sqrt(70)*y*(3*x**2 - y**2)*(5*z**2/r**2 - 1) \
+                        / (8*sqrtpi*r**5)
+    elif lm == "fz(x2-y2)":
+        if der == "x":
+            return np.sqrt(105)*z*(-3*x**2/r**2 + 3*(x**2 - y**2) \
+                        * (5*x**2/r**2 - 1)/(4*r**2) + 1/2)/(sqrtpi*r**3)
+        elif der == "y":
+            return np.sqrt(105)*z*(3*y**2/r**2 + 3*(x**2 - y**2) \
+                        * (5*y**2/r**2 - 1)/(4*r**2) - 1/2)/(sqrtpi*r**3)
+        elif der == "z":
+            return 3*np.sqrt(105)*z*(x**2 - y**2)*(5*z**2/r**2 - 3) \
+                        / (4*sqrtpi*r**5)
+    elif lm == "fxyz":
+        if der == "x":
+            return 3*np.sqrt(105)*x*y*z*(5*x**2/r**2 - 3)/(2*sqrtpi*r**5)
+        elif der == "y":
+            return 3*np.sqrt(105)*x*y*z*(5*y**2/r**2 - 3)/(2*sqrtpi*r**5)
+        elif der == "z":
+            return 3*np.sqrt(105)*x*y*z*(5*z**2/r**2 - 3)/(2*sqrtpi*r**5)
+    elif lm == "fyz2":
+        if der == "x":
+            return np.sqrt(42)*y*(12*x**2/r**2 - 3*(5*x**2/r**2 - 1) \
+                        * (x**2 + y**2 - 4*z**2)/r**2 - 2)/(8*sqrtpi*r**3)
+        elif der == "y":
+            return 3*np.sqrt(42)*y*(4*y**2/r**2 - (5*y**2/r**2 - 1) \
+                        * (x**2 + y**2 - 4*z**2)/r**2 \
+                        + 2*(x**2 + y**2 - 4*z**2)/r**2 - 2)/(8*sqrtpi*r**3)
+        elif der == "z":
+            return np.sqrt(42)*y*(-6*z**2/r**2 - 3*(5*z**2/r**2 - 1) \
+                        * (x**2 + y**2 - 4*z**2)/(8*r**2) + 1)/(sqrtpi*r**3)
+    elif lm == "fxz2":
+        if der == "x":
+            return 3*np.sqrt(42)*x*(4*x**2/r**2 - (5*x**2/r**2 - 1) \
+                        * (x**2 + y**2 - 4*z**2)/r**2 \
+                        + 2*(x**2 + y**2 - 4*z**2)/r**2 - 2)/(8*sqrtpi*r**3)
+        elif der == "y":
+            return np.sqrt(42)*x*(12*y**2/r**2 - 3*(5*y**2/r**2 - 1) \
+                        * (x**2 + y**2 - 4*z**2)/r**2 - 2)/(8*sqrtpi*r**3)
+        elif der == "z":
+            return np.sqrt(42)*x*(-6*z**2/r**2 - 3*(5*z**2/r**2 - 1) \
+                        * (x**2 + y**2 - 4*z**2)/(8*r**2) + 1)/(sqrtpi*r**3)
+    elif lm == "fz3":
+        if der == "x":
+            return 3*np.sqrt(7)*z*(3*x**2/r**2 - (5*x**2/r**2 - 1) \
+                        * (3*x**2 + 3*y**2 - 2*z**2)/(4*r**2) - 1/2) \
+                        / (sqrtpi*r**3)
+        elif der == "y":
+            return 3*np.sqrt(7)*z*(3*y**2/r**2 - (5*y**2/r**2 - 1) \
+                        * (3*x**2 + 3*y**2 - 2*z**2)/(4*r**2) - 1/2) \
+                        /(sqrtpi*r**3)
+        elif der == "z":
+            return 3*np.sqrt(7)*z*(-2*z**2/r**2 - (5*z**2/r**2 - 1) \
+                        * (3*x**2 + 3*y**2 - 2*z**2)/(4*r**2) + 1 \
+                        + (3*x**2 + 3*y**2 - 2*z**2)/(2*r**2))/(sqrtpi*r**3)
+    else:
+        raise NotImplementedError('Unknown orbital label: ' + lm)
