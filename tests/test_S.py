@@ -58,15 +58,15 @@ def test_energies(atom):
     assert e_diff < e_tol
 
     # Eigenvalues
-    e_ref = {
+    H_ref = {
         '3s': -0.163276829e+02 / Ha,
         '3p': -0.620202160e+01 / Ha,
     }
-    e_tol = 1e-4
+    H_tol = 1e-4
     for nl in atom.valence:
-        e = atom.get_onecenter_integral(nl)
-        e_diff = abs(e - e_ref[nl])
-        assert e_diff < e_tol
+        H = atom.get_onecenter_integrals(nl, nl)[0]
+        H_diff = abs(e - e_ref[nl])
+        assert H_diff < H_tol, nl
 
     # Hubbard parameter for 3p
     U = atom.get_hubbard_value('3p', scheme='central', maxstep=1.)
@@ -95,7 +95,7 @@ def test_on1c(atom):
     htol = 5e-6
     msg = 'Too large error for H_{0} (value={1})'
     for nl, ref in H_ref[xc].items():
-        H = atom.get_onecenter_integral(nl)
+        H = atom.get_onecenter_integrals(nl, nl)[0]
         H_diff = abs(H - ref)
         assert H_diff < htol, msg.format(nl, H)
 

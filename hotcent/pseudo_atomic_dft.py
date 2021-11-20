@@ -158,22 +158,23 @@ class PseudoAtomicDFT(AtomicDFT):
         # that is consistent with the density as a sum of orbital densities.
         # The eigenvalues in self.enl, by contrast, are 'perturbative' in
         # character, calculated with V_eff = V_eff,free + V_confinement.
-        enl_sc = {nl: self.get_onecenter_integral(nl) for nl in self.valence}
+        enl_sc = {nl: self.get_onecenter_integrals(nl, nl)[0]
+                  for nl in self.valence}
         self.energies = self.calculate_energies(enl_sc, self.dens,
                                                 echo='valence',
                                                 only_valence=True)
         self.timer.summary()
         self.txt.flush()
 
-    def get_onecenter_integral(self, nl):
-        """ Returns the chosen one-center integral (<phi|H|phi>). """
+    def get_onecenter_integrals(self, nl1, nl2):
+        """ Wraps around AtomicDFT.get_onecenter_integrals(). """
         assert self.solved, NOT_SOLVED_MESSAGE
-        l = ANGULAR_MOMENTUM[nl[1]]
+        l = ANGULAR_MOMENTUM[nl2[1]]
         veff = np.copy(self.veff)
         self.veff += self.pp.nonlocal_potential(self.rgrid, l)
-        e = AtomicDFT.get_onecenter_integral(self, nl)
+        H, S = AtomicDFT.get_onecenter_integrals(self, nl1, nl2)
         self.veff = veff
-        return e
+        return H, S
 
     def outer_scf(self):
         """ Solve the self-consistent potential. """

@@ -337,38 +337,57 @@ class AtomicDFT(AtomicBase):
         self.timer.summary()
         self.txt.flush()
 
-    def get_onecenter_integral(self, nl):
-        """ Returns the chosen one-center integral (<phi|H|phi>). """
-        assert nl in self.valence
-        l = ANGULAR_MOMENTUM[nl[1]]
+    def get_onecenter_integrals(self, nl1, nl2):
+        """
+        Calculates one-center Hamiltonian and overlap integrals.
+
+        Parameters
+        ----------
+        nl1, nl2 : str
+            Orbital labels.
+
+        Returns
+        -------
+        H, S : float
+            The selected H and S integrals (<phi_nl1|H|phi_nl2>
+            and <phi_nl1|phi_nl2>, respectively).
+        """
+        l = ANGULAR_MOMENTUM[nl2[1]]
+
+        if ANGULAR_MOMENTUM[nl1[1]] != l:
+            return 0., 0.
+
+        S = self.grid.integrate(self.unlg[nl1] * self.unlg[nl2])
 
         if not self.scalarrel:
-            hpsi = -0.5 * self.unl(self.rgrid, nl, der=2)
-            hpsi += (self.veff + l*(l+1) / (2. * self.rgrid**2)) * self.unlg[nl]
-            e = self.grid.integrate(self.unlg[nl] * hpsi)
+            hpsi = -0.5 * self.unl(self.rgrid, nl2, der=2)
+            hpsi += (self.veff + l*(l+1) / (2.*self.rgrid**2)) * self.unlg[nl2]
+            H = self.grid.integrate(self.unlg[nl1] * hpsi)
         else:
             spl = CubicSplineFunction(self.rgrid, self.veff)
             dveff = spl(self.rgrid, der=1)
 
             c = 137.036
-            eps = self.get_eigenvalue(nl)  # initial guess
+            # initial guess
+            eps = (self.get_eigenvalue(nl1) + self.get_eigenvalue(nl2)) / 2.
 
             while True:
                 M = 1. - (self.veff - eps) / (2. * c**2)
-                hpsi = -0.5 * self.unl(self.rgrid, nl, der=2)
+                hpsi = -0.5 * self.unl(self.rgrid, nl2, der=2)
                 hpsi += (l*(l+1) / (2. * self.rgrid**2) \
-                         + M * (self.veff - eps) + eps) * self.unlg[nl]
+                         + M * (self.veff - eps) + eps) * self.unlg[nl2]
                 hpsi -= 1. / (4. * M * c**2) * dveff \
-                        * (self.unl(self.rgrid, nl, der=1) \
-                           - self.unlg[nl] / self.rgrid)
+                        * (self.unl(self.rgrid, nl2, der=1) \
+                           - self.unlg[nl2] / self.rgrid)
 
-                e = self.grid.integrate(self.unlg[nl] * hpsi)
-                de = eps - e
+                H = self.grid.integrate(self.unlg[nl1] * hpsi)
+                de = eps - H
                 if abs(de) < 1e-8:
                     break
                 else:
-                    eps = self.mix * e + (1. - self.mix) * eps
-        return e
+                    eps = self.mix * H + (1. - self.mix) * eps
+
+        return H, S
 
     def outer_scf(self):
         """ Solve the self-consistent potential. """

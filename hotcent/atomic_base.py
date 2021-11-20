@@ -687,7 +687,7 @@ class AtomicBase:
                 # Update the valence eigenvalues
                 enl = self.enl.copy()
                 for nl in self.valence:
-                    enl[nl] = self.get_onecenter_integral(nl)
+                    enl[nl] = self.get_onecenter_integrals(nl, nl)[0]
 
                 # Get the total energy
                 energies = self.calculate_energies(enl, dens, echo='valence',

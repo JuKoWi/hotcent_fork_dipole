@@ -30,7 +30,7 @@ atom = AtomicDFT(element,
 atom.run()
 
 eigenvalues = {nl: atom.get_eigenvalue(nl) for nl in valence}
-on1c = {nl: atom.get_onecenter_integral(nl) for nl in valence}
+on1c = {nl: atom.get_onecenter_integrals(nl, nl)[0] for nl in valence}
 
 atom.pp.build_projectors(atom)
 atom.pp.build_overlaps(atom, atom, rmin=0.05, rmax=8.)

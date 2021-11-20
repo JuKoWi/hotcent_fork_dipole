@@ -91,7 +91,7 @@ def test_on1c(atoms):
     htol = 5e-6
     msg = 'Too large error for H_{0} (value={1})'
     for nl, ref in H_ref[xc].items():
-        H = atom_Mo.get_onecenter_integral(nl)
+        H = atom_Mo.get_onecenter_integrals(nl, nl)[0]
         H_diff = abs(H - ref)
         assert H_diff < htol, msg.format(nl, H)
 
