@@ -29,6 +29,13 @@ Development version
   '<el1>-<el2>_offsite2c.skf' and the default superposition scheme
   is changed to density superposition.
 
+* Dropped support for writing '.par' Slater-Koster files
+  (only the SKF format remains).
+
+* Added functionality for non-minimal basis sets (see
+  AtomicBase.generate_nonminimal_basis()). Currently just a
+  split-valence scheme for double-zeta basis sets is implemented.
+
 
 Version 1.0
 ===========
