@@ -206,8 +206,8 @@ class KleinmanBylanderPP(SeparablePP):
         """ Returns the local part of the pseudopotential at r. """
         return self.Vl_fct[self.lmax+1](r)
 
-    def nonlocal_potential(self, r, l, der=0):
-        """ Returns the chosen l-dependent nonlocal potential at r. """
+    def semilocal_potential(self, r, l, der=0):
+        """ Returns the chosen l-dependent semilocal potential at r. """
         return self.Vl_fct[l](r, der=der) \
                - self.Vl_fct[self.lmax+1](r, der=der)
 
@@ -267,7 +267,7 @@ class KleinmanBylanderPP(SeparablePP):
                 raise ValueError('Could not find valence state for l=%d' % l)
 
             Rnl_free = e3.Rnl_free(e3.rgrid, nl)
-            dVl = self.nonlocal_potential(e3.rgrid, l)
+            dVl = self.semilocal_potential(e3.rgrid, l)
 
             self.projectors[nl] = CubicSplineFunction(e3.rgrid, Rnl_free * dVl)
             integrand = Rnl_free**2 * dVl * e3.rgrid**2

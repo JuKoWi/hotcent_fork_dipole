@@ -119,7 +119,7 @@ class PseudoAtomicDFT(AtomicDFT):
 
             l = ANGULAR_MOMENTUM[nl[1]]
             veff = veff_free + self.confinement(self.rgrid) \
-                   + self.pp.nonlocal_potential(self.rgrid, l)
+                   + self.pp.semilocal_potential(self.rgrid, l)
 
             enl = {nl: enl_free[nl]}
             itmax, enl, d_enl, unlg, Rnlg = self.inner_scf(0, veff, enl, {},
@@ -171,7 +171,7 @@ class PseudoAtomicDFT(AtomicDFT):
         assert self.solved, NOT_SOLVED_MESSAGE
         l = ANGULAR_MOMENTUM[nl2[1]]
         veff = np.copy(self.veff)
-        self.veff += self.pp.nonlocal_potential(self.rgrid, l)
+        self.veff += self.pp.semilocal_potential(self.rgrid, l)
         H, S = AtomicDFT.get_onecenter_integrals(self, nl1, nl2)
         self.veff = veff
         return H, S
@@ -191,7 +191,7 @@ class PseudoAtomicDFT(AtomicDFT):
         vnonloc = {}
         for nl in self.valence:
             l = 'spdf'.index(nl[1])
-            vnonloc[nl] = self.pp.nonlocal_potential(self.rgrid, l)
+            vnonloc[nl] = self.pp.semilocal_potential(self.rgrid, l)
 
         for it in range(self.maxiter):
             veff *= 1. - self.mix
