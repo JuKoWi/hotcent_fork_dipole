@@ -76,16 +76,29 @@ def select_integrals(e1, e2):
     """ Return list of integrals (integral, nl1, nl2)
     to be done for element pair e1, e2. """
     selected = []
-    val1, val2 = e1.get_valence_orbitals(), e2.get_valence_orbitals()
-
-    for integral in INTEGRALS:
-        nl1, nl2 = select_orbitals(val1, val2, integral)
-        if nl1 is None or nl2 is None:
-            continue
-        else:
-            selected.append((integral, nl1, nl2))
-
+    for ival1, valence1 in enumerate(e1.basis_sets):
+        for ival2, valence2 in enumerate(e2.basis_sets):
+            for integral in INTEGRALS:
+                nl1, nl2 = select_orbitals(valence1, valence2, integral)
+                if nl1 is not None and nl2 is not None:
+                    selected.append((integral, nl1, nl2))
     return selected
+
+
+def print_integral_overview(e1, e2, selected, file):
+    """ Prints an overview of the selected Slater-Koster integrals. """
+    for bas1 in range(len(e1.basis_sets)):
+        for bas2 in range(len(e2.basis_sets)):
+            sym1 = e1.get_symbol() + '+'*bas1
+            sym2 = e2.get_symbol() + '+'*bas2
+            print('Integrals for %s-%s pair:' % (sym1, sym2), end=' ',
+                  file=file)
+            for integral, nl1, nl2 in selected:
+                if e1.get_basis_set_index(nl1) == bas1 and \
+                   e2.get_basis_set_index(nl2) == bas2:
+                    print('_'.join([nl1, nl2, integral]), end=' ', file=file)
+            print(file=file, flush=True)
+    return
 
 
 def g(c1, c2, s1, s2, integral):

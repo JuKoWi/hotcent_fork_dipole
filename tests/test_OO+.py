@@ -6,6 +6,7 @@ import pytest
 from hotcent.confinement import SoftConfinement
 from hotcent.kleinman_bylander import KleinmanBylanderPP
 from hotcent.pseudo_atomic_dft import PseudoAtomicDFT
+from hotcent.slako import INTEGRALS
 
 
 R1 = 2.4
@@ -71,8 +72,8 @@ def test_on1c(atom):
         H, S = atom.get_onecenter_integrals(nl1, nl2)
         htol = 1e-4
         if '+' in nl2:
-            # Larger deviations in this case due to use
-            # of KB transformation in BeckeHarris.
+            # Larger deviations due to use of KB transformation
+            # in BeckeHarris calculations.
             htol = 5e-3
 
         H_diff = abs(H - ref[0])
@@ -80,3 +81,117 @@ def test_on1c(atom):
 
         S_diff = abs(S - ref[1])
         assert S_diff < stol, msg.format('S', nl1, nl2, S)
+
+
+@pytest.mark.parametrize('R', [R1])
+@pytest.mark.parametrize('atom', [LDA], indirect=True)
+def test_off2c(R, atom):
+    from hotcent.offsite_twocenter import Offsite2cTable
+
+    xc = atom.xcname
+
+    rmin, dr, N = R, R, 2
+    off2c = Offsite2cTable(atom, atom)
+    off2c.run(rmin=rmin, dr=dr, N=N, superposition='density', xc=xc,
+              smoothen_tails=False, ntheta=300, nr=100)
+    HS = off2c.tables
+
+    HS_ref = {
+        (R1, LDA): {
+            (0, 0, 0): {
+                'sss': (-0.37502703, 0.24459516),
+                'sps': (0.43535478, -0.34981181),
+                'pps': (0.30997467, -0.28858338),
+                'ppp': (-0.15800151, 0.18783366),
+            },
+            (0, 0, 1): {
+                'sss': (-0.28889358, 0.14105552),
+                'sps': (0.31934193, -0.19191517),
+                'pps': (0.32966136, -0.25526033),
+                'ppp': (-0.13312948, 0.10124055),
+            },
+            (0, 1, 0): {
+                'sss': (-0.28930004, 0.14105552),
+                'sps': (0.42329127, -0.26913362),
+                'pps': (0.32957689, -0.25526033),
+                'ppp': (-0.13286351, 0.10124055),
+            },
+            (0, 1, 1): {
+                'sss': (-0.20116785, 0.05818130),
+                'sps': (0.29805990, -0.13395224),
+                'pps': (0.33298175, -0.23139294),
+                'ppp': (-0.09435624, 0.04956880),
+            },
+        },
+    }
+
+    stol = 5e-5
+    msg = 'Too large error for {0}_{1} [{2}] (value={3})'
+
+    for key, integrals_refs in HS_ref[(R, xc)].items():
+        for integral, ref in integrals_refs.items():
+            index = INTEGRALS.index(integral)
+            htol = 5e-5
+            if (key[1] > 0 or key[2] > 0):
+                # Larger deviations related to kinetic energy
+                htol = 5e-4
+
+            val = HS[key][0, index]
+            H_diff = abs(val - ref[0])
+            assert H_diff < htol, msg.format('H', integral, key, val)
+
+            val = HS[key][0, index+20]
+            S_diff = abs(val - ref[1])
+            assert S_diff < stol, msg.format('S', integral, key, val)
+
+
+@pytest.mark.parametrize('R', [R1])
+@pytest.mark.parametrize('atom', [LDA], indirect=True)
+def test_on2c(R, atom):
+    from hotcent.onsite_twocenter import Onsite2cTable
+
+    xc = atom.xcname
+
+    rmin, dr, N = R, R, 2
+    on2c = Onsite2cTable(atom, atom)
+    on2c.run(rmin=rmin, dr=dr, N=N, superposition='density', xc=xc,
+             smoothen_tails=False, ntheta=300, nr=100)
+    H = on2c.tables
+
+    H_ref = {
+        (R1, LDA): {
+            (0, 0): {
+                'sss': -0.06792868,
+                'sps': -0.09856299,
+                'pps': -0.16365362,
+                'ppp': -0.03296093,
+            },
+            (0, 1): {
+                'sss': -0.04648836,
+                'sps': -0.07643658,
+                'pps': -0.11687865,
+                'ppp': -0.02694682,
+            },
+            (1, 0): {
+                'sss': -0.04648836,
+                'sps': -0.05877341,
+                'pps': -0.11687865,
+                'ppp': -0.02694682,
+            },
+            (1, 1): {
+                'sss': -0.04216209,
+                'sps': -0.05714434,
+                'pps': -0.10282754,
+                'ppp': -0.02613588,
+            },
+        },
+    }
+
+    msg = 'Too large error for H_{0} [{1}] (value={2})'
+
+    for key, integrals_refs in H_ref[(R, xc)].items():
+        for integral, ref in integrals_refs.items():
+            index = INTEGRALS.index(integral)
+            val = H[key][0, index]
+            diff = abs(val - ref)
+            assert diff < 2e-5, msg.format(integral, key, val)

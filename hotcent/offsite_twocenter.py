@@ -11,7 +11,8 @@ from hotcent.interpolation import CubicSplineFunction
 from hotcent.multiatom_integrator import MultiAtomIntegrator
 from hotcent.orbitals import ANGULAR_MOMENTUM
 from hotcent.slako import (dg, g, INTEGRAL_PAIRS, INTEGRALS, NUMSK,
-                           select_integrals, tail_smoothening)
+                           print_integral_overview, select_integrals,
+                           tail_smoothening)
 from hotcent.xc import XC_PW92, LibXC
 try:
     import matplotlib.pyplot as plt
@@ -96,18 +97,15 @@ class Offsite2cTable(MultiAtomIntegrator):
         wf_range = self.get_range(wflimit)
         Nsub = N // stride
         Rgrid = rmin + stride * dr * np.arange(Nsub)
-        tables = [np.zeros((Nsub, 2*NUMSK)) for i in range(self.nel)]
-        dH = 0.
-        Hmax = 0.
+        tables = {}
 
         for p, (e1, e2) in enumerate(self.pairs):
-            sym1, sym2 = e1.get_symbol(), e2.get_symbol()
-            print('Integrals for %s-%s pair:' % (sym1, sym2), end=' ',
-                  file=self.txt)
             selected = select_integrals(e1, e2)
-            for s in selected:
-                print(s[0], end=' ', file=self.txt)
-            print(file=self.txt, flush=True)
+            print_integral_overview(e1, e2, selected, file=self.txt)
+
+            for bas1 in range(len(e1.basis_sets)):
+                for bas2 in range(len(e2.basis_sets)):
+                    tables[(p, bas1, bas2)] = np.zeros((Nsub, 2*NUMSK))
 
         for i, R in enumerate(Rgrid):
             if R > 2 * wf_range:
@@ -115,45 +113,41 @@ class Offsite2cTable(MultiAtomIntegrator):
 
             grid, area = self.make_grid(R, wf_range, nt=ntheta, nr=nr)
 
-            if  i == Nsub - 1 or Nsub // 10 == 0 or i % (Nsub // 10) == 0:
+            if i == Nsub - 1 or Nsub // 10 == 0 or i % (Nsub // 10) == 0:
                 print('R=%8.2f, %i grid points ...' % (R, len(grid)),
                       file=self.txt, flush=True)
 
             for p, (e1, e2) in enumerate(self.pairs):
                 selected = select_integrals(e1, e2)
-                S, H, H2 = 0., 0., 0.
                 if len(grid) > 0:
-                    S, H, H2 = self.calculate(selected, e1, e2, R, grid,
-                                                   area, xc=xc,
-                                                   superposition=superposition)
-                    Hmax = max(Hmax, max(abs(H)))
-                    dH = max(dH, max(abs(H - H2)))
-                tables[p][i, :NUMSK] = H
-                tables[p][i, NUMSK:] = S
-
-        if superposition == 'potential':
-            print('Maximum value for H=%.2g' % Hmax, file=self.txt)
-            print('Maximum error for H=%.2g' % dH, file=self.txt)
-            print('     Relative error=%.2g %%' % (dH / Hmax * 100),
-                  file=self.txt)
+                    S, H, H2 = self.calculate(selected, e1, e2, R, grid, area,
+                                             xc=xc, superposition=superposition)
+                    for key in selected:
+                        integral, nl1, nl2 = key
+                        bas1 = e1.get_basis_set_index(nl1)
+                        bas2 = e2.get_basis_set_index(nl2)
+                        index = INTEGRALS.index(integral)
+                        tables[(p, bas1, bas2)][i, index] = H[key]
+                        tables[(p, bas1, bas2)][i, NUMSK+index] = S[key]
 
         self.Rgrid = rmin + dr * np.arange(N)
 
         if stride > 1:
-            self.tables = [np.zeros((N, 2*NUMSK)) for i in range(self.nel)]
-            for p in range(self.nel):
+            self.tables = {}
+            for key in tables:
+                self.tables[key] = np.zeros((N, 2*NUMSK))
                 for i in range(2*NUMSK):
-                    spl = CubicSplineFunction(Rgrid, tables[p][:, i])
-                    self.tables[p][:, i] = spl(self.Rgrid)
+                    spl = CubicSplineFunction(Rgrid, tables[key][:, i])
+                    self.tables[key][:, i] = spl(self.Rgrid)
         else:
             self.tables = tables
 
         if smoothen_tails:
             # Smooth the curves near the cutoff
-            for p in range(self.nel):
+            for key in self.tables:
                 for i in range(2*NUMSK):
-                    self.tables[p][:, i] = tail_smoothening(self.Rgrid,
-                                                        self.tables[p][:, i])
+                    self.tables[key][:, i] = \
+                            tail_smoothening(self.Rgrid, self.tables[key][:, i])
 
         self.timer.stop('run_offsite2c')
 
@@ -189,15 +183,15 @@ class Offsite2cTable(MultiAtomIntegrator):
 
         Returns
         -------
-        S: np.ndarray
+        S: dict
             Overlap integrals (R1 * R2 * angle_part).
 
-        H: np.ndarray
+        H: dict
             Hamiltonian integrals (<R1 | T + Veff - Vconf1 - Vconf2 | R2>).
             With potential superposition: Veff = Veff1 + Veff2.
             With density superposition: Veff = Vna1 + Vna2 + Vxc(rho1 + rho2).
 
-        H2: np.ndarray
+        H2: dict
             Hamiltonian integrals calculated in an alternative way:
             H2 =  <R1 | (T1 + Veff1) + Veff2 - Vconf1 - Vconf2 | R2>
             = <R1 | H1 + Veff2 - Vconf1 - Vconf2 | R2> (operate with H1 on left)
@@ -263,19 +257,18 @@ class Offsite2cTable(MultiAtomIntegrator):
         self.timer.stop('prelude')
 
         # calculate all selected integrals
-        Sl = np.zeros(NUMSK)
-        if not only_overlap:
-            Hl, H2l = np.zeros(NUMSK), np.zeros(NUMSK)
+        Sl, Hl, H2l = {}, {}, {}
 
-        for integral, nl1, nl2 in selected:
-            index = INTEGRALS.index(integral)
+        for key in selected:
+            integral, nl1, nl2 = key
+
             gphi = g(c1, c2, s1, s2, integral)
             aux = gphi * area * x
 
             Rnl1 = e1.Rnl(r1, nl1)
             Rnl2 = e2.Rnl(r2, nl2)
             S = np.sum(Rnl1 * Rnl2 * aux)
-            Sl[index] = S
+            Sl[key] = S
 
             if not only_overlap:
                 l2 = ANGULAR_MOMENTUM[nl2[1]]
@@ -315,8 +308,8 @@ class Offsite2cTable(MultiAtomIntegrator):
                     H += 2. * np.sum(vsigma * grad_rho_grad_phi * area * x)
                     self.timer.stop('vsigma')
 
-                Hl[index] = H
-                H2l[index] = H2
+                Hl[key] = H
+                H2l[key] = H2
 
         self.timer.stop('calculate_offsite2c')
         if only_overlap:
@@ -324,85 +317,86 @@ class Offsite2cTable(MultiAtomIntegrator):
         else:
             return Sl, Hl, H2l
 
-    def write(self, filename=None, pair=None, eigenvalues={},
-              hubbardvalues={}, occupations={}, spe=0.):
+    def write(self, eigenvalues=None, hubbardvalues=None, occupations=None,
+              spe=None):
         """
-        Writes a Slater-Koster table to a file.
+        Writes all Slater-Koster integral tables to file.
+
+        The filename template corresponds to '<el1>-<el2>_offsite2c.skf'.
+
+        All parameters are optional and are only written in the
+        homonuclear case. For non-minimal basis sets, each parameter
+        (if provided) needs to be a list of dicts (floats for the SPE)
+        to cover each separate set of basis functions.
+
+        By default the 'simple' SKF format is chosen, and the 'extended'
+        SKF format is only used when necessary (i.e. when a basis set
+        includes f-electrons).
 
         Parameters
         ----------
-        filename : str, optional
-            Name of the file to write to. The format is selected based
-            on the extension (.par or .skf). Defaults to the
-            '<el1>-<el2>_offsite2c.skf' template.
-        pair : (str, str) tuple, optional
-            Selects which of the two Slater-Koster tables to write,
-            to be used in the heteronuclear case. Defaults to
-            the symbol pair of (self.ela, self.elb).
-        eigenvalues : dict, optional
+        eigenvalues : None or (list of) dict, optional
             {nl: value} dictionary with valence orbital eigenvalues
             (or one-center onsite Hamiltonian integrals, if you will).
-            Only written in the homonuclear case.
-        hubbardvalues : dict, optional
-            {nl: value} dictionary with valence orbital Hubbard values
-            Only written in the homonuclear case.
-        occupations : dict, optional
+        hubbardvalues : None or (list of) dict, optional
+            {nl: value} dictionary with valence orbital Hubbard values.
+        occupations : None or (list of) dict, optional
             {nl: value} dictionary with valence orbital occupations.
-            Only written in the homonuclear case.
+        spe : None or (list of) float, optional
+            Spin-polarization error.
         """
-        if pair is None:
-            pair = (self.ela.get_symbol(), self.elb.get_symbol())
+        template = '%s-%s_offsite2c.skf'
 
-        fn = '%s-%s_offsite2c.skf' % pair if filename is None else filename
+        for p, (e1, e2) in enumerate(self.pairs):
+            sym1, sym2 = e1.get_symbol(), e2.get_symbol()
+            is_nonminimal = len(e1.basis_sets) > 1 or len(e2.basis_sets) > 1
 
-        ext = fn[-4:]
+            for bas1, valence1 in enumerate(e1.basis_sets):
+                for bas2, valence2 in enumerate(e2.basis_sets):
+                    filename = template % (sym1 + '+'*bas1, sym2  + '+'*bas2)
+                    print('Writing to %s' % filename, file=self.txt, flush=True)
 
-        assert ext in ['.par', '.skf'], \
-               "Unknown format: %s (-> choose .par or .skf)" % ext
+                    is_extended = any([nl[1]=='f' for nl in valence1+valence2])
+                    has_onecenter_data = sym1 == sym2 and bas1 == bas2
+                    mass = atomic_masses[atomic_numbers[sym1]]
+                    eigval, hubval, occup, SPE = {}, {}, {}, 0.
 
-        with open(fn, 'w') as handle:
-            if ext == '.par':
-                self._write_par(handle)
-            elif ext == '.skf':
-                self._write_skf(handle, pair, eigenvalues, hubbardvalues,
-                                occupations, spe)
+                    if has_onecenter_data:
+                        if eigenvalues is not None:
+                            eigval = eigenvalues[bas1] if is_nonminimal \
+                                     else eigenvalues
+                        if hubbardvalues is not None:
+                            hubval = hubbardvalues[bas1] if is_nonminimal \
+                                     else hubbardvalues
+                        if occupations is not None:
+                            occup = occupations[bas1] if is_nonminimal \
+                                    else occupations
+                        if spe is not None:
+                            SPE = spe[bas1] if is_nonminimal else spe
 
-    def _write_skf(self, handle, pair, eigval, hubval, occup, spe):
-        """ Write to SKF file format; this function
-        is an adaptation of hotbit.io.hbskf
+                    key = (p, bas1, bas2)
+                    with open(filename, 'w') as f:
+                        self._write_skf(f, key, has_onecenter_data, is_extended,
+                                        eigval, hubval, occup, SPE, mass)
 
-        By default the 'simple' format is chosen, and the 'extended'
-        format is only used when necessary (i.e. when there are f-electrons
-        included in the valence of one of the elements).
-        """
-        symbols = (self.ela.get_symbol(), self.elb.get_symbol())
-        if pair == symbols:
-             index = 0
-        elif pair == symbols[::-1]:
-             index = 1
-        else:
-             msg = 'Requested ' + str(pair) + ' pair, but this calculator '
-             msg += 'is restricted to the %s-%s pair.' % symbols
-             raise ValueError(msg)
-
-        extended_format = any(['f' in nl
-                               for nl in (self.ela.valence + self.elb.valence)])
-        if extended_format:
+    def _write_skf(self, handle, key, has_onecenter_data, is_extended, eigval,
+                   hubval, occup, spe, mass):
+        """ Write to SKF file format. """
+        if is_extended:
             print('@', file=handle)
 
         grid_dist = self.Rgrid[1] - self.Rgrid[0]
-        grid_npts = len(self.tables[index])
+        grid_npts = len(self.tables[key])
         nzeros = int(np.round(self.Rgrid[0] / grid_dist)) - 1
         assert nzeros >= 0
         grid_npts += nzeros
         print("%.12f, %d" % (grid_dist, grid_npts), file=handle)
 
-        el1, el2 = self.ela.get_symbol(), self.elb.get_symbol()
-        if el1 == el2:
+        if has_onecenter_data:
             fields = ['E_f', 'E_d', 'E_p', 'E_s', 'SPE', 'U_f', 'U_d',
                       'U_p', 'U_s', 'f_f', 'f_d', 'f_p', 'f_s']
 
-            if not extended_format:
+            if not is_extended:
                 fields = [field for field in fields if field[-1] != 'f']
 
             labels = {'SPE': spe}
@@ -422,11 +416,10 @@ class Offsite2cTable(MultiAtomIntegrator):
                 line = line.replace(field, s)
             print(line, file=handle)
 
-        m = atomic_masses[atomic_numbers[symbols[index]]]
-        print("%.3f, 19*0.0" % m, file=handle)
+        print("%.3f, 19*0.0" % mass, file=handle)
 
         # Table containing the Slater-Koster integrals
-        if extended_format:
+        if is_extended:
             indices = range(2*NUMSK)
         else:
             indices = [INTEGRALS.index(name) for name in INTEGRALS
@@ -437,17 +430,17 @@ class Offsite2cTable(MultiAtomIntegrator):
             print('%d*0.0,' % len(indices), file=handle)
 
         ct, theader = 0, ''
-        for i in range(len(self.tables[index])):
+        for i in range(len(self.tables[key])):
             line = ''
             for j in indices:
-                if self.tables[index][i, j] == 0:
+                if self.tables[key][i, j] == 0:
                     ct += 1
                     theader = str(ct) + '*0.0 '
                 else:
                     ct = 0
                     line += theader
                     theader = ''
-                    line += '{0: 1.12e}  '.format(self.tables[index][i, j])
+                    line += '{0: 1.12e}  '.format(self.tables[key][i, j])
 
             if theader != '':
                 ct = 0
@@ -455,30 +448,17 @@ class Offsite2cTable(MultiAtomIntegrator):
 
             print(line, file=handle)
 
-    def _write_par(self, handle):
-        for p, (e1, e2) in enumerate(self.pairs):
-            line = '%s-%s_table=' % (e1.get_symbol(), e2.get_symbol())
-            print(line, file=handle)
+    def plot(self, filename=None, bas1=0, bas2=0):
+        """
+        Plot the Slater-Koster tables with matplotlib.
 
-            for i, R in enumerate(self.Rgrid):
-                print('%.6e' % R, end=' ', file=handle)
-
-                for t in range(2*NUMSK):
-                    x = self.tables[p][i, t]
-                    if abs(x) < 1e-90:
-                        print('0.', end=' ', file=handle)
-                    else:
-                        print('%.6e' % x, end=' ', file=handle)
-                print(file=handle)
-
-            print('\n\n', file=handle)
-
-    def plot(self, filename=None):
-        """ Plot the Slater-Koster table with matplotlib.
-
-        parameters:
-        ===========
-        filename:     name for the figure
+        Parameters
+        ----------
+        filename : str, optional
+            Figure filename (default: '<el1>-<el2>_slako.pdf')
+        bas1, bas2 : int, optional
+            Basis set indices, when dealing with non-minimal
+            basis sets.
         """
         self.timer.start('plotting')
         assert plt is not None, 'Matplotlib could not be imported!'
@@ -488,11 +468,11 @@ class Offsite2cTable(MultiAtomIntegrator):
 
         el1 = self.ela.get_symbol()
         rmax = 6 * covalent_radii[atomic_numbers[el1]] / Bohr
-        ymax = max(1, self.tables[0].max())
+        ymax = max(1, self.tables[(0, bas1, bas2)].max())
         if self.nel == 2:
             el2 = self.elb.get_symbol()
             rmax = max(rmax, 6 * covalent_radii[atomic_numbers[el2]] / Bohr)
-            ymax = max(ymax, self.tables[1].max())
+            ymax = max(ymax, self.tables[(1, bas1, bas2)].max())
 
         for i in range(NUMSK):
             name = INTEGRALS[i]
@@ -500,6 +480,7 @@ class Offsite2cTable(MultiAtomIntegrator):
 
             for p, (e1, e2) in enumerate(self.pairs):
                 s1, s2 = e1.get_symbol(), e2.get_symbol()
+                key = (p, bas1, bas2)
 
                 if p == 0:
                     s = '-'
@@ -510,7 +491,7 @@ class Offsite2cTable(MultiAtomIntegrator):
                     lw = 4
                     alpha = 0.2
 
-                if np.all(abs(self.tables[p][:, i]) < 1e-10):
+                if np.all(abs(self.tables[key][:, i]) < 1e-10):
                     ax.text(0.03, 0.5 + p * 0.15,
                             'No %s integrals for <%s|%s>' % (name, s1, s2),
                             transform=ax.transAxes, size=10, va='center')
@@ -520,9 +501,9 @@ class Offsite2cTable(MultiAtomIntegrator):
                     if not ax.get_subplotspec().is_first_col():
                         plt.yticks([], [])
                 else:
-                    plt.plot(self.Rgrid, self.tables[p][:, i] , c='r',
+                    plt.plot(self.Rgrid, self.tables[key][:, i] , c='r',
                              ls=s, lw=lw, alpha=alpha)
-                    plt.plot(self.Rgrid, self.tables[p][:, i+NUMSK], c='b',
+                    plt.plot(self.Rgrid, self.tables[key][:, i+NUMSK], c='b',
                              ls=s, lw=lw, alpha=alpha)
                     plt.axhline(0, c='k', ls='--')
                     ax.text(0.8, 0.1 + p * 0.15, name, size=10,
@@ -541,12 +522,12 @@ class Offsite2cTable(MultiAtomIntegrator):
         plt.figtext(0.3, 0.95, 'H', color='r', size=20)
         plt.figtext(0.34, 0.95, 'S', color='b', size=20)
         plt.figtext(0.38, 0.95, ' Slater-Koster tables', size=20)
-        e1, e2 = self.ela.get_symbol(), self.elb.get_symbol()
+        sym1, sym2 = self.ela.get_symbol(), self.elb.get_symbol()
         plt.figtext(0.3, 0.92, '(thin solid: <%s|%s>, wide dashed: <%s|%s>)' \
-                    % (e1, e2, e2, e1), size=10)
+                    % (sym1, sym2, sym2, sym1), size=10)
 
         if filename is None:
-            filename = '%s-%s_slako.pdf' % (e1, e2)
+            filename = '%s-%s_slako.pdf' % (sym1 + '+'*bas1, sym2 + '+'*bas2)
         plt.savefig(filename, bbox_inches='tight')
         plt.clf()
         self.timer.stop('plotting')

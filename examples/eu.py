@@ -35,6 +35,5 @@ atom.plot_density()
 rmin, dr, N = 0.56, 0.04, 420
 off2c = Offsite2cTable(atom, atom, timing=True)
 off2c.run(rmin, dr, N, superposition='potential', xc=xc)
-off2c.write('Eu-Eu_offsite2c.skf')
-off2c.write('Eu-Eu_offsite2c.par')
+off2c.write()
 off2c.plot()

@@ -65,8 +65,8 @@ def test_energies(atom):
     H_tol = 1e-4
     for nl in atom.valence:
         H = atom.get_onecenter_integrals(nl, nl)[0]
-        H_diff = abs(e - e_ref[nl])
-        assert H_diff < H_tol, nl
+        H_diff = abs(H - H_ref[nl])
+        assert H_diff < H_tol, (nl, H)
 
     # Hubbard parameter for 3p
     U = atom.get_hubbard_value('3p', scheme='central', maxstep=1.)
@@ -111,7 +111,7 @@ def test_off2c(R, atom):
     off2c = Offsite2cTable(atom, atom)
     off2c.run(rmin=rmin, dr=dr, N=N, superposition='density', xc=xc,
               smoothen_tails=False, ntheta=300, nr=100)
-    H, S = off2c.tables[0][0, :20], off2c.tables[0][0, 20:41]
+    H, S = off2c.tables[(0, 0, 0)][0, :20], off2c.tables[(0, 0, 0)][0, 20:41]
 
     HS_ref = {
         (R1, PBE_LibXC): {
@@ -165,8 +165,9 @@ def test_on2c(R, atom):
 
     rmin, dr, N = R, R, 2
     on2c = Onsite2cTable(atom, atom)
-    H = on2c.run(atom, rmin=rmin, dr=dr, N=N, superposition='density', xc=xc,
-                 smoothen_tails=False, ntheta=300, nr=100, write=False)
+    on2c.run(rmin=rmin, dr=dr, N=N, superposition='density', xc=xc,
+             smoothen_tails=False, ntheta=300, nr=100)
+    H = on2c.tables[(0, 0)]
 
     H_ref = {
         (R1, PBE_LibXC): {
@@ -200,8 +201,8 @@ def test_on2c(R, atom):
     msg = 'Too large error for H_{0} (value={1})'
 
     for integral, ref in H_ref[(R, xc)].items():
-        pair = ('S', 'S')
-        val = H[pair][integral][0]
+        index = INTEGRALS.index(integral)
+        val = H[0, index]
         diff = abs(val - ref)
         assert diff < 1e-4, msg.format(integral, val)
 

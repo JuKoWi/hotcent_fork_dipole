@@ -181,7 +181,8 @@ def test_off2c(R, atoms):
     }
 
     for i in range(2):
-        H, S = off2c.tables[i][0, :20], off2c.tables[i][0, 20:41]
+        H = off2c.tables[(i, 0, 0)][0, :20]
+        S = off2c.tables[(i, 0, 0)][0, 20:41]
 
         htol = 1e-4
         stol = 1e-4
@@ -206,9 +207,10 @@ def test_on2c(R, atoms):
     xc = atom_Mo.xcname
 
     rmin, dr, N = R, R, 2
-    on2c = Onsite2cTable(atom_Mo, atom_Mo)
-    H = on2c.run(atom_Au, rmin=rmin, dr=dr, N=N, superposition='density', xc=xc,
-                 smoothen_tails=False, ntheta=300, nr=100, write=False)
+    on2c = Onsite2cTable(atom_Mo, atom_Au)
+    on2c.run(rmin=rmin, dr=dr, N=N, superposition='density', xc=xc,
+             smoothen_tails=False, ntheta=300, nr=100)
+    H = on2c.tables[(0, 0)]
 
     H_ref = {
         (R1, PBE_LibXC): {
@@ -264,8 +266,8 @@ def test_on2c(R, atoms):
     msg = 'Too large error for H_{0} (value={1})'
 
     for integral, ref in H_ref[(R, xc)].items():
-        pair = ('Mo', 'Mo')
-        val = H[pair][integral][0]
+        index = INTEGRALS.index(integral)
+        val = H[0, index]
         diff = abs(val - ref)
         assert diff < 1e-4, msg.format(integral, val)
 

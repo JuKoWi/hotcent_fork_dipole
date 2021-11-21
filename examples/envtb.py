@@ -41,7 +41,8 @@ rep2c.write()
 
 rmin, dr, N = 0.4, 0.04, 300
 on2c = Onsite2cTable(atom, atom)
-on2c.run(atom, rmin, dr, N, superposition='density', xc=xc)
+on2c.run(rmin, dr, N, superposition='density', xc=xc)
+on2c.write()
 
 min_rAB, max_rAB, num_rAB = 2.6456165761716997, 2.6456165761716997, 1
 min_rCM, max_rCM, num_rCM = 2.2911711636379, 2.2911711636379, 1

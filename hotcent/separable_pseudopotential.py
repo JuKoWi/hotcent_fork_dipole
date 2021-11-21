@@ -9,7 +9,6 @@ from hotcent.interpolation import CubicSplineFunction
 from hotcent.offsite_twocenter import Offsite2cTable
 from hotcent.orbitals import (ANGULAR_MOMENTUM, calculate_slako_coeff,
                               ORBITALS, ORBITAL_LABELS)
-from hotcent.slako import INTEGRALS as INTEGRALS_2c
 
 
 class SeparablePP:
@@ -94,8 +93,6 @@ class SeparablePP:
                             sk_integral = nl3[-1] + nl1[1] + 'spdf'[tau]
                             sk_selected = [(sk_integral, nl3, nl1)]
 
-                        iint = INTEGRALS_2c.index(sk_integral)
-
                         sval = []
                         for r13 in rval:
                             grid, area = off2c.make_grid(r13, wf_range, nt=150,
@@ -103,16 +100,15 @@ class SeparablePP:
                             if l1 < l3:
                                 s = off2c.calculate(sk_selected, e1, e3, r13,
                                                 grid, area, only_overlap=True)
-                                s = s[(bas1, 0)]
                             else:
                                 s = off2c.calculate(sk_selected, e3, e1, r13,
                                                 grid, area, only_overlap=True)
-                                s = s[(0, bas1)]
+                            s = s[sk_selected[0]]
 
                             if len(grid) == 0:
-                                assert abs(s[iint]) < 1e-24
+                                assert abs(s) < 1e-24
 
-                            sval.append(s[iint])
+                            sval.append(s)
 
                         self.overlap_fct[key] = CubicSplineFunction(rval, sval)
 
