@@ -3,6 +3,7 @@
 Reference values come from the BeckeHarris tool, unless mentioned otherwise.
 """
 import pytest
+import numpy as np
 from hotcent.confinement import SoftConfinement
 from hotcent.kleinman_bylander import KleinmanBylanderPP
 from hotcent.pseudo_atomic_dft import PseudoAtomicDFT
@@ -195,3 +196,161 @@ def test_on2c(R, atom):
             val = H[key][0, index]
             diff = abs(val - ref)
             assert diff < 2e-5, msg.format(integral, key, val)
+
+
+@pytest.fixture(scope='module')
+def grids(request):
+    all_grids = {
+        R1: (R1, np.array([R1]), np.array([1.]), np.array([0.6*np.pi])),
+    }
+    return all_grids[request.param]
+
+
+@pytest.mark.parametrize('nphi', ['adaptive', 13])
+@pytest.mark.parametrize('grids', [R1], indirect=True)
+@pytest.mark.parametrize('atom', [LDA], indirect=True)
+def test_off3c(nphi, grids, atom):
+    from hotcent.offsite_threecenter import Offsite3cTable
+
+    R, Rgrid, Sgrid, Tgrid = grids
+    xc = atom.xcname
+
+    off3c = Offsite3cTable(atom, atom)
+    H = off3c.run(atom, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc,
+                  ntheta=300, nr=100, nphi=nphi, write=False)
+
+    H_ref = {
+        (R1, LDA): {
+            ('O', 0, 0, 0): {
+                's_s': -0.14513380,
+                's_px': -0.07153752,
+                's_pz': 0.23273429,
+                'px_s': -0.07592540,
+                'px_px': -0.08057081,
+                'px_pz': 0.12971555,
+                'py_py': -0.06718708,
+                'pz_s': -0.19588074,
+                'pz_px': -0.09415060,
+                'pz_pz': 0.27737727,
+            },
+            ('O', 0, 0, 1): {
+                's_s': -0.08055232,
+                's_px': -0.04634292,
+                's_pz': 0.15418093,
+                'px_s': -0.02192888,
+                'px_px': -0.03902317,
+                'px_pz': 0.05415374,
+                'py_py': -0.04277687,
+                'pz_s': -0.13809558,
+                'pz_px': -0.08002882,
+                'pz_pz': 0.23227257,
+            },
+            ('O', 0, 1, 0): {
+                's_s': -0.10714404,
+                's_px': -0.03104567,
+                's_pz': 0.19586654,
+                'px_s': -0.05923435,
+                'px_px': -0.05058672,
+                'px_pz': 0.11652169,
+                'py_py': -0.05595607,
+                'pz_s': -0.16338977,
+                'pz_px': -0.05698134,
+                'pz_pz': 0.25538340,
+            },
+            ('O', 0, 1, 1): {
+                's_s': -0.04914880,
+                's_px': -0.01519286,
+                's_pz': 0.11962572,
+                'px_s': -0.01128544,
+                'px_px': -0.01869574,
+                'px_pz': 0.04390940,
+                'py_py': -0.03450254,
+                'pz_s': -0.10822087,
+                'pz_px': -0.04856542,
+                'pz_pz': 0.20884367,
+            },
+        },
+    }
+
+    msg = 'Too large error for H_{0} [{1}] (value={2})'
+
+    for key, integrals_refs in H_ref[(R, xc)].items():
+        for integral, ref in integrals_refs.items():
+            val = H[key][integral][0][1]
+            diff = abs(val - ref)
+            assert diff < 1e-4, msg.format(integral, key, val)
+
+
+@pytest.mark.parametrize('nphi', ['adaptive', 13])
+@pytest.mark.parametrize('grids', [R1], indirect=True)
+@pytest.mark.parametrize('atom', [LDA], indirect=True)
+def test_on3c(nphi, grids, atom):
+    from hotcent.onsite_threecenter import Onsite3cTable
+
+    R, Rgrid, Sgrid, Tgrid = grids
+    xc = atom.xcname
+
+    on3c = Onsite3cTable(atom, atom)
+    H = on3c.run(atom, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc,
+                 ntheta=300, nr=100, nphi=nphi, write=False)
+
+    H_ref = {
+        (R1, LDA): {
+            (0, 0, 0): {
+                's_s': 0.00708275,
+                's_px': 0.00279041,
+                's_pz': 0.01040898,
+                'px_s': 0.00279041,
+                'px_px': 0.00447262,
+                'px_pz': 0.00365672,
+                'py_py': 0.00389250,
+                'pz_s': 0.01040898,
+                'pz_px': 0.00365672,
+                'pz_pz': 0.01691855,
+            },
+            (0, 0, 1): {
+                's_s': 0.00416779,
+                's_px': 0.00197603,
+                's_pz': 0.00751428,
+                'px_s': 0.00145023,
+                'px_px': 0.00294593,
+                'px_pz': 0.00228509,
+                'py_py': 0.00255736,
+                'pz_s': 0.00551233,
+                'pz_px': 0.00228509,
+                'pz_pz': 0.01121707,
+            },
+            (0, 1, 0): {
+                's_s': 0.00416779,
+                's_px': 0.00145023,
+                's_pz': 0.00551233,
+                'px_s': 0.00197603,
+                'px_px': 0.00294593,
+                'px_pz': 0.00228509,
+                'py_py': 0.00255736,
+                'pz_s': 0.00751428,
+                'pz_px': 0.00228509,
+                'pz_pz': 0.01121707,
+            },
+            (0, 1, 1): {
+                's_s': 0.00340006,
+                's_px': 0.00136317,
+                's_pz': 0.00512853,
+                'px_s': 0.00136317,
+                'px_px': 0.00250592,
+                'px_pz': 0.00187392,
+                'py_py': 0.00217054,
+                'pz_s': 0.00512853,
+                'pz_px': 0.00187392,
+                'pz_pz': 0.00935529,
+            },
+        },
+    }
+
+    msg = 'Too large error for H_{0} [{1}] (value={2})'
+
+    for key, integrals_refs in H_ref[(R, xc)].items():
+        for integral, ref in integrals_refs.items():
+            val = H[key][integral][0][1]
+            diff = abs(val - ref)
+            assert diff < 1e-6, msg.format(integral, key, val)

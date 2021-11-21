@@ -21,21 +21,21 @@ def select_integrals(e1, e2):
     """ Return list of non-zero integrals (integral, nl1, nl2)
     to be evaluated for element pair e1, e2. """
     selected = []
-    val1, val2 = e1.get_valence_orbitals(), e2.get_valence_orbitals()
 
-    for integral in INTEGRALS:
-        nl1, nl2 = select_orbitals(val1, val2, integral)
-        if nl1 is None or nl2 is None:
-            continue
-        else:
-            lm1, lm2 = integral.split('_')
-            if lm1 in XZ_ANTISYMMETRIC_ORBITALS:
-                is_nonzero = lm2 in XZ_ANTISYMMETRIC_ORBITALS
-            else:
-                is_nonzero = lm2 not in XZ_ANTISYMMETRIC_ORBITALS
-            if is_nonzero:
-                selected.append((integral, nl1, nl2))
+    for ival1, valence1 in enumerate(e1.basis_sets):
+        for ival2, valence2 in enumerate(e2.basis_sets):
+            for integral in INTEGRALS:
+                nl1, nl2 = select_orbitals(valence1, valence2, integral)
+                if nl1 is not None and nl2 is not None:
+                    lm1, lm2 = integral.split('_')
 
+                    if lm1 in XZ_ANTISYMMETRIC_ORBITALS:
+                        is_nonzero = lm2 in XZ_ANTISYMMETRIC_ORBITALS
+                    else:
+                        is_nonzero = lm2 not in XZ_ANTISYMMETRIC_ORBITALS
+
+                    if is_nonzero:
+                        selected.append((integral, nl1, nl2))
     return selected
 
 

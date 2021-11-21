@@ -54,10 +54,10 @@ Sgrid = np.exp(np.linspace(np.log(min_rCM), np.log(max_rCM), num=num_rCM,
 Tgrid = np.linspace(0., np.pi, num=num_theta)
 
 on3c = Onsite3cTable(atom, atom)
-on3c.run(atom, atom, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc)
+on3c.run(atom, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc, write=True)
 
 off3c = Offsite3cTable(atom, atom)
-off3c.run(atom, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc)
+off3c.run(atom, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc, write=True)
 
 rep3c = Repulsion3cTable(atom, atom)
-rep3c.run(atom, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc)
+rep3c.run(atom, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc, write=True)

@@ -456,8 +456,8 @@ def test_off3c(nphi, grids, atoms):
     msg = 'Too large error for H_{0} (value={1})'
 
     for integral, ref in H_ref[(R, xc)].items():
-        pair = ('Mo', 'Au')
-        val = H[pair][integral][0][1]
+        key = ('S', 0, 0, 0)
+        val = H[key][integral][0][1]
         diff = abs(val - ref)
         assert diff < 5e-4, msg.format(integral, val)
 
@@ -472,8 +472,8 @@ def test_on3c(nphi, grids, atoms):
     atom_Mo, atom_Au, atom_S = atoms
     xc = atom_Mo.xcname
 
-    on3c = Onsite3cTable(atom_Mo, atom_Mo)
-    H = on3c.run(atom_Au, atom_S, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc,
+    on3c = Onsite3cTable(atom_Mo, atom_Au)
+    H = on3c.run(atom_S, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc,
                  nphi=nphi, write=False)
 
     H_ref = {
@@ -670,8 +670,8 @@ def test_on3c(nphi, grids, atoms):
     msg = 'Too large error for H_{0} (value={1})'
 
     for integral, ref in H_ref[(R, xc)].items():
-        pair = ('Au', 'S')
-        val = H[pair][integral][0][1]
+        key = (0, 0, 0)
+        val = H[key][integral][0][1]
         diff = abs(val - ref)
         assert diff < 5e-6, msg.format(integral, val)
 

@@ -7,6 +7,7 @@
 import numpy as np
 from scipy.integrate import quad_vec
 from hotcent.multiatom_integrator import MultiAtomIntegrator
+from hotcent.slako import print_integral_overview
 from hotcent.spherical_harmonics import (sph_nophi, sph_nophi_der,
                                          sph_phi, sph_phi_der)
 from hotcent.threecenter import select_integrals, write_3cf
@@ -18,15 +19,15 @@ class Onsite3cTable(MultiAtomIntegrator):
         MultiAtomIntegrator.__init__(self, *args, grid_type='monopolar',
                                      **kwargs)
 
-    def run(self, e2, e3, Rgrid, Sgrid, Tgrid, ntheta=150, nr=50,
-            nphi='adaptive', wflimit=1e-7, xc='LDA', write=True, filename=None):
+    def run(self, e3, Rgrid, Sgrid, Tgrid, ntheta=150, nr=50, nphi='adaptive',
+            wflimit=1e-7, xc='LDA', write=True):
         """
         Calculates on-site three-center Hamiltonian integrals.
 
         Parameters
         ----------
-        e2, e3 : AtomicBase-like object
-            Objects with atomic properties for the second and third atoms.
+        e3 : AtomicBase-like object
+            Object with atomic properties for the third atom.
         Rgrid, Sgrid, Tgrid : list or array
             Lists with distances defining the three-atom geometries.
         nphi : 'adaptive' or int
@@ -40,12 +41,8 @@ class Onsite3cTable(MultiAtomIntegrator):
             using nphi equally spaced phi angles in the [0, pi] interval.
             Comparatively low nphi values (e.g. 13) are often sufficient.
         write : bool, optional
-            Whether to write the integrals to file (the default)
-            or return them as a dictionary instead.
-        filename : str, optional
-            File name to use in case write=True. The default (None)
-            implies that a '<el1a>-<el1b>_onsite3c_<el2>-<el3>.3cf'
-            template is used.
+            Whether to write the integrals to file (default: True). The
+            filename template is '<el1a>-<el1b>_onsite3c_<el2>-<el3>.3cf'.
 
         Other Parameters
         ----------------
@@ -53,9 +50,9 @@ class Onsite3cTable(MultiAtomIntegrator):
 
         Returns
         -------
-        output : dict of dict of np.ndarray, optional
+        tables : dict of dict of np.ndarray
             Dictionary with the values for each el2-el3 pair
-            and integral type. Only returned if write=False.
+            and integral type.
         """
         print('\n\n', file=self.txt)
         print('***********************************************', file=self.txt)
@@ -69,57 +66,57 @@ class Onsite3cTable(MultiAtomIntegrator):
 
         wf_range = self.get_range(wflimit)
         grid, area = self.make_grid(wf_range, nt=ntheta, nr=nr)
-
         numST = len(Sgrid) * len(Tgrid)
+        tables = {}
 
-        selected = select_integrals(self.ela, self.elb)
-        print('Integrals:', end=' ', file=self.txt)
-        for s in selected:
-            print(s[0], end=' ', file=self.txt)
-        print(file=self.txt, flush=True)
+        selected = select_integrals(self.ela, self.ela)
+        print_integral_overview(self.ela, self.ela, selected, file=self.txt)
 
-        if e2.get_symbol() == e3.get_symbol():
-            pairs = [(e2, e3)]
+        syma = self.ela.get_symbol()
+        if self.elb.get_symbol() == e3.get_symbol():
+            pairs = [(self.elb, e3)]
         else:
-            pairs = [(e2, e3), (e3, e2)]
+            pairs = [(self.elb, e3), (e3, self.elb)]
 
-        output = {}
-        sym1a, sym1b = self.ela.get_symbol(), self.elb.get_symbol()
-
-        for elc, eld in pairs:
-            symc, symd = elc.get_symbol(), eld.get_symbol()
-
-            output[(symc, symd)] = {integral: []
-                                    for (integral, nl1, nl2) in selected}
+        for p, (elb, elc) in enumerate(pairs):
+            for bas1a in range(len(self.ela.basis_sets)):
+                for bas1b in range(len(self.ela.basis_sets)):
+                    tables[(p, bas1a, bas1b)] = {
+                            integral: [] for (integral, nl1, nl2) in selected}
 
             for i, R in enumerate(Rgrid):
                 print('Starting for R=%.3f' % R, file=self.txt, flush=True)
 
                 if R < 2 * wf_range:
-                    d = self.calculate(selected, self.ela, self.elb,
-                                       elc, eld, R, grid, area, Sgrid=Sgrid,
-                                       Tgrid=Tgrid, nphi=nphi, xc=xc)
+                    d = self.calculate(selected, self.ela, elb, elc, R, grid,
+                                       area, Sgrid=Sgrid, Tgrid=Tgrid,
+                                       nphi=nphi, xc=xc)
                 else:
                     d = {key: np.zeros(1 + numST) for key in selected}
 
                 for key in selected:
-                    integral, nl1, nl2 = key
-                    output[(symc, symd)][integral].append(d[key])
+                    integral, nl1a, nl1b = key
+                    bas1a = self.ela.get_basis_set_index(nl1a)
+                    bas1b = self.ela.get_basis_set_index(nl1b)
+                    tables[(p, bas1a, bas1b)][integral].append(d[key])
 
             if write:
-                if filename is None:
-                    items = (sym1a, sym1b, symc, symd)
-                    fname = '%s-%s_onsite3c_%s-%s.3cf' % items
-                else:
-                    fname = filename
-                print('Writing to %s' % fname, file=self.txt, flush=True)
-                write_3cf(fname, Rgrid, Sgrid, Tgrid, output[(symc, symd)])
+                symb, symc = elb.get_symbol(), elc.get_symbol()
+                template =  '%s-%s_onsite3c_%s-%s.3cf'
+
+                for bas1a in range(len(self.ela.basis_sets)):
+                    for bas1b in range(len(self.ela.basis_sets)):
+                        items = (syma + '+'*bas1a, syma + '+'*bas1b, symb, symc)
+                        filename = template % items
+                        print('Writing to %s' % filename, file=self.txt,
+                              flush=True)
+                        write_3cf(filename, Rgrid, Sgrid, Tgrid,
+                                  tables[(p, bas1a, bas1b)])
 
         self.timer.stop('run_onsite3c')
-        if not write:
-            return output
+        return tables
 
-    def calculate(self, selected, e1a, e1b, e2, e3, R, grid, area, Sgrid, Tgrid,
+    def calculate(self, selected, e1, e2, e3, R, grid, area, Sgrid, Tgrid,
                   nphi='adaptive', xc='LDA'):
         self.timer.start('calculate_onsite3c')
 
@@ -136,7 +133,7 @@ class Onsite3cTable(MultiAtomIntegrator):
         s2 = x / r2  # sine of theta_2
         aux = area * x
 
-        rho1 = e1a.electron_density(r1)
+        rho1 = e1.electron_density(r1)
         rho12 = rho1 + e2.electron_density(r2)
 
         self.timer.start('vxc')
@@ -147,7 +144,7 @@ class Onsite3cTable(MultiAtomIntegrator):
         else:
             xc = LibXC(xc)
 
-            drho1 = e1a.electron_density(r1, der=1)
+            drho1 = e1.electron_density(r1, der=1)
             grad_rho1_x = drho1 * s1
             grad_rho1_y = drho1 * c1
             sigma1 = drho1**2
@@ -253,16 +250,16 @@ class Onsite3cTable(MultiAtomIntegrator):
 
         for key in selected:
             integral, nl1, nl2 = key
-            Rnl1 = e1a.Rnl(r1, nl1)
-            Rnl2 = e1b.Rnl(r1, nl2)
+            Rnl1 = e1.Rnl(r1, nl1)
+            Rnl2 = e1.Rnl(r1, nl2)
             lm1, lm2 = integral.split('_')
             Theta1 = sph_nophi(lm1, c1, s1)
             Theta2 = sph_nophi(lm2, c1, s1)
             Rnl12[key] = Rnl1 * Rnl2 * Theta1 * Theta2
 
             if xc.add_gradient_corrections:
-                dRnl1 = e1a.Rnl(r1, nl1, der=1)
-                dRnl2 = e1b.Rnl(r1, nl2, der=1)
+                dRnl1 = e1.Rnl(r1, nl1, der=1)
+                dRnl2 = e1.Rnl(r1, nl2, der=1)
                 dTheta1 = sph_nophi_der(lm1, c1, s1)
                 dTheta2 = sph_nophi_der(lm2, c1, s1)
                 grad_phi_x_nophi[key] = (dRnl1*s1*Rnl2 + Rnl1*dRnl2*s1) \

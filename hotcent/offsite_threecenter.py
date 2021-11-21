@@ -7,6 +7,7 @@
 import numpy as np
 from scipy.integrate import quad_vec
 from hotcent.multiatom_integrator import MultiAtomIntegrator
+from hotcent.slako import print_integral_overview
 from hotcent.spherical_harmonics import (sph_nophi, sph_nophi_der,
                                          sph_phi, sph_phi_der)
 from hotcent.threecenter import select_integrals, write_3cf
@@ -18,7 +19,7 @@ class Offsite3cTable(MultiAtomIntegrator):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
 
     def run(self, e3, Rgrid, Sgrid, Tgrid, ntheta=150, nr=50, nphi='adaptive',
-            wflimit=1e-7, xc='LDA', write=True, filename=None):
+            wflimit=1e-7, xc='LDA', write=True):
         """
         Calculates off-site three-center Hamiltonian integrals.
 
@@ -39,12 +40,8 @@ class Offsite3cTable(MultiAtomIntegrator):
             using nphi equally spaced phi angles in the [0, pi] interval.
             Comparatively low nphi values (e.g. 13) are often sufficient.
         write : bool, optional
-            Whether to write the integrals to file (the default)
-            or return them as a dictionary instead.
-        filename : str, optional
-            File name to use in case write=True. The default (None)
-            implies that a '<el1>-<el2>_offsite3c_<el3>.3cf'
-            template is used.
+            Whether to write the integrals to file (default: True)
+            The filename template is '<el1>-<el2>_offsite3c_<el3>.3cf'.
 
         Other Parameters
         ----------------
@@ -52,9 +49,9 @@ class Offsite3cTable(MultiAtomIntegrator):
 
         Returns
         -------
-        output : dict of dict of np.ndarray, optional
+        tables : dict of dict of np.ndarray
             Dictionary with the values for each el1-el2 pair
-            and integral type. Only returned if write=False.
+            and integral type.
         """
         print('\n\n', file=self.txt)
         print('***********************************************', file=self.txt)
@@ -68,19 +65,17 @@ class Offsite3cTable(MultiAtomIntegrator):
 
         wf_range = self.get_range(wflimit)
         numST = len(Sgrid) * len(Tgrid)
-        output = {}
+        sym3 = e3.get_symbol()
+        tables = {}
 
         for p, (e1, e2) in enumerate(self.pairs):
-            sym1, sym2, sym3 = e1.get_symbol(), e2.get_symbol(), e3.get_symbol()
-
             selected = select_integrals(e1, e2)
-            print('Integrals:', end=' ', file=self.txt)
-            for s in selected:
-                print(s[0], end=' ', file=self.txt)
-            print(file=self.txt, flush=True)
+            print_integral_overview(e1, e2, selected, file=self.txt)
 
-            output[(sym1, sym2)] = {integral: []
-                                    for (integral, nl1, nl2) in selected}
+            for bas1 in range(len(e1.basis_sets)):
+                for bas2 in range(len(e2.basis_sets)):
+                    tables[(sym3, p, bas1, bas2)] = {
+                            integral: [] for (integral, nl1, nl2) in selected}
 
             for i, R in enumerate(Rgrid):
                 print('Starting for R=%.3f' % R, file=self.txt, flush=True)
@@ -92,26 +87,30 @@ class Offsite3cTable(MultiAtomIntegrator):
                         d = self.calculate(selected, e1, e2, e3, R, grid, area,
                                            Sgrid=Sgrid, Tgrid=Tgrid, nphi=nphi,
                                            xc=xc)
-
                 if d is None:
                     d = {key: np.zeros(1 + numST) for key in selected}
 
                 for key in selected:
                     integral, nl1, nl2 = key
-                    output[(sym1, sym2)][integral].append(d[key])
+                    bas1 = e1.get_basis_set_index(nl1)
+                    bas2 = e2.get_basis_set_index(nl2)
+                    tables[(sym3, p, bas1, bas2)][integral].append(d[key])
 
             if write:
-                if filename is None:
-                    fname = '%s-%s_offsite3c_%s.3cf' % (sym1, sym2, sym3)
-                else:
-                    fname = filename
-                print('Writing to %s' % fname, file=self.txt, flush=True)
-                write_3cf(fname, Rgrid, Sgrid, Tgrid, output[(sym1, sym2)])
+                sym1, sym2 = e1.get_symbol(), e2.get_symbol()
+                template =  '%s-%s_offsite3c_%s.3cf'
+
+                for bas1 in range(len(e1.basis_sets)):
+                    for bas2 in range(len(e2.basis_sets)):
+                        items = (sym1 + '+'*bas1, sym2 + '+'*bas2, sym3)
+                        filename = template % items
+                        print('Writing to %s' % filename, file=self.txt,
+                              flush=True)
+                        write_3cf(filename, Rgrid, Sgrid, Tgrid,
+                                  tables[(sym3, p, bas1, bas2)])
 
         self.timer.stop('run_offsite3c')
-        if not write:
-            return output
-
+        return tables
 
     def calculate(self, selected, e1, e2, e3, R, grid, area, Sgrid, Tgrid,
                   nphi='adaptive', xc='LDA'):
