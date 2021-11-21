@@ -156,7 +156,7 @@ def test_on2c(R, atom):
     rmin, dr, N = R, R, 2
     on2c = Onsite2cTable(atom, atom)
     on2c.run(rmin=rmin, dr=dr, N=N, superposition='density', xc=xc,
-             smoothen_tails=False, ntheta=300, nr=100)
+             smoothen_tails=False, shift=False, ntheta=300, nr=100)
     H = on2c.tables
 
     H_ref = {

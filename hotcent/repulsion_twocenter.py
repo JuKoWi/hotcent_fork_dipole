@@ -16,7 +16,7 @@ class Repulsion2cTable(MultiAtomIntegrator):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
 
     def run(self, rmin=0.4, dr=0.02, N=None, ntheta=600, nr=100, wflimit=1e-7,
-            smoothen_tails=True, xc='LDA'):
+            shift=True, smoothen_tails=True, xc='LDA'):
         """
         Calculates the 'repulsive' contributions to the total energy
         (i.e. the double-counting and ion-ion interaction terms),
@@ -24,6 +24,12 @@ class Repulsion2cTable(MultiAtomIntegrator):
 
         Parameters
         ----------
+        shift: bool, optional
+            Whether to apply rigid shifts such that the integrals
+            at the table ends are zero.
+
+        Other parameters
+        ----------------
         See Offsite2cTable.run().
         """
         print('\n\n', file=self.txt)
@@ -50,6 +56,9 @@ class Repulsion2cTable(MultiAtomIntegrator):
 
             self.erep[i] = self.calculate(self.ela, self.elb, R, grid, area,
                                           xc=xc)
+
+        if shift:
+            self.erep[:] -= self.erep[-1]
 
         if smoothen_tails:
             # Smooth the curves near the cutoff

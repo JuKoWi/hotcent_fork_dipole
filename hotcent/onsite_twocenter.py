@@ -19,14 +19,19 @@ class Onsite2cTable(MultiAtomIntegrator):
                                      **kwargs)
 
     def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
-            smoothen_tails=True, superposition='density', xc='LDA'):
+            smoothen_tails=True, shift=True, superposition='density', xc='LDA'):
         """
         Calculates on-site two-center Hamiltonian integrals.
 
         Parameters
         ----------
-        rmin, dr, N, ntheta, nr, wflimit, smoothen_tails, superposition, xc :
-            See Offsite2cTable.run().
+        shift: bool, optional
+            Whether to apply rigid shifts such that the integrals
+            at the table ends are zero.
+
+        Other parameters
+        ----------------
+        See Offsite2cTable.run().
         """
         print('\n\n', file=self.txt)
         print('***********************************************', file=self.txt)
@@ -71,9 +76,12 @@ class Onsite2cTable(MultiAtomIntegrator):
                     index = INTEGRALS.index(integral)
                     self.tables[(bas1a, bas1b)][i, index] = H[key]
 
-        if smoothen_tails:
-            for key in self.tables:
-                for i in range(NUMSK):
+        for key in self.tables:
+            for i in range(NUMSK):
+                if shift:
+                    self.tables[key][:, i] -= self.tables[key][:, -1]
+
+                if smoothen_tails:
                     self.tables[key][:, i] = tail_smoothening(self.Rgrid,
                                                         self.tables[key][:, i])
         self.timer.stop('run_onsite2c')

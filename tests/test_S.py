@@ -165,7 +165,7 @@ def test_on2c(R, atom):
 
     rmin, dr, N = R, R, 2
     on2c = Onsite2cTable(atom, atom)
-    on2c.run(rmin=rmin, dr=dr, N=N, superposition='density', xc=xc,
+    on2c.run(rmin=rmin, dr=dr, N=N, superposition='density', xc=xc, shift=False,
              smoothen_tails=False, ntheta=300, nr=100)
     H = on2c.tables[(0, 0)]
 
@@ -216,7 +216,7 @@ def test_rep2c(R, atom):
 
     rmin, dr, N = R, R, 3
     rep2c = Repulsion2cTable(atom, atom)
-    rep2c.run(rmin=rmin, dr=dr, N=N, xc=xc, smoothen_tails=False,
+    rep2c.run(rmin=rmin, dr=dr, N=N, xc=xc, smoothen_tails=False, shift=False,
               ntheta=600, nr=200)
     E = rep2c.erep[0]
 
