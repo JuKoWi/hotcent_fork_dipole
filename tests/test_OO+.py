@@ -54,6 +54,11 @@ def atom(request):
 def test_on1c(atom):
     xc = atom.xcname
 
+    for valence in atom.basis_sets:
+        for nl in valence:
+            U = atom.get_hubbard_value(nl, scheme='forward', maxstep=0.5)
+            assert U > 0, 'Negative hubbard value for {0}'.format(nl)
+
     HS_ref = {
         LDA: {
             ('2s', '2s'): (-0.79874591, 0.99999468),

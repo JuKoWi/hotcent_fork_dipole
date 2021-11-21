@@ -672,7 +672,8 @@ class AtomicBase:
         return
 
     def get_hubbard_value(self, nl, maxstep=1., scheme=None):
-        """ Calculates the Hubbard value of an orbital using
+        """
+        Calculates the Hubbard value of an orbital using
         (second order) finite differences.
 
         Note: when using perturbative confinement, the run() method
@@ -681,23 +682,33 @@ class AtomicBase:
         perturbative scheme, where a self-consistent solution is sought
         for every orbital occupancy.
 
-        nl:      e.g. '2p'
-        maxstep: the maximal step size in the orbital occupancy;
-                 the default value of 1 means not going further
-                 than the monovalent ions
-        scheme:  the finite difference scheme, either 'central',
-                 'forward' or 'backward' or None. In the last
-                 case the appropriate scheme will be chosen
-                 based on the orbital in question being empty
-                 of partly or entirely filled
+        Parameters
+        ----------
+        nl : str
+            Orbital label (e.g. '2p').
+        maxstep : float, optional
+            The maximal step size in the orbital occupancy.
+            The default default value of 1 means not going further
+            than the monovalent ions.
+        scheme : None or str, optional
+            The finite difference scheme, either 'central', 'forward'
+            or 'backward' or None. In the last case the appropriate
+            scheme will be chosen based on the orbital occupation.
         """
         assert scheme in [None, 'central', 'forward', 'backward']
 
+        nl_bare = nl[:2]
+        bas = self.get_basis_set_index(nl)
+        is_minimal = bas == 0
+
         if self.perturbative_confinement:
             assert self.solved, NOT_SOLVED_MESSAGE
-            assert nl in self.valence
+            assert nl_bare in self.valence
+        else:
+            assert is_minimal, 'Non-minimal basis sets only implemented' + \
+                   ' for the perturbative confinement scheme.'
 
-        def get_total_energy(configuration):
+        def get_total_energy(configuration, diff=None):
             if self.perturbative_confinement:
                 configuration_original = self.configuration.copy()
                 veff_original = np.copy(self.veff)
@@ -707,17 +718,26 @@ class AtomicBase:
                 self.configuration = configuration.copy()
                 dens = self.calculate_density(self.unlg,
                                               only_valence=only_valence)
+                if not is_minimal:
+                    # Change density and number of electrons
+                    # due to non-minimal basis function occupation
+                    self.configuration[nl_bare] += diff
+                    dens += diff * self.unlg[nl]**2 \
+                            / (4 * np.pi * self.rgrid**2)
                 self.veff = self.calculate_veff(dens)
 
                 # Update the valence eigenvalues
                 enl = self.enl.copy()
-                for nl in self.valence:
-                    enl[nl] = self.get_onecenter_integrals(nl, nl)[0]
+                for nl2 in self.valence:
+                    enl[nl2] = self.get_onecenter_integrals(nl2, nl2)[0]
 
                 # Get the total energy
                 energies = self.calculate_energies(enl, dens, echo='valence',
                                                    only_valence=only_valence)
                 e = energies['total']
+                if not is_minimal:
+                    # Add non-minimal basis function eigenenergy
+                    e += diff * self.get_onecenter_integrals(nl, nl)[0]
 
                 self.configuration = configuration_original
                 self.veff = veff_original
@@ -731,15 +751,17 @@ class AtomicBase:
             return e
 
         if scheme is None:
-            n, l = nl2tuple(nl)
-            max_occup = 2 * (2 * l + 1)
-            occup = self.configuration[nl]
+            n, l = nl2tuple(nl_bare)
+            max_occup = 2 * (2*l + 1)
+            occup = self.configuration[nl_bare] if bas == 0 else 0
             if occup == 0:
                 scheme = 'forward'
             elif occup == max_occup:
                 scheme = 'backward'
             else:
                 scheme = 'central'
+        elif not is_minimal:
+            assert scheme == 'forward'
 
         directions = {'forward': [0, 1, 2],
                       'central': [-1, 0, 1],
@@ -752,15 +774,18 @@ class AtomicBase:
 
         for direction in directions[scheme]:
             diff = direction * delta
-            configuration[nl] += diff
-            s = ' '.join([nl + '%.1f' % configuration[nl]
-                          for nl in self.valence])
-            print('\n%s Configuration %s %s' % (bar, s, bar), file=self.txt)
-            energies[direction] = get_total_energy(configuration)
-            configuration[nl] -= diff
+            if is_minimal:
+                configuration[nl_bare] += diff
+                s = ' '.join([nl2 + '%.1f' % configuration[nl2]
+                              for nl2 in self.valence])
+                print('\n%s Configuration %s %s' % (bar, s, bar), file=self.txt)
+                energies[direction] = get_total_energy(configuration)
+                configuration[nl_bare] -= diff
+            else:
+                energies[direction] = get_total_energy(configuration, diff=diff)
 
         # Check that the original electronic configuration has been restored
-        assert self.configuration[nl] == configuration[nl]
+        assert self.configuration[nl_bare] == configuration[nl_bare]
 
         if scheme in ['forward', 'central']:
             EA = (energies[0] - energies[1]) / delta
