@@ -18,10 +18,11 @@ import numpy as np
 from scipy.optimize import minimize
 from ase.data import atomic_numbers, covalent_radii
 from ase.units import Bohr, Ha
-from hotcent.interpolation import CubicSplineFunction
-from hotcent.timing import Timer
 from hotcent.confinement import Confinement, ZeroConfinement
+from hotcent.interpolation import CubicSplineFunction
+from hotcent.orbitals import ANGULAR_MOMENTUM
 from hotcent.phillips_kleinman import PhillipsKleinmanPP
+from hotcent.timing import Timer
 try:
     import matplotlib.pyplot as plt
 except:
@@ -33,6 +34,56 @@ NOT_SOLVED_MESSAGE = 'A required attribute is missing. ' \
 
 
 class AtomicBase:
+    """
+    Base class for atomic DFT calculators.
+
+    Parameters
+    ----------
+    symbol : str
+        Chemical symbol.
+    configuration : str
+        Electronic configuration, e.g. '[He] 2s2 2p2'.
+    valence : list
+        Valence orbitals, e.g. ['2s','2p'].
+    confinement : Confinement-like object, optional
+        Confinement potential for the electron density
+        (see hotcent.confinement). The default None means
+        that means no density confinement will be applied.
+    wf_confinement : dict, optional
+        Dictionary with confinement potentials for the
+        valence orbitals. If None, the same confinement will
+        be used as for the electron density. If a certain
+        hotcent.confinement.Confinement instance is provided,
+        this will be applied to all valence states. If a
+        dictionary is provided, it is supposed to look like
+        this: {nl: <a certain Confinement instance, or None>
+        for each nl in your set of valence states}.
+        For missing entries, no confinement will be applied.
+    scalarrel : bool, optional
+        Whether to use scalar relativistic corrections (default:
+        False). Setting it to True is strongly recommended for
+        all-electron calculations of heavier elements
+        (atomic numbers above, say, 24).
+    mix : float, optional
+        Mixing coefficient for the effective potential during
+        the self-consistency cycle.
+    maxiter : int, optional
+        Maximum number of iterations for self-consistency.
+    rmax : float, optional
+        Radial cutoff in Bohr.
+    nodegpts : int, optional
+        Total number of grid points is nodegpts times the max
+        number of antinodes for all orbitals.
+    timing : bool, optional
+        Whether to produce a timing summary (default: False).
+    verbose : bool, optional
+        Whether to increase verbosity during iterations
+        (default: False).
+    txt : str or None or file handle, optional
+        Where output should be printed. Use '-' for stdout
+        (default), None for /dev/null, any other string for a
+        text file, or a file handle.
+    """
     def __init__(self,
                  symbol,
                  configuration='',
@@ -47,35 +98,6 @@ class AtomicBase:
                  timing=False,
                  verbose=False,
                  txt='-'):
-        """ Base class for atomic DFT calculators
-
-        symbol:         chemical symbol
-        configuration:  e.g. '[He] 2s2 2p2'
-        valence:        valence orbitals, e.g. ['2s','2p'].
-        confinement:    confinement potential for the electron density
-                        (see hotcent.confinement). The default None
-                        means no confinement will be applied.
-        wf_confinement: dictionary with confinement potentials for the
-                        valence orbitals. If None, the same confinement will
-                        be used as for the electron density. If a certain
-                        hotcent.confinement.Confinement instance is provided,
-                        this will be applied to all valence states. If a
-                        dictionary is provided, it is supposed to look like
-                        this: {nl: <a certain Confinement instance, or None>
-                         for each nl in your set of valence states}.
-                        For missing entries, no confinement will be applied.
-        scalarrel:      Use scalar relativistic corrections
-        mix:            effective potential mixing constant
-        maxiter:          maximum number of iterations for self-consistency.
-        rmax:           radial cutoff in Bohr
-        nodegpts:       total number of grid points is nodegpts times the max
-                        number of antinodes for all orbitals
-        timing:         output of timing summary
-        verbose:        increase verbosity during iterations
-        txt:            where output should be printed
-                        use '-' for stdout (default), None for /dev/null,
-                        any other string for a text file, or a file handle
-        """
         self.symbol = symbol
         self.valence = valence
         self.scalarrel = scalarrel
@@ -120,6 +142,9 @@ class AtomicBase:
         self.vharval_fct = None
         self.energies = {}
         self.solved = False
+
+        self.zetacount = 1
+        self.basis_sets = [valence]
 
         # Set default 'pseudopotential':
         self.pp = PhillipsKleinmanPP(self.symbol)
@@ -752,6 +777,122 @@ class AtomicBase:
             U += energies[d] * factor / (delta ** 2)
 
         return U
+
+    def generate_nonminimal_basis(self, size='dz', tail_norm=None):
+        """
+        Adds more basis functions to the default minimal basis.
+
+        Multiple-zeta basis functions are generated using
+        a "split-valence" scheme (see Artacho et al.,
+        Phys. stat. sol. (b) 215, 809 (1999)).
+
+        Parameters
+        ----------
+        size : str, optional
+            Size of the non-minimal basis set to be generated.
+            The currently only choice is 'dz' ('double-zeta').
+        tail_norm : None or float, optional
+            Parameter determining the radius at which a double-zeta
+            function is 'split off' from the parent single-zeta in
+            the split-valence scheme. This radius is chosen such that
+            the norm of the corresponding tail equals the given target.
+            By default, tail norms of 0.5 are chosen for hydrogen
+            and 0.15 for all other elements.
+        """
+        assert self.solved, NOT_SOLVED_MESSAGE
+        assert size == 'dz', 'Only a double-zeta basis is currently implemented'
+
+        print('Generating {0} basis for {1}'.format(size, self.symbol),
+              file=self.txt)
+
+        if tail_norm is None:
+            tail_norm = 0.5 if self.symbol == 'H' else 0.15
+        print('Tail norm: {0:.3f}'.format(tail_norm), file=self.txt)
+
+        def get_split_valence_unl(nl, tail_norm):
+            # Find split radius based on the tail norm
+            u = np.copy(self.unlg[nl])
+            norm2 = 1.
+            index = len(self.rgrid)
+            while norm2 > (1. - tail_norm**2):
+                index -= 1
+                u[index] = 0.
+                norm2 = self.grid.integrate(u**2)
+            r_split = self.rgrid[index]
+
+            print('Split radius ({0}): {1:.3f}'.format(nl, r_split),
+                  file=self.txt)
+
+            # Fit the polynomial coefficients
+            l = ANGULAR_MOMENTUM[nl[1]]
+            f0 = self.Rnl(r_split, nl, der=0)
+            f1 = self.Rnl(r_split, nl, der=1)
+            b = (f1 - l*f0/r_split) / (-2. * r_split**(l+1))
+            a = f0/r_split**l + b*r_split**2
+
+            # Build the new radial function
+            u = self.unlg[nl] - self.rgrid**(l+1) * (a - b*self.rgrid**2)
+            u[index:] = 0.
+            norm2 = self.grid.integrate(u**2)
+            u /= np.sqrt(norm2)
+            self.smoothen_tail(u, index)
+            return u
+
+        self.basis_sets = [[nl for nl in self.valence], []]
+        for nl in self.valence:
+            nldz = nl + '+'
+            self.unlg[nldz] = get_split_valence_unl(nl, tail_norm)
+            self.unl_fct[nldz] = None
+            self.Rnlg[nldz] = self.unlg[nldz] / self.rgrid
+            self.Rnl_fct[nldz] = None
+            self.basis_sets[1].append(nldz)
+
+        self.zetacount = 2
+        print(file=self.txt)
+        return
+
+    def get_basis_set_index(self, nl):
+        if nl.startswith('proj_'):
+            return 0
+        else:
+            assert nl[:2] in self.valence, nl
+            return nl.count('+')
+
+    def smoothen_tail(self, u, N):
+        """
+        Smoothens any derivative kink near a cutoff radius
+        by replacing the tail by a polynomial of degree 6.
+
+        Parameters
+        ----------
+        u : np.ndarray
+            Radial function to be smoothened.
+        N : int
+            Index of the grid point corresponding to the
+            cutoff radius.
+        """
+        rgrid = self.rgrid
+        M = N - 4
+        tail_length = 0.1 * rgrid[N]
+        while (rgrid[N] - rgrid[M]) < tail_length:
+            M -= 1
+
+        spl = CubicSplineFunction(rgrid[M-4:M+3], u[M-4:M+3],
+                                  bc_type=('not-a-knot', 'not-a-knot'))
+        dr = rgrid[N-1] - rgrid[M-1]
+        fdr = np.array([spl(rgrid[M-1], der=der) * dr**der
+                        for der in range(4)])
+        c3 = np.dot([120., 60., 12, 1.], fdr) / (6*dr**3)
+        c4 = -np.dot([90., 50., 11, 1.], fdr) / (2*dr**4)
+        c5 = np.dot([72., 42., 10., 1.], fdr) / (2*dr**5)
+        c6 = -np.dot([60., 36., 9., 1.], fdr) / (6*dr**6)
+
+        for i in range(M, N):
+            dr = rgrid[N-1] - rgrid[i]
+            u[i] = c3*dr**3 + c4*dr**4 + c5*dr**5 + c6*dr**6
+
+        norm = self.grid.integrate(u**2)
+        u /= np.sqrt(norm)
 
 
 SUBSHELLS = ['s', 'p', 'd', 'f', 'g', 'h', 'i', 'j', 'k', 'l']

@@ -359,17 +359,17 @@ class AtomicDFT(AtomicBase):
 
         S = self.grid.integrate(self.unlg[nl1] * self.unlg[nl2])
 
-        if not self.scalarrel:
-            hpsi = -0.5 * self.unl(self.rgrid, nl2, der=2)
-            hpsi += (self.veff + l*(l+1) / (2.*self.rgrid**2)) * self.unlg[nl2]
-            H = self.grid.integrate(self.unlg[nl1] * hpsi)
-        else:
+        # Non-scalar-relativistic H
+        hpsi = -0.5 * self.unl(self.rgrid, nl2, der=2)
+        hpsi += (self.veff + l*(l+1) / (2.*self.rgrid**2)) * self.unlg[nl2]
+        H = self.grid.integrate(self.unlg[nl1] * hpsi)
+
+        if self.scalarrel:
             spl = CubicSplineFunction(self.rgrid, self.veff)
             dveff = spl(self.rgrid, der=1)
 
             c = 137.036
-            # initial guess
-            eps = (self.get_eigenvalue(nl1) + self.get_eigenvalue(nl2)) / 2.
+            eps = H  # initial guess
 
             while True:
                 M = 1. - (self.veff - eps) / (2. * c**2)
@@ -578,29 +578,7 @@ class AtomicDFT(AtomicBase):
             itmax = max(it, itmax)
 
             if has_finite_range:
-                # Smoothen the derivative kink near the cutoff radius
-                # by replacing the tail by a polynomial of degree 6
-                M = N - 4
-                tail_length = 0.1 * rgrid[N]
-                while (rgrid[N] - rgrid[M]) < tail_length:
-                    M -= 1
-
-                spl = CubicSplineFunction(rgrid[M-4:M+3], u[M-4:M+3],
-                                          bc_type=('not-a-knot', 'not-a-knot'))
-                dr = rgrid[N-1] - rgrid[M-1]
-                fdr = np.array([spl(rgrid[M-1], der=der) * dr**der
-                                for der in range(4)])
-                c3 = np.dot([120., 60., 12, 1.], fdr) / (6*dr**3)
-                c4 = -np.dot([90., 50., 11, 1.], fdr) / (2*dr**4)
-                c5 = np.dot([72., 42., 10., 1.], fdr) / (2*dr**5)
-                c6 = -np.dot([60., 36., 9., 1.], fdr) / (6*dr**6)
-
-                for i in range(M, N):
-                    dr = rgrid[N-1] - rgrid[i]
-                    u[i] = c3*dr**3 + c4*dr**4 + c5*dr**5 + c6*dr**6
-
-                norm = self.grid.integrate(u**2)
-                u /= np.sqrt(norm)
+                self.smoothen_tail(u, N)
 
             unlg[nl] = u
             Rnlg[nl] = unlg[nl] / self.rgrid
