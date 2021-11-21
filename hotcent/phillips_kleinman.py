@@ -43,9 +43,12 @@ class PhillipsKleinmanPP(SeparablePP):
         self.projectors = {}
         self.energies = {}
 
-        for n3, l3, nl3 in e3.list_states():
-            if nl3 not in e3.valence:
-                self.projectors[nl3] = e3.construct_wfn_interpolator(e3.rgrid,
-                                                            e3.Rnlg[nl3], nl3)
-                self.energies[nl3] = -e3.get_eigenvalue(nl3)
-                self.overlap_onsite[nl3] = 0.
+        for n, l, nl in e3.list_states():
+            if nl not in e3.valence:
+                self.projectors[nl] = e3.construct_wfn_interpolator(e3.rgrid,
+                                                                e3.Rnlg[nl], nl)
+                self.energies[nl] = -e3.get_eigenvalue(nl)
+
+                for valence in e3.basis_sets:
+                    for nl2 in valence:
+                        self.overlap_onsite[(nl, nl2)] = 0.

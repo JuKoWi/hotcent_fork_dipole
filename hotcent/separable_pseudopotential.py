@@ -69,48 +69,54 @@ class SeparablePP:
         numr = min(100, int(np.ceil((rmax - rmin) / dr)))
         rval = np.linspace(rmin, rmax, num=numr, endpoint=True)
 
-        for nl1 in e1.valence:
-            l1 = ANGULAR_MOMENTUM[nl1[1]]
+        for bas1, valence in enumerate(e1.basis_sets):
+            for nl1 in valence:
 
-            for nl3, projector in self.projectors.items():
-                l3 = ANGULAR_MOMENTUM[nl3[1]]
-                nl3 = 'proj_' + nl3
-                e3.Rnl_fct[nl3] = projector  # temporary
+                l1 = ANGULAR_MOMENTUM[nl1[1]]
 
-                for tau in range(min(l1, l3) + 1):
-                    key = (sym1, sym3, nl1, nl3, tau)
-                    if key in self.overlap_fct:
-                        continue
+                for nl3, projector in self.projectors.items():
+                    l3 = ANGULAR_MOMENTUM[nl3[1]]
+                    nl3 = 'proj_' + nl3
+                    e3.Rnl_fct[nl3] = projector  # temporary
 
-                    if self.verbose:
-                        print('Calculating overlaps for ', key)
+                    for tau in range(min(l1, l3) + 1):
+                        key = (sym1, sym3, nl1, nl3, tau)
+                        if key in self.overlap_fct:
+                            continue
 
-                    if l1 < l3:
-                        sk_integral = nl1[1] + nl3[-1] + 'spdf'[tau]
-                        sk_selected = [(sk_integral, nl1, nl3)]
-                    else:
-                        sk_integral = nl3[-1] + nl1[1] + 'spdf'[tau]
-                        sk_selected = [(sk_integral, nl3, nl1)]
+                        if self.verbose:
+                            print('Calculating overlaps for ', key)
 
-                    iint = INTEGRALS_2c.index(sk_integral)
-
-                    sval = []
-                    for r13 in rval:
-                        grid, area = off2c.make_grid(r13, wf_range, nt=150,
-                                                     nr=50)
                         if l1 < l3:
-                            s = off2c.calculate(sk_selected, e1, e3, r13,
-                                                grid, area, only_overlap=True)
+                            sk_integral = nl1[1] + nl3[-1] + 'spdf'[tau]
+                            sk_selected = [(sk_integral, nl1, nl3)]
                         else:
-                            s = off2c.calculate(sk_selected, e3, e1, r13,
+                            sk_integral = nl3[-1] + nl1[1] + 'spdf'[tau]
+                            sk_selected = [(sk_integral, nl3, nl1)]
+
+                        iint = INTEGRALS_2c.index(sk_integral)
+
+                        sval = []
+                        for r13 in rval:
+                            grid, area = off2c.make_grid(r13, wf_range, nt=150,
+                                                         nr=50)
+                            if l1 < l3:
+                                s = off2c.calculate(sk_selected, e1, e3, r13,
                                                 grid, area, only_overlap=True)
-                        if len(grid) == 0:
-                            assert abs(s[iint]) < 1e-24
-                        sval.append(s[iint])
+                                s = s[(bas1, 0)]
+                            else:
+                                s = off2c.calculate(sk_selected, e3, e1, r13,
+                                                grid, area, only_overlap=True)
+                                s = s[(0, bas1)]
 
-                    self.overlap_fct[key] = CubicSplineFunction(rval, sval)
+                            if len(grid) == 0:
+                                assert abs(s[iint]) < 1e-24
 
-                del e3.Rnl_fct[nl3]
+                            sval.append(s[iint])
+
+                        self.overlap_fct[key] = CubicSplineFunction(rval, sval)
+
+                    del e3.Rnl_fct[nl3]
 
         self.initialized_elements.append(sym1)
 
@@ -192,7 +198,7 @@ class SeparablePP:
 
                 # Atom1
                 if coincide13:
-                    S3 = self.overlap_onsite[nl3] if lm1 == lm3 else 0.
+                    S3 = self.overlap_onsite[(nl3, nl1)] if lm1 == lm3 else 0.
                 else:
                     S3 = 0.
                     x, y, z = v13
@@ -212,7 +218,7 @@ class SeparablePP:
 
                 # Atom2
                 if coincide23:
-                    S3 = self.overlap_onsite[nl3] if lm2 == lm3 else 0.
+                    S3 = self.overlap_onsite[(nl3, nl2)] if lm2 == lm3 else 0.
                 else:
                     S3 = 0.
                     x, y, z = v23

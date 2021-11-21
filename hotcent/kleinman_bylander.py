@@ -261,7 +261,7 @@ class KleinmanBylanderPP(SeparablePP):
 
         for l in range(self.lmax+1):
             for nl in self.subshells:
-                if nl[1] == 'spdf'[l]:
+                if ANGULAR_MOMENTUM[nl[1]] == l:
                     break
             else:
                 raise ValueError('Could not find valence state for l=%d' % l)
@@ -273,13 +273,16 @@ class KleinmanBylanderPP(SeparablePP):
             integrand = Rnl_free**2 * dVl * e3.rgrid**2
             self.energies[nl] = 1. / e3.grid.integrate(integrand, use_dV=False)
 
-            if nl in e3.valence:
-                integrand = Rnl_free * dVl * e3.rgrid**2 * e3.Rnl(e3.rgrid, nl)
-                self.overlap_onsite[nl] = e3.grid.integrate(integrand,
-                                                            use_dV=False)
-            else:
-                self.overlap_onsite[nl] = 1. / self.energies[nl]
+            # Calculate onsite overlaps
+            integrand = Rnl_free * dVl * e3.rgrid**2
+            for valence in e3.basis_sets:
+                for nl2 in valence:
+                    if ANGULAR_MOMENTUM[nl2[1]] != l:
+                        continue
 
+                    self.overlap_onsite[(nl, nl2)] = \
+                        e3.grid.integrate(integrand * e3.Rnl(e3.rgrid, nl2),
+                                          use_dV=False)
 
 if __name__ == '__main__':
     """ Example:

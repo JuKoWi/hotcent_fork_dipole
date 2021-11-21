@@ -83,12 +83,14 @@ class BeckeHarris:
 
     def get_valence_orbitals(self, index):
         sym = self.get_symbol(index)
-        orbitals = []
-        for nl in self.elements[sym].valence:
-            l = ANGULAR_MOMENTUM[nl[1]]
-            for lm in ORBITALS[l]:
-                orbitals.append(nl[0] + lm)
-        return orbitals
+        nls, lms = [], []
+        for valence in self.elements[sym].basis_sets:
+            for nl in valence:
+                l = ANGULAR_MOMENTUM[nl[1]]
+                for lm in ORBITALS[l]:
+                    nls.append(nl)
+                    lms.append(lm)
+        return (nls, lms)
 
     def run_selected_HS(self, atoms_ase, mode, check_mc=True):
         self.atoms_ase = atoms_ase
@@ -115,7 +117,7 @@ class BeckeHarris:
             assert is_onsite
             pairs = [('%s_%s' % (lmA, lmA), (lmA, lmA))
                      for lmA in ORBITAL_LABELS]
-            labels = 'on1c'
+            labels = 'on1c,overlap'
         elif N == 2:
             pairs = [(k, v) for k, v in INTEGRAL_PAIRS_2c.items()]
             labels = 'on2c' if is_onsite else 'off2c,overlap'
@@ -135,58 +137,67 @@ class BeckeHarris:
             labels = 'on3c' if is_onsite else 'off3c'
 
         # Evaluate the integrals
-        results = {}
-        for integral, (lmA, lmB) in pairs:
-            for nlA in self.elA.valence:
-                if nlA[1] == lmA[0]: break
-            else:
-                continue
+        for ibasisA, valenceA in enumerate(self.elA.basis_sets):
+            for ibasisB, valenceB in enumerate(self.elB.basis_sets):
 
-            for nlB in self.elB.valence:
-                if nlB[1] == lmB[0]: break
-            else:
-                continue
+                results = {}
+                for integral, (lmA, lmB) in pairs:
+                    for nlA in valenceA:
+                        if nlA[1] == lmA[0]:
+                            break
+                    else:
+                        continue
 
-            self.nlA, self.nlB = nlA, nlB
-            self.lmA, self.lmB = lmA, lmB
-            self.nlmA, self.nlmB = nlA + lmA[1:], nlB + lmB[1:]
+                    for nlB in valenceB:
+                        if nlB[1] == lmB[0]:
+                            break
+                    else:
+                        continue
 
-            print('Running %s_%s %s_%s' % (symA, self.nlmA, symB, self.nlmB),
-                  flush=True)
-            if is_onsite:
-                out = self.calculate_onsite_integral_approximations()
-            else:
-                out = self.calculate_offsite_integral_approximations()
+                    self.nlA, self.nlB = nlA, nlB
+                    self.lmA, self.lmB = lmA, lmB
+                    nlmA = nlA[0] + lmA + nlA[2:]
+                    nlmB = nlB[0] + lmB + nlB[2:]
 
-            if check_mc:
-                out_mc = self.calculate_multicenter_integral()
-                tol = 1e-8
-            print()
+                    print('Running %s_%s %s_%s' % (symA, nlmA, symB, nlmB),
+                          flush=True)
+                    if is_onsite:
+                        out = self.calculate_onsite_integral_approximations()
+                    else:
+                        out = self.calculate_offsite_integral_approximations()
 
-            if N == 1:
-                if check_mc:
-                    assert abs(out_mc['H_mc'] - out['H_1c']) < tol
-                results[integral] = out['H_1c']
-            elif N == 2:
-                if check_mc:
-                    assert abs(out_mc['H_mc'] - out['H_2c']) < tol
-                if is_onsite:
-                    results[integral] = out['H_2c'] - out['H_1c']
-                else:
-                    results[integral] = (out['H_2c'], out['S'])
-            elif N == 3:
-                if check_mc:
-                    assert abs(out_mc['H_mc'] - out['H_3c']) < tol
-                results[integral] = out['H_3c'] - out['H_2c']
+                    if check_mc:
+                        out_mc = self.calculate_multicenter_integral()
+                        tol = 1e-8
+                    print()
 
-        # Print summary
-        print('=== {0} ==='.format(labels))
-        for integral, values in results.items():
-            print("'%s': " % integral, end='')
-            if isinstance(values, tuple):
-                print("(%s)," % ', '.join(map(lambda x: '%.8f' % x, values)))
-            else:
-                print("%.8f," % values)
+                    if N == 1:
+                        if check_mc:
+                            assert abs(out_mc['H_mc'] - out['H_1c']) < tol
+                        results[integral] = (out['H_1c'], out['S'])
+                    elif N == 2:
+                        if check_mc:
+                            assert abs(out_mc['H_mc'] - out['H_2c']) < tol
+                        if is_onsite:
+                            results[integral] = out['H_2c'] - out['H_1c']
+                        else:
+                            results[integral] = (out['H_2c'], out['S'])
+                    elif N == 3:
+                        if check_mc:
+                            assert abs(out_mc['H_mc'] - out['H_3c']) < tol
+                        results[integral] = out['H_3c'] - out['H_2c']
+
+                # Print summary
+                print('=== {0} [{1}, {2}] ==='.format(labels, ibasisA, ibasisB))
+                for integral, values in results.items():
+                    print("'%s': " % integral, end='')
+                    fmt = lambda x: '%.8f' % x
+                    if isinstance(values, tuple):
+                        print("(%s)," % ', '.join(map(fmt, values)))
+                    else:
+                        print(fmt(values) + ",")
+                print()
+
         return
 
     def run_all_HS(self, atoms_ase, indices_A=None, indices_B=None,
@@ -205,20 +216,22 @@ class BeckeHarris:
         else:
             assert len(indices_B) == len(set(indices_B)), indices_B
 
-        iAs, nlmAs = [], []
+        iAs, nlAs, lmAs = [], [], []
         for index in indices_A:
-            nlms = self.get_valence_orbitals(index)
-            iAs.extend([index] * len(nlms))
-            nlmAs.extend(nlms)
+            nls, lms = self.get_valence_orbitals(index)
+            iAs.extend([index] * len(lms))
+            nlAs.extend(nls)
+            lmAs.extend(lms)
 
-        iBs, nlmBs = [], []
+        iBs, nlBs, lmBs = [], [], []
         for index in indices_B:
-            nlms = self.get_valence_orbitals(index)
-            iBs.extend([index] * len(nlms))
-            nlmBs.extend(nlms)
+            nls, lms = self.get_valence_orbitals(index)
+            iBs.extend([index] * len(lms))
+            nlBs.extend(nls)
+            lmBs.extend(lms)
 
         # Calculate (parts of the) Hamiltonian and overlap matrices
-        shape = (len(nlmAs), len(nlmBs))
+        shape = (len(lmAs), len(lmBs))
         S = np.zeros(shape)
         H_22 = np.zeros(shape)
         H_23 = np.zeros(shape)
@@ -226,22 +239,22 @@ class BeckeHarris:
         H_33 = np.zeros(shape)
         H_mc = np.zeros(shape)
 
-        for indexA, (iA, nlmA) in enumerate(zip(iAs, nlmAs)):
-            self.iA, self.nlmA = iA, nlmA
-            self.nlA, self.lmA = self.nlmA[:2], self.nlmA[1:]
+        for indexA, (iA, nlA, lmA) in enumerate(zip(iAs, nlAs, lmAs)):
+            self.iA, self.nlA, self.lmA = iA, nlA, lmA
+            nlmA = nlA[0] + lmA + nlA[2:]
             self.xA, self.yA, self.zA = self.get_position(self.iA)
             symA = self.get_symbol(self.iA)
             self.elA = self.elements[symA]
 
-            for indexB, (iB, nlmB) in enumerate(zip(iBs, nlmBs)):
-                self.iB, self.nlmB = iB, nlmB
-                self.nlB, self.lmB = self.nlmB[:2], self.nlmB[1:]
+            for indexB, (iB, nlB, lmB) in enumerate(zip(iBs, nlBs, lmBs)):
+                self.iB, self.nlB, self.lmB = iB, nlB, lmB
+                nlmB = nlB[0] + lmB + nlB[2:]
                 self.xB, self.yB, self.zB = self.get_position(self.iB)
                 symB = self.get_symbol(self.iB)
                 self.elB = self.elements[symB]
 
                 print('\nRunning iA %d iB %d nlmA %s nlmB %s' % \
-                      (self.iA, self.iB, self.nlmA, self.nlmB))
+                      (self.iA, self.iB, nlmA, nlmB))
                 is_onsite = self.iA == self.iB
 
                 if is_onsite:
@@ -812,7 +825,8 @@ class BeckeHarris:
 
                     if rAC < 1e-3:
                         if self.lmA == lmC:
-                            sAC = self.elements[symC].pp.overlap_onsite[nlC]
+                            sAC = self.elements[symC].pp.overlap_onsite[ \
+                                                                (nlC, self.nlA)]
                         else:
                             sAC = 0.
                     else:
@@ -820,7 +834,8 @@ class BeckeHarris:
 
                     if rCB < 1e-3:
                         if self.lmB == lmC:
-                            sCB = self.elements[symC].pp.overlap_onsite[nlC]
+                            sCB = self.elements[symC].pp.overlap_onsite[ \
+                                                                (nlC, self.nlB)]
                         else:
                             sCB = 0.
                     else:
