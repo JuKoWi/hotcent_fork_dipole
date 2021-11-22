@@ -322,29 +322,33 @@ class Offsite2cTable(MultiAtomIntegrator):
         """
         Writes all Slater-Koster integral tables to file.
 
-        The filename template corresponds to '<el1>-<el2>_offsite2c.skf'.
-
         All parameters are optional and are only written in the
-        homonuclear case. For non-minimal basis sets, each parameter
-        (if provided) needs to be a list of dicts (floats for the SPE)
-        to cover each separate set of basis functions.
+        homonuclear case.
 
+        The filename template corresponds to '<el1>-<el2>_offsite2c.skf'.
         By default the 'simple' SKF format is chosen, and the 'extended'
         SKF format is only used when necessary (i.e. when a basis set
         includes f-electrons).
 
         Parameters
         ----------
-        eigenvalues : None or (list of) dict, optional
+        eigenvalues : None or dict, optional
             {nl: value} dictionary with valence orbital eigenvalues
             (or one-center onsite Hamiltonian integrals, if you will).
-        hubbardvalues : None or (list of) dict, optional
+        hubbardvalues : None or dict, optional
             {nl: value} dictionary with valence orbital Hubbard values.
-        occupations : None or (list of) dict, optional
+        occupations : None or dict, optional
             {nl: value} dictionary with valence orbital occupations.
         spe : None or (list of) float, optional
-            Spin-polarization error.
+            Spin-polarization error. Needs to be a list for non-minimal
+            basis sets.
         """
+        def copy_dict(dict_src, dict_dest, valence):
+            for nl in valence:
+                nl_bare = nl[:2]
+                if dict_src is not None and nl in dict_src:
+                    dict_dest[nl_bare] = dict_src[nl]
+
         template = '%s-%s_offsite2c.skf'
 
         for p, (e1, e2) in enumerate(self.pairs):
@@ -357,36 +361,31 @@ class Offsite2cTable(MultiAtomIntegrator):
                     print('Writing to %s' % filename, file=self.txt, flush=True)
 
                     is_extended = any([nl[1]=='f' for nl in valence1+valence2])
-                    has_onecenter_data = sym1 == sym2 and bas1 == bas2
                     mass = atomic_masses[atomic_numbers[sym1]]
-                    eigval, hubval, occup, SPE = {}, {}, {}, 0.
 
+                    eigval, hubval, occup, SPE = {}, {}, {}, 0.
+                    has_onecenter_data = sym1 == sym2 and bas1 == bas2
                     if has_onecenter_data:
-                        if eigenvalues is not None:
-                            eigval = eigenvalues[bas1] if is_nonminimal \
-                                     else eigenvalues
-                        if hubbardvalues is not None:
-                            hubval = hubbardvalues[bas1] if is_nonminimal \
-                                     else hubbardvalues
-                        if occupations is not None:
-                            occup = occupations[bas1] if is_nonminimal \
-                                    else occupations
+                        copy_dict(eigenvalues, eigval, valence1)
+                        copy_dict(hubbardvalues, hubval, valence1)
+                        copy_dict(occupations, occup, valence1)
                         if spe is not None:
                             SPE = spe[bas1] if is_nonminimal else spe
 
                     key = (p, bas1, bas2)
                     with open(filename, 'w') as f:
-                        self._write_skf(f, key, has_onecenter_data, is_extended,
-                                        eigval, hubval, occup, SPE, mass)
+                        self._write_skf(f, self.tables[key], has_onecenter_data,
+                                        is_extended, eigval, hubval, occup, SPE,
+                                        mass)
 
-    def _write_skf(self, handle, key, has_onecenter_data, is_extended, eigval,
+    def _write_skf(self, handle, table, has_onecenter_data, is_extended, eigval,
                    hubval, occup, spe, mass):
         """ Write to SKF file format. """
         if is_extended:
             print('@', file=handle)
 
         grid_dist = self.Rgrid[1] - self.Rgrid[0]
-        grid_npts = len(self.tables[key])
+        grid_npts = len(table)
         nzeros = int(np.round(self.Rgrid[0] / grid_dist)) - 1
         assert nzeros >= 0
         grid_npts += nzeros
@@ -430,17 +429,17 @@ class Offsite2cTable(MultiAtomIntegrator):
             print('%d*0.0,' % len(indices), file=handle)
 
         ct, theader = 0, ''
-        for i in range(len(self.tables[key])):
+        for i in range(len(table)):
             line = ''
             for j in indices:
-                if self.tables[key][i, j] == 0:
+                if table[i, j] == 0:
                     ct += 1
                     theader = str(ct) + '*0.0 '
                 else:
                     ct = 0
                     line += theader
                     theader = ''
-                    line += '{0: 1.12e}  '.format(self.tables[key][i, j])
+                    line += '{0: 1.12e}  '.format(table[i, j])
 
             if theader != '':
                 ct = 0
