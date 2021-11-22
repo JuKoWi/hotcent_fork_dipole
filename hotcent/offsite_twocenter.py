@@ -318,7 +318,7 @@ class Offsite2cTable(MultiAtomIntegrator):
             return Sl, Hl, H2l
 
     def write(self, eigenvalues=None, hubbardvalues=None, occupations=None,
-              spe=None):
+              spe=None, offdiagonal_H=None, offdiagonal_S=None):
         """
         Writes all Slater-Koster integral tables to file.
 
@@ -342,21 +342,39 @@ class Offsite2cTable(MultiAtomIntegrator):
         spe : None or (list of) float, optional
             Spin-polarization error. Needs to be a list for non-minimal
             basis sets.
+        offdiagonal_H : None or dict, optional
+            {(nl1, nl2): value} dictionary with the off-diagonal,
+            one-center, onsite Hamiltonian integrals. Only needed for
+            non-minimal basis sets.
+        offdiagonal_S : None or dict, optional
+            {(nl1, nl2): value} dictionary with the off-diagonal,
+            one-center, onsite overlap integrals. Only needed for
+            non-minimal basis sets.
         """
-        def copy_dict(dict_src, dict_dest, valence):
+        def copy_dict1(dict_src, dict_dest, valence):
+            if dict_src is None:
+                return
             for nl in valence:
                 nl_bare = nl[:2]
                 if dict_src is not None and nl in dict_src:
                     dict_dest[nl_bare] = dict_src[nl]
 
-        template = '%s-%s_offsite2c.skf'
+        def copy_dict2(dict_src, dict_dest, valence1, valence2):
+            if dict_src is None:
+                return
+            for nl1 in valence1:
+                nl_bare1 = nl1[:2]
+                for nl2 in valence2:
+                    nl_bare2 = nl2[:2]
+                    if nl_bare1 == nl_bare2 and (nl1, nl2) in dict_src:
+                        dict_dest[nl_bare1] = dict_src[(nl1, nl2)]
 
         for p, (e1, e2) in enumerate(self.pairs):
             sym1, sym2 = e1.get_symbol(), e2.get_symbol()
-            is_nonminimal = len(e1.basis_sets) > 1 or len(e2.basis_sets) > 1
 
             for bas1, valence1 in enumerate(e1.basis_sets):
                 for bas2, valence2 in enumerate(e2.basis_sets):
+                    template = '%s-%s_offsite2c.skf'
                     filename = template % (sym1 + '+'*bas1, sym2  + '+'*bas2)
                     print('Writing to %s' % filename, file=self.txt, flush=True)
 
@@ -364,23 +382,31 @@ class Offsite2cTable(MultiAtomIntegrator):
                     mass = atomic_masses[atomic_numbers[sym1]]
 
                     eigval, hubval, occup, SPE = {}, {}, {}, 0.
-                    has_onecenter_data = sym1 == sym2 and bas1 == bas2
-                    if has_onecenter_data:
-                        copy_dict(eigenvalues, eigval, valence1)
-                        copy_dict(hubbardvalues, hubval, valence1)
-                        copy_dict(occupations, occup, valence1)
-                        if spe is not None:
-                            SPE = spe[bas1] if is_nonminimal else spe
+                    has_diagonal_data = sym1 == sym2 and bas1 == bas2
+                    if has_diagonal_data:
+                        copy_dict1(eigenvalues, eigval, valence1)
+                        copy_dict1(hubbardvalues, hubval, valence1)
+                        copy_dict1(occupations, occup, valence1)
+
+                    offdiag_H, offdiag_S = {}, {}
+                    has_offdiagonal_data = sym1 == sym2 and bas1 != bas2
+                    if has_offdiagonal_data:
+                        copy_dict2(offdiagonal_H, offdiag_H, valence1, valence2)
+                        copy_dict2(offdiagonal_S, offdiag_S, valence1, valence2)
 
                     key = (p, bas1, bas2)
                     with open(filename, 'w') as f:
-                        self._write_skf(f, self.tables[key], has_onecenter_data,
+                        self._write_skf(f, self.tables[key], has_diagonal_data,
                                         is_extended, eigval, hubval, occup, SPE,
-                                        mass)
+                                        mass, has_offdiagonal_data, offdiag_H,
+                                        offdiag_S)
 
-    def _write_skf(self, handle, table, has_onecenter_data, is_extended, eigval,
-                   hubval, occup, spe, mass):
+    def _write_skf(self, handle, table, has_diagonal_data, is_extended, eigval,
+                   hubval, occup, spe, mass, has_offdiagonal_data, offdiag_H,
+                   offdiag_S):
         """ Write to SKF file format. """
+        assert not (has_diagonal_data and has_offdiagonal_data)
+
         if is_extended:
             print('@', file=handle)
 
@@ -391,18 +417,25 @@ class Offsite2cTable(MultiAtomIntegrator):
         grid_npts += nzeros
         print("%.12f, %d" % (grid_dist, grid_npts), file=handle)
 
-        if has_onecenter_data:
-            fields = ['E_f', 'E_d', 'E_p', 'E_s', 'SPE', 'U_f', 'U_d',
-                      'U_p', 'U_s', 'f_f', 'f_d', 'f_p', 'f_s']
+        if has_diagonal_data or has_offdiagonal_data:
+            if has_diagonal_data:
+                prefixes, dicts = ['E', 'U', 'f'], [eigval, hubval, occup]
+                fields = ['E_f', 'E_d', 'E_p', 'E_s', 'SPE', 'U_f', 'U_d',
+                          'U_p', 'U_s', 'f_f', 'f_d', 'f_p', 'f_s']
+                labels = {'SPE': spe}
+            elif has_offdiagonal_data:
+                prefixes, dicts = ['H', 'S'], [offdiag_H, offdiag_S]
+                fields = ['H_f', 'H_d', 'H_p', 'H_s',
+                          'S_f', 'S_d', 'S_p', 'S_s']
+                labels = {}
 
             if not is_extended:
                 fields = [field for field in fields if field[-1] != 'f']
 
-            labels = {'SPE': spe}
-            for prefix, d in zip(['E', 'U', 'f'], [eigval, hubval, occup]):
+            for prefix, d in zip(prefixes, dicts):
                 keys = list(d.keys())
                 for l in ['s', 'p', 'd', 'f']:
-                    check = [key[-1] == l for key in keys]
+                    check = [key[1] == l for key in keys]
                     assert sum(check) in [0, 1], (keys, l)
                     if sum(check) == 1:
                         key = keys[check.index(True)]
@@ -413,6 +446,7 @@ class Offsite2cTable(MultiAtomIntegrator):
                 val = labels[field] if field in labels else 0
                 s = '%d' % val if isinstance(val, int) else '%.6f' % val
                 line = line.replace(field, s)
+
             print(line, file=handle)
 
         print("%.3f, 19*0.0" % mass, file=handle)
