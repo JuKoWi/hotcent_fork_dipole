@@ -355,19 +355,21 @@ class Offsite2cTable(MultiAtomIntegrator):
             if dict_src is None:
                 return
             for nl in valence:
-                nl_bare = nl[:2]
+                l = nl[1]
+                assert l not in dict_dest
                 if dict_src is not None and nl in dict_src:
-                    dict_dest[nl_bare] = dict_src[nl]
+                    dict_dest[l] = dict_src[nl]
 
         def copy_dict2(dict_src, dict_dest, valence1, valence2):
             if dict_src is None:
                 return
             for nl1 in valence1:
-                nl_bare1 = nl1[:2]
+                l1 = nl1[1]
                 for nl2 in valence2:
-                    nl_bare2 = nl2[:2]
-                    if nl_bare1 == nl_bare2 and (nl1, nl2) in dict_src:
-                        dict_dest[nl_bare1] = dict_src[(nl1, nl2)]
+                    l2 = nl2[1]
+                    if l1 == l2 and (nl1, nl2) in dict_src:
+                        assert l1 not in dict_dest
+                        dict_dest[l1] = dict_src[(nl1, nl2)]
 
         for p, (e1, e2) in enumerate(self.pairs):
             sym1, sym2 = e1.get_symbol(), e2.get_symbol()
@@ -433,13 +435,10 @@ class Offsite2cTable(MultiAtomIntegrator):
                 fields = [field for field in fields if field[-1] != 'f']
 
             for prefix, d in zip(prefixes, dicts):
-                keys = list(d.keys())
                 for l in ['s', 'p', 'd', 'f']:
-                    check = [key[1] == l for key in keys]
-                    assert sum(check) in [0, 1], (keys, l)
-                    if sum(check) == 1:
-                        key = keys[check.index(True)]
-                        labels['%s_%s' % (prefix, l)] = d[key]
+                    if l in d:
+                        key = '%s_%s' % (prefix, l)
+                        labels[key] = d[l]
 
             line = ' '.join(fields)
             for field in fields:
