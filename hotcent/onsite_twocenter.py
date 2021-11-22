@@ -9,7 +9,7 @@ from ase.data import atomic_numbers, atomic_masses
 from hotcent.multiatom_integrator import MultiAtomIntegrator
 from hotcent.slako import (dg, g, INTEGRAL_PAIRS, INTEGRALS, NUMSK,
                            print_integral_overview, select_integrals,
-                           tail_smoothening)
+                           tail_smoothening, write_skf)
 from hotcent.xc import XC_PW92, LibXC
 
 
@@ -185,61 +185,18 @@ class Onsite2cTable(MultiAtomIntegrator):
         format is only used when necessary (i.e. when there are f-electrons
         included in the valence).
         """
-        template = '%s-%s_onsite2c_%s.skf'
         sym1, sym2 = self.ela.get_symbol(), self.elb.get_symbol()
 
-        for bas1, valence1 in enumerate(self.ela.basis_sets):
-            for bas2, valence2 in enumerate(self.ela.basis_sets):
-                filename = template % (sym1 + '+'*bas1, sym1 + '+'*bas2, sym2)
+        for bas1a, valence1a in enumerate(self.ela.basis_sets):
+            for bas1b, valence1b in enumerate(self.ela.basis_sets):
+                template = '%s-%s_onsite2c_%s.skf'
+                filename = template % (sym1 + '+'*bas1a, sym1 + '+'*bas1b, sym2)
                 print('Writing to %s' % filename, file=self.txt, flush=True)
 
-                is_extended = any([nl[1] == 'f' for nl in valence1+valence2])
+                is_extended = any([nl[1] == 'f' for nl in valence1a+valence1b])
                 mass = atomic_masses[atomic_numbers[self.ela.get_symbol()]]
+                table = self.tables[(bas1a, bas1b)]
 
-                key = (bas1, bas2)
                 with open(filename, 'w') as f:
-                    self._write_skf(f, key, is_extended, mass)
-
-    def _write_skf(self, handle, key, is_extended, mass):
-        """ Write to SKF file format. """
-        # TODO: boilerplate (similar to Offsite2cTable._write_skf)
-        if is_extended:
-            print('@', file=handle)
-
-        grid_dist = self.Rgrid[1] - self.Rgrid[0]
-        grid_npts = len(self.tables[key])
-        nzeros = int(np.round(self.Rgrid[0] / grid_dist)) - 1
-        assert nzeros >= 0
-        grid_npts += nzeros
-        print("%.12f, %d" % (grid_dist, grid_npts), file=handle)
-
-        print("%.3f, 19*0.0" % mass, file=handle)
-
-        # Table containing the Slater-Koster integrals
-        if is_extended:
-            indices = range(NUMSK)
-        else:
-            indices = [INTEGRALS.index(name) for name in INTEGRALS
-                       if 'f' not in name[:2]]
-
-        for i in range(nzeros):
-            print('%d*0.0,' % len(indices), file=handle)
-
-        ct, theader = 0, ''
-        for i in range(len(self.tables[key])):
-            line = ''
-            for j in indices:
-                if self.tables[key][i, j] == 0:
-                    ct += 1
-                    theader = str(ct) + '*0.0 '
-                else:
-                    ct = 0
-                    line += theader
-                    theader = ''
-                    line += '{0: 1.12e}  '.format(self.tables[key][i, j])
-
-            if theader != '':
-                ct = 0
-                line += theader
-
-            print(line, file=handle)
+                    write_skf(f, self.Rgrid, table, False, is_extended,
+                              {}, {}, {}, 0., mass, False, {}, {})

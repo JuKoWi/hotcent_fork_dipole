@@ -282,3 +282,101 @@ def tail_smoothening(x, y):
                 raise RuntimeError(msg)
 
     return y
+
+
+def write_skf(handle, Rgrid, table, has_diagonal_data, is_extended, eigval,
+              hubval, occup, spe, mass, has_offdiagonal_data, offdiag_H,
+              offdiag_S):
+    """
+    Writes a parameter file in '.skf' format.
+
+    Parameters
+    ----------
+    handle : file handle
+        Handle of an open file.
+    Rgrid : list or array
+        Lists with interatomic distances.
+    table : nd.ndarray
+        Two-dimensional array with the Slater-Koster table.
+
+    Other parameters
+    ----------------
+    See Offsite2cTable.write()
+    """
+    assert not (has_diagonal_data and has_offdiagonal_data)
+
+    if is_extended:
+        print('@', file=handle)
+
+    grid_dist = Rgrid[1] - Rgrid[0]
+    grid_npts, numint = np.shape(table)
+    assert (numint % NUMSK) == 0
+    nzeros = int(np.round(Rgrid[0] / grid_dist)) - 1
+    assert nzeros >= 0
+    print("%.12f, %d" % (grid_dist, grid_npts + nzeros), file=handle)
+
+    if has_diagonal_data or has_offdiagonal_data:
+        if has_diagonal_data:
+            prefixes, dicts = ['E', 'U', 'f'], [eigval, hubval, occup]
+            fields = ['E_f', 'E_d', 'E_p', 'E_s', 'SPE', 'U_f', 'U_d',
+                      'U_p', 'U_s', 'f_f', 'f_d', 'f_p', 'f_s']
+            labels = {'SPE': spe}
+        elif has_offdiagonal_data:
+            prefixes, dicts = ['H', 'S'], [offdiag_H, offdiag_S]
+            fields = ['H_f', 'H_d', 'H_p', 'H_s',
+                      'S_f', 'S_d', 'S_p', 'S_s']
+            labels = {}
+
+        if not is_extended:
+            fields = [field for field in fields if field[-1] != 'f']
+
+        for prefix, d in zip(prefixes, dicts):
+            for l in ['s', 'p', 'd', 'f']:
+                if l in d:
+                    key = '%s_%s' % (prefix, l)
+                    labels[key] = d[l]
+
+        line = ' '.join(fields)
+        for field in fields:
+            val = labels[field] if field in labels else 0
+            s = '%d' % val if isinstance(val, int) else '%.6f' % val
+            line = line.replace(field, s)
+
+        print(line, file=handle)
+
+    print("%.3f, 19*0.0" % mass, file=handle)
+
+    # Table containing the Slater-Koster integrals
+    numtab = numint // NUMSK
+    assert numtab > 0
+
+    if is_extended:
+        indices = list(range(numtab*NUMSK))
+    else:
+        selected = [INTEGRALS.index(name) for name in INTEGRALS
+                    if 'f' not in name[:2]]
+        indices = []
+        for itab in range(numtab):
+            indices.extend([itab*NUMSK+j for j in selected])
+
+    for i in range(nzeros):
+        print('%d*0.0,' % len(indices), file=handle)
+
+    ct, theader = 0, ''
+    for i in range(grid_npts):
+        line = ''
+        for j in indices:
+            if table[i, j] == 0:
+                ct += 1
+                theader = str(ct) + '*0.0 '
+            else:
+                ct = 0
+                line += theader
+                theader = ''
+                line += '{0: 1.12e}  '.format(table[i, j])
+
+        if theader != '':
+            ct = 0
+            line += theader
+
+        print(line, file=handle)
