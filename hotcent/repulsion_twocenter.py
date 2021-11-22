@@ -66,30 +66,24 @@ class Repulsion2cTable(MultiAtomIntegrator):
 
         self.timer.stop('run_repulsion2c')
 
-    def write(self, filename=None, pair=None):
+    def write(self):
         """
-        Writes the two-center repulsive energies to file
+        Writes all two-center repulsive energies to file
         in the 'Spline block' style of the SKF format.
 
-        Parameters
-        ----------
-        filename : str, optional
-            Name of the file to write to. Defaults to the
-            '<el1>-<el2>_repulsion2c.spl' template.
-        pair : (str, str) tuple, optional
-            Selects which of the two Slater-Koster tables to write,
-            to be used in the heteronuclear case. Defaults to
-            the symbol pair of (self.ela, self.elb).
+        The filename template corresponds to
+        '<el1>-<el2>_repulsion2c.spl'.
         """
-        if pair is None:
-            pair = (self.ela.get_symbol(), self.elb.get_symbol())
+        lines = self.get_spline_block()
 
-        fn = '%s-%s_repulsion2c.spl' % pair if filename is None else filename
-        ext = fn[-4:]
-        assert ext == '.spl', 'Unknown repulsion2c file extension: ' + ext
+        for p, (e1, e2) in enumerate(self.pairs):
+            sym1, sym2 = e1.get_symbol(), e2.get_symbol()
+            template = '%s-%s_repulsion2c.spl'
+            filename = template % (sym1, sym2)
+            print('Writing to %s' % filename, file=self.txt, flush=True)
 
-        with open(fn, 'w') as f:
-            f.write(self.get_spline_block())
+            with open(filename, 'w') as f:
+                f.write(lines)
 
     def get_spline_block(self):
         """
