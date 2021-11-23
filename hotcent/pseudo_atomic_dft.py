@@ -9,6 +9,7 @@ import numpy as np
 from hotcent.atomic_base import NOT_SOLVED_MESSAGE
 from hotcent.atomic_dft import AtomicDFT
 from hotcent.confinement import ZeroConfinement
+from hotcent.interpolation import build_interpolator
 from hotcent.orbitals import ANGULAR_MOMENTUM
 try:
     import matplotlib.pyplot as plt
@@ -47,9 +48,8 @@ class PseudoAtomicDFT(AtomicDFT):
         """ Rnl_free(r, '2p') """
         assert self.solved, NOT_SOLVED_MESSAGE
         if self.Rnl_free_fct[nl] is None:
-            self.Rnl_free_fct[nl] = self.construct_wfn_interpolator(self.rgrid,
-                                                           self.Rnlg_free[nl],
-                                                           nl)
+            self.Rnl_free_fct[nl] = build_interpolator(self.rgrid,
+                                                       self.Rnlg_free[nl])
         return self.Rnl_free_fct[nl](r, der=der)
 
     def calculate_veff(self, dens):

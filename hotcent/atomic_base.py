@@ -19,7 +19,7 @@ from scipy.optimize import minimize
 from ase.data import atomic_numbers, covalent_radii
 from ase.units import Bohr, Ha
 from hotcent.confinement import Confinement, ZeroConfinement
-from hotcent.interpolation import CubicSplineFunction
+from hotcent.interpolation import build_interpolator, CubicSplineFunction
 from hotcent.orbitals import ANGULAR_MOMENTUM
 from hotcent.phillips_kleinman import PhillipsKleinmanPP
 from hotcent.timing import Timer
@@ -120,6 +120,10 @@ class AtomicBase:
 
         self.set_confinement(confinement)
         self.set_wf_confinement(wf_confinement)
+        self.rcutnl = {}
+        for nl, conf in self.wf_confinement.items():
+            if nl in self.valence and hasattr(conf, 'rc'):
+                self.rcutnl[nl] = conf.rc
 
         self.timer = Timer('Atomic', txt=self.txt, enabled=self.timing)
 
@@ -273,70 +277,36 @@ class AtomicBase:
             if abs(wf) > fractional_limit * wfmax:
                 return r
 
-    def construct_wfn_interpolator(self, x, y, nl):
-        """ Returns a (cubic) interpolator for wave functions, taking
-        into account the cut-off radii of certain confinement schemes.
-        """
-        rc = None
-        if nl in self.wf_confinement:
-            if hasattr(self.wf_confinement[nl], 'rc'):
-                rc = self.wf_confinement[nl].rc
-
-        if rc is None:
-            fct = CubicSplineFunction(x, y)
-        else:
-            N = np.argmax(x > rc)
-            fct = CubicSplineFunction(x[:N], y[:N],
-                                      bc_type=('natural', 'clamped'))
-        return fct
-
     def Rnl(self, r, nl, der=0):
         """ Rnl(r, '2p') """
         assert self.solved, NOT_SOLVED_MESSAGE
         if self.Rnl_fct[nl] is None:
-            self.Rnl_fct[nl] = self.construct_wfn_interpolator(self.rgrid,
-                                                               self.Rnlg[nl],
-                                                               nl)
+            rc = self.rcutnl[nl] if nl in self.rcutnl else None
+            self.Rnl_fct[nl] = build_interpolator(self.rgrid, self.Rnlg[nl], rc)
         return self.Rnl_fct[nl](r, der=der)
 
     def unl(self, r, nl, der=0):
         """ unl(r, '2p') = Rnl(r, '2p') / r """
         assert self.solved, NOT_SOLVED_MESSAGE
         if self.unl_fct[nl] is None:
-            self.unl_fct[nl] = self.construct_wfn_interpolator(self.rgrid,
-                                                               self.unlg[nl],
-                                                               nl)
+            rc = self.rcutnl[nl] if nl in self.rcutnl else None
+            self.unl_fct[nl] = build_interpolator(self.rgrid, self.unlg[nl], rc)
         return self.unl_fct[nl](r, der=der)
 
     def electron_density(self, r, der=0, only_valence=False):
         """ Return the all-electron density at r. """
         assert self.solved, NOT_SOLVED_MESSAGE
 
-        # Find the largest wave-function cutoff radius (if any)
-        rcmax = 0
-        nlmax = None
-        for nl in self.wf_confinement:
-            if hasattr(self.wf_confinement[nl], 'rc'):
-                rc = self.wf_confinement[nl].rc
-                if rc > rcmax:
-                    rcmax = rc
-                    nlmax = nl
+        if self.densval_fct is None or self.dens_fct is None:
+            # Find the largest (minimal basis) wave-function cutoff radius
+            rcs = [self.rcutnl[nl] for nl in self.valence if nl in self.rcutnl]
+            rc = max(rcs) if len(rcs) > 0 else None
+            self.dens_fct = build_interpolator(self.rgrid, self.dens, rc)
+            self.densval_fct = build_interpolator(self.rgrid, self.densval, rc)
 
         if only_valence:
-            if self.densval_fct is None and nlmax is None:
-                self.densval_fct = CubicSplineFunction(self.rgrid, self.densval)
-            elif self.densval_fct is None:
-                self.densval_fct = self.construct_wfn_interpolator(self.rgrid,
-                                                                   self.densval,
-                                                                   nlmax)
             return self.densval_fct(r, der=der)
         else:
-            if self.dens_fct is None and nlmax is None:
-                self.dens_fct = CubicSplineFunction(self.rgrid, self.dens)
-            elif self.dens_fct is None:
-                self.dens_fct = self.construct_wfn_interpolator(self.rgrid,
-                                                                self.dens,
-                                                                nlmax)
             return self.dens_fct(r, der=der)
 
     def nuclear_potential(self,r):
@@ -356,7 +326,7 @@ class AtomicBase:
         """ Return effective potential at r or its derivatives. """
         assert self.solved, NOT_SOLVED_MESSAGE
         if self.veff_fct is None:
-            self.veff_fct = CubicSplineFunction(self.rgrid, self.veff)
+            self.veff_fct = build_interpolator(self.rgrid, self.veff)
         return self.veff_fct(r, der=der)
 
     def hartree_potential(self, r, only_valence=False):
@@ -364,11 +334,11 @@ class AtomicBase:
         assert self.solved, NOT_SOLVED_MESSAGE
         if only_valence:
             if self.vharval_fct is None:
-                self.vharval_fct = CubicSplineFunction(self.rgrid, self.vharval)
+                self.vharval_fct = build_interpolator(self.rgrid, self.vharval)
             return self.vharval_fct(r)
         else:
             if self.vhar_fct is None:
-                self.vhar_fct = CubicSplineFunction(self.rgrid, self.vhar)
+                self.vhar_fct = build_interpolator(self.rgrid, self.vhar)
             return self.vhar_fct(r)
 
     def plot_Rnl(self, filename=None, only_valence=True):
@@ -845,9 +815,6 @@ class AtomicBase:
                 norm2 = self.grid.integrate(u**2)
             r_split = self.rgrid[index]
 
-            print('Split radius ({0}): {1:.3f}'.format(nl, r_split),
-                  file=self.txt)
-
             # Fit the polynomial coefficients
             l = ANGULAR_MOMENTUM[nl[1]]
             f0 = self.Rnl(r_split, nl, der=0)
@@ -861,15 +828,20 @@ class AtomicBase:
             norm2 = self.grid.integrate(u**2)
             u /= np.sqrt(norm2)
             self.smoothen_tail(u, index)
-            return u
+            return u, r_split
 
         self.basis_sets = [[nl for nl in self.valence], []]
         for nl in self.valence:
             nldz = nl + '+'
-            self.unlg[nldz] = get_split_valence_unl(nl, tail_norm)
+
+            self.unlg[nldz], r_split = get_split_valence_unl(nl, tail_norm)
+            print('Split radius ({0}): {1:.3f}'.format(nldz, r_split),
+                  file=self.txt)
+
             self.unl_fct[nldz] = None
             self.Rnlg[nldz] = self.unlg[nldz] / self.rgrid
             self.Rnl_fct[nldz] = None
+            self.rcutnl[nldz] = r_split
             self.basis_sets[1].append(nldz)
 
         self.zetacount = 2

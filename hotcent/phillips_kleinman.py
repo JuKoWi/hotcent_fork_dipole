@@ -5,6 +5,7 @@
 #   SPDX-License-Identifier: GPL-3.0-or-later                                 #
 #-----------------------------------------------------------------------------#
 from ase.data import atomic_numbers
+from hotcent.interpolation import build_interpolator
 from hotcent.separable_pseudopotential import SeparablePP
 
 
@@ -45,8 +46,7 @@ class PhillipsKleinmanPP(SeparablePP):
 
         for n, l, nl in e3.list_states():
             if nl not in e3.valence:
-                self.projectors[nl] = e3.construct_wfn_interpolator(e3.rgrid,
-                                                                e3.Rnlg[nl], nl)
+                self.projectors[nl] = build_interpolator(e3.rgrid, e3.Rnlg[nl])
                 self.energies[nl] = -e3.get_eigenvalue(nl)
 
                 for valence in e3.basis_sets:
