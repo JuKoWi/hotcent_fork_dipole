@@ -146,8 +146,6 @@ class AtomicBase:
         self.vharval_fct = None
         self.energies = {}
         self.solved = False
-
-        self.zetacount = 1
         self.basis_sets = [valence]
 
         # Set default 'pseudopotential':
@@ -844,7 +842,6 @@ class AtomicBase:
             self.rcutnl[nldz] = r_split
             self.basis_sets[1].append(nldz)
 
-        self.zetacount = 2
         print(file=self.txt)
         return
 
