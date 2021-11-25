@@ -19,7 +19,8 @@ class Onsite2cTable(MultiAtomIntegrator):
                                      **kwargs)
 
     def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
-            smoothen_tails=True, shift=True, superposition='density', xc='LDA'):
+            smoothen_tails=True, shift=False, superposition='density',
+            xc='LDA'):
         """
         Calculates on-site two-center Hamiltonian integrals.
 
@@ -27,7 +28,7 @@ class Onsite2cTable(MultiAtomIntegrator):
         ----------
         shift: bool, optional
             Whether to apply rigid shifts such that the integrals
-            at the table ends are zero.
+            at the table ends are zero (default: False).
 
         Other parameters
         ----------------
