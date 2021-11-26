@@ -57,8 +57,11 @@ class Repulsion2cTable(MultiAtomIntegrator):
             self.erep[i] = self.calculate(self.ela, self.elb, R, grid, area,
                                           xc=xc)
 
-        if shift:
-            self.erep[:] -= self.erep[-1]
+        if shift and not np.allclose(self.erep, 0):
+            for i in range(N-1, 1, -1):
+                if abs(self.erep[i]) > 0:
+                    self.erep[:i+1] -= self.erep[i]
+                    break
 
         if smoothen_tails:
             # Smooth the curves near the cutoff

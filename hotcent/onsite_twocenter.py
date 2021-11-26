@@ -79,8 +79,11 @@ class Onsite2cTable(MultiAtomIntegrator):
 
         for key in self.tables:
             for i in range(NUMSK):
-                if shift:
-                    self.tables[key][:, i] -= self.tables[key][-1, i]
+                if shift and not np.allclose(self.tables[key][:, i], 0):
+                    for j in range(N-1, 1, -1):
+                        if abs(self.tables[key][j, i]) > 0:
+                            self.tables[key][:j+1, i] -= self.tables[key][j, i]
+                            break
 
                 if smoothen_tails:
                     self.tables[key][:, i] = tail_smoothening(self.Rgrid,
