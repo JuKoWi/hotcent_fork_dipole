@@ -1,4 +1,4 @@
-""" Tests for a double-numerical basis set for oxygen.
+""" Tests with double-zeta and single-zeta-plus-polarization basis sets for O.
 
 Reference values come from the BeckeHarris tool, unless mentioned otherwise.
 """
@@ -12,12 +12,13 @@ from hotcent.slako import INTEGRALS
 
 R1 = 2.4
 
-LDA = 'LDA'
+SZP = 'szp'
+DZ = 'dz'
 
 
 @pytest.fixture(scope='module')
 def atom(request):
-    xcname = request.param
+    size = request.param
 
     configuration = '[He] 2s2 2p4'
 
@@ -33,7 +34,7 @@ def atom(request):
                             verbose=True)
 
     atom = PseudoAtomicDFT(element, pp,
-                           xc=xcname,
+                           xc='LDA',
                            nodegpts=1000,
                            valence=valence,
                            configuration=configuration,
@@ -44,15 +45,15 @@ def atom(request):
                            txt=None,
                            )
     atom.run()
-    atom.generate_nonminimal_basis(size='dz', tail_norm=0.15)
+    atom.generate_nonminimal_basis(size=size, tail_norm=0.15, r_pol=1.125)
     atom.pp.build_projectors(atom)
     atom.pp.build_overlaps(atom, atom, rmin=1., rmax=4.)
     return atom
 
 
-@pytest.mark.parametrize('atom', [LDA], indirect=True)
+@pytest.mark.parametrize('atom', [SZP, DZ], indirect=True)
 def test_on1c(atom):
-    xc = atom.xcname
+    size = atom.basis_size
 
     for valence in atom.basis_sets:
         for nl in valence:
@@ -60,7 +61,12 @@ def test_on1c(atom):
             assert U > 0, 'Negative hubbard value for {0}'.format(nl)
 
     HS_ref = {
-        LDA: {
+        SZP: {
+            ('2s', '2s'): (-0.79874591, 0.99999468),
+            ('2p', '2p'): (-0.25260263, 0.99999468),
+            ('0d', '0d'): (1.68192139, 0.99999468),
+        },
+        DZ: {
             ('2s', '2s'): (-0.79874591, 0.99999468),
             ('2p', '2p'): (-0.25260263, 0.99999468),
             ('2s', '2s+'): (-0.73938783, 0.94299966),
@@ -74,7 +80,7 @@ def test_on1c(atom):
 
     stol = 1e-5
     msg = 'Too large error for {0}_{1}-{2} (value={3})'
-    for (nl1, nl2), ref in HS_ref[xc].items():
+    for (nl1, nl2), ref in HS_ref[size].items():
         H, S = atom.get_onecenter_integrals(nl1, nl2)
         htol = 1e-4
         if '+' in nl2:
@@ -90,11 +96,12 @@ def test_on1c(atom):
 
 
 @pytest.mark.parametrize('R', [R1])
-@pytest.mark.parametrize('atom', [LDA], indirect=True)
+@pytest.mark.parametrize('atom', [SZP, DZ], indirect=True)
 def test_off2c(R, atom):
     from hotcent.offsite_twocenter import Offsite2cTable
 
     xc = atom.xcname
+    size = atom.basis_size
 
     rmin, dr, N = R, R, 2
     off2c = Offsite2cTable(atom, atom)
@@ -103,7 +110,21 @@ def test_off2c(R, atom):
     HS = off2c.tables
 
     HS_ref = {
-        (R1, LDA): {
+        (R1, SZP): {
+            (0, 0, 0): {
+                'sss': (-0.37502703, 0.24459516),
+                'sps': (0.43535478, -0.34981181),
+                'sds': (-0.24666439, 0.24752688),
+                'pps': (0.30997467, -0.28858338),
+                'ppp': (-0.15800151, 0.18783366),
+                'pds': (-0.12496644, 0.22400675),
+                'pdp': (0.11533162, -0.21547920),
+                'dds': (0.39997486, 0.18863603),
+                'ddp': (-0.28419754, -0.36484078),
+                'ddd': (0.00558790, 0.10273658),
+            },
+        },
+        (R1, DZ): {
             (0, 0, 0): {
                 'sss': (-0.37502703, 0.24459516),
                 'sps': (0.43535478, -0.34981181),
@@ -134,11 +155,12 @@ def test_off2c(R, atom):
     stol = 5e-5
     msg = 'Too large error for {0}_{1} [{2}] (value={3})'
 
-    for key, integrals_refs in HS_ref[(R, xc)].items():
+    for key, integrals_refs in HS_ref[(R, size)].items():
         for integral, ref in integrals_refs.items():
             index = INTEGRALS.index(integral)
             htol = 5e-5
-            if (key[1] > 0 or key[2] > 0):
+            if (size == DZ and (key[1] > 0 or key[2] > 0)) or \
+               (size == SZP and integral[1] == 'd'):
                 # Larger deviations related to kinetic energy
                 htol = 5e-4
 
@@ -152,11 +174,12 @@ def test_off2c(R, atom):
 
 
 @pytest.mark.parametrize('R', [R1])
-@pytest.mark.parametrize('atom', [LDA], indirect=True)
+@pytest.mark.parametrize('atom', [SZP, DZ], indirect=True)
 def test_on2c(R, atom):
     from hotcent.onsite_twocenter import Onsite2cTable
 
     xc = atom.xcname
+    size = atom.basis_size
 
     rmin, dr, N = R, R, 2
     on2c = Onsite2cTable(atom, atom)
@@ -165,7 +188,21 @@ def test_on2c(R, atom):
     H = on2c.tables
 
     H_ref = {
-        (R1, LDA): {
+        (R1, SZP): {
+            (0, 0): {
+                'sps': -0.09856299,
+                'sss': -0.06792868,
+                'sds': -0.10830885,
+                'pps': -0.16365362,
+                'ppp': -0.03296093,
+                'pds': -0.18812456,
+                'pdp': -0.04953338,
+                'dds': -0.27832485,
+                'ddp': -0.10611034,
+                'ddd': -0.02447832,
+            },
+        },
+        (R1, DZ): {
             (0, 0): {
                 'sss': -0.06792868,
                 'sps': -0.09856299,
@@ -194,13 +231,14 @@ def test_on2c(R, atom):
     }
 
     msg = 'Too large error for H_{0} [{1}] (value={2})'
+    htol = 5e-5 if size == SZP else 2e-5
 
-    for key, integrals_refs in H_ref[(R, xc)].items():
+    for key, integrals_refs in H_ref[(R, size)].items():
         for integral, ref in integrals_refs.items():
             index = INTEGRALS.index(integral)
             val = H[key][0, index]
             diff = abs(val - ref)
-            assert diff < 2e-5, msg.format(integral, key, val)
+            assert diff < htol, msg.format(integral, key, val)
 
 
 @pytest.fixture(scope='module')
@@ -213,19 +251,69 @@ def grids(request):
 
 @pytest.mark.parametrize('nphi', ['adaptive', 13])
 @pytest.mark.parametrize('grids', [R1], indirect=True)
-@pytest.mark.parametrize('atom', [LDA], indirect=True)
+@pytest.mark.parametrize('atom', [SZP, DZ], indirect=True)
 def test_off3c(nphi, grids, atom):
     from hotcent.offsite_threecenter import Offsite3cTable
 
     R, Rgrid, Sgrid, Tgrid = grids
     xc = atom.xcname
+    size = atom.basis_size
 
     off3c = Offsite3cTable(atom, atom)
     H = off3c.run(atom, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc,
                   ntheta=300, nr=100, nphi=nphi, write=False)
 
     H_ref = {
-        (R1, LDA): {
+        (R1, SZP): {
+            ('O', 0, 0, 0): {
+                's_s': -0.14513380,
+                's_px': -0.07153752,
+                's_pz': 0.23273429,
+                's_dxz': 0.12409047,
+                's_dx2-y2': -0.00710350,
+                's_dz2': -0.25429537,
+                'px_s': -0.07592540,
+                'px_px': -0.08057081,
+                'px_pz': 0.12971555,
+                'px_dxz': 0.11846876,
+                'px_dx2-y2': -0.01898184,
+                'px_dz2': -0.10411828,
+                'py_py': -0.06718708,
+                'py_dxy': -0.05147703,
+                'py_dyz': 0.13823137,
+                'pz_s': -0.19588074,
+                'pz_px': -0.09415060,
+                'pz_pz': 0.27737727,
+                'pz_dxz': 0.17435741,
+                'pz_dx2-y2': -0.02020218,
+                'pz_dz2': -0.32433343,
+                'dxy_py': -0.06224529,
+                'dxy_dxy': -0.08506329,
+                'dxy_dyz': 0.13050945,
+                'dyz_py': -0.11445817,
+                'dyz_dxy': -0.09873114,
+                'dyz_dyz': 0.25661722,
+                'dxz_s': -0.13824009,
+                'dxz_px': -0.14477121,
+                'dxz_pz': 0.18976408,
+                'dxz_dxz': 0.27665309,
+                'dxz_dx2-y2': -0.06128564,
+                'dxz_dz2': -0.16439247,
+                'dx2-y2_s': -0.00895321,
+                'dx2-y2_px': -0.03690125,
+                'dx2-y2_pz': 0.02266394,
+                'dx2-y2_dxz': 0.02808808,
+                'dx2-y2_dx2-y2': -0.03556367,
+                'dx2-y2_dz2': 0.01959273,
+                'dz2_s': -0.19514948,
+                'dz2_px': -0.08112433,
+                'dz2_pz': 0.24717968,
+                'dz2_dxz': 0.19678484,
+                'dz2_dx2-y2': -0.03410039,
+                'dz2_dz2': -0.30908415,
+            },
+        },
+        (R1, DZ): {
             ('O', 0, 0, 0): {
                 's_s': -0.14513380,
                 's_px': -0.07153752,
@@ -278,29 +366,80 @@ def test_off3c(nphi, grids, atom):
     }
 
     msg = 'Too large error for H_{0} [{1}] (value={2})'
+    htol = 4e-4 if size == SZP else 1e-4
 
-    for key, integrals_refs in H_ref[(R, xc)].items():
+    for key, integrals_refs in H_ref[(R, size)].items():
         for integral, ref in integrals_refs.items():
             val = H[key][integral][0][1]
             diff = abs(val - ref)
-            assert diff < 1e-4, msg.format(integral, key, val)
+            assert diff < htol, msg.format(integral, key, val)
 
 
 @pytest.mark.parametrize('nphi', ['adaptive', 13])
 @pytest.mark.parametrize('grids', [R1], indirect=True)
-@pytest.mark.parametrize('atom', [LDA], indirect=True)
+@pytest.mark.parametrize('atom', [SZP, DZ], indirect=True)
 def test_on3c(nphi, grids, atom):
     from hotcent.onsite_threecenter import Onsite3cTable
 
     R, Rgrid, Sgrid, Tgrid = grids
     xc = atom.xcname
+    size = atom.basis_size
 
     on3c = Onsite3cTable(atom, atom)
     H = on3c.run(atom, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc,
                  ntheta=300, nr=100, nphi=nphi, write=False)
 
     H_ref = {
-        (R1, LDA): {
+        (R1, SZP): {
+            (0, 0, 0): {
+                's_s': 0.00708275,
+                's_px': 0.00279041,
+                's_pz': 0.01040898,
+                's_dxz': 0.00497859,
+                's_dx2-y2': 0.00038799,
+                's_dz2': 0.01062247,
+                'px_s': 0.00279041,
+                'px_px': 0.00447262,
+                'px_pz': 0.00365672,
+                'px_dxz': 0.00725993,
+                'px_dx2-y2': 0.00161921,
+                'px_dz2': 0.00211912,
+                'py_py': 0.00389250,
+                'py_dxy': 0.00173547,
+                'py_dyz': 0.00650814,
+                'pz_s': 0.01040898,
+                'pz_px': 0.00365672,
+                'pz_pz': 0.01691855,
+                'pz_dxz': 0.00702511,
+                'pz_dx2-y2': 0.00037590,
+                'pz_dz2': 0.01826269,
+                'dxy_py': 0.00173547,
+                'dxy_dxy': 0.00388589,
+                'dxy_dyz': 0.00277126,
+                'dyz_py': 0.00650814,
+                'dyz_dxy': 0.00277126,
+                'dyz_dyz': 0.01384782,
+                'dxz_s': 0.00497859,
+                'dxz_px': 0.00725993,
+                'dxz_pz': 0.00702511,
+                'dxz_dxz': 0.01526283,
+                'dxz_dx2-y2': 0.00251854,
+                'dxz_dz2': 0.00608610,
+                'dx2-y2_s': 0.00038799,
+                'dx2-y2_px': 0.00161921,
+                'dx2-y2_pz': 0.00037590,
+                'dx2-y2_dxz': 0.00251854,
+                'dx2-y2_dx2-y2': 0.00376423,
+                'dx2-y2_dz2': 0.00003398,
+                'dz2_s': 0.01062247,
+                'dz2_px': 0.00211912,
+                'dz2_pz': 0.01826269,
+                'dz2_dxz': 0.00608610,
+                'dz2_dx2-y2': 0.00003398,
+                'dz2_dz2': 0.02587294,
+            },
+        },
+        (R1, DZ): {
             (0, 0, 0): {
                 's_s': 0.00708275,
                 's_px': 0.00279041,
@@ -353,9 +492,10 @@ def test_on3c(nphi, grids, atom):
     }
 
     msg = 'Too large error for H_{0} [{1}] (value={2})'
+    htol = 4e-6 if size == SZP else 1e-6
 
-    for key, integrals_refs in H_ref[(R, xc)].items():
+    for key, integrals_refs in H_ref[(R, size)].items():
         for integral, ref in integrals_refs.items():
             val = H[key][integral][0][1]
             diff = abs(val - ref)
-            assert diff < 1e-6, msg.format(integral, key, val)
+            assert diff < htol, msg.format(integral, key, val)
