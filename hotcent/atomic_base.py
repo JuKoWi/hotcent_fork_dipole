@@ -147,6 +147,7 @@ class AtomicBase:
         self.energies = {}
         self.solved = False
         self.basis_sets = [valence]
+        self.basis_size = 'sz'
 
         # Set default 'pseudopotential':
         self.pp = PhillipsKleinmanPP(self.symbol)
@@ -665,13 +666,10 @@ class AtomicBase:
         """
         assert scheme in [None, 'central', 'forward', 'backward']
 
-        nl_bare = nl[:2]
-        bas = self.get_basis_set_index(nl)
-        is_minimal = bas == 0
+        is_minimal = nl in self.valence
 
         if self.perturbative_confinement:
             assert self.solved, NOT_SOLVED_MESSAGE
-            assert nl_bare in self.valence
         else:
             assert is_minimal, 'Non-minimal basis sets only implemented' + \
                    ' for the perturbative confinement scheme.'
@@ -689,7 +687,7 @@ class AtomicBase:
                 if not is_minimal:
                     # Change density and number of electrons
                     # due to non-minimal basis function occupation
-                    self.configuration[nl_bare] += diff
+                    self.configuration[self.valence[0]] += diff
                     dens += diff * self.unlg[nl]**2 \
                             / (4 * np.pi * self.rgrid**2)
                 self.veff = self.calculate_veff(dens)
@@ -719,9 +717,9 @@ class AtomicBase:
             return e
 
         if scheme is None:
-            n, l = nl2tuple(nl_bare)
+            n, l = nl2tuple(nl[:2])
             max_occup = 2 * (2*l + 1)
-            occup = self.configuration[nl_bare] if bas == 0 else 0
+            occup = self.configuration[nl] if is_minimal else 0
             if occup == 0:
                 scheme = 'forward'
             elif occup == max_occup:
@@ -743,17 +741,18 @@ class AtomicBase:
         for direction in directions[scheme]:
             diff = direction * delta
             if is_minimal:
-                configuration[nl_bare] += diff
+                configuration[nl] += diff
                 s = ' '.join([nl2 + '%.1f' % configuration[nl2]
                               for nl2 in self.valence])
                 print('\n%s Configuration %s %s' % (bar, s, bar), file=self.txt)
                 energies[direction] = get_total_energy(configuration)
-                configuration[nl_bare] -= diff
+                configuration[nl] -= diff
             else:
                 energies[direction] = get_total_energy(configuration, diff=diff)
 
         # Check that the original electronic configuration has been restored
-        assert self.configuration[nl_bare] == configuration[nl_bare]
+        if is_minimal:
+            assert self.configuration[nl] == configuration[nl]
 
         if scheme in ['forward', 'central']:
             EA = (energies[0] - energies[1]) / delta
@@ -771,7 +770,8 @@ class AtomicBase:
 
         return U
 
-    def generate_nonminimal_basis(self, size='dz', tail_norm=None):
+    def generate_nonminimal_basis(self, size, tail_norm=None, l_pol=None,
+                                  r_pol=None):
         """
         Adds more basis functions to the default minimal basis.
 
@@ -779,11 +779,16 @@ class AtomicBase:
         a "split-valence" scheme (see Artacho et al.,
         Phys. stat. sol. (b) 215, 809 (1999)).
 
+        Polarization functions correspond to so-called "quasi-Gaussians"
+        (see Larsen et al., Phys. Rev. B 80, 105112 (2009)).
+
         Parameters
         ----------
-        size : str, optional
+        size : str
             Size of the non-minimal basis set to be generated.
-            The currently only choice is 'dz' ('double-zeta').
+            The currently allowed choices are 'dz' ('double-zeta'),
+            'szp' ('single-zeta with polarization') and 'dzp'
+            ('double-zeta with polarization'). The default is 'dz'.
         tail_norm : None or float, optional
             Parameter determining the radius at which a double-zeta
             function is 'split off' from the parent single-zeta in
@@ -791,16 +796,47 @@ class AtomicBase:
             the norm of the corresponding tail equals the given target.
             By default, tail norms of 0.5 are chosen for hydrogen
             and 0.15 for all other elements.
+        l_pol : None or float, optional
+            Angular momentum of the polarizing quasi-Gaussian.
+            If None (the default), the first angular momentum is
+            used which does not appear in the minimal basis.
+        r_pol : None or float, optional
+            Characteristic radius for the polarizing quasi-Gaussian.
         """
         assert self.solved, NOT_SOLVED_MESSAGE
-        assert size == 'dz', 'Only a double-zeta basis is currently implemented'
+        assert size in ['dz', 'szp', 'dzp'], 'Unknown basis size: %s' % size
 
         print('Generating {0} basis for {1}'.format(size, self.symbol),
               file=self.txt)
 
-        if tail_norm is None:
-            tail_norm = 0.5 if self.symbol == 'H' else 0.15
-        print('Tail norm: {0:.3f}'.format(tail_norm), file=self.txt)
+        l_val = [ANGULAR_MOMENTUM[nl[1]] for nl in self.valence]
+        assert len(set(l_val)) == len(l_val), \
+               'Minimal basis should not contain multiple basis functions ' + \
+               'with the same angular momentum'
+
+        needs_dz = size in ['dz', 'dzp']
+        if needs_dz:
+            if tail_norm is None:
+                tail_norm = 0.5 if self.symbol == 'H' else 0.15
+            assert tail_norm > 0
+            print('Tail norm: {0:.3f}'.format(tail_norm), file=self.txt)
+
+        needs_pol = size in ['szp', 'dzp']
+        if needs_pol:
+            assert r_pol is not None, 'r_pol value is needed for polarization'
+            assert r_pol > 0
+            print('Characteristic radius: {0:.3f}'.format(r_pol), file=self.txt)
+            if l_pol is None:
+                for l_pol in sorted(ANGULAR_MOMENTUM.values()):
+                    if l_pol not in l_val:
+                        break
+                else:
+                    raise ValueError('Only polarization function functions '
+                                     'up to l={0} are available'.format(l_pol))
+            else:
+                assert 0 <= l_pol <= 3 and l_pol not in l_val
+            print('Polarization l: {0}'.format(l_pol), file=self.txt)
+
 
         def get_split_valence_unl(nl, tail_norm):
             # Find split radius based on the tail norm
@@ -828,25 +864,58 @@ class AtomicBase:
             self.smoothen_tail(u, index)
             return u, r_split
 
-        self.basis_sets = [[nl for nl in self.valence], []]
-        for nl in self.valence:
-            nldz = nl + '+'
+        def get_quasi_gaussian_unl(nl, l_pol, r_pol, r_cut):
+            alpha = 1. / r_pol**2
+            alpha_rc2 = (r_cut / r_pol)**2
+            a = (1 + alpha_rc2) * np.exp(-alpha_rc2)
+            b = alpha * np.exp(-alpha_rc2)
 
-            self.unlg[nldz], r_split = get_split_valence_unl(nl, tail_norm)
-            print('Split radius ({0}): {1:.3f}'.format(nldz, r_split),
-                  file=self.txt)
+            u = self.rgrid**(l_pol+1) * (np.exp(-alpha * self.rgrid**2) \
+                                         - (a - b*self.rgrid**2))
+            index = np.argmax(self.rgrid > r_cut)
+            u[index:] = 0.
+            norm2 = self.grid.integrate(u**2)
+            u /= np.sqrt(norm2)
+            self.smoothen_tail(u, index)
+            return u
 
-            self.unl_fct[nldz] = None
-            self.Rnlg[nldz] = self.unlg[nldz] / self.rgrid
-            self.Rnl_fct[nldz] = None
-            self.rcutnl[nldz] = r_split
-            self.basis_sets[1].append(nldz)
+        self.basis_size = size
+        self.basis_sets = [[nl for nl in self.valence]]
 
-        print(file=self.txt)
+        if needs_dz:
+            self.basis_sets.append([])
+
+            for nl in self.valence:
+                nldz = nl + '+'
+
+                self.unlg[nldz], r_split = get_split_valence_unl(nl, tail_norm)
+                print('Split radius ({0}): {1:.3f}'.format(nldz, r_split),
+                      file=self.txt)
+
+                self.unl_fct[nldz] = None
+                self.Rnlg[nldz] = self.unlg[nldz] / self.rgrid
+                self.Rnl_fct[nldz] = None
+                self.rcutnl[nldz] = r_split
+                self.basis_sets[1].append(nldz)
+
+            print(file=self.txt)
+
+        if needs_pol:
+            nlp = '0' + 'spdf'[l_pol]
+            r_cut = max([self.rcutnl[nl] for nl in self.valence])
+            self.unlg[nlp] = get_quasi_gaussian_unl(nlp, l_pol, r_pol, r_cut)
+            self.unl_fct[nlp] = None
+            self.Rnlg[nlp] = self.unlg[nlp] / self.rgrid
+            self.Rnl_fct[nlp] = None
+            self.rcutnl[nlp] = r_cut
+            self.basis_sets[0].append(nlp)
+            print(file=self.txt)
+
         return
 
     def get_basis_set_index(self, nl):
-        if nl.startswith('proj_'):
+        if nl.startswith('proj_') or nl.startswith('0'):
+            assert '+' not in nl, nl
             return 0
         else:
             assert nl[:2] in self.valence, nl
