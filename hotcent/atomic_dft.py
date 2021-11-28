@@ -348,7 +348,6 @@ class AtomicDFT(AtomicBase):
         self.densval = self.calculate_density(self.unlg, only_valence=True)
         self.vharval = self.calculate_hartree_potential(self.densval,
                                                         only_valence=True)
-        exc, self.vxc = self.xc.evaluate(self.dens, self.grid)
 
         if write is not None:
             with open(write, 'w') as f:
