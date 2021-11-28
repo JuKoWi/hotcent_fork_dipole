@@ -39,10 +39,11 @@ class PseudoAtomicDFT(AtomicDFT):
         header = '\n'.join(['*' * len(header), header, '*' * len(header)])
         print(header, file=self.txt)
 
-    def electron_density(self, r, der=0, only_valence=True):
-        assert only_valence, 'PseudoAtomicDFT calculator does not have ' + \
-                             'access to the all-electron electron density'
-        return AtomicDFT.electron_density(self, r, der=der, only_valence=True)
+    def add_core_electron_density(self, dens):
+        """ Returns the given density plus any (partial)
+        core electron density.
+        """
+        return dens + self.pp.get_core_density(self.rgrid)
 
     def Rnl_free(self, r, nl, der=0):
         """ Rnl_free(r, '2p') """
@@ -57,7 +58,8 @@ class PseudoAtomicDFT(AtomicDFT):
         pseudopotential contributions) from the given density.
         """
         vhar = self.calculate_hartree_potential(dens, only_valence=True)
-        exc, vxc = self.xc.evaluate(dens, self.grid)
+        dens_tot = self.add_core_electron_density(dens)
+        exc, vxc = self.xc.evaluate(dens_tot, self.grid)
         vconf = self.confinement(self.rgrid)
         vloc = self.pp.local_potential(self.rgrid)
         return vhar + vxc + vconf + vloc
@@ -136,14 +138,13 @@ class PseudoAtomicDFT(AtomicDFT):
                 self.unlg[nl] = unlg_free[nl]
                 self.Rnlg[nl] = self.Rnlg_free[nl]
 
-        self.dens = self.calculate_density(self.unlg, only_valence=True)
-        self.vhar = self.calculate_hartree_potential(self.dens,
-                                                     only_valence=True)
-        self.densval = self.dens
-        self.vharval = self.vhar
-        exc, self.vxc = self.xc.evaluate(self.dens, self.grid)
+        self.densval = self.calculate_density(self.unlg, only_valence=True)
+        self.dens = self.add_core_electron_density(self.densval)
+        self.vharval = self.calculate_hartree_potential(self.densval,
+                                                        only_valence=True)
+        self.vhar = self.vharval
         self.confinement = ZeroConfinement()
-        self.veff = self.calculate_veff(self.dens)
+        self.veff = self.calculate_veff(self.densval)
 
         if write is not None:
             with open(write, 'w') as f:
@@ -160,7 +161,8 @@ class PseudoAtomicDFT(AtomicDFT):
         # character, calculated with V_eff = V_eff,free + V_confinement.
         enl_sc = {nl: self.get_onecenter_integrals(nl, nl)[0]
                   for nl in self.valence}
-        self.energies = self.calculate_energies(enl_sc, self.dens,
+        self.energies = self.calculate_energies(enl_sc, self.densval,
+                                                dens_xc=self.dens,
                                                 echo='valence',
                                                 only_valence=True)
         self.timer.summary()

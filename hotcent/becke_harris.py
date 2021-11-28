@@ -888,10 +888,9 @@ class BeckeHarris:
         def get_drho(x, y, z, indices, deriv2=True):
             drho = {}
             if self.xc.add_gradient_corrections:
-                drho.update(self.get_rho_deriv1(x, y, z, indices, **only_val))
+                drho.update(self.get_rho_deriv1(x, y, z, indices))
                 if deriv2:
-                    drho.update(self.get_rho_deriv2(x, y, z, indices,
-                                                    **only_val))
+                    drho.update(self.get_rho_deriv2(x, y, z, indices))
             return drho
 
         def Vhar_rho_mc(x, y, z):
@@ -905,13 +904,13 @@ class BeckeHarris:
             return vhar * rho
 
         def Exc_rho_mc(x, y, z):
-            rho = self.get_rho(x, y, z, all_indices, **only_val)
+            rho = self.get_rho(x, y, z, all_indices)
             drho = get_drho(x, y, z, all_indices, deriv2=False)
             exc = self.get_exc(rho, **drho)
             return exc * rho
 
         def Vxc_rho_mc(x, y, z):
-            rho = self.get_rho(x, y, z, all_indices, **only_val)
+            rho = self.get_rho(x, y, z, all_indices)
             drho = get_drho(x, y, z, all_indices, deriv2=True)
             vxc = self.get_vxc(rho, **drho)
             return vxc * rho
@@ -947,10 +946,9 @@ class BeckeHarris:
         def get_drho(x, y, z, indices, deriv2=True):
             drho = {}
             if self.xc.add_gradient_corrections:
-                drho.update(self.get_rho_deriv1(x, y, z, indices, **only_val))
+                drho.update(self.get_rho_deriv1(x, y, z, indices))
                 if deriv2:
-                    drho.update(self.get_rho_deriv2(x, y, z, indices,
-                                                    **only_val))
+                    drho.update(self.get_rho_deriv2(x, y, z, indices))
             return drho
 
         for iC in range(len(self.atoms_becke)):
@@ -966,13 +964,13 @@ class BeckeHarris:
 
             def Exc_rho_1c(x, y, z):
                 rC = np.sqrt((x - xC)**2 + (y - yC)**2 + (z - zC)**2)
-                rho = self.elements[symC].electron_density(rC, **only_val)
+                rho = self.elements[symC].electron_density(rC)
                 drho = get_drho(x, y, z, [iC], deriv2=False)
                 return self.get_exc(rho, **drho) * rho
 
             def Vxc_rho_1c(x, y, z):
                 rC = np.sqrt((x - xC)**2 + (y - yC)**2 + (z - zC)**2)
-                rho = self.elements[symC].electron_density(rC, **only_val)
+                rho = self.elements[symC].electron_density(rC)
                 drho = get_drho(x, y, z, [iC], deriv2=True)
                 return self.get_vxc(rho, **drho) * rho
 
@@ -990,10 +988,9 @@ class BeckeHarris:
         def get_drho(x, y, z, indices, deriv2=True):
             drho = {}
             if self.xc.add_gradient_corrections:
-                drho.update(self.get_rho_deriv1(x, y, z, indices, **only_val))
+                drho.update(self.get_rho_deriv1(x, y, z, indices))
                 if deriv2:
-                    drho.update(self.get_rho_deriv2(x, y, z, indices,
-                                                    **only_val))
+                    drho.update(self.get_rho_deriv2(x, y, z, indices))
             return drho
 
         results = {key: [] for key in ['Enuc', 'Evhar', 'Evxc', 'Exc']}
@@ -1021,12 +1018,12 @@ class BeckeHarris:
 
                 def Exc_rho_2c(x, y, z):
                     rC = np.sqrt((x - xC)**2 + (y - yC)**2 + (z - zC)**2)
-                    rhoC = self.elements[symC].electron_density(rC, **only_val)
+                    rhoC = self.elements[symC].electron_density(rC)
                     drho = get_drho(x, y, z, [iC], deriv2=False)
                     exc_rho = -self.get_exc(rhoC, **drho) * rhoC
 
                     rD = np.sqrt((x - xD)**2 + (y - yD)**2 + (z - zD)**2)
-                    rhoD = self.elements[symD].electron_density(rD, **only_val)
+                    rhoD = self.elements[symD].electron_density(rD)
                     drho = get_drho(x, y, z, [iD], deriv2=False)
                     exc_rho -= self.get_exc(rhoD, **drho) * rhoD
 
@@ -1036,12 +1033,12 @@ class BeckeHarris:
 
                 def Vxc_rho_2c(x, y, z):
                     rC = np.sqrt((x - xC)**2 + (y - yC)**2 + (z - zC)**2)
-                    rhoC = self.elements[symC].electron_density(rC, **only_val)
+                    rhoC = self.elements[symC].electron_density(rC)
                     drho = get_drho(x, y, z, [iC], deriv2=True)
                     vxc_rho = -self.get_vxc(rhoC, **drho) * rhoC
 
                     rD = np.sqrt((x - xD)**2 + (y - yD)**2 + (z - zD)**2)
-                    rhoD = self.elements[symD].electron_density(rD, **only_val)
+                    rhoD = self.elements[symD].electron_density(rD)
                     drho = get_drho(x, y, z, [iD], deriv2=True)
                     vxc_rho -= self.get_vxc(rhoD, **drho) * rhoD
 

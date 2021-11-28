@@ -698,7 +698,13 @@ class AtomicBase:
                     enl[nl2] = self.get_onecenter_integrals(nl2, nl2)[0]
 
                 # Get the total energy
-                energies = self.calculate_energies(enl, dens, echo='valence',
+                if only_valence:
+                    dens_xc = self.add_core_electron_density(dens)
+                else:
+                    dens_xc = None
+                energies = self.calculate_energies(enl, dens,
+                                                   dens_xc=dens_xc,
+                                                   echo='valence',
                                                    only_valence=only_valence)
                 e = energies['total']
                 if not is_minimal:

@@ -171,8 +171,8 @@ class Repulsion2cTable(MultiAtomIntegrator):
         r2 = np.sqrt(x**2 + (y - R)**2)
 
         aux = 2 * np.pi * area * x
-        rho1 = e1.electron_density(r1, only_valence=True)
-        rho2 = e2.electron_density(r2, only_valence=True)
+        rho1 = e1.electron_density(r1)
+        rho2 = e2.electron_density(r2)
         rho12 = rho1 + rho2
         self.timer.stop('prelude')
 
@@ -186,14 +186,14 @@ class Repulsion2cTable(MultiAtomIntegrator):
         else:
             xc = LibXC(xc)
 
-            sigma = e1.electron_density(r1, der=1, only_valence=True)**2
+            sigma = e1.electron_density(r1, der=1)**2
             out = xc.compute_all(rho1, sigma)
             Exc = -np.sum(rho1 * out['zk'] * aux)
             Evxc = -np.sum(rho1 * out['vrho'] * aux)
             if xc.add_gradient_corrections:
                 Evxc -= 2. * np.sum(out['vsigma'] * sigma * aux)
 
-            sigma = e2.electron_density(r2, der=1, only_valence=True)**2
+            sigma = e2.electron_density(r2, der=1)**2
             out = xc.compute_all(rho2, sigma)
             Exc -= np.sum(rho2 * out['zk'] * aux)
             Evxc -= np.sum(rho2 * out['vrho'] * aux)
@@ -204,8 +204,8 @@ class Repulsion2cTable(MultiAtomIntegrator):
             c2 = (y - R) / r2  # cosine of theta_2
             s1 = x / r1  # sine of theta_1
             s2 = x / r2  # sine of theta_2
-            drho1 = e1.electron_density(r1, der=1, only_valence=True)
-            drho2 = e2.electron_density(r2, der=1, only_valence=True)
+            drho1 = e1.electron_density(r1, der=1)
+            drho2 = e2.electron_density(r2, der=1)
             sigma = (drho1*s1 + drho2*s2)**2 + (drho1*c1 + drho2*c2)**2
             out = xc.compute_all(rho12, sigma)
             exc12 = out['zk']
@@ -216,6 +216,9 @@ class Repulsion2cTable(MultiAtomIntegrator):
         Exc += np.sum(exc12 * rho12 * aux)
         Evxc += np.sum(vxc12 * rho12 * aux)
         self.timer.stop('xc')
+
+        rho1 = e1.electron_density(r1, only_valence=True)
+        rho2 = e2.electron_density(r2, only_valence=True)
 
         vhar1 = e1.hartree_potential(r1, only_valence=True)
         vhar2 = e2.hartree_potential(r2, only_valence=True)

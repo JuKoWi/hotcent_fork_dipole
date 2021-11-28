@@ -112,8 +112,8 @@ class Repulsion3cTable(MultiAtomIntegrator):
         r2 = np.sqrt(x**2 + (R - y)**2)
         aux = area * x
 
-        rho1 = e1.electron_density(r1, only_valence=True)
-        rho2 = e2.electron_density(r2, only_valence=True)
+        rho1 = e1.electron_density(r1)
+        rho2 = e2.electron_density(r2)
         rho12 = rho1 + rho2
 
         self.timer.start('vxc')
@@ -130,14 +130,14 @@ class Repulsion3cTable(MultiAtomIntegrator):
         else:
             xc = LibXC(xc)
 
-            sigma = e1.electron_density(r1, der=1, only_valence=True)**2
+            sigma = e1.electron_density(r1, der=1)**2
             out = xc.compute_all(rho1, sigma)
             exc1 = np.sum(rho1 * out['zk'] * aux)
             evxc1 = np.sum(rho1 * out['vrho'] * aux)
             if xc.add_gradient_corrections:
                 evxc1 += 2. * np.sum(out['vsigma'] * sigma * aux)
 
-            sigma = e2.electron_density(r2, der=1, only_valence=True)**2
+            sigma = e2.electron_density(r2, der=1)**2
             out = xc.compute_all(rho2, sigma)
             exc2 = np.sum(rho2 * out['zk'] * aux)
             evxc2 = np.sum(rho2 * out['vrho'] * aux)
@@ -168,7 +168,7 @@ class Repulsion3cTable(MultiAtomIntegrator):
             rA = np.sqrt((x - x0*np.cos(phi))**2 + (y - y0)**2 \
                          + (x0*np.sin(phi))**2)
 
-            rho3 = e3.electron_density(rA, only_valence=True)
+            rho3 = e3.electron_density(rA)
             rho13 = rho1 + rho3
             rho23 = rho2 + rho3
             rho123 = rho12 + rho3
@@ -188,7 +188,7 @@ class Repulsion3cTable(MultiAtomIntegrator):
                 drdphi = ((x - x0*np.cos(phi))*x0*np.sin(phi) \
                           + x0*np.sin(phi)*x0*np.cos(phi)) / rA
 
-                drho3 = e3.electron_density(rA, der=1, only_valence=True)
+                drho3 = e3.electron_density(rA, der=1)
                 grad_rho3_x = drho3 * drdx
                 grad_rho3_y = drho3 * drdy
                 grad_rho3_phi = drho3 * drdphi / x

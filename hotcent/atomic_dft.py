@@ -119,9 +119,31 @@ class AtomicDFT(AtomicBase):
         header = '\n'.join(['*' * len(header), header, '*' * len(header)])
         print(header, file=self.txt)
 
-    def calculate_energies(self, enl, dens, echo='valence', only_valence=False):
+    def calculate_energies(self, enl, dens, dens_xc=None, echo='valence',
+                           only_valence=False):
         """ Returns a dictionary with the total energy and its contributions,
         which also get printed out.
+
+        Parameters
+        ----------
+        enl : dict
+            Dictionary with the electronic eigenvalues.
+        dens : np.ndarray
+            The valence or all-electron electron density on the radial grid.
+        dens_xc : np.ndarray, optional
+            Electron density to be used instead of 'dens' when evaluating
+            the exchange-correlation energies.
+        echo : str or None, optional
+            Controls the output that gets printed (None, 'valence' or 'all').
+        only_valence : bool, optional
+            Whether the supplied density is the valence or all-electron
+            density. Also determines whether or not the core eigenvalues
+            are included in the band energy.
+
+        Returns
+        -------
+        energies : dict
+            Dictionary with the total energy and its contributions.
         """
         self.timer.start('energies')
         assert echo in [None, 'valence', 'all']
@@ -136,9 +158,10 @@ class AtomicDFT(AtomicBase):
         vhar = self.calculate_hartree_potential(dens, only_valence=only_valence)
         har_energy = 0.5 * self.grid.integrate(vhar * dens, use_dV=True)
 
-        exc, vxc = self.xc.evaluate(dens, self.grid)
-        vxc_energy = self.grid.integrate(vxc * dens, use_dV=True)
-        exc_energy = self.grid.integrate(exc * dens, use_dV=True)
+        d = dens if dens_xc is None else dens_xc
+        exc, vxc = self.xc.evaluate(d, self.grid)
+        vxc_energy = self.grid.integrate(vxc * d, use_dV=True)
+        exc_energy = self.grid.integrate(exc * d, use_dV=True)
 
         total_energy = band_energy - har_energy - vxc_energy + exc_energy
 
