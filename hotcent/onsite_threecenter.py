@@ -51,8 +51,8 @@ class Onsite3cTable(MultiAtomIntegrator):
         Returns
         -------
         tables : dict of dict of np.ndarray
-            Dictionary with the values for each el2-el3 pair
-            and integral type.
+            Dictionary of the onsite threecenter integrals for each
+            basis set pair (of the first element) and integral type.
         """
         print('\n\n', file=self.txt)
         print('***********************************************', file=self.txt)
@@ -72,46 +72,40 @@ class Onsite3cTable(MultiAtomIntegrator):
         selected = select_integrals(self.ela, self.ela)
         print_integral_overview(self.ela, self.ela, selected, file=self.txt)
 
-        syma = self.ela.get_symbol()
-        if self.elb.get_symbol() == e3.get_symbol():
-            pairs = [(self.elb, e3)]
-        else:
-            pairs = [(self.elb, e3), (e3, self.elb)]
+        for bas1a in range(len(self.ela.basis_sets)):
+            for bas1b in range(len(self.ela.basis_sets)):
+                tables[(bas1a, bas1b)] = {
+                        integral: [] for (integral, nl1, nl2) in selected}
 
-        for p, (elb, elc) in enumerate(pairs):
+        for i, R in enumerate(Rgrid):
+            print('Starting for R=%.3f' % R, file=self.txt, flush=True)
+
+            if R < 2 * wf_range:
+                d = self.calculate(selected, self.ela, self.elb, e3, R, grid,
+                                   area, Sgrid=Sgrid, Tgrid=Tgrid,
+                                   nphi=nphi, xc=xc)
+            else:
+                d = {key: np.zeros(1 + numST) for key in selected}
+
+            for key in selected:
+                integral, nl1a, nl1b = key
+                bas1a = self.ela.get_basis_set_index(nl1a)
+                bas1b = self.ela.get_basis_set_index(nl1b)
+                tables[(bas1a, bas1b)][integral].append(d[key])
+
+        if write:
+            syma, symb = self.ela.get_symbol(), self.elb.get_symbol()
+            symc = e3.get_symbol()
+            template =  '%s-%s_onsite3c_%s-%s.3cf'
+
             for bas1a in range(len(self.ela.basis_sets)):
                 for bas1b in range(len(self.ela.basis_sets)):
-                    tables[(p, bas1a, bas1b)] = {
-                            integral: [] for (integral, nl1, nl2) in selected}
-
-            for i, R in enumerate(Rgrid):
-                print('Starting for R=%.3f' % R, file=self.txt, flush=True)
-
-                if R < 2 * wf_range:
-                    d = self.calculate(selected, self.ela, elb, elc, R, grid,
-                                       area, Sgrid=Sgrid, Tgrid=Tgrid,
-                                       nphi=nphi, xc=xc)
-                else:
-                    d = {key: np.zeros(1 + numST) for key in selected}
-
-                for key in selected:
-                    integral, nl1a, nl1b = key
-                    bas1a = self.ela.get_basis_set_index(nl1a)
-                    bas1b = self.ela.get_basis_set_index(nl1b)
-                    tables[(p, bas1a, bas1b)][integral].append(d[key])
-
-            if write:
-                symb, symc = elb.get_symbol(), elc.get_symbol()
-                template =  '%s-%s_onsite3c_%s-%s.3cf'
-
-                for bas1a in range(len(self.ela.basis_sets)):
-                    for bas1b in range(len(self.ela.basis_sets)):
-                        items = (syma + '+'*bas1a, syma + '+'*bas1b, symb, symc)
-                        filename = template % items
-                        print('Writing to %s' % filename, file=self.txt,
-                              flush=True)
-                        write_3cf(filename, Rgrid, Sgrid, Tgrid,
-                                  tables[(p, bas1a, bas1b)])
+                    items = (syma + '+'*bas1a, syma + '+'*bas1b, symb, symc)
+                    filename = template % items
+                    print('Writing to %s' % filename, file=self.txt,
+                          flush=True)
+                    write_3cf(filename, Rgrid, Sgrid, Tgrid,
+                              tables[(bas1a, bas1b)])
 
         self.timer.stop('run_onsite3c')
         return tables

@@ -388,7 +388,7 @@ def test_on3c(nphi, grids, atom):
     msg = 'Too large error for H_{0} (value={1})'
 
     for integral, ref in H_ref[(R, xc)].items():
-        key = (0, 0, 0)
+        key = (0, 0)
         val = H[key][integral][0][1]
         diff = abs(val - ref)
         assert diff < 1e-6, msg.format(integral, val)
