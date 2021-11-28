@@ -38,6 +38,7 @@ class KleinmanBylanderPP(SeparablePP):
         self.Vl = {}
         self.rgrid = []
         self.rho_core = []
+        self.rho_core_fct = None
         self.rho_val = []
         self.rho_val_fct = None
 
@@ -48,6 +49,8 @@ class KleinmanBylanderPP(SeparablePP):
 
         self.grid = RadialGrid(self.rgrid)
         self.normalize_valence_density()
+        if self.has_nonzero_rho_core:
+            self.normalize_core_density()
 
         self.Vl_fct = {}
         for l, Vl in self.Vl.items():
@@ -60,7 +63,8 @@ class KleinmanBylanderPP(SeparablePP):
 
         Attributes that are initialized in this way include the chemical
         symbol (self.symbol), the radial grid (self.rgrid), the l-dependent
-        potentials (self.Vl) and the valence charge density (self.rho_val).
+        potentials (self.Vl), the core and valence charge densities
+        (self.rho_core, self.rho_val) and the self.has_nonzero_rho_core flag.
         """
         with open(filename, 'r') as f:
             # First line
@@ -147,12 +151,11 @@ class KleinmanBylanderPP(SeparablePP):
                             setattr(self, key, np.array(array))
                         new_section = True
 
+        self.has_nonzero_rho_core = not np.allclose(self.rho_core, 0.)
+
         # Final checks
         for key, val in label_dict.items():
             assert hasattr(self, val)
-
-        assert np.allclose(self.rho_core, 0.), \
-               'Non-zero core densities are not yet implemented'
 
     def all_zero_onsite_overlaps(self):
         """ Returns whether all on-site overlaps of the (valence)
@@ -185,11 +188,25 @@ class KleinmanBylanderPP(SeparablePP):
 
         self.lmax = lmax
 
+    def get_core_density(self, r, der=0):
+        """ Evaluates the core electron density at the given radius. """
+        if self.rho_core_fct is None:
+            self.rho_core_fct = CubicSplineFunction(self.rgrid, self.rho_core)
+
+        if self.has_nonzero_rho_core:
+            return self.rho_core_fct(r, der=der)
+        else:
+            return 0.
+
     def get_valence_density(self, r, der=0):
         """ Evaluates the valence electron density at the given radius. """
         if self.rho_val_fct is None:
             self.rho_val_fct = CubicSplineFunction(self.rgrid, self.rho_val)
         return self.rho_val_fct(r, der=der)
+
+    def normalize_core_density(self):
+        """ Normalizes the core electron density. """
+        self.rho_core /= 4. * np.pi * self.rgrid ** 2
 
     def normalize_valence_density(self):
         """ Normalizes the valence electron density. """
