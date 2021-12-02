@@ -37,21 +37,31 @@ class SeparablePP:
         """
         raise NotImplementedError
 
-    def build_overlaps(self, e1, e3, rmin=1e-2, rmax=None, dr=0.1,
+    def build_overlaps(self, e1, e3, rmin=1e-3, rmax=None, N=500,
                        wflimit=1e-7):
         """ Builds the projector-valence overlap integral interpolators.
 
         Assumes that the projectors have already been constructed
         through a previous call to build_projectors().
 
-        Arguments:
-
-        e1: AtomicDFT object (for the valence orbitals)
-        e3: AtomicDFT object (for the projectors)
-        rmin, rmax, dr: defines the linear grid on which the overlaps
-                        will be evaluated (and used for interpolation)
-        wflimit: wave function cutoff for setting the range of the 2D
-                 integration grids
+        Parameters
+        ----------
+        e1 : AtomicBase-like object
+            Object with atomic properties (for the valence orbitals).
+        e3 : AtomicBase-like object
+            Object with atomic properties (for the pseudopotential
+            projectors).
+        rmin : float, optional
+            Minimal radius to be used in the overlap tabulation.
+        rmax : None or float, optional
+            Maximal radius to be used in the overlap tabulation.
+            If None, a sufficiently large radius is determined from
+            the wf_limit parameter.
+        N : int, optional
+            Number of grid points to be used in the overlap tabulation.
+        wflimit : float, optional
+            Wave function cutoff for setting the range of the 2D
+            integration grids if the rmax parameter is None.
         """
         sym1, sym3 = e1.get_symbol(), e3.get_symbol()
 
@@ -65,8 +75,7 @@ class SeparablePP:
         if rmax is None:
             rmax = 2. * off2c.wf_range
 
-        numr = min(100, int(np.ceil((rmax - rmin) / dr)))
-        rval = np.linspace(rmin, rmax, num=numr, endpoint=True)
+        rval = rmin * np.exp(np.linspace(0., np.log(rmax / rmin), N))
 
         for bas1, valence in enumerate(e1.basis_sets):
             for nl1 in valence:

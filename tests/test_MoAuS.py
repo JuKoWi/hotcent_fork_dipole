@@ -66,7 +66,7 @@ def atoms(request):
 
     for atom1 in atoms:
         for atom2 in atoms:
-            atom1.pp.build_overlaps(atom2, atom1, rmin=2., rmax=9.)
+            atom1.pp.build_overlaps(atom2, atom1, rmin=2., rmax=9., N=300)
     return atoms
 
 

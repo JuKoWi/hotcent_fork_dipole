@@ -34,13 +34,13 @@ def atoms(request):
     atom_ae = AtomicDFT('Li', **kwargs)
     atom_ae.run()
     atom_ae.pp.build_projectors(atom_ae)
-    atom_ae.pp.build_overlaps(atom_ae, atom_ae, rmin=3., rmax=5.)
+    atom_ae.pp.build_overlaps(atom_ae, atom_ae, rmin=3., rmax=5., N=100)
 
     pp = KleinmanBylanderPP('./pseudos/Li.psf', valence)
     atom_pp = PseudoAtomicDFT('Li', pp, **kwargs)
     atom_pp.run()
     atom_pp.pp.build_projectors(atom_pp)
-    atom_pp.pp.build_overlaps(atom_pp, atom_pp, rmin=3., rmax=5.)
+    atom_pp.pp.build_overlaps(atom_pp, atom_pp, rmin=3., rmax=5., N=100)
 
     return (atom_ae, atom_pp)
 

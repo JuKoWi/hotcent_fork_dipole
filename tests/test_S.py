@@ -41,7 +41,7 @@ def atom(request):
                            )
     atom.run()
     atom.pp.build_projectors(atom)
-    atom.pp.build_overlaps(atom, atom, rmin=1., rmax=7.)
+    atom.pp.build_overlaps(atom, atom, rmin=1., rmax=7., N=300)
     return atom
 
 
