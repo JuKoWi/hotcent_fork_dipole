@@ -362,21 +362,22 @@ def write_skf(handle, Rgrid, table, has_diagonal_data, is_extended, eigval,
     for i in range(nzeros):
         print('%d*0.0,' % len(indices), file=handle)
 
-    ct, theader = 0, ''
     for i in range(grid_npts):
         line = ''
+        num_zero = 0
+        zero_str = ''
+
         for j in indices:
             if table[i, j] == 0:
-                ct += 1
-                theader = str(ct) + '*0.0 '
+                num_zero += 1
+                zero_str = str(num_zero) + '*0.0 '
             else:
-                ct = 0
-                line += theader
-                theader = ''
+                num_zero = 0
+                line += zero_str
+                zero_str = ''
                 line += '{0: 1.12e}  '.format(table[i, j])
 
-        if theader != '':
-            ct = 0
-            line += theader
+        if zero_str != '':
+            line += zero_str
 
         print(line, file=handle)
