@@ -72,10 +72,13 @@ class Onsite3cTable(MultiAtomIntegrator):
         selected = select_integrals(self.ela, self.ela)
         print_integral_overview(self.ela, self.ela, selected, file=self.txt)
 
-        for bas1a in range(len(self.ela.basis_sets)):
-            for bas1b in range(len(self.ela.basis_sets)):
-                tables[(bas1a, bas1b)] = {
-                        integral: [] for (integral, nl1, nl2) in selected}
+        for (integral, nl1a, nl1b) in selected:
+            bas1a = self.ela.get_basis_set_index(nl1a)
+            bas1b = self.ela.get_basis_set_index(nl1b)
+            key = (bas1a, bas1b)
+            if key not in tables:
+                tables[key] = {}
+            tables[key][integral] = []
 
         for i, R in enumerate(Rgrid):
             print('Starting for R=%.3f' % R, file=self.txt, flush=True)

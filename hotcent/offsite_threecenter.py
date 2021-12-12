@@ -72,10 +72,13 @@ class Offsite3cTable(MultiAtomIntegrator):
             selected = select_integrals(e1, e2)
             print_integral_overview(e1, e2, selected, file=self.txt)
 
-            for bas1 in range(len(e1.basis_sets)):
-                for bas2 in range(len(e2.basis_sets)):
-                    tables[(sym3, p, bas1, bas2)] = {
-                            integral: [] for (integral, nl1, nl2) in selected}
+            for (integral, nl1, nl2) in selected:
+                bas1 = e1.get_basis_set_index(nl1)
+                bas2 = e2.get_basis_set_index(nl2)
+                key = (sym3, p, bas1, bas2)
+                if key not in tables:
+                    tables[key] = {}
+                tables[key][integral] = []
 
             for i, R in enumerate(Rgrid):
                 print('Starting for R=%.3f' % R, file=self.txt, flush=True)
