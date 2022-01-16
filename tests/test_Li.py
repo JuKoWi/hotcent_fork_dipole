@@ -48,18 +48,18 @@ def atoms(request):
 @pytest.mark.parametrize('atoms', [PBE_LibXC], indirect=True)
 def test_on1c(atoms):
     labels = ['AE', 'PP']
-    HSU = {label: {} for label in labels}
+    HU = {label: {} for label in labels}
     for atom, label in zip(atoms, labels):
         for nl in atom.valence:
             H, S = atom.get_onecenter_integrals(nl, nl)
             U = atom.get_hubbard_value(nl)
-            HSU[label][nl] = (H, U)
+            HU[label][nl] = (H, U)
 
     msg = 'Too large difference for {0}_{1} (AE: {2}, PP: {3})'
     tol = {'H': 5e-5, 'U': 5e-4}
 
-    for nl, vals_ae in HSU['AE'].items():
-        vals_pp = HSU['PP'][nl]
+    for nl, vals_ae in HU['AE'].items():
+        vals_pp = HU['PP'][nl]
         for key, val_ae, val_pp in zip(['H', 'U'], vals_ae, vals_pp):
             diff = abs(val_ae - val_pp)
             assert diff < tol[key], msg.format(key, nl, val_ae, val_pp)
