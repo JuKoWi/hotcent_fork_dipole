@@ -13,11 +13,11 @@ atom = AtomicDFT('C',
 
 values = []
 schemes = ['central', 'forward', 'backward']
-for scheme in ['central', 'forward', 'backward']:
+for scheme in schemes:
     u = atom.get_hubbard_value('2p', scheme=scheme, maxstep=1.)
     values.append(u)
 
-references = [0.35665217698348783, 0.2694950932099687, 0.4310705719360044]
+references = [0.346391, 0.383819, 0.368047]
 eps = 1e-4
 
 print('\n========================================================')

@@ -674,14 +674,15 @@ class AtomicBase:
             assert is_minimal, 'Non-minimal basis sets only implemented' + \
                    ' for the perturbative confinement scheme.'
 
-        def get_total_energy(configuration, diff=None):
+        def get_eig(configuration, diff=None):
+            configuration_original = self.configuration.copy()
+            self.configuration = configuration.copy()
+
             if self.perturbative_confinement:
-                configuration_original = self.configuration.copy()
                 veff_original = np.copy(self.veff)
                 only_valence = not isinstance(self.pp, PhillipsKleinmanPP)
 
                 # Obtain dens & veff for the given electronic configuration
-                self.configuration = configuration.copy()
                 dens = self.calculate_density(self.unlg,
                                               only_valence=only_valence)
                 if not is_minimal:
@@ -690,36 +691,16 @@ class AtomicBase:
                     self.configuration[self.valence[0]] += diff
                     dens += diff * self.unlg[nl]**2 \
                             / (4 * np.pi * self.rgrid**2)
+
                 self.veff = self.calculate_veff(dens)
-
-                # Update the valence eigenvalues
-                enl = self.enl.copy()
-                for nl2 in self.valence:
-                    enl[nl2] = self.get_onecenter_integrals(nl2, nl2)[0]
-
-                # Get the total energy
-                if only_valence:
-                    dens_xc = self.add_core_electron_density(dens)
-                else:
-                    dens_xc = None
-                energies = self.calculate_energies(enl, dens,
-                                                   dens_xc=dens_xc,
-                                                   echo='valence',
-                                                   only_valence=only_valence)
-                e = energies['total']
-                if not is_minimal:
-                    # Add non-minimal basis function eigenenergy
-                    e += diff * self.get_onecenter_integrals(nl, nl)[0]
-
-                self.configuration = configuration_original
+                e = self.get_onecenter_integrals(nl, nl)[0]
                 self.veff = veff_original
             else:
-                configuration_original = self.configuration.copy()
-                self.configuration = configuration.copy()
                 self.run()
-                self.configuration = configuration_original
-                e = self.get_energy()
+                e = self.get_eigenvalue(nl)
                 self.solved = False
+
+            self.configuration = configuration_original
             return e
 
         if scheme is None:
@@ -737,43 +718,33 @@ class AtomicBase:
 
         directions = {'forward': [0, 1, 2],
                       'central': [-1, 0, 1],
-                      'backward': [-2, -1, 0]}
+                      'backward': [-2, -1, 0]}[scheme]
         delta = maxstep if scheme == 'central' else 0.5 * maxstep
 
         configuration = self.configuration.copy()
         energies = {}
         bar = '+' * 12
 
-        for direction in directions[scheme]:
+        energies = []
+        for i, direction in enumerate(directions):
             diff = direction * delta
             if is_minimal:
                 configuration[nl] += diff
                 s = ' '.join([nl2 + '%.1f' % configuration[nl2]
                               for nl2 in self.valence])
                 print('\n%s Configuration %s %s' % (bar, s, bar), file=self.txt)
-                energies[direction] = get_total_energy(configuration)
+                energies.append(get_eig(configuration))
                 configuration[nl] -= diff
             else:
-                energies[direction] = get_total_energy(configuration, diff=diff)
+                energies.append(get_eig(configuration, diff=diff))
 
         # Check that the original electronic configuration has been restored
-        if is_minimal:
-            assert self.configuration[nl] == configuration[nl]
+        assert self.configuration == configuration
 
-        if scheme in ['forward', 'central']:
-            EA = (energies[0] - energies[1]) / delta
-            print('\nElectron affinity = %.5f Ha (%.5f eV)' % (EA, EA * Ha),
-                  file=self.txt)
-
-        if scheme in ['backward', 'central']:
-            IE = (energies[-1] - energies[0]) / delta
-            print('\nIonization energy = %.5f Ha (%.5f eV)' % (IE, IE * Ha),
-                  file=self.txt)
-        U = 0.
-        for i, d in enumerate(directions[scheme]):
-            factor = 1 if i % 2 == 0 else -2
-            U += energies[d] * factor / (delta ** 2)
-
+        coefficients = {'forward': [-1.5, 2, -0.5],
+                        'central': [-0.5, 0, 0.5],
+                        'backward': [0.5, -2, 1.5]}[scheme]
+        U = sum([c*e for c, e in zip(coefficients, energies)]) / delta
         return U
 
     def generate_nonminimal_basis(self, size, tail_norm=None, l_pol=None,

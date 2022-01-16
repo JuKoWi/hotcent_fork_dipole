@@ -36,6 +36,12 @@ Development version
   AtomicBase.generate_nonminimal_basis()). Currently just a
   split-valence scheme for double-zeta basis sets is implemented.
 
+* Hubbard parameters (U values) are now calculated as derivatives of
+  the corresponding Hamiltonian matrix elements in the isolated atom
+  (no longer as second derivatives of the total energy). The present
+  version may hence produce U values that are slightly different from
+  previous versions.
+
 
 Version 1.0
 ===========
