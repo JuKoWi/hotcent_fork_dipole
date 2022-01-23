@@ -640,10 +640,55 @@ class AtomicBase:
             f.write('}\n')
         return
 
-    def get_hubbard_value(self, nl, maxstep=1., scheme=None):
+    def calculate_excited_eigenvalue(self, nl1, nl2, diff):
         """
-        Calculates the Hubbard value of an orbital using
-        (second order) finite differences.
+        Returns <phi_nl1|H|phi_nl1> for an 'excited' electronic configuration
+        involving a change in the occupation of a second orbital.
+
+        Parameters
+        ----------
+        nl1 : str
+            First orbital label.
+        nl2 : str
+            Second orbital label.
+        diff : float
+            Change in the occupation of the second orbital.
+        """
+        msg = '\nEvaluating {0} eigenvalue for {1:.3f} change in {2} occupation'
+        print(msg.format(nl1, diff, nl2), file=self.txt)
+
+        configuration_original = self.configuration.copy()
+
+        if self.perturbative_confinement:
+            veff_original = np.copy(self.veff)
+            only_valence = not isinstance(self.pp, PhillipsKleinmanPP)
+
+            # Obtain dens & veff for the default electronic configuration
+            dens = self.calculate_density(self.unlg, only_valence=only_valence)
+
+            # Update density and number of electrons
+            self.configuration[self.valence[0]] += diff
+            dens += diff * self.unlg[nl2]**2 \
+                    / (4 * np.pi * self.rgrid**2)
+
+            self.veff = self.calculate_veff(dens)
+            e = self.get_onecenter_integrals(nl1, nl1)[0]
+            self.veff = veff_original
+        else:
+            assert nl1 in self.valence, (nl1, self.valence)
+            assert nl2 in self.valence, (nl2, self.valence)
+            self.configuration[nl2] += diff
+            self.run()
+            e = self.get_eigenvalue(nl1)
+            self.solved = False
+
+        self.configuration = configuration_original
+        return e
+
+    def calculate_eigenvalue_derivative(self, nl1, nl2, maxstep=1, scheme=None):
+        """
+        Calculates the derivative of <phi_nl1|H|phi_nl1> with respect to
+        the occupation of nl2 using (second order) finite differences.
 
         Note: when using perturbative confinement, the run() method
         has to be called first, because the radial functions are needed
@@ -653,8 +698,10 @@ class AtomicBase:
 
         Parameters
         ----------
-        nl : str
-            Orbital label (e.g. '2p').
+        nl1: str
+            First orbital label.
+        nl2: str
+            Second orbital label.
         maxstep : float, optional
             The maximal step size in the orbital occupancy.
             The default default value of 1 means not going further
@@ -665,48 +712,19 @@ class AtomicBase:
             scheme will be chosen based on the orbital occupation.
         """
         assert scheme in [None, 'central', 'forward', 'backward']
-
-        is_minimal = nl in self.valence
+        is_minimal = nl2 in self.valence
 
         if self.perturbative_confinement:
             assert self.solved, NOT_SOLVED_MESSAGE
         else:
-            assert is_minimal, 'Non-minimal basis sets only implemented' + \
-                   ' for the perturbative confinement scheme.'
-
-        def get_eig(configuration, diff=None):
-            configuration_original = self.configuration.copy()
-            self.configuration = configuration.copy()
-
-            if self.perturbative_confinement:
-                veff_original = np.copy(self.veff)
-                only_valence = not isinstance(self.pp, PhillipsKleinmanPP)
-
-                # Obtain dens & veff for the given electronic configuration
-                dens = self.calculate_density(self.unlg,
-                                              only_valence=only_valence)
-                if not is_minimal:
-                    # Change density and number of electrons
-                    # due to non-minimal basis function occupation
-                    self.configuration[self.valence[0]] += diff
-                    dens += diff * self.unlg[nl]**2 \
-                            / (4 * np.pi * self.rgrid**2)
-
-                self.veff = self.calculate_veff(dens)
-                e = self.get_onecenter_integrals(nl, nl)[0]
-                self.veff = veff_original
-            else:
-                self.run()
-                e = self.get_eigenvalue(nl)
-                self.solved = False
-
-            self.configuration = configuration_original
-            return e
+            msg = 'Eigenvalue derivatives for non-minimal basis functions ' + \
+                  'are only available for the perturbative confinement scheme.'
+            assert is_minimal, msg
 
         if scheme is None:
-            n, l = nl2tuple(nl[:2])
+            n, l = nl2tuple(nl2[:2])
             max_occup = 2 * (2*l + 1)
-            occup = self.configuration[nl] if is_minimal else 0
+            occup = self.configuration[nl2] if is_minimal else 0
             if occup == 0:
                 scheme = 'forward'
             elif occup == max_occup:
@@ -716,35 +734,48 @@ class AtomicBase:
         elif not is_minimal:
             assert scheme == 'forward'
 
-        directions = {'forward': [0, 1, 2],
-                      'central': [-1, 0, 1],
-                      'backward': [-2, -1, 0]}[scheme]
+        directions, weights = {
+            'forward': ([0, 1, 2], [-1.5, 2, -0.5]),
+            'central': ([-1, 0, 1], [-0.5, 0, 0.5]),
+            'backward': ([-2, -1, 0], [0.5, -2, 1.5]),
+            }[scheme]
+
         delta = maxstep if scheme == 'central' else 0.5 * maxstep
-
         configuration = self.configuration.copy()
-        energies = {}
-        bar = '+' * 12
-
         energies = []
+
         for i, direction in enumerate(directions):
             diff = direction * delta
-            if is_minimal:
-                configuration[nl] += diff
-                s = ' '.join([nl2 + '%.1f' % configuration[nl2]
-                              for nl2 in self.valence])
-                print('\n%s Configuration %s %s' % (bar, s, bar), file=self.txt)
-                energies.append(get_eig(configuration))
-                configuration[nl] -= diff
-            else:
-                energies.append(get_eig(configuration, diff=diff))
+            e = self.calculate_excited_eigenvalue(nl1, nl2, diff)
+            energies.append(e)
 
-        # Check that the original electronic configuration has been restored
+        # Check that the original electronic configuration has not changed
         assert self.configuration == configuration
 
-        coefficients = {'forward': [-1.5, 2, -0.5],
-                        'central': [-0.5, 0, 0.5],
-                        'backward': [0.5, -2, 1.5]}[scheme]
-        U = sum([c*e for c, e in zip(coefficients, energies)]) / delta
+        dedf = sum([c*e for c, e in zip(weights, energies)]) / delta
+        return dedf
+
+    def get_hubbard_value(self, nl, nl2=None, maxstep=1., scheme=None):
+        """
+        Calculates the Hubbard value of the given orbital as the
+        derivative of its eigenvalue with respect to the occupation
+        of a second orbital.
+
+        Parameters
+        ----------
+        nl : str
+            First orbital label (e.g. '2p').
+        nl2 : str, optional
+            Second orbital label. If None (the default) it will be
+            taken equal to the first orbital label.
+
+        Other Parameters
+        ----------------
+        maxstep, scheme: see calculate_eigenvalue_derivative().
+        """
+        nl2 = nl if nl2 is None else nl2
+        U = self.calculate_eigenvalue_derivative(nl, nl2, maxstep=maxstep,
+                                                 scheme=scheme)
         return U
 
     def generate_nonminimal_basis(self, size, tail_norm=None, l_pol=None,
