@@ -95,6 +95,57 @@ def test_on1c(atom):
         assert S_diff < stol, msg.format('S', nl1, nl2, S)
 
 
+@pytest.mark.parametrize('atom', [SZP, DZ], indirect=True)
+def test_spin(atom):
+    size = atom.basis_size
+
+    # Regression test; values compare well with those
+    # from e.g. the pbc-0-3 DFTB parameter set
+    W_ref = {
+        SZP: {
+            ('2s', '2s'): -0.031736,
+            ('2s', '2p'): -0.029346,
+            ('2s', '0d'): -0.022399,
+            ('2p', '2s'): -0.029120,
+            ('2p', '2p'): -0.028053,
+            ('2p', '0d'): -0.021191,
+            ('0d', '2s'): -0.022427,
+            ('0d', '2p'): -0.021382,
+            ('0d', '0d'): -0.031324,
+        },
+        DZ: {
+            ('2s', '2s'): -0.031736,
+            ('2s', '2p'): -0.029346,
+            ('2s', '2s+'): -0.037900,
+            ('2s', '2p+'): -0.035232,
+            ('2p', '2s'): -0.029120,
+            ('2p', '2p'): -0.028053,
+            ('2p', '2s+'): -0.034169,
+            ('2p', '2p+'): -0.033071,
+            ('2s+', '2s'): -0.037919,
+            ('2s+', '2p'): -0.034455,
+            ('2s+', '2s+'): -0.049712,
+            ('2s+', '2p+'): -0.044614,
+            ('2p+', '2s'): -0.035226,
+            ('2p+', '2p'): -0.033329,
+            ('2p+', '2s+'): -0.044585,
+            ('2p+', '2p+'): -0.042220,
+        },
+    }
+
+    msg = 'Too large error for W_{0}-{1} (value={2})'
+    tol = 1e-4
+
+    for valence1 in atom.basis_sets:
+        for nl1 in valence1:
+            for valence2 in atom.basis_sets:
+                for nl2 in valence2:
+                    W = atom.get_spin_constant(nl1, nl2, scheme=None,
+                                               maxstep=0.5)
+                    W_diff = abs(W - W_ref[size][(nl1, nl2)])
+                    assert W_diff < tol, msg.format(nl1, nl2, W)
+
+
 @pytest.mark.parametrize('R', [R1])
 @pytest.mark.parametrize('atom', [SZP, DZ], indirect=True)
 def test_off2c(R, atom):
