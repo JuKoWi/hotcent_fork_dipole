@@ -23,6 +23,7 @@ from hotcent.interpolation import build_interpolator, CubicSplineFunction
 from hotcent.orbitals import ANGULAR_MOMENTUM
 from hotcent.phillips_kleinman import PhillipsKleinmanPP
 from hotcent.timing import Timer
+from hotcent.xc import LibXC, XC_PW92
 try:
     import matplotlib.pyplot as plt
 except:
@@ -640,10 +641,11 @@ class AtomicBase:
             f.write('}\n')
         return
 
-    def calculate_excited_eigenvalue(self, nl1, nl2, diff):
+    def calculate_excited_eigenvalue(self, nl1, nl2, diff, spin):
         """
-        Returns <phi_nl1|H|phi_nl1> for an 'excited' electronic configuration
-        involving a change in the occupation of a second orbital.
+        Returns <phi_nl1|H|phi_nl1> for an 'excited' electronic
+        configuration involving a change in the (possible spin-resolved)
+        occupation of a second orbital.
 
         Parameters
         ----------
@@ -653,9 +655,28 @@ class AtomicBase:
             Second orbital label.
         diff : float
             Change in the occupation of the second orbital.
+        spin : None or str
+            If None (default), the 'up' and 'down' occupations of the
+            second orbital are changed by the same amount (0.5 * 'diff'),
+            so that the magnetization density remains zero. When
+            choosing spin='up' or 'down', only the occupation of the
+            selected channel is modified (by a 'diff' amount). The nl1
+            eigenvalue is then evaluated for the 'up' spin.
         """
-        msg = '\nEvaluating {0} eigenvalue for {1:.3f} change in {2} occupation'
-        print(msg.format(nl1, diff, nl2), file=self.txt)
+        assert spin in [None, 'up', 'down']
+
+        template = 'Evaluating the {0}{1} eigenvalue for a {2:.3f} change '
+        template += 'in the {3}{4} occupation'
+        msg = template.format(nl1, '' if spin is None else ' (up)', diff, nl2,
+                              '' if spin is None else ' (' + spin + ')')
+        print(msg, file=self.txt)
+
+        if spin is not None:
+            if isinstance(self.xc, LibXC):
+                xcname = self.xc.xcname
+                xc = LibXC(xcname, spin_polarized=True)
+            elif isinstance(self.xc, XC_PW92):
+                xc = LibXC('LDA_X+LDA_C_PW', spin_polarized=True)
 
         configuration_original = self.configuration.copy()
 
@@ -668,10 +689,26 @@ class AtomicBase:
 
             # Update density and number of electrons
             self.configuration[self.valence[0]] += diff
-            dens += diff * self.unlg[nl2]**2 \
-                    / (4 * np.pi * self.rgrid**2)
+            dens_nl2 = diff * self.unlg[nl2]**2 / (4 * np.pi * self.rgrid**2)
+            dens += dens_nl2
 
             self.veff = self.calculate_veff(dens)
+
+            if spin is not None:
+                # Recalculate the XC part of the effective potential
+                exc, vxc = self.xc.evaluate(dens, self.grid)
+                self.veff -= vxc
+
+                dens_up = (dens - dens_nl2) / 2.
+                dens_down = np.copy(dens_up)
+                if spin == 'up':
+                    dens_up += dens_nl2
+                else:
+                    dens_down += dens_nl2
+
+                vxc = xc.evaluate_polarized(dens_up, dens_down, self.grid)
+                self.veff += vxc
+
             e = self.get_onecenter_integrals(nl1, nl1)[0]
             self.veff = veff_original
         else:
@@ -685,7 +722,8 @@ class AtomicBase:
         self.configuration = configuration_original
         return e
 
-    def calculate_eigenvalue_derivative(self, nl1, nl2, maxstep=1, scheme=None):
+    def calculate_eigenvalue_derivative(self, nl1, nl2, maxstep=1, scheme=None,
+                                        spin=None):
         """
         Calculates the derivative of <phi_nl1|H|phi_nl1> with respect to
         the occupation of nl2 using (second order) finite differences.
@@ -710,6 +748,10 @@ class AtomicBase:
             The finite difference scheme, either 'central', 'forward'
             or 'backward' or None. In the last case the appropriate
             scheme will be chosen based on the orbital occupation.
+
+        Other Parameters
+        ----------------
+        spin : see calculate_excited_eigenvalue().
         """
         assert scheme in [None, 'central', 'forward', 'backward']
         is_minimal = nl2 in self.valence
@@ -720,6 +762,9 @@ class AtomicBase:
             msg = 'Eigenvalue derivatives for non-minimal basis functions ' + \
                   'are only available for the perturbative confinement scheme.'
             assert is_minimal, msg
+            msg = 'Spin constants are only available for the perturbative ' + \
+                  'confinement scheme.'
+            assert spin is None, msg
 
         if scheme is None:
             n, l = nl2tuple(nl2[:2])
@@ -744,9 +789,9 @@ class AtomicBase:
         configuration = self.configuration.copy()
         energies = []
 
-        for i, direction in enumerate(directions):
+        for direction in directions:
             diff = direction * delta
-            e = self.calculate_excited_eigenvalue(nl1, nl2, diff)
+            e = self.calculate_excited_eigenvalue(nl1, nl2, diff, spin)
             energies.append(e)
 
         # Check that the original electronic configuration has not changed
@@ -777,6 +822,30 @@ class AtomicBase:
         U = self.calculate_eigenvalue_derivative(nl, nl2, maxstep=maxstep,
                                                  scheme=scheme)
         return U
+
+    def get_spin_constant(self, nl, nl2=None, maxstep=0.5, scheme=None):
+        """
+        Calculates the spin constant of the given orbital based on
+        derivatives of its up-eigenvalue with respect to the up/down-
+        occupation of a second orbital.
+
+        Parameters
+        ----------
+        nl : str
+            First orbital label (e.g. '2p').
+        nl2 : str
+            Second orbital label.
+
+        Other Parameters
+        ----------------
+        maxstep, scheme: see calculate_eigenvalue_derivative().
+        """
+        dedf_up = self.calculate_eigenvalue_derivative(nl, nl2, maxstep=maxstep,
+                                                       scheme=scheme, spin='up')
+        dedf_down = self.calculate_eigenvalue_derivative(nl, nl2,
+                                    maxstep=maxstep, scheme=scheme, spin='down')
+        W = 0.5 * (dedf_up - dedf_down)
+        return W
 
     def generate_nonminimal_basis(self, size, tail_norm=None, l_pol=None,
                                   r_pol=None):

@@ -42,6 +42,9 @@ Development version
   version may hence produce U values that are slightly different from
   previous versions.
 
+* Added the possibility to calculate spin constants (W values).
+  This requires the otherwise optional PyLibXC dependency.
+
 
 Version 1.0
 ===========

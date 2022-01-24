@@ -18,7 +18,7 @@ except ImportError:
 
 
 class LibXC:
-    def __init__(self, xcname):
+    def __init__(self, xcname, spin_polarized=False):
         """ Interface to PyLibXC.
 
         Parameters
@@ -26,6 +26,9 @@ class LibXC:
         xcname : str
             Combination of LibXC functional names,
             e.g. 'GGA_X_PBE+GGA_C_PBE'.
+        spin_polarized : bool, optional
+            Whether to select the spin-polarized version
+            of the functionals (default: False).
         """
         assert has_pylibxc, 'Using XC other than LDA requires PyLibXC!'
 
@@ -37,7 +40,9 @@ class LibXC:
 
         for name in self.names:
             try:
-                self.functionals.append(LibXCFunctional(name, 'unpolarized'))
+                spin = 'polarized' if spin_polarized else 'unpolarized'
+                func = LibXCFunctional(name, spin)
+                self.functionals.append(func)
             except KeyError as err:
                 print('KeyError:', err)
                 print('>>> Bad XC name. For valid LibXC functional names, see')
@@ -122,6 +127,69 @@ class LibXC:
 
         return results
 
+    def compute_vxc_polarized(self, rho_up, rho_down, sigma_up=None,
+                              sigma_updown=None, sigma_down=None):
+        """
+        Returns a dictionary with the arrays needed to compute
+        the spin-resolved XC potentials.
+
+        Parameters
+        ----------
+        rho_up : np.ndarray
+            Electron density for the 'up' spin channel.
+        rho_down : np.ndarray
+            Electron density for the 'down' spin channel.
+        sigma_up : np.ndarray, optional
+            Norm of the electron density gradient for the 'up' spin
+            channel (only needed if GGA functionals are involved).
+        sigma_updown : np.ndarray, optional
+            Dot product of the density gradients for the 'up'
+            and 'down' spin channels (only needed if GGA functionals
+            are involved).
+        sigma_down : np.ndarray, optional
+            Norm of the electron density gradient for the 'down' spin
+            channel (only needed if GGA functionals are involved).
+
+        Returns
+        -------
+        results: dict of np.ndarray
+            Dictionary with 'vrho_up' and 'vrho_down' and also
+            (if GGA functionals are involved), 'vsigma_up',
+            'vsigma_updown' and 'vsigma_down'.
+        """
+        rho = np.array([rho_up, rho_down])
+        sigma = np.array([sigma_up, sigma_updown, sigma_down])
+        inp = {
+            'rho': np.ascontiguousarray(rho.T),
+            'sigma': np.ascontiguousarray(sigma.T),
+        }
+
+        N = len(rho_up)
+        results = {}
+
+        for suffix in ['up', 'down']:
+            results['vrho_' + suffix] = np.zeros(N)
+
+        if self.add_gradient_corrections:
+            grad_keys = ['vsigma']
+            for key in grad_keys:
+                for suffix in ['up', 'updown', 'down']:
+                    results[key + '_' + suffix] = np.zeros(N)
+
+        for i, func in enumerate(self.functionals):
+            is_gga = self.types[i] == 'GGA'
+            out = func.compute(inp, do_exc=False, do_vxc=True, do_fxc=False)
+
+            for j, suffix in enumerate(['up', 'down']):
+                results['vrho_' + suffix] += out['vrho'][:, j]
+
+            if self.add_gradient_corrections and is_gga:
+                for key in grad_keys:
+                    for j, suffix in enumerate(['up', 'updown', 'down']):
+                        results[key + '_' + suffix] += out[key][:, j]
+
+        return results
+
     def compute_all(self, rho, sigma=None):
         """ Returns the results of self.compute_vxc() together
         with a 'zk' entry with the result from self.compute_exc().
@@ -157,6 +225,39 @@ class LibXC:
             assert out['vsigma'] is not None
             vxc += -2 * gd.divergence(out['vsigma'] * grad)
         return exc, vxc
+
+    def evaluate_polarized(self, rho_up, rho_down, gd):
+        """ Returns the XC potential for the 'up' spin channel.
+
+        Parameters
+        ----------
+        rho_up : np.ndarray
+            Electron density for the 'up' spin channel.
+        rho_down : np.ndarray
+            Electron density for the 'down' spin channel.
+        gd : Grid
+            An object that can carry out gradient and divergence
+            operations on a grid-based array.
+
+        Returns
+        -------
+        vxc_up : np.ndarray
+            XC potential for spin 'up' electrons.
+        """
+        grad_up = gd.gradient(rho_up)
+        grad_down = gd.gradient(rho_down)
+
+        sigma_up = grad_up**2
+        sigma_down = grad_down**2
+        sigma_updown = grad_up * grad_down
+
+        out = self.compute_vxc_polarized(rho_up, rho_down, sigma_up,
+                                         sigma_updown, sigma_down)
+        vxc_up = out['vrho_up']
+        if self.add_gradient_corrections:
+            vxc_up -= 2. * gd.divergence(out['vsigma_up'] * grad_up)
+            vxc_up -= gd.divergence(out['vsigma_updown'] * grad_down)
+        return vxc_up
 
 
 class XC_PW92:
