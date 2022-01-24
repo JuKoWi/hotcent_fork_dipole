@@ -55,11 +55,6 @@ def atom(request):
 def test_on1c(atom):
     size = atom.basis_size
 
-    for valence in atom.basis_sets:
-        for nl in valence:
-            U = atom.get_hubbard_value(nl, scheme='forward', maxstep=0.5)
-            assert U > 0, 'Negative hubbard value for {0}'.format(nl)
-
     HS_ref = {
         SZP: {
             ('2s', '2s'): (-0.79874591, 0.99999468),
@@ -93,6 +88,16 @@ def test_on1c(atom):
 
         S_diff = abs(S - ref[1])
         assert S_diff < stol, msg.format('S', nl1, nl2, S)
+
+
+@pytest.mark.parametrize('atom', [SZP, DZ], indirect=True)
+def test_hubbard(atom):
+    size = atom.basis_size
+
+    for valence in atom.basis_sets:
+        for nl in valence:
+            U = atom.get_hubbard_value(nl, scheme='forward', maxstep=0.5)
+            assert U > 0, 'Negative hubbard value for {0}'.format(nl)
 
 
 @pytest.mark.parametrize('atom', [SZP, DZ], indirect=True)

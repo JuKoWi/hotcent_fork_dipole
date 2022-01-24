@@ -5,6 +5,7 @@ Reference values come from the BeckeHarris tool, unless mentioned otherwise.
 """
 import pytest
 import numpy as np
+from ase.units import Ha
 from hotcent.confinement import SoftConfinement
 from hotcent.kleinman_bylander import KleinmanBylanderPP
 from hotcent.pseudo_atomic_dft import PseudoAtomicDFT
@@ -46,29 +47,18 @@ def atom(request):
 
 
 @pytest.mark.parametrize('atom', [PBE_LibXC], indirect=True)
-def test_energies(atom):
-    # Reference values obtained with Siesta v4.1.5
-    from ase.units import Ha
-
-    # Total energy
+def test_total_energy(atom):
+    # Reference value based on calculations with Siesta v4.1.5
     e = atom.get_energy()
     e_ref = -273.865791 / Ha
     e_tol = 5e-4
     e_diff = abs(e - e_ref)
     assert e_diff < e_tol
 
-    # Eigenvalues
-    H_ref = {
-        '3s': -0.163276829e+02 / Ha,
-        '3p': -0.620202160e+01 / Ha,
-    }
-    H_tol = 1e-4
-    for nl in atom.valence:
-        H = atom.get_onecenter_integrals(nl, nl)[0]
-        H_diff = abs(H - H_ref[nl])
-        assert H_diff < H_tol, (nl, H)
 
-    # Hubbard parameter for 3p
+@pytest.mark.parametrize('atom', [PBE_LibXC], indirect=True)
+def test_hubbard(atom):
+    # Reference value based on calculations with Siesta v4.1.5
     U = atom.get_hubbard_value('3p', scheme='central', maxstep=1.)
     U_ref = (2*273.865791 - 261.846966 - 274.229224) / Ha
     U_tol = 1e-3
@@ -98,6 +88,18 @@ def test_on1c(atom):
         H = atom.get_onecenter_integrals(nl, nl)[0]
         H_diff = abs(H - ref)
         assert H_diff < htol, msg.format(nl, H)
+
+    if xc == PBE_LibXC:
+        # Reference values based on calculations with Siesta v4.1.5
+        H_ref = {
+            '3s': -0.163276829e+02 / Ha,
+            '3p': -0.620202160e+01 / Ha,
+        }
+        H_tol = 1e-4
+        for nl in atom.valence:
+            H = atom.get_onecenter_integrals(nl, nl)[0]
+            H_diff = abs(H - H_ref[nl])
+            assert H_diff < H_tol, (nl, H)
 
 
 @pytest.mark.parametrize('R', [R1, R2])

@@ -48,21 +48,35 @@ def atoms(request):
 @pytest.mark.parametrize('atoms', [PBE_LibXC], indirect=True)
 def test_on1c(atoms):
     labels = ['AE', 'PP']
-    HU = {label: {} for label in labels}
+    H = {label: {} for label in labels}
     for atom, label in zip(atoms, labels):
         for nl in atom.valence:
-            H, S = atom.get_onecenter_integrals(nl, nl)
-            U = atom.get_hubbard_value(nl)
-            HU[label][nl] = (H, U)
+            H[label][nl], S = atom.get_onecenter_integrals(nl, nl)
 
-    msg = 'Too large difference for {0}_{1} (AE: {2}, PP: {3})'
-    tol = {'H': 5e-5, 'U': 5e-4}
+    msg = 'Too large difference for H_{0} (AE: {1}, PP: {2})'
+    tol = 5e-5
 
-    for nl, vals_ae in HU['AE'].items():
-        vals_pp = HU['PP'][nl]
-        for key, val_ae, val_pp in zip(['H', 'U'], vals_ae, vals_pp):
-            diff = abs(val_ae - val_pp)
-            assert diff < tol[key], msg.format(key, nl, val_ae, val_pp)
+    for nl, val_ae in H['AE'].items():
+        val_pp = H['PP'][nl]
+        diff = abs(val_ae - val_pp)
+        assert diff < tol, msg.format(nl, val_ae, val_pp)
+
+
+@pytest.mark.parametrize('atoms', [PBE_LibXC], indirect=True)
+def test_hubbard(atoms):
+    labels = ['AE', 'PP']
+    U = {label: {} for label in labels}
+    for atom, label in zip(atoms, labels):
+        for nl in atom.valence:
+            U[label][nl] = atom.get_hubbard_value(nl)
+
+    msg = 'Too large difference for U_{0} (AE: {1}, PP: {2})'
+    tol = 5e-4
+
+    for nl, val_ae in U['AE'].items():
+        val_pp = U['PP'][nl]
+        diff = abs(val_ae - val_pp)
+        assert diff < tol, msg.format(nl, val_ae, val_pp)
 
 
 @pytest.mark.parametrize('R', [R1])
