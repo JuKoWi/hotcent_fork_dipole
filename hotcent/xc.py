@@ -19,7 +19,8 @@ except ImportError:
 
 class LibXC:
     def __init__(self, xcname, spin_polarized=False):
-        """ Interface to PyLibXC.
+        """
+        Interface to PyLibXC.
 
         Parameters
         ----------
@@ -60,7 +61,8 @@ class LibXC:
                 raise ValueError('XC func %s is not LDA or GGA' % name)
 
     def compute_exc(self, rho, sigma=None):
-        """ Returns the exchange-correlation energy density.
+        """
+        Returns the exchange-correlation energy density.
 
         Parameters
         ----------
@@ -85,7 +87,8 @@ class LibXC:
         return exc
 
     def compute_vxc(self, rho, sigma=None, fxc=False):
-        """ Returns a dictionary with the arrays needed to compute
+        """
+        Returns a dictionary with the arrays needed to compute
         the XC potential.
 
         Parameters
@@ -102,8 +105,8 @@ class LibXC:
         Returns
         -------
         results: dict of np.ndarray
-            Dictionary with 'vrho' and 'vsigma' and (if fxc=True)
-            'v2rhosigma' and 'v2sigma2'.
+            Dictionary with 'vrho' and (if GGA functionals are involved)
+            'vsigma' and (if also fxc=True) 'v2rhosigma' and 'v2sigma2'.
         """
         inp = {'rho': rho, 'sigma': sigma}
         results = {'vrho': np.zeros_like(rho)}
@@ -154,7 +157,7 @@ class LibXC:
         -------
         results: dict of np.ndarray
             Dictionary with 'vrho_up' and 'vrho_down' and also
-            (if GGA functionals are involved), 'vsigma_up',
+            (if GGA functionals are involved) 'vsigma_up',
             'vsigma_updown' and 'vsigma_down'.
         """
         rho = np.array([rho_up, rho_down])
@@ -191,15 +194,17 @@ class LibXC:
         return results
 
     def compute_all(self, rho, sigma=None):
-        """ Returns the results of self.compute_vxc() together
-        with a 'zk' entry with the result from self.compute_exc().
+        """
+        Returns the results of self.compute_vxc() together with
+        a 'zk' entry with the result from self.compute_exc().
         """
         results = self.compute_vxc(rho, sigma=sigma)
         results['zk'] = self.compute_exc(rho, sigma=sigma)
         return results
 
     def evaluate(self, rho, gd):
-        """ Returns the XC energy density and the XC potential.
+        """
+        Returns the XC energy density and the XC potential.
 
         Parameters
         ----------
@@ -227,7 +232,8 @@ class LibXC:
         return exc, vxc
 
     def evaluate_polarized(self, rho_up, rho_down, gd):
-        """ Returns the XC potential for the 'up' spin channel.
+        """
+        Returns the XC potential for the 'up' spin channel.
 
         Parameters
         ----------
@@ -314,9 +320,13 @@ class XC_PW92:
         return v
 
     def evaluate(self, n, *args, **kwargs):
-        """ Return the XC energy and potential
+        """
+        Returns the XC energy and potential.
 
-            n: array-like, the electron density
+        Parameters
+        ----------
+        n : array-like,
+            The electron density.
         """
         return self.exc(n), self.vxc(n)
 
