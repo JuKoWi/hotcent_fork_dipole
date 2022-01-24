@@ -94,10 +94,31 @@ def test_on1c(atom):
 def test_hubbard(atom):
     size = atom.basis_size
 
-    for valence in atom.basis_sets:
-        for nl in valence:
-            U = atom.get_hubbard_value(nl, scheme='forward', maxstep=0.5)
-            assert U > 0, 'Negative hubbard value for {0}'.format(nl)
+    def mix(U_a, U_b):
+        U = 8. / 5. * ((U_a * U_b) / (U_a + U_b) + \
+                       (U_a * U_b)**2 / (U_a + U_b)**3)
+        return U
+
+    tol = 2e-2
+    msg =  'Too large difference between d(eps_{0})/d(occ_{1}) ' + \
+           'and the value obtained from the mixing rule: {2}'
+
+    for valence1 in atom.basis_sets:
+        for nl1 in valence1:
+            for valence2 in atom.basis_sets:
+                for nl2 in valence2:
+                    U = atom.get_hubbard_value(nl1, nl2, scheme=None,
+                                               maxstep=0.5)
+                    if nl1 == nl2:
+                        assert U > 0, 'U = {0} < 0 for {1}'.format(U, nl)
+                    else:
+                        U_a = atom.get_hubbard_value(nl1, nl1, scheme=None,
+                                                   maxstep=0.5)
+                        U_b = atom.get_hubbard_value(nl2, nl2, scheme=None,
+                                                   maxstep=0.5)
+                        U_mix = mix(U_a, U_b)
+                        U_diff = abs(U - U_mix)
+                        assert U_diff < tol, msg.format(nl1, nl2, U_diff)
 
 
 @pytest.mark.parametrize('atom', [SZP, DZ], indirect=True)
