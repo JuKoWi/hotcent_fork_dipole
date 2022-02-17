@@ -17,7 +17,7 @@ import collections
 import numpy as np
 from scipy.optimize import minimize
 from ase.data import atomic_numbers, covalent_radii
-from ase.units import Bohr, Ha
+from ase.units import Bohr
 from hotcent.confinement import Confinement, ZeroConfinement
 from hotcent.interpolation import build_interpolator, CubicSplineFunction
 from hotcent.orbitals import ANGULAR_MOMENTUM
@@ -823,6 +823,40 @@ class AtomicBase:
                                                  scheme=scheme)
         return U
 
+    def get_analytical_hubbard_value(self, nl1, nl2=None):
+        """
+        Returns the (on-site, one-center) Hubbard value U associated
+        with the given subshell pair, calculated as the corresponding
+        matrix element of the Hartree-XC kernel.
+
+        Parameters
+        ----------
+        nl1 : str
+            First orbital label.
+        nl2 : str
+            Second orbital label. If None (the default) it will be
+            taken equal to the first orbital label.
+        """
+        assert self.perturbative_confinement
+        assert self.solved, NOT_SOLVED_MESSAGE
+
+        nl2 = nl1 if nl2 is None else nl2
+
+        if isinstance(self.xc, LibXC):
+            xc = self.xc
+        elif isinstance(self.xc, XC_PW92):
+            xc = LibXC('LDA_X+LDA_C_PW')
+
+        dens = self.electron_density(self.rgrid)
+        dens_nl1 = self.Rnlg[nl1]**2 / (4 * np.pi)
+        dens_nl2 = self.Rnlg[nl2]**2 / (4 * np.pi)
+
+        kernel = xc.evaluate_fxc(dens, self.grid)
+        U = self.grid.integrate(dens_nl1 * kernel * dens_nl2, use_dV=True)
+        vhar2 = self.calculate_hartree_potential(dens_nl2, nel=1.)
+        U += self.grid.integrate(dens_nl1 * vhar2, use_dV=True)
+        return U
+
     def get_spin_constant(self, nl, nl2=None, maxstep=0.5, scheme=None):
         """
         Calculates the spin constant of the given orbital based on
@@ -845,6 +879,41 @@ class AtomicBase:
         dedf_down = self.calculate_eigenvalue_derivative(nl, nl2,
                                     maxstep=maxstep, scheme=scheme, spin='down')
         W = 0.5 * (dedf_up - dedf_down)
+        return W
+
+    def get_analytical_spin_constant(self, nl1, nl2=None):
+        """
+        Returns the (on-site, one-center) spin constant W associated
+        with the given subshell pair, calculated as the corresponding
+        matrix element of the spin-polarized XC kernel.
+
+        Parameters
+        ----------
+        nl1 : str
+            First orbital label.
+        nl2 : str
+            Second orbital label. If None (the default) it will be
+            taken equal to the first orbital label.
+        """
+        assert self.perturbative_confinement
+        assert self.solved, NOT_SOLVED_MESSAGE
+
+        nl2 = nl1 if nl2 is None else nl2
+
+        if isinstance(self.xc, LibXC):
+            xcname = self.xc.xcname
+            xc = LibXC(xcname, spin_polarized=True)
+        elif isinstance(self.xc, XC_PW92):
+            xc = LibXC('LDA_X+LDA_C_PW', spin_polarized=True)
+
+        dens = self.electron_density(self.rgrid)
+        dens_nl1 = self.Rnlg[nl1]**2 / (4 * np.pi)
+        dens_nl2 = self.Rnlg[nl2]**2 / (4 * np.pi)
+
+        dens_up = dens / 2.
+        dens_down = np.copy(dens_up)
+        fxc = xc.evaluate_fxc_polarized(dens_up, dens_down, self.grid)
+        W = self.grid.integrate(dens_nl1 * fxc * dens_nl2, use_dV=True)
         return W
 
     def generate_nonminimal_basis(self, size, tail_norm=None, l_pol=None,

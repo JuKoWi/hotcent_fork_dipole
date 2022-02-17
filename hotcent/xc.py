@@ -100,38 +100,45 @@ class LibXC:
             (only needed if GGA functionals are involved).
         fxc : bool, optional
             Whether to also compute selected second derivatives
-            with respect to the electron density.
+            with respect to the electron density and its gradient.
 
         Returns
         -------
         results: dict of np.ndarray
-            Dictionary with 'vrho' and (if GGA functionals are involved)
-            'vsigma' and (if also fxc=True) 'v2rhosigma' and 'v2sigma2'.
+            Dictionary with 'vrho' and (if fxc=True) 'v2rho2'.
+            If GGA functionals are involved, also 'vsigma' and
+            (if fxc=True) 'v2rhosigma' and 'v2sigma2' are included.
         """
         inp = {'rho': rho, 'sigma': sigma}
-        results = {'vrho': np.zeros_like(rho)}
-        if self.add_gradient_corrections:
-            grad_keys = ['vsigma']
-            if fxc:
-                grad_keys.extend(['v2rhosigma', 'v2sigma2'])
 
-            for key in grad_keys:
-                results[key] = np.copy(results['vrho'])
+        includes = ['vrho']
+        if fxc:
+            includes += ['v2rho2']
+
+        if self.add_gradient_corrections:
+            includes += ['vsigma']
+            if fxc:
+                includes += ['v2rhosigma', 'v2sigma2']
+
+        N = len(rho)
+        results = {}
+        for key in includes:
+            results[key] = np.zeros(N)
 
         for i, func in enumerate(self.functionals):
             is_gga = self.types[i] == 'GGA'
-            do_fxc = fxc and is_gga
-            out = func.compute(inp, do_exc=False, do_vxc=True, do_fxc=do_fxc)
+            out = func.compute(inp, do_exc=False, do_vxc=True, do_fxc=fxc)
 
-            results['vrho'] += out['vrho'][:, 0]
-            if self.add_gradient_corrections and is_gga:
-                for key in grad_keys:
-                    results[key] += out[key][:, 0]
+            for key in includes:
+                if 'sigma' in key and not is_gga:
+                    continue
+
+                results[key] += out[key][:, 0]
 
         return results
 
     def compute_vxc_polarized(self, rho_up, rho_down, sigma_up=None,
-                              sigma_updown=None, sigma_down=None):
+                              sigma_updown=None, sigma_down=None, fxc=False):
         """
         Returns a dictionary with the arrays needed to compute
         the spin-resolved XC potentials.
@@ -152,13 +159,16 @@ class LibXC:
         sigma_down : np.ndarray, optional
             Norm of the electron density gradient for the 'down' spin
             channel (only needed if GGA functionals are involved).
+        fxc : bool, optional
+            Whether to also compute selected second derivatives
+            with respect to the electron density and its gradient.
 
         Returns
         -------
         results: dict of np.ndarray
-            Dictionary with 'vrho_up' and 'vrho_down' and also
-            (if GGA functionals are involved) 'vsigma_up',
-            'vsigma_updown' and 'vsigma_down'.
+            Dictionary with 'vrho' and (if fxc=True) 'v2rho2'.
+            If GGA functionals are involved, also 'vsigma' and
+            (if fxc=True) 'v2rhosigma' and 'v2sigma2' are included.
         """
         rho = np.array([rho_up, rho_down])
         sigma = np.array([sigma_up, sigma_updown, sigma_down])
@@ -167,29 +177,40 @@ class LibXC:
             'sigma': np.ascontiguousarray(sigma.T),
         }
 
-        N = len(rho_up)
-        results = {}
-
-        for suffix in ['up', 'down']:
-            results['vrho_' + suffix] = np.zeros(N)
+        suffices = {
+            'vrho': ['_up', '_down'],
+            'v2rho2': ['_up', '_updown', '_down'],
+            'vsigma': ['_up', '_updown', '_down'],
+            'v2rhosigma': ['_up_up', '_up_updown', '_up_down',
+                           '_down_up', '_down_updown', '_down_down'],
+            'v2sigma2': ['_up_up', '_up_updown', '_up_down', '_updown_updown',
+                         '_updown_down', '_down_down'],
+        }
+        includes = ['vrho']
+        if fxc:
+            includes += ['v2rho2']
 
         if self.add_gradient_corrections:
-            grad_keys = ['vsigma']
-            for key in grad_keys:
-                for suffix in ['up', 'updown', 'down']:
-                    results[key + '_' + suffix] = np.zeros(N)
+            includes += ['vsigma']
+            if fxc:
+                includes += ['v2rhosigma', 'v2sigma2']
+
+        N = len(rho_up)
+        results = {}
+        for key in includes:
+            for suffix in suffices[key]:
+                results[key + suffix] = np.zeros(N)
 
         for i, func in enumerate(self.functionals):
             is_gga = self.types[i] == 'GGA'
-            out = func.compute(inp, do_exc=False, do_vxc=True, do_fxc=False)
+            out = func.compute(inp, do_exc=False, do_vxc=True, do_fxc=fxc)
 
-            for j, suffix in enumerate(['up', 'down']):
-                results['vrho_' + suffix] += out['vrho'][:, j]
+            for key in includes:
+                if 'sigma' in key and not is_gga:
+                    continue
 
-            if self.add_gradient_corrections and is_gga:
-                for key in grad_keys:
-                    for j, suffix in enumerate(['up', 'updown', 'down']):
-                        results[key + '_' + suffix] += out[key][:, j]
+                for j, suffix in enumerate(suffices[key]):
+                    results[key + suffix] += out[key][:, j]
 
         return results
 
@@ -264,6 +285,70 @@ class LibXC:
             vxc_up -= 2. * gd.divergence(out['vsigma_up'] * grad_up)
             vxc_up -= gd.divergence(out['vsigma_updown'] * grad_down)
         return vxc_up
+
+    def evaluate_fxc(self, rho, gd):
+        """
+        Returns the XC kernel (second derivative w.r.t. the electron
+        density).
+
+        Parameters
+        ----------
+        rho : np.ndarray
+            Electron density.
+        gd : Grid
+            An object that can carry out gradient and divergence
+            operations on a grid-based array.
+
+        Returns
+        -------
+        fxc : np.ndarray
+            XC kernel.
+        """
+        grad = gd.gradient(rho)
+        sigma = grad**2
+
+        out = self.compute_vxc(rho, sigma=sigma, fxc=True)
+        fxc = out['v2rho2']
+        if self.add_gradient_corrections:
+            raise NotImplementedError
+        return fxc
+
+    def evaluate_fxc_polarized(self, rho_up, rho_down, gd):
+        """
+        Returns the spin-polarized XC kernel (second derivative
+        w.r.t. the magnetization density).
+
+        Parameters
+        ----------
+        rho_up : np.ndarray
+            Electron density for the 'up' spin channel.
+        rho_down : np.ndarray
+            Electron density for the 'up' spin channel.
+        gd : Grid
+            An object that can carry out gradient and divergence
+            operations on a grid-based array.
+
+        Returns
+        -------
+        fxc : np.ndarray
+            XC kernel.
+        """
+        grad_up = gd.gradient(rho_up)
+        grad_down = gd.gradient(rho_down)
+
+        sigma_up = grad_up**2
+        sigma_down = grad_down**2
+        sigma_updown = grad_up * grad_down
+
+        out = self.compute_vxc_polarized(rho_up, rho_down, sigma_up,
+                                         sigma_updown, sigma_down, fxc=True)
+        fxc = out['v2rho2_up'] - out['v2rho2_updown']
+
+        if self.add_gradient_corrections:
+            raise NotImplementedError
+
+        fxc /= 2.
+        return fxc
 
 
 class XC_PW92:
