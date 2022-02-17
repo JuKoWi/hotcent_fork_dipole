@@ -216,15 +216,21 @@ class AtomicDFT(AtomicBase):
         self.timer.stop('density')
         return dens
 
-    def calculate_hartree_potential(self, dens, only_valence=False):
+    def calculate_hartree_potential(self, dens, only_valence=False, nel=None):
         """ Calculate the Hartree potential. """
         self.timer.start('Hartree')
         dV = self.grid.get_dvolumes()
         r, r0 = self.rgrid, self.grid.get_r0grid()
         N = self.N
-        n0 = 0.5 * (dens[1:] + dens[:-1])
-        nel = self.get_number_of_electrons(only_valence=only_valence)
-        n0 *= nel / np.sum(n0 * dV) if nel > 0 else 0.
+
+        if nel is None:
+            nel = self.get_number_of_electrons(only_valence=only_valence)
+
+        if np.isclose(nel, 0.):
+            n0 = np.zeros(np.size(dens) - 1)
+        else:
+            n0 = 0.5 * (dens[1:] + dens[:-1])
+            n0 *= nel / np.sum(n0 * dV)
 
         if _hotcent is not None:
             vhar = _hotcent.hartree(n0, dV, r, r0, N)
