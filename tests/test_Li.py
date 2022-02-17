@@ -11,6 +11,7 @@ from hotcent.pseudo_atomic_dft import PseudoAtomicDFT
 
 R1 = 4.0
 PBE_LibXC = 'GGA_X_PBE+GGA_C_PBE'
+LDA = 'LDA'
 
 
 @pytest.fixture(scope='module')
@@ -77,6 +78,27 @@ def test_hubbard(atoms):
         val_pp = U['PP'][nl]
         diff = abs(val_ae - val_pp)
         assert diff < tol, msg.format(nl, val_ae, val_pp)
+
+
+@pytest.mark.parametrize('atoms', [LDA], indirect=True)
+def test_hubbard_analytical(atoms):
+    for atom, ae_or_pp in zip(atoms, ['AE', 'PP']):
+        labels = ['analytical', 'numerical']
+        U = {label: {} for label in labels}
+        for label in labels:
+            for nl in atom.valence:
+                if label == 'analytical':
+                    U[label][nl] = atom.get_analytical_hubbard_value(nl)
+                elif label == 'numerical':
+                    U[label][nl] = atom.get_hubbard_value(nl, maxstep=0.2)
+
+        msg = 'Too large diff. for U_{0}-{1} (analytical: {2}, numerical: {3})'
+        tol = 5e-4
+
+        for nl, val_ana in U['analytical'].items():
+            val_num = U['numerical'][nl]
+            diff = abs(val_ana - val_num)
+            assert diff < tol, msg.format(nl, ae_or_pp, val_ana, val_num)
 
 
 @pytest.mark.parametrize('R', [R1])

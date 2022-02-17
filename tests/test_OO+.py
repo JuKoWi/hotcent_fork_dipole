@@ -14,6 +14,7 @@ R1 = 2.4
 
 SZP = 'szp'
 DZ = 'dz'
+DZP = 'dzp'
 
 
 @pytest.fixture(scope='module')
@@ -92,16 +93,14 @@ def test_on1c(atom):
 
 @pytest.mark.parametrize('atom', [SZP, DZ], indirect=True)
 def test_hubbard(atom):
-    size = atom.basis_size
-
     def mix(U_a, U_b):
         U = 8. / 5. * ((U_a * U_b) / (U_a + U_b) + \
                        (U_a * U_b)**2 / (U_a + U_b)**3)
         return U
 
     tol = 2e-2
-    msg =  'Too large difference between d(eps_{0})/d(occ_{1}) ' + \
-           'and the value obtained from the mixing rule: {2}'
+    msg = 'Too large difference between d(eps_{0})/d(occ_{1}) ' + \
+          'and the value obtained from the mixing rule: {2}'
 
     for valence1 in atom.basis_sets:
         for nl1 in valence1:
@@ -110,15 +109,31 @@ def test_hubbard(atom):
                     U = atom.get_hubbard_value(nl1, nl2, scheme=None,
                                                maxstep=0.5)
                     if nl1 == nl2:
-                        assert U > 0, 'U = {0} < 0 for {1}'.format(U, nl)
+                        assert U > 0, 'U = {0} < 0 for {1}'.format(U, nl1)
                     else:
                         U_a = atom.get_hubbard_value(nl1, nl1, scheme=None,
-                                                   maxstep=0.5)
+                                                     maxstep=0.5)
                         U_b = atom.get_hubbard_value(nl2, nl2, scheme=None,
-                                                   maxstep=0.5)
+                                                     maxstep=0.5)
                         U_mix = mix(U_a, U_b)
                         U_diff = abs(U - U_mix)
                         assert U_diff < tol, msg.format(nl1, nl2, U_diff)
+
+
+@pytest.mark.parametrize('atom', [SZP, DZ], indirect=True)
+def test_hubbard_analytical(atom):
+    tol = 5e-4
+    msg = 'Too large diff. for U_{0}-{1} (analytical: {2}, numerical: {3})'
+
+    for valence1 in atom.basis_sets:
+        for nl1 in valence1:
+            for valence2 in atom.basis_sets:
+                for nl2 in valence2:
+                    U_num = atom.get_hubbard_value(nl1, nl2, scheme=None,
+                                                   maxstep=0.25)
+                    U_ana = atom.get_analytical_hubbard_value(nl1, nl2)
+                    U_diff = abs(U_num - U_ana)
+                    assert U_diff < tol, msg.format(nl1, nl2, U_ana, U_num)
 
 
 @pytest.mark.parametrize('atom', [SZP, DZ], indirect=True)
@@ -170,6 +185,22 @@ def test_spin(atom):
                                                maxstep=0.5)
                     W_diff = abs(W - W_ref[size][(nl1, nl2)])
                     assert W_diff < tol, msg.format(nl1, nl2, W)
+
+
+@pytest.mark.parametrize('atom', [SZP, DZ], indirect=True)
+def test_spin_analytical(atom):
+    tol = 5e-4
+    msg = 'Too large diff. for W_{0}-{1} (analytical: {2}, numerical: {3})'
+
+    for valence1 in atom.basis_sets:
+        for nl1 in valence1:
+            for valence2 in atom.basis_sets:
+                for nl2 in valence2:
+                    W_num = atom.get_spin_constant(nl1, nl2, scheme=None,
+                                                   maxstep=0.25)
+                    W_ana = atom.get_analytical_spin_constant(nl1, nl2)
+                    W_diff = abs(W_num - W_ana)
+                    assert W_diff < tol, msg.format(nl1, nl2, W_ana, W_num)
 
 
 @pytest.mark.parametrize('R', [R1])
@@ -316,6 +347,168 @@ def test_on2c(R, atom):
             val = H[key][0, index]
             diff = abs(val - ref)
             assert diff < htol, msg.format(integral, key, val)
+
+
+@pytest.mark.parametrize('R', [R1])
+@pytest.mark.parametrize('atom', [DZP], indirect=True)
+def test_chg2c(R, atom):
+    # Regression test
+    from hotcent.offsite_chargetransfer import Offsite2cGammaTable
+    from hotcent.onsite_chargetransfer import Onsite2cGammaTable
+
+    xc = atom.xcname
+    xc = 'LDA_X+LDA_C_PW' if xc == 'LDA' else xc
+    size = atom.basis_size
+    rmin, dr, N = R, R, 2
+    tol = 1e-9
+    msg = 'Too large error for {0}_{1}-{2} [{3}] (value={4})'
+
+    chg2c = Offsite2cGammaTable(atom, atom)
+    chg2c.run(rmin=rmin, dr=dr, N=N, xc=xc, smoothen_tails=False,
+              shift=False, ntheta=300, nr=100)
+    G = chg2c.tables
+
+    G_ref = {
+        (R1, DZP): {
+            (0, 0, 0):
+                [-9.35969499e-03, -1.34282890e-02, -1.46553291e-02,  0.,
+                 -1.34277776e-02, -1.75928447e-02, -1.94190229e-02,  0.,
+                 -1.46544664e-02, -1.94185700e-02, -2.36020571e-02,  0.,
+                  0.,  0.,  0.,  0.],
+            (0, 0, 1):
+                [-4.40057174e-03, -5.77791810e-03,  0.,  0.,
+                 -8.04183907e-03, -9.57411647e-03,  0.,  0.,
+                 -7.32470849e-03, -9.52989235e-03,  0.,  0., 0.,  0.,  0.,  0.],
+            (0, 1, 0):
+                [-4.40133432e-03, -8.04316075e-03, -7.32625544e-03,  0.,
+                 -5.77845065e-03, -9.57518213e-03, -9.53122151e-03,  0.,
+                  0.,  0.,  0.,  0., 0.,  0.,  0.,  0.],
+            (0, 1, 1):
+                [-9.63066950e-04, -1.80356765e-03,  0.,  0.,
+                 -1.80335255e-03, -2.83041102e-03,  0.,  0.,
+                  0.,  0.,  0.,  0., 0.,  0.,  0.,  0.],
+        }
+    }
+
+    for key, val in G.items():
+        val_ref = G_ref[R, size][key]
+        for i, (item, item_ref) in enumerate(zip(val[0, :], val_ref)):
+            diff = abs(item - item_ref)
+            assert diff < tol, msg.format('Goff2c', key, val[0, i], i, item)
+
+    G_ref = {
+        (R1, DZP): {
+            (0, 0):
+                [1.42296952e-03, 1.42910128e-03, 2.11772456e-03, 0.0,
+                 1.42910128e-03, 1.56374110e-03, 2.19621864e-03, 0.0,
+                 2.11772456e-03, 2.19621864e-03, 4.00294625e-03, 0.0,
+                 0.,  0.,  0.,  0.],
+            (0, 1):
+                [1.05548720e-03, 1.18507853e-03,  0.,  0.,
+                 9.46946512e-04, 1.12067380e-03,  0.,  0.,
+                 1.11553459e-03, 1.52803407e-03,  0.,  0., 0.,  0.,  0.,  0.],
+            (1, 0):
+                [1.05548720e-03, 9.46946512e-04, 1.11553459e-03,  0.,
+                 1.18507853e-03, 1.12067380e-03, 1.52803407e-03,  0.,
+                 0.,  0.,  0.,  0., 0.,  0.,  0.,  0.],
+            (1, 1):
+                [1.08711046e-03, 1.05680334e-03,  0.,  0.,
+                 1.05680334e-03, 1.11845459e-03,  0.,  0.,
+                 0.,  0.,  0.,  0., 0.,  0.,  0.,  0.],
+        }
+    }
+
+    chg2c = Onsite2cGammaTable(atom, atom)
+    chg2c.run(rmin=rmin, dr=dr, N=N, xc=xc, smoothen_tails=False,
+              ntheta=300, nr=100)
+    G = chg2c.tables
+
+    for key, val in G.items():
+        val_ref = G_ref[R, size][key]
+        for i, (item, item_ref) in enumerate(zip(val[0, :], val_ref)):
+            diff = abs(item - item_ref)
+            assert diff < tol, msg.format('Gon2c', key, val[0, i], i, item)
+
+
+@pytest.mark.parametrize('R', [R1])
+@pytest.mark.parametrize('atom', [DZP], indirect=True)
+def test_mag2c(R, atom):
+    # Regression test
+    from hotcent.offsite_magnetization import Offsite2cWTable
+    from hotcent.onsite_magnetization import Onsite2cWTable
+
+    xc = atom.xcname
+    xc = 'LDA_X+LDA_C_PW' if xc == 'LDA' else xc
+    size = atom.basis_size
+    rmin, dr, N = R, R, 2
+    tol = 1e-9
+    msg = 'Too large error for {0}_{1}-{2} [{3}] (value={4})'
+
+    mag2c = Offsite2cWTable(atom, atom)
+    mag2c.run(rmin=rmin, dr=dr, N=N, xc=xc, smoothen_tails=False,
+              ntheta=300, nr=100)
+    W = mag2c.tables
+
+    W_ref = {
+        (R1, DZP): {
+            (0, 0, 0):
+                [-1.79165855e-03, -2.00311480e-03, -2.89578338e-03,  0.,
+                 -2.00311480e-03, -2.22735265e-03, -3.08172118e-03,  0.,
+                 -2.89578338e-03, -3.08172118e-03, -4.35845865e-03,  0.,
+                  0.,  0.,  0.,  0.],
+            (0, 0, 1):
+                [-1.08039042e-03, -1.32933282e-03,  0.,  0.,
+                 -1.29743684e-03, -1.54043621e-03,  0.,  0.,
+                 -2.02415879e-03, -2.33307716e-03,  0.,  0., 0.,  0.,  0.,  0.],
+            (0, 1, 0):
+                [-1.08039042e-03, -1.29743684e-03, -2.02415879e-03,  0.,
+                 -1.32933282e-03, -1.54043621e-03, -2.33307716e-03,  0.,
+                  0.,  0.,  0.,  0., 0.,  0.,  0.,  0.],
+            (0, 1, 1):
+                [-4.44143146e-04, -6.67809564e-04,  0.,  0.,
+                 -6.67809564e-04, -9.01765450e-04,  0.,  0.,
+                  0.,  0.,  0.,  0., 0.,  0.,  0.,  0.],
+        }
+    }
+
+    for key, val in W.items():
+        val_ref = W_ref[R, size][key]
+        for i, (item, item_ref) in enumerate(zip(val[0, :], val_ref)):
+            diff = abs(item - item_ref)
+            assert diff < tol, msg.format('Woff2c', key, val[0, i], i, item)
+
+    W_ref = {
+        (R1, DZP): {
+            (0, 0):
+                [9.61652033e-04, 9.46355500e-04, 1.38206143e-03, 0.0,
+                 9.46355500e-04, 9.96262206e-04, 1.41085940e-03, 0.0,
+                 1.38206143e-03, 1.41085940e-03, 2.57319291e-03, 0.0,
+                 0.,  0.,  0.,  0.],
+            (0, 1):
+                [7.51922824e-04, 8.25861445e-04,  0.,  0.,
+                 6.73925789e-04, 7.76604103e-04,  0.,  0.,
+                 7.64947714e-04, 1.02052139e-03,  0.,  0., 0.,  0.,  0.,  0.],
+            (1, 0):
+                [7.51922824e-04, 6.73925789e-04, 7.64947714e-04,  0.,
+                 8.25861445e-04, 7.76604103e-04, 1.02052139e-03,  0.,
+                 0.,  0.,  0.,  0., 0.,  0.,  0.,  0.],
+            (1, 1):
+                [7.89504958e-04, 7.61853632e-04,  0.,  0.,
+                 7.61853632e-04, 7.95211355e-04,  0.,  0.,
+                 0.,  0.,  0.,  0., 0.,  0.,  0.,  0.],
+        }
+    }
+
+    mag2c = Onsite2cWTable(atom, atom)
+    mag2c.run(rmin=rmin, dr=dr, N=N, xc=xc, smoothen_tails=False,
+              ntheta=300, nr=100)
+    W = mag2c.tables
+
+    for key, val in W.items():
+        val_ref = W_ref[R, size][key]
+        for i, (item, item_ref) in enumerate(zip(val[0, :], val_ref)):
+            diff = abs(item - item_ref)
+            assert diff < tol, msg.format('Won2c', key, val[0, i], i, item)
 
 
 @pytest.fixture(scope='module')
