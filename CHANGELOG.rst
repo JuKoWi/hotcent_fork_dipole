@@ -45,6 +45,19 @@ Development version
 * Added the possibility to calculate spin constants (W values).
   This requires the otherwise optional PyLibXC dependency.
 
+* Implemented analytical methods for Hubbard value and spin constant
+  calculations based on the (Hartree-)XC kernel (instead of finite
+  differentiation of atomic eigenvalues).
+
+* Added the possibility to calculate higher-order corrections to
+  Hamiltonian and (Hartree-) XC kernel matrix elements:
+
+  - three-center expansion for off-site H integrals
+  - two- and three-center expansions for on-site H integrals
+  - two-center expansion for on- and off-site "gamma" and "W"
+    integrals associated with the SCC and spin polarization energies,
+    respectively.
+
 
 Version 1.0
 ===========
