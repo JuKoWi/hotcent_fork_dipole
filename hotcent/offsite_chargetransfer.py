@@ -129,14 +129,22 @@ class Offsite2cGammaTable(MultiAtomIntegrator):
         rho = e1.electron_density(r1) + e2.electron_density(r2)
 
         if xc.add_gradient_corrections:
-            raise NotImplementedError('GGA functionals are not yet implemented')
+            drho1 = e1.electron_density(r1, der=1)
+            drho2 = e2.electron_density(r2, der=1)
+            c1 = y / r1  # cosine of theta_1
+            c2 = (y - R) / r2  # cosine of theta_2
+            s1 = x / r1  # sine of theta_1
+            s2 = x / r2  # sine of theta_2
+
+            grad_rho_x = drho1 * s1 + drho2 * s2
+            grad_rho_y = drho1 * c1 + drho2 * c2
+            sigma = grad_rho_x**2 + grad_rho_y**2
         else:
             sigma = None
         self.timer.stop('prelude')
 
         self.timer.start('fxc')
         out = xc.compute_vxc(rho, sigma=sigma, fxc=True)
-        v2rho2 = out['v2rho2']
         self.timer.stop('fxc')
 
         G = {}
@@ -144,10 +152,26 @@ class Offsite2cGammaTable(MultiAtomIntegrator):
             nl1, nl2 = key
             dens_nl1 = e1.Rnl(r1, nl1)**2 / (4 * np.pi)
             dens_nl2 = e2.Rnl(r2, nl2)**2 / (4 * np.pi)
-            G[key] = np.sum(dens_nl1 * v2rho2 * dens_nl2 * aux)
+            integrand = out['v2rho2'] * dens_nl1 * dens_nl2
 
             if xc.add_gradient_corrections:
-                raise NotImplementedError('GGA functionals not yet implemented')
+                dnl1 = e1.Rnl(r1, nl1) / (2 * np.pi) * e1.Rnl(r1, nl1, der=1)
+                dnl2 = e2.Rnl(r2, nl2) / (2 * np.pi) * e2.Rnl(r2, nl2, der=1)
+                grad_nl1_grad_nl2 = (dnl1*s1 * dnl2*s2) + (dnl1*c1 * dnl2*c2)
+
+                grad_nl1_grad_rho = (dnl1*s1 * grad_rho_x) \
+                                    + (dnl1*c1 * grad_rho_y)
+                grad_nl2_grad_rho = (dnl2*s2 * grad_rho_x) \
+                                    + (dnl2*c2 * grad_rho_y)
+
+                integrand += 2. * out['v2rhosigma'] \
+                             * (grad_nl1_grad_rho * dens_nl2 \
+                                + grad_nl2_grad_rho * dens_nl1)
+                integrand += 4. * out['v2sigma2'] \
+                             * grad_nl1_grad_rho * grad_nl2_grad_rho
+                integrand += 2. * out['vsigma'] * grad_nl1_grad_nl2
+
+            G[key] = np.sum(integrand * aux)
 
         self.timer.stop('calculate_offsiteG_xc')
         return G

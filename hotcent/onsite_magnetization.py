@@ -115,7 +115,30 @@ class Onsite2cWTable(MultiAtomIntegrator):
         rho12_down = rho1_down + rho2_down
 
         if xc.add_gradient_corrections:
-            raise NotImplementedError('GGA functionals are not yet implemented')
+            drho1_up = e1.electron_density(r1, der=1) / 2.
+            drho2_up = e2.electron_density(r2, der=1) / 2.
+            c1 = y / r1  # cosine of theta_1
+            c2 = (y - R) / r2  # cosine of theta_2
+            s1 = x / r1  # sine of theta_1
+            s2 = x / r2  # sine of theta_2
+
+            grad_rho1_x_up = drho1_up * s1
+            grad_rho1_y_up = drho1_up * c1
+            grad_rho1_x_down = np.copy(grad_rho1_x_up)
+            grad_rho1_y_down = np.copy(grad_rho1_y_up)
+            sigma1_up = grad_rho1_x_up**2 + grad_rho1_y_up**2
+            sigma1_updown = grad_rho1_x_up * grad_rho1_x_down \
+                            + grad_rho1_y_up * grad_rho1_y_down
+            sigma1_down = grad_rho1_x_down**2 + grad_rho1_y_down**2
+
+            grad_rho12_x_up = drho1_up * s1 + drho2_up * s2
+            grad_rho12_y_up = drho1_up * c1 + drho2_up * c2
+            grad_rho12_x_down = np.copy(grad_rho12_x_up)
+            grad_rho12_y_down = np.copy(grad_rho12_y_up)
+            sigma12_up = grad_rho12_x_up**2 + grad_rho12_y_up**2
+            sigma12_updown = grad_rho12_x_up * grad_rho12_x_down \
+                             + grad_rho12_y_up * grad_rho12_y_down
+            sigma12_down = grad_rho12_x_down**2 + grad_rho12_y_down**2
         else:
             sigma1_up, sigma1_updown, sigma1_down = None, None, None
             sigma12_up, sigma12_updown, sigma12_down = None, None, None
@@ -123,16 +146,13 @@ class Onsite2cWTable(MultiAtomIntegrator):
         self.timer.stop('prelude')
 
         self.timer.start('fxc')
-        out = xc.compute_vxc_polarized(rho12_up, rho12_down,
-                                       sigma_up=sigma12_up,
-                                       sigma_updown=sigma12_updown,
-                                       sigma_down=sigma12_down, fxc=True)
-        v2rho2 = (out['v2rho2_up'] - out['v2rho2_updown']) / 2.
-
-        out = xc.compute_vxc_polarized(rho1_up, rho1_down, sigma_up=sigma1_up,
-                                       sigma_updown=sigma1_updown,
-                                       sigma_down=sigma1_down, fxc=True)
-        v2rho2 -= (out['v2rho2_up'] - out['v2rho2_updown']) / 2.
+        out1 = xc.compute_vxc_polarized(rho1_up, rho1_down, sigma_up=sigma1_up,
+                                        sigma_updown=sigma1_updown,
+                                        sigma_down=sigma1_down, fxc=True)
+        out12 = xc.compute_vxc_polarized(rho12_up, rho12_down,
+                                         sigma_up=sigma12_up,
+                                         sigma_updown=sigma12_updown,
+                                         sigma_down=sigma12_down, fxc=True)
         self.timer.stop('fxc')
 
         W = {}
@@ -140,10 +160,116 @@ class Onsite2cWTable(MultiAtomIntegrator):
             nl1a, nl1b = key
             dens_nl1a = e1.Rnl(r1, nl1a)**2 / (4 * np.pi)
             dens_nl1b = e1.Rnl(r1, nl1b)**2 / (4 * np.pi)
-            W[key] = np.sum(dens_nl1a * v2rho2 * dens_nl1b * aux)
+
+            integrand = (out12['v2rho2_up'] - out12['v2rho2_updown']) \
+                        * dens_nl1a * dens_nl1b
+
+            integrand -= (out1['v2rho2_up'] - out1['v2rho2_updown']) \
+                         * dens_nl1a * dens_nl1b
 
             if xc.add_gradient_corrections:
-                raise NotImplementedError('GGA functionals not yet implemented')
+                dnl1a = e1.Rnl(r1, nl1a) / (2 * np.pi) * e1.Rnl(r1, nl1a, der=1)
+                dnl1b = e2.Rnl(r1, nl1b) / (2 * np.pi) * e1.Rnl(r1, nl1b, der=1)
+                grad_nl1a_grad_nl1b = (dnl1a*s1 * dnl1b*s1) \
+                                      + (dnl1a*c1 * dnl1b*c1)
+
+                # rho12
+                grad_nl1a_grad_rho12_up = (dnl1a*s1 * grad_rho12_x_up) \
+                                          + (dnl1a*c1 * grad_rho12_y_up)
+                grad_nl1b_grad_rho12_up = (dnl1b*s1 * grad_rho12_x_up) \
+                                          + (dnl1b*c1 * grad_rho12_y_up)
+                grad_nl1a_grad_rho12_down = (dnl1a*s1 * grad_rho12_x_down) \
+                                            + (dnl1a*c1 * grad_rho12_y_down)
+                grad_nl1b_grad_rho12_down = (dnl1b*s1 * grad_rho12_x_down) \
+                                            + (dnl1b*c1 * grad_rho12_y_down)
+
+                ## up-up contribution
+                integrand += 2. * out12['v2rhosigma_up_up'] \
+                             * (grad_nl1a_grad_rho12_up * dens_nl1b \
+                                + dens_nl1a * grad_nl1b_grad_rho12_up)
+
+                integrand += 4. * out12['v2sigma2_up_up'] \
+                             * grad_nl1a_grad_rho12_up \
+                             * grad_nl1b_grad_rho12_up
+                integrand += 2. * out12['v2sigma2_up_updown'] \
+                             * grad_nl1a_grad_rho12_down \
+                             * grad_nl1b_grad_rho12_up
+                integrand += 2. * out12['v2sigma2_up_updown'] \
+                             * grad_nl1a_grad_rho12_up \
+                             * grad_nl1b_grad_rho12_down
+                integrand += 1. * out12['v2sigma2_updown_updown'] \
+                             * grad_nl1a_grad_rho12_down \
+                             * grad_nl1b_grad_rho12_down
+                integrand += 2. * out12['vsigma_up'] * grad_nl1a_grad_nl1b
+
+                ## up-down contrbution
+                integrand -= 2. * out12['v2rhosigma_up_down'] \
+                             * (grad_nl1a_grad_rho12_down * dens_nl1b \
+                                + dens_nl1a * grad_nl1b_grad_rho12_down)
+
+                integrand -= 4. * out12['v2sigma2_up_down'] \
+                             * grad_nl1a_grad_rho12_down \
+                             * grad_nl1b_grad_rho12_up
+                integrand -= 2. * out12['v2sigma2_up_updown'] \
+                             * grad_nl1a_grad_rho12_down \
+                             * grad_nl1b_grad_rho12_up
+                integrand -= 2. * out12['v2sigma2_updown_down'] \
+                             * grad_nl1a_grad_rho12_down \
+                             * grad_nl1b_grad_rho12_down
+                integrand -= 1. * out12['v2sigma2_updown_updown'] \
+                             * grad_nl1a_grad_rho12_up \
+                             * grad_nl1b_grad_rho12_down
+                integrand -= 1. * out12['vsigma_updown'] * grad_nl1a_grad_nl1b
+
+                # rho1
+                grad_nl1a_grad_rho1_up = (dnl1a*s1 * grad_rho1_x_up) \
+                                          + (dnl1a*c1 * grad_rho1_y_up)
+                grad_nl1b_grad_rho1_up = (dnl1b*s1 * grad_rho1_x_up) \
+                                          + (dnl1b*c1 * grad_rho1_y_up)
+                grad_nl1a_grad_rho1_down = (dnl1a*s1 * grad_rho1_x_down) \
+                                            + (dnl1a*c1 * grad_rho1_y_down)
+                grad_nl1b_grad_rho1_down = (dnl1b*s1 * grad_rho1_x_down) \
+                                            + (dnl1b*c1 * grad_rho1_y_down)
+
+                ## up-up contribution
+                integrand -= 2. * out1['v2rhosigma_up_up'] \
+                             * (grad_nl1a_grad_rho1_up * dens_nl1b \
+                                + dens_nl1a * grad_nl1b_grad_rho1_up)
+
+                integrand -= 4. * out1['v2sigma2_up_up'] \
+                             * grad_nl1a_grad_rho1_up \
+                             * grad_nl1b_grad_rho1_up
+                integrand -= 2. * out1['v2sigma2_up_updown'] \
+                             * grad_nl1a_grad_rho1_down \
+                             * grad_nl1b_grad_rho1_up
+                integrand -= 2. * out1['v2sigma2_up_updown'] \
+                             * grad_nl1a_grad_rho1_up \
+                             * grad_nl1b_grad_rho1_down
+                integrand -= 1. * out1['v2sigma2_updown_updown'] \
+                             * grad_nl1a_grad_rho1_down \
+                             * grad_nl1b_grad_rho1_down
+                integrand -= 2. * out1['vsigma_up'] * grad_nl1a_grad_nl1b
+
+                ## up-down contrbution
+                integrand += 2. * out1['v2rhosigma_up_down'] \
+                             * (grad_nl1a_grad_rho1_down * dens_nl1b \
+                                + dens_nl1a * grad_nl1b_grad_rho1_down)
+
+                integrand += 4. * out1['v2sigma2_up_down'] \
+                             * grad_nl1a_grad_rho1_down \
+                             * grad_nl1b_grad_rho1_up
+                integrand += 2. * out1['v2sigma2_up_updown'] \
+                             * grad_nl1a_grad_rho1_down \
+                             * grad_nl1b_grad_rho1_up
+                integrand += 2. * out1['v2sigma2_updown_down'] \
+                             * grad_nl1a_grad_rho1_down \
+                             * grad_nl1b_grad_rho1_down
+                integrand += 1. * out1['v2sigma2_updown_updown'] \
+                             * grad_nl1a_grad_rho1_up \
+                             * grad_nl1b_grad_rho1_down
+                integrand += 1. * out1['vsigma_updown'] * grad_nl1a_grad_nl1b
+
+            W[key] = np.sum(integrand * aux) / 2.
 
         self.timer.stop('calculate_onsiteW')
         return W
