@@ -18,7 +18,7 @@ class Offsite2cWTable(MultiAtomIntegrator):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
 
     def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
-            xc='LDA_X+LDA_C_PW', smoothen_tails=True):
+            xc='LDA', smoothen_tails=True):
         """
         Calculates off-site, distance dependent "W" values as matrix
         elements of the two-center-expanded spin-polarized XC kernel.
@@ -82,7 +82,7 @@ class Offsite2cWTable(MultiAtomIntegrator):
 
         self.timer.stop('run_offsiteW')
 
-    def calculate(self, selected, e1, e2, R, grid, area, xc='LDA_X+LDA_C_PW'):
+    def calculate(self, selected, e1, e2, R, grid, area, xc='LDA'):
         """
         Calculates the selected integrals involving the magnetization kernel.
 
@@ -106,7 +106,8 @@ class Offsite2cWTable(MultiAtomIntegrator):
         r2 = np.sqrt(x**2 + (y - R)**2)
         aux = 2 * np.pi * area * x
 
-        xc = LibXC(xc, spin_polarized=True)
+        xc = LibXC('LDA_X+LDA_C_PW' if xc == 'LDA' else xc,
+                   spin_polarized=True)
 
         rho_up = (e1.electron_density(r1) + e2.electron_density(r2)) / 2.
         rho_down = np.copy(rho_up)

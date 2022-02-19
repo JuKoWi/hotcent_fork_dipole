@@ -369,8 +369,7 @@ def test_chg2c(R, atom):
     from hotcent.offsite_chargetransfer import Offsite2cGammaTable
     from hotcent.onsite_chargetransfer import Onsite2cGammaTable
 
-    xcname = atom.xcname
-    xc = 'LDA_X+LDA_C_PW' if xcname == 'LDA' else xcname
+    xc = atom.xcname
     size = atom.basis_size
     rmin, dr, N = R, R, 2
 
@@ -424,7 +423,7 @@ def test_chg2c(R, atom):
     }
 
     for key, val in G.items():
-        val_ref = G_ref[R, size, xcname][key]
+        val_ref = G_ref[R, size, xc][key]
         for i, (item, item_ref) in enumerate(zip(val[0, :], val_ref)):
             diff = abs(item - item_ref)
             assert diff < tol, msg.format('Goff2c', key, val[0, i], i, item)
@@ -476,7 +475,7 @@ def test_chg2c(R, atom):
     }
 
     for key, val in G.items():
-        val_ref = G_ref[R, size, xcname][key]
+        val_ref = G_ref[R, size, xc][key]
         for i, (item, item_ref) in enumerate(zip(val[0, :], val_ref)):
             diff = abs(item - item_ref)
             assert diff < tol, msg.format('Gon2c', key, val[0, i], i, item)
@@ -489,8 +488,7 @@ def test_mag2c(R, atom):
     from hotcent.offsite_magnetization import Offsite2cWTable
     from hotcent.onsite_magnetization import Onsite2cWTable
 
-    xcname = atom.xcname
-    xc = 'LDA_X+LDA_C_PW' if xcname == 'LDA' else xcname
+    xc = atom.xcname
     size = atom.basis_size
     rmin, dr, N = R, R, 2
 
@@ -544,7 +542,7 @@ def test_mag2c(R, atom):
     }
 
     for key, val in W.items():
-        val_ref = W_ref[R, size, xcname][key]
+        val_ref = W_ref[R, size, xc][key]
         for i, (item, item_ref) in enumerate(zip(val[0, :], val_ref)):
             diff = abs(item - item_ref)
             assert diff < tol, msg.format('Woff2c', key, val[0, i], i, item)
@@ -596,7 +594,7 @@ def test_mag2c(R, atom):
     }
 
     for key, val in W.items():
-        val_ref = W_ref[R, size, xcname][key]
+        val_ref = W_ref[R, size, xc][key]
         for i, (item, item_ref) in enumerate(zip(val[0, :], val_ref)):
             diff = abs(item - item_ref)
             assert diff < tol, msg.format('Won2c', key, val[0, i], i, item)

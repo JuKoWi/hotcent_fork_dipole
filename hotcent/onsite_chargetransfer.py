@@ -19,7 +19,7 @@ class Onsite2cGammaTable(MultiAtomIntegrator):
                                      **kwargs)
 
     def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
-            xc='LDA_X+LDA_C_PW', smoothen_tails=True):
+            xc='LDA', smoothen_tails=True):
         """
         Calculates on-site, distance dependent "Gamma" values as matrix
         elements of the two-center-expanded XC kernel.
@@ -81,7 +81,7 @@ class Onsite2cGammaTable(MultiAtomIntegrator):
 
         self.timer.stop('run_onsiteG')
 
-    def calculate(self, selected, e1, e2, R, grid, area, xc='LDA_X+LDA_C_PW'):
+    def calculate(self, selected, e1, e2, R, grid, area, xc='LDA'):
         """
         Calculates the selected integrals involving the magnetization kernel.
 
@@ -105,7 +105,7 @@ class Onsite2cGammaTable(MultiAtomIntegrator):
         r2 = np.sqrt(x**2 + (y - R)**2)
         aux = 2 * np.pi * area * x
 
-        xc = LibXC(xc)
+        xc = LibXC('LDA_X+LDA_C_PW' if xc == 'LDA' else xc)
 
         rho1 = e1.electron_density(r1)
         rho2 = e2.electron_density(r2)

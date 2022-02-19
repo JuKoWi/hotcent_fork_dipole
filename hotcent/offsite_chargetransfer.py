@@ -19,7 +19,7 @@ class Offsite2cGammaTable(MultiAtomIntegrator):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
 
     def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
-            xc='LDA_X+LDA_C_PW', smoothen_tails=True, shift=False):
+            xc='LDA', smoothen_tails=True, shift=False):
         """
         Calculates off-site, distance dependent "Gamma" values as matrix
         elements of the two-center-expanded Hartree-XC kernel.
@@ -100,8 +100,7 @@ class Offsite2cGammaTable(MultiAtomIntegrator):
 
         self.timer.stop('run_offsiteG')
 
-    def calculate_xc(self, selected, e1, e2, R, grid, area,
-                     xc='LDA_X+LDA_C_PW'):
+    def calculate_xc(self, selected, e1, e2, R, grid, area, xc='LDA'):
         """
         Calculates the selected integrals involving the XC kernel.
 
@@ -125,7 +124,8 @@ class Offsite2cGammaTable(MultiAtomIntegrator):
         r2 = np.sqrt(x**2 + (y - R)**2)
         aux = 2 * np.pi * area * x
 
-        xc = LibXC(xc)
+        xc = LibXC('LDA_X+LDA_C_PW' if xc == 'LDA' else xc)
+
         rho = e1.electron_density(r1) + e2.electron_density(r2)
 
         if xc.add_gradient_corrections:
