@@ -16,10 +16,21 @@ SZP = 'szp'
 DZ = 'dz'
 DZP = 'dzp'
 
+LDA = 'LDA'
+PBE = 'GGA_X_PBE+GGA_C_PBE'
+
+# The following will be used to avoid unnecessary fixture rebuilds
+SZP_LDA = SZP + '-' + LDA
+SZP_PBE = SZP + '-' + PBE
+DZ_LDA = DZ + '-' + LDA
+DZ_PBE = DZ + '-' + PBE
+DZP_LDA = DZP + '-' + LDA
+DZP_PBE = DZP + '-' + PBE
+
 
 @pytest.fixture(scope='module')
 def atom(request):
-    size = request.param
+    size, xc = request.param.split('-')
 
     configuration = '[He] 2s2 2p4'
 
@@ -35,7 +46,7 @@ def atom(request):
                             verbose=True)
 
     atom = PseudoAtomicDFT(element, pp,
-                           xc='LDA',
+                           xc=xc,
                            nodegpts=1000,
                            valence=valence,
                            configuration=configuration,
@@ -52,7 +63,7 @@ def atom(request):
     return atom
 
 
-@pytest.mark.parametrize('atom', [SZP, DZ], indirect=True)
+@pytest.mark.parametrize('atom', [SZP_LDA, DZ_LDA], indirect=True)
 def test_on1c(atom):
     size = atom.basis_size
 
@@ -91,7 +102,7 @@ def test_on1c(atom):
         assert S_diff < stol, msg.format('S', nl1, nl2, S)
 
 
-@pytest.mark.parametrize('atom', [SZP, DZ], indirect=True)
+@pytest.mark.parametrize('atom', [SZP_LDA, DZ_LDA], indirect=True)
 def test_hubbard(atom):
     def mix(U_a, U_b):
         U = 8. / 5. * ((U_a * U_b) / (U_a + U_b) + \
@@ -120,9 +131,10 @@ def test_hubbard(atom):
                         assert U_diff < tol, msg.format(nl1, nl2, U_diff)
 
 
-@pytest.mark.parametrize('atom', [SZP, DZ], indirect=True)
+@pytest.mark.parametrize('atom', [SZP_LDA, DZ_LDA, SZP_PBE, DZ_PBE],
+                         indirect=True)
 def test_hubbard_analytical(atom):
-    tol = 5e-4
+    tol = 2e-4
     msg = 'Too large diff. for U_{0}-{1} (analytical: {2}, numerical: {3})'
 
     for valence1 in atom.basis_sets:
@@ -136,7 +148,7 @@ def test_hubbard_analytical(atom):
                     assert U_diff < tol, msg.format(nl1, nl2, U_ana, U_num)
 
 
-@pytest.mark.parametrize('atom', [SZP, DZ], indirect=True)
+@pytest.mark.parametrize('atom', [SZP_LDA, DZ_LDA], indirect=True)
 def test_spin(atom):
     size = atom.basis_size
 
@@ -187,9 +199,10 @@ def test_spin(atom):
                     assert W_diff < tol, msg.format(nl1, nl2, W)
 
 
-@pytest.mark.parametrize('atom', [SZP, DZ], indirect=True)
+@pytest.mark.parametrize('atom', [SZP_LDA, DZ_LDA, SZP_PBE, DZ_PBE],
+                         indirect=True)
 def test_spin_analytical(atom):
-    tol = 5e-4
+    tol = 2e-4
     msg = 'Too large diff. for W_{0}-{1} (analytical: {2}, numerical: {3})'
 
     for valence1 in atom.basis_sets:
@@ -204,7 +217,7 @@ def test_spin_analytical(atom):
 
 
 @pytest.mark.parametrize('R', [R1])
-@pytest.mark.parametrize('atom', [SZP, DZ], indirect=True)
+@pytest.mark.parametrize('atom', [SZP_LDA, DZ_LDA], indirect=True)
 def test_off2c(R, atom):
     from hotcent.offsite_twocenter import Offsite2cTable
 
@@ -282,7 +295,7 @@ def test_off2c(R, atom):
 
 
 @pytest.mark.parametrize('R', [R1])
-@pytest.mark.parametrize('atom', [SZP, DZ], indirect=True)
+@pytest.mark.parametrize('atom', [SZP_LDA, DZ_LDA], indirect=True)
 def test_on2c(R, atom):
     from hotcent.onsite_twocenter import Onsite2cTable
 
@@ -350,16 +363,17 @@ def test_on2c(R, atom):
 
 
 @pytest.mark.parametrize('R', [R1])
-@pytest.mark.parametrize('atom', [DZP], indirect=True)
+@pytest.mark.parametrize('atom', [DZP_LDA], indirect=True)
 def test_chg2c(R, atom):
     # Regression test
     from hotcent.offsite_chargetransfer import Offsite2cGammaTable
     from hotcent.onsite_chargetransfer import Onsite2cGammaTable
 
-    xc = atom.xcname
-    xc = 'LDA_X+LDA_C_PW' if xc == 'LDA' else xc
+    xcname = atom.xcname
+    xc = 'LDA_X+LDA_C_PW' if xcname == 'LDA' else xcname
     size = atom.basis_size
     rmin, dr, N = R, R, 2
+
     tol = 1e-9
     msg = 'Too large error for {0}_{1}-{2} [{3}] (value={4})'
 
@@ -369,7 +383,7 @@ def test_chg2c(R, atom):
     G = chg2c.tables
 
     G_ref = {
-        (R1, DZP): {
+        (R1, DZP, LDA): {
             (0, 0, 0):
                 [-9.35969499e-03, -1.34282890e-02, -1.46553291e-02,  0.,
                  -1.34277776e-02, -1.75928447e-02, -1.94190229e-02,  0.,
@@ -391,13 +405,13 @@ def test_chg2c(R, atom):
     }
 
     for key, val in G.items():
-        val_ref = G_ref[R, size][key]
+        val_ref = G_ref[R, size, xcname][key]
         for i, (item, item_ref) in enumerate(zip(val[0, :], val_ref)):
             diff = abs(item - item_ref)
             assert diff < tol, msg.format('Goff2c', key, val[0, i], i, item)
 
     G_ref = {
-        (R1, DZP): {
+        (R1, DZP, LDA): {
             (0, 0):
                 [1.42296952e-03, 1.42910128e-03, 2.11772456e-03, 0.0,
                  1.42910128e-03, 1.56374110e-03, 2.19621864e-03, 0.0,
@@ -424,23 +438,24 @@ def test_chg2c(R, atom):
     G = chg2c.tables
 
     for key, val in G.items():
-        val_ref = G_ref[R, size][key]
+        val_ref = G_ref[R, size, xcname][key]
         for i, (item, item_ref) in enumerate(zip(val[0, :], val_ref)):
             diff = abs(item - item_ref)
             assert diff < tol, msg.format('Gon2c', key, val[0, i], i, item)
 
 
 @pytest.mark.parametrize('R', [R1])
-@pytest.mark.parametrize('atom', [DZP], indirect=True)
+@pytest.mark.parametrize('atom', [DZP_LDA], indirect=True)
 def test_mag2c(R, atom):
     # Regression test
     from hotcent.offsite_magnetization import Offsite2cWTable
     from hotcent.onsite_magnetization import Onsite2cWTable
 
-    xc = atom.xcname
-    xc = 'LDA_X+LDA_C_PW' if xc == 'LDA' else xc
+    xcname = atom.xcname
+    xc = 'LDA_X+LDA_C_PW' if xcname == 'LDA' else xcname
     size = atom.basis_size
     rmin, dr, N = R, R, 2
+
     tol = 1e-9
     msg = 'Too large error for {0}_{1}-{2} [{3}] (value={4})'
 
@@ -450,7 +465,7 @@ def test_mag2c(R, atom):
     W = mag2c.tables
 
     W_ref = {
-        (R1, DZP): {
+        (R1, DZP, LDA): {
             (0, 0, 0):
                 [-1.79165855e-03, -2.00311480e-03, -2.89578338e-03,  0.,
                  -2.00311480e-03, -2.22735265e-03, -3.08172118e-03,  0.,
@@ -472,13 +487,13 @@ def test_mag2c(R, atom):
     }
 
     for key, val in W.items():
-        val_ref = W_ref[R, size][key]
+        val_ref = W_ref[R, size, xcname][key]
         for i, (item, item_ref) in enumerate(zip(val[0, :], val_ref)):
             diff = abs(item - item_ref)
             assert diff < tol, msg.format('Woff2c', key, val[0, i], i, item)
 
     W_ref = {
-        (R1, DZP): {
+        (R1, DZP, LDA): {
             (0, 0):
                 [9.61652033e-04, 9.46355500e-04, 1.38206143e-03, 0.0,
                  9.46355500e-04, 9.96262206e-04, 1.41085940e-03, 0.0,
@@ -505,7 +520,7 @@ def test_mag2c(R, atom):
     W = mag2c.tables
 
     for key, val in W.items():
-        val_ref = W_ref[R, size][key]
+        val_ref = W_ref[R, size, xcname][key]
         for i, (item, item_ref) in enumerate(zip(val[0, :], val_ref)):
             diff = abs(item - item_ref)
             assert diff < tol, msg.format('Won2c', key, val[0, i], i, item)
@@ -521,7 +536,7 @@ def grids(request):
 
 @pytest.mark.parametrize('nphi', ['adaptive', 13])
 @pytest.mark.parametrize('grids', [R1], indirect=True)
-@pytest.mark.parametrize('atom', [SZP, DZ], indirect=True)
+@pytest.mark.parametrize('atom', [SZP_LDA, DZ_LDA], indirect=True)
 def test_off3c(nphi, grids, atom):
     from hotcent.offsite_threecenter import Offsite3cTable
 
@@ -647,7 +662,7 @@ def test_off3c(nphi, grids, atom):
 
 @pytest.mark.parametrize('nphi', ['adaptive', 13])
 @pytest.mark.parametrize('grids', [R1], indirect=True)
-@pytest.mark.parametrize('atom', [SZP, DZ], indirect=True)
+@pytest.mark.parametrize('atom', [SZP_LDA, DZ_LDA], indirect=True)
 def test_on3c(nphi, grids, atom):
     from hotcent.onsite_threecenter import Onsite3cTable
 

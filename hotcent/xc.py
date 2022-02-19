@@ -278,18 +278,21 @@ class LibXC:
         sigma_down = grad_down**2
         sigma_updown = grad_up * grad_down
 
-        out = self.compute_vxc_polarized(rho_up, rho_down, sigma_up,
-                                         sigma_updown, sigma_down)
+        out = self.compute_vxc_polarized(rho_up, rho_down, sigma_up=sigma_up,
+                                         sigma_updown=sigma_updown,
+                                         sigma_down=sigma_down)
         vxc_up = out['vrho_up']
         if self.add_gradient_corrections:
             vxc_up -= 2. * gd.divergence(out['vsigma_up'] * grad_up)
             vxc_up -= gd.divergence(out['vsigma_updown'] * grad_down)
         return vxc_up
 
-    def evaluate_fxc(self, rho, gd):
+    def evaluate_fxc(self, rho, gd, f1, f2):
         """
-        Returns the XC kernel (second derivative w.r.t. the electron
-        density).
+        Returns a matrix element of the XC kernel:
+        \int \int f_1(r)
+                  \frac{\partial^2 E_xc}{\partial \rho(r) \partial \rho(r')}
+                  f_2(r') dr dr'
 
         Parameters
         ----------
@@ -298,25 +301,42 @@ class LibXC:
         gd : Grid
             An object that can carry out gradient and divergence
             operations on a grid-based array.
+        f1 : np.ndarray
+            Values of function f_1.
+        f2 : np.ndarray
+            Values of function f_2.
 
         Returns
         -------
-        fxc : np.ndarray
-            XC kernel.
+        fxc : float
+            XC kernel matrix element
         """
         grad = gd.gradient(rho)
         sigma = grad**2
 
         out = self.compute_vxc(rho, sigma=sigma, fxc=True)
-        fxc = out['v2rho2']
+
+        integrand = out['v2rho2'] * f1 * f2
+
         if self.add_gradient_corrections:
-            raise NotImplementedError
+            integrand += 2. * out['v2rhosigma'] \
+                         * (gd.gradient(f1) * gd.gradient(rho) * f2 \
+                            + f1 * gd.gradient(f2) * gd.gradient(rho))
+            integrand += 4. * out['v2sigma2'] \
+                         * gd.gradient(f1) * gd.gradient(rho) \
+                         * gd.gradient(f2) * gd.gradient(rho)
+            integrand += 2. * out['vsigma'] \
+                         * gd.gradient(f1) *  gd.gradient(f2)
+
+        fxc = gd.integrate(integrand, use_dV=True)
         return fxc
 
-    def evaluate_fxc_polarized(self, rho_up, rho_down, gd):
+    def evaluate_fxc_polarized(self, rho_up, rho_down, gd, f1, f2):
         """
-        Returns the spin-polarized XC kernel (second derivative
-        w.r.t. the magnetization density).
+        Returns a matrix element of the spin-polarized XC kernel:
+        \int \int f_1(r)
+                  \frac{\partial^2 E_xc}{\partial \mu(r) \partial \mu(r')}
+                  f_2(r') dr dr'
 
         Parameters
         ----------
@@ -327,11 +347,15 @@ class LibXC:
         gd : Grid
             An object that can carry out gradient and divergence
             operations on a grid-based array.
+        f1 : np.ndarray
+            Values of function f_1.
+        f2 : np.ndarray
+            Values of function f_2.
 
         Returns
         -------
-        fxc : np.ndarray
-            XC kernel.
+        fxc : float
+            Spin-polarized XC kernel matrix element
         """
         grad_up = gd.gradient(rho_up)
         grad_down = gd.gradient(rho_down)
@@ -340,14 +364,50 @@ class LibXC:
         sigma_down = grad_down**2
         sigma_updown = grad_up * grad_down
 
-        out = self.compute_vxc_polarized(rho_up, rho_down, sigma_up,
-                                         sigma_updown, sigma_down, fxc=True)
-        fxc = out['v2rho2_up'] - out['v2rho2_updown']
+        out = self.compute_vxc_polarized(rho_up, rho_down, sigma_up=sigma_up,
+                                         sigma_updown=sigma_updown,
+                                         sigma_down=sigma_down, fxc=True)
+
+        integrand = (out['v2rho2_up'] - out['v2rho2_updown']) * f1 * f2
 
         if self.add_gradient_corrections:
-            raise NotImplementedError
+            grad_f1_grad_f2 = gd.gradient(f1) * gd.gradient(f2)
+            grad_f1_grad_rho_up = gd.gradient(f1) * gd.gradient(rho_up)
+            grad_f1_grad_rho_down = gd.gradient(f1) * gd.gradient(rho_down)
+            grad_f2_grad_rho_up = gd.gradient(f2) * gd.gradient(rho_up)
+            grad_f2_grad_rho_down = gd.gradient(f2) * gd.gradient(rho_down)
 
-        fxc /= 2.
+            # up-up contribution
+            integrand += 2. * out['v2rhosigma_up_up'] \
+                         * (grad_f1_grad_rho_up * f2 \
+                            + f1 * grad_f2_grad_rho_up)
+
+            integrand += 4. * out['v2sigma2_up_up'] \
+                         * grad_f1_grad_rho_up * grad_f2_grad_rho_up
+            integrand += 2. * out['v2sigma2_up_updown'] \
+                         * grad_f1_grad_rho_down * grad_f2_grad_rho_up
+            integrand += 2. * out['v2sigma2_up_updown'] \
+                         * grad_f1_grad_rho_up * grad_f2_grad_rho_down
+            integrand += 1. * out['v2sigma2_updown_updown'] \
+                         * grad_f1_grad_rho_down * grad_f2_grad_rho_down
+            integrand += 2. * out['vsigma_up'] * grad_f1_grad_f2
+
+            # up-down contribution
+            integrand -= 2. * out['v2rhosigma_up_down'] \
+                         * (grad_f1_grad_rho_down * f2 \
+                            + f1 * grad_f2_grad_rho_down)
+
+            integrand -= 4. * out['v2sigma2_up_down'] \
+                         * grad_f1_grad_rho_down * grad_f2_grad_rho_up
+            integrand -= 2. * out['v2sigma2_up_updown'] \
+                         * grad_f1_grad_rho_down * grad_f2_grad_rho_up
+            integrand -= 2. * out['v2sigma2_updown_down'] \
+                         * grad_f1_grad_rho_down * grad_f2_grad_rho_down
+            integrand -= 1. * out['v2sigma2_updown_updown'] \
+                         * grad_f1_grad_rho_up * grad_f2_grad_rho_down
+            integrand -= 1. * out['vsigma_updown'] * grad_f1_grad_f2
+
+        fxc = gd.integrate(integrand, use_dV=True) / 2.
         return fxc
 
 

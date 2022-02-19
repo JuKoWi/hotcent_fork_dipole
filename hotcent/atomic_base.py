@@ -851,8 +851,7 @@ class AtomicBase:
         dens_nl1 = self.Rnlg[nl1]**2 / (4 * np.pi)
         dens_nl2 = self.Rnlg[nl2]**2 / (4 * np.pi)
 
-        kernel = xc.evaluate_fxc(dens, self.grid)
-        U = self.grid.integrate(dens_nl1 * kernel * dens_nl2, use_dV=True)
+        U = xc.evaluate_fxc(dens, self.grid, dens_nl1, dens_nl2)
         vhar2 = self.calculate_hartree_potential(dens_nl2, nel=1.)
         U += self.grid.integrate(dens_nl1 * vhar2, use_dV=True)
         return U
@@ -912,8 +911,8 @@ class AtomicBase:
 
         dens_up = dens / 2.
         dens_down = np.copy(dens_up)
-        fxc = xc.evaluate_fxc_polarized(dens_up, dens_down, self.grid)
-        W = self.grid.integrate(dens_nl1 * fxc * dens_nl2, use_dV=True)
+        W = xc.evaluate_fxc_polarized(dens_up, dens_down, self.grid, dens_nl1,
+                                      dens_nl2)
         return W
 
     def generate_nonminimal_basis(self, size, tail_norm=None, l_pol=None,

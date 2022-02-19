@@ -80,7 +80,7 @@ def test_hubbard(atoms):
         assert diff < tol, msg.format(nl, val_ae, val_pp)
 
 
-@pytest.mark.parametrize('atoms', [LDA], indirect=True)
+@pytest.mark.parametrize('atoms', [LDA, PBE_LibXC], indirect=True)
 def test_hubbard_analytical(atoms):
     for atom, ae_or_pp in zip(atoms, ['AE', 'PP']):
         labels = ['analytical', 'numerical']
