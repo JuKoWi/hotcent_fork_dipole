@@ -48,7 +48,7 @@ class Onsite2cGammaTable(MultiAtomIntegrator):
         self.tables = {}
 
         e1, e2 = self.ela, self.elb
-        selected = select_subshells(e1, e2)
+        selected = select_subshells(e1, e1)
 
         for bas1a in range(len(e1.basis_sets)):
             for bas1b in range(len(e1.basis_sets)):

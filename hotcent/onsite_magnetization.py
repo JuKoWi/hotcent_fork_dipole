@@ -48,7 +48,7 @@ class Onsite2cWTable(MultiAtomIntegrator):
         self.tables = {}
 
         e1, e2 = self.ela, self.elb
-        selected = select_subshells(e1, e2)
+        selected = select_subshells(e1, e1)
 
         for bas1a in range(len(e1.basis_sets)):
             for bas1b in range(len(e1.basis_sets)):
@@ -170,7 +170,7 @@ class Onsite2cWTable(MultiAtomIntegrator):
 
             if xc.add_gradient_corrections:
                 dnl1a = e1.Rnl(r1, nl1a) / (2 * np.pi) * e1.Rnl(r1, nl1a, der=1)
-                dnl1b = e2.Rnl(r1, nl1b) / (2 * np.pi) * e1.Rnl(r1, nl1b, der=1)
+                dnl1b = e1.Rnl(r1, nl1b) / (2 * np.pi) * e1.Rnl(r1, nl1b, der=1)
                 grad_nl1a_grad_nl1b = (dnl1a*s1 * dnl1b*s1) \
                                       + (dnl1a*c1 * dnl1b*c1)
 
