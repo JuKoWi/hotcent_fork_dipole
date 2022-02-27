@@ -152,7 +152,8 @@ class Offsite2cTable(MultiAtomIntegrator):
         self.timer.stop('run_offsite2c')
 
     def calculate(self, selected, e1, e2, R, grid, area,
-                  superposition='potential', xc='LDA', only_overlap=False):
+                  superposition='potential', xc='LDA', only_overlap=False,
+                  symmetrize_kinetic=True):
         """
         Calculates the selected Hamiltonian and overlap integrals.
 
@@ -180,6 +181,11 @@ class Offsite2cTable(MultiAtomIntegrator):
             Whether to only evaluate the overlap integrals
             (default: False). If True, the 'xc' and 'superposition'
             have no influence.
+        symmetrize_kinetic : bool, optional
+            Whether to symmetrize the kinetic energy contribution
+            (default: True). This helps to ensure that Hamiltonian
+            integrals do not change when swapping the bra and ket
+            states.
 
         Returns
         -------
@@ -258,6 +264,7 @@ class Offsite2cTable(MultiAtomIntegrator):
 
         # calculate all selected integrals
         Sl, Hl, H2l = {}, {}, {}
+        sym1, sym2 = e1.get_symbol(), e2.get_symbol()
 
         for key in selected:
             integral, nl1, nl2 = key
@@ -275,9 +282,15 @@ class Offsite2cTable(MultiAtomIntegrator):
                 ddunl2 = e2.unl(r2, nl2, der=2)
 
                 H = np.sum(Rnl1 * (-0.5 * ddunl2 / r2 + (veff + \
-                           l2 * (l2 + 1) / (2 * r2 ** 2)) * Rnl2) * aux)
+                           l2 * (l2 + 1) / (2 * r2**2)) * Rnl2) * aux)
 
-                sym1, sym2 = e1.get_symbol(), e2.get_symbol()
+                if symmetrize_kinetic:
+                    l1 = ANGULAR_MOMENTUM[nl1[1]]
+                    ddunl1 = e1.unl(r1, nl1, der=2)
+                    H += np.sum(Rnl2 * (-0.5 * ddunl1 / r1 + (veff + \
+                                l1 * (l1 + 1) / (2 * r1**2)) * Rnl1) * aux)
+                    H /= 2.
+
                 lm1, lm2 = INTEGRAL_PAIRS[integral]
                 H += e1.pp.get_nonlocal_integral(sym1, sym2, sym1, 0., 0., R,
                                                  nl1, nl2, lm1, lm2)
