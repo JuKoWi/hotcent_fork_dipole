@@ -1058,3 +1058,249 @@ class BeckeHarris:
                 results['Evxc'].append(becke.integral(atoms_2c, Vxc_rho_2c))
 
         return results
+
+
+class BeckeHarrisKernels(BeckeHarris):
+    """
+    Calculator for "kernel" matrix elements involving second
+    derivatives of the Hartree and XC energies.
+
+    Parameters
+    ----------
+    See BeckeHarris.__init__()
+    """
+    def __init__(self, *args, xc='LDA_X+LDA_C_PW', **kwargs):
+        BeckeHarris.__init__(self, *args, xc=xc, **kwargs)
+        self.xc_polarized = LibXC(xc, spin_polarized=True)
+
+    def get_valence_subshells(self, index):
+        sym = self.get_symbol(index)
+        nls = []
+        for valence in self.elements[sym].basis_sets:
+            nls.extend(valence)
+        return nls
+
+    def run_all_kernels(self, atoms_ase, indices_A=None, indices_B=None,
+                        print_matrices=True, spin=False,
+                        substract_pointcharge=False):
+        self.atoms_ase = atoms_ase
+        self.atoms_becke = ase2becke(atoms_ase)
+
+        # Collect atom indices and subshell labels
+        if indices_A is None:
+            indices_A = list(range(len(self.atoms_becke)))
+        else:
+            assert len(indices_A) == len(set(indices_A)), indices_A
+
+        if indices_B is None:
+            indices_B = list(range(len(self.atoms_becke)))
+        else:
+            assert len(indices_B) == len(set(indices_B)), indices_B
+
+        iAs, nlAs = [], []
+        for index in indices_A:
+            nls = self.get_valence_subshells(index)
+            iAs.extend([index] * len(nls))
+            nlAs.extend(nls)
+
+        iBs, nlBs = [], []
+        for index in indices_B:
+            nls = self.get_valence_subshells(index)
+            iBs.extend([index] * len(nls))
+            nlBs.extend(nls)
+
+        # Calculate kernels
+        shape = (len(nlAs), len(nlBs))
+        K_10 = np.zeros(shape)
+        K_20 = np.zeros(shape)
+        K_12 = np.zeros(shape)
+        K_22 = np.zeros(shape)
+        K_mc = np.zeros(shape)
+
+        for indexA, (iA, nlA) in enumerate(zip(iAs, nlAs)):
+            self.iA, self.nlA = iA, nlA
+            self.xA, self.yA, self.zA = self.get_position(self.iA)
+            symA = self.get_symbol(self.iA)
+            self.elA = self.elements[symA]
+
+            vharA = self.get_subshell_vharA()
+
+            for indexB, (iB, nlB) in enumerate(zip(iBs, nlBs)):
+                self.iB, self.nlB = iB, nlB
+                self.xB, self.yB, self.zB = self.get_position(self.iB)
+                symB = self.get_symbol(self.iB)
+                self.elB = self.elements[symB]
+
+                print('\nRunning iA %d iB %d nlA %s nlB %s %s' % \
+                      (self.iA, self.iB, nlA, nlB, spin))
+                is_onsite = self.iA == self.iB
+
+                # Hartree contribution
+                if spin:
+                    KharAB = 0.
+                else:
+                    KharAB = self.evaluate_KharAB(vharA)
+                    if substract_pointcharge and not is_onsite:
+                        R = np.linalg.norm(self.get_position(self.iA) \
+                                           - self.get_position(self.iB))
+                        KharAB -= 1. / R
+                print("<a|fhartree|b> =", KharAB)
+
+                # XC contribution
+                if is_onsite:
+                    out = self.calculate_onsite_kernel_approximations(spin)
+                else:
+                    out = self.calculate_offsite_kernel_approximations(spin)
+                out.update(self.calculate_multicenter_kernel(spin))
+                print(out, flush=True)
+
+                K_mc[indexA, indexB] = out['K_mc'] + KharAB
+                if is_onsite:
+                    K_10[indexA, indexB] = out['K_1c'] + KharAB
+                    K_20[indexA, indexB] = out['K_2c'] + KharAB
+                    K_12[indexA, indexB] = out['K_1c'] + KharAB
+                else:
+                    K_12[indexA, indexB] = out['K_2c'] + KharAB
+                K_22[indexA, indexB] = out['K_2c'] + KharAB
+
+        if print_matrices:
+            def print_matrix(M, nperline=4):
+                print('np.array([')
+                for row in M:
+                    print('[', end='')
+                    i = 0
+                    while i < len(row):
+                        part = row[i:min(i+nperline, len(row))]
+                        items = list(map(lambda x: '%.6e' % x, part))
+                        print(', '.join(items), end='')
+                        i += nperline
+                        if i >= len(row):
+                            print('],')
+                        else:
+                            print(',')
+                print('])\n')
+
+            for name, K in zip(['K_10', 'K_20', 'K_12', 'K_22', 'K_mc'],
+                               [K_10, K_20, K_12, K_22, K_mc]):
+                template = '=== Kernel matrix {0} (spin-polarized = {1}) ==='
+                print(template.format(name, spin))
+                print_matrix(K, nperline=4)
+
+        results = {'K_10': K_10, 'K_20': K_20, 'K_12': K_12, 'K_22': K_22,
+                   'K_mc': K_mc}
+        return results
+
+    def calculate_onsite_kernel_approximations(self, spin):
+        assert self.iA == self.iB
+        assert self.elA.get_symbol() == self.elB.get_symbol()
+
+        results = {}
+        atoms_1c = [self.atoms_becke[self.iA]]
+
+        Kxc1c = lambda x, y, z: self.subshellA(x, y, z) \
+                                * self.fxc_on1c(x, y, z, spin) \
+                                * self.subshellB(x, y, z)
+        Kxcab1c = becke.integral(atoms_1c, Kxc1c)
+        print("<a|fxc1c|b> =", Kxcab1c)
+        results['K_1c'] = Kxcab1c
+
+        Kxc2c = lambda x, y, z: self.subshellA(x, y, z) \
+                                * self.fxc_on2c(x, y, z, spin) \
+                                * self.subshellB(x, y, z)
+        Kxcab2c = becke.integral(self.atoms_becke, Kxc2c)
+        print("<a|fxc2c|b> =", Kxcab2c)
+        results['K_2c'] = Kxcab1c + Kxcab2c
+        return results
+
+    def calculate_offsite_kernel_approximations(self, spin):
+        assert self.iA != self.iB
+
+        results = {}
+
+        Kxc2c = lambda x, y, z: self.subshellA(x, y, z) \
+                                * self.fxc_off2c(x, y, z, spin) \
+                                * self.subshellB(x, y, z)
+        Kxcab2c = becke.integral(self.atoms_becke, Kxc2c)
+        print("<a|fxc2c|b> =", Kxcab2c)
+
+        results['K_2c'] = Kxcab2c
+        return results
+
+    def calculate_multicenter_kernel(self, spin):
+        results = {}
+
+        Kxcmc = lambda x, y, z: self.subshellA(x, y, z) \
+                                * self.fxc_mc(x, y, z, spin) \
+                                * self.subshellB(x, y, z)
+        Kxcabmc = becke.integral(self.atoms_becke, Kxcmc)
+        print("<a|fxcmc|b> =", Kxcabmc)
+        results['K_mc'] = Kxcabmc
+        return results
+
+    def subshellA(self, x, y, z):
+        rA = np.sqrt((x - self.xA)**2 + (y - self.yA)**2 + (z - self.zA)**2)
+        return self.elA.Rnl(rA, self.nlA)**2 / (4. * np.pi)
+
+    def subshellB(self, x, y, z):
+        rB = np.sqrt((x - self.xB)**2 + (y - self.yB)**2 + (z - self.zB)**2)
+        return self.elB.Rnl(rB, self.nlB)**2 / (4. * np.pi)
+
+    def get_subshell_vharA(self):
+        vharA = becke.poisson(self.atoms_becke, self.subshellA)
+        return vharA
+
+    def evaluate_KharAB(self, vharA):
+        atoms_B = [self.atoms_becke[self.iB]]
+
+        def integrand(x, y, z):
+            return vharA(x, y, z) * self.subshellB(x, y, z)
+
+        KharAB = becke.integral(atoms_B, integrand)
+        return KharAB
+
+    def get_fxc(self, rho, spin):
+        assert not self.xc.add_gradient_corrections, 'Not yet implemented'
+
+        if spin:
+            out = self.xc_polarized.compute_vxc_polarized(rho / 2., rho / 2.,
+                                                          fxc=True)
+            fxc = (out['v2rho2_up'] - out['v2rho2_updown']) / 2.
+        else:
+            out = self.xc.compute_vxc(rho, fxc=True)
+            fxc = out['v2rho2']
+        return fxc
+
+    def fxc_on1c(self, x, y, z, spin):
+        rA = np.sqrt((x - self.xA)**2 + (y - self.yA)**2 + (z - self.zA)**2)
+        rho = self.elA.electron_density(rA)
+        fxc = self.get_fxc(rho, spin)
+        return fxc
+
+    def fxc_off2c(self, x, y, z, spin):
+        rA = np.sqrt((x - self.xA)**2 + (y - self.yA)**2 + (z - self.zA)**2)
+        rB = np.sqrt((x - self.xB)**2 + (y - self.yB)**2 + (z - self.zB)**2)
+        rho = self.elA.electron_density(rA) + self.elB.electron_density(rB)
+        fxc = self.get_fxc(rho, spin)
+        return fxc
+
+    def fxc_on2c(self, x, y, z, spin):
+        all_indices = list(range(len(self.atoms_becke)))
+        rA = np.sqrt((x - self.xA)**2 + (y - self.yA)**2 + (z - self.zA)**2)
+        rhoA = self.elA.electron_density(rA)
+        fxcA = self.get_fxc(rhoA, spin)
+
+        fxc = 0.
+        for iC in all_indices:
+            if iC in [self.iA, self.iB]: continue
+            symC = self.get_symbol(iC)
+            xC, yC, zC = self.get_position(iC)
+            rC = np.sqrt((x - xC)**2 + (y - yC)**2 + (z - zC)**2)
+            rhoC = self.elements[symC].electron_density(rC)
+            fxc += self.get_fxc(rhoA+rhoC, spin) - fxcA
+        return fxc
+
+    def fxc_mc(self, x, y, z, spin):
+        all_indices = list(range(len(self.atoms_becke)))
+        rho = self.get_rho(x, y, z, all_indices, only_valence=True)
+        fxc = self.get_fxc(rho, spin)
+        return fxc
