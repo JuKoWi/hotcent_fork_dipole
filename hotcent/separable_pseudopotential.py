@@ -182,8 +182,10 @@ class SeparablePP:
         else:
             v23 /= r23
 
-        if self.all_zero_onsite_overlaps() and (coincide13 or coincide23):
-            # Quick return
+        # Check for quick return
+        if (coincide13 and sym1 != sym3) or (coincide23 and sym2 != sym3):
+            return 0.
+        elif (coincide13 or coincide23) and self.all_zero_onsite_overlaps():
             return 0.
 
         self.assert_initialized(sym1)
