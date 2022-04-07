@@ -495,7 +495,11 @@ class AtomicDFT(AtomicBase):
 
         N = np.argmax(veff == np.inf)
         has_finite_range = N > 0
-        N = N if has_finite_range else self.N
+        if has_finite_range:
+            while veff[N-1] > 1e4:
+                N -= 1
+        else:
+            N = self.N
 
         if self.scalarrel and dveff is None:
             spl = CubicSplineFunction(self.rgrid[:N], veff[:N])
