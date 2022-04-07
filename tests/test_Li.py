@@ -55,6 +55,12 @@ def test_on1c(atoms):
     atom = atoms[1]
     assert atom.pp.lmax == 1
 
+    # Check that we can write an .ion file
+    write_ion(atom)
+    filename = 'Li.gga.ion'
+    assert os.path.exists(filename)
+    os.remove(filename)
+
     # Reference (ref. energy, KB energy, KB cosine) values (Siesta v4.1.5):
     ref = {
         '2s': (-0.211265/2., 1.857598/2., 0.213116),
