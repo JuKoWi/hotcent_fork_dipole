@@ -13,9 +13,10 @@ hotbit/blob/master/hotbit/parametrization/atom.py).
 """
 import pickle
 import numpy as np
+from ase.units import Ha
 from hotcent.interpolation import CubicSplineFunction
 from hotcent.atomic_base import AtomicBase
-from hotcent.confinement import ZeroConfinement
+from hotcent.confinement import SoftConfinement, ZeroConfinement
 from hotcent.orbitals import ANGULAR_MOMENTUM
 from hotcent.radial_grid import RadialGrid
 from hotcent.xc import XC_PW92, LibXC
@@ -111,6 +112,9 @@ class AtomicDFT(AtomicBase):
         self.rgrid = self.rmin * np.exp(self.xgrid)
         self.grid = RadialGrid(self.rgrid)
         self.timer.stop('init')
+
+    def __del__(self):
+        self.timer.summary()
 
     def print_header(self):
         template = '{0}-relativistic all-electron {1} calculator for {2}'
@@ -363,7 +367,6 @@ class AtomicDFT(AtomicBase):
                 pickle.dump(self.dens, f)
 
         self.solved = True
-        self.timer.summary()
         self.txt.flush()
 
     def get_onecenter_integrals(self, nl1, nl2):
@@ -455,8 +458,6 @@ class AtomicDFT(AtomicBase):
                 print(line, file=self.txt, flush=True)
 
             if it == self.maxiter - 1:
-                if self.timing:
-                    self.timer.summary()
                 err = 'Density not converged in %i iterations' % (it + 1)
                 raise RuntimeError(err)
 
@@ -640,3 +641,65 @@ class AtomicDFT(AtomicBase):
             c0 -= dveff * self.rgrid / (2 * ScR_mass * c ** 2)
             c1 = dveff * self.rgrid / (2 * ScR_mass * c ** 2) - 1
         return c0, c1, c2
+
+    def find_cutoff_radius(self, nl, energy_shift=0.2, tolerance=1e-3,
+                           **kwargs):
+        """
+        Returns the orbital cutoff radius such that the corresponding
+        energy upshift upon soft confinement equals the given value.
+
+        Parameters
+        ----------
+        nl : str
+            Subshell label.
+        energy_shift : float, optional
+            Energy shift in eV (default: 0.2).
+        tolerance : float, optional
+            Tolerance (in eV) for termination of the search
+            (default: 1e-3).
+
+        Other parameters
+        ----------------
+        kwargs : additional parameters to the SoftConfinement
+                 potential
+
+        Returns
+        -------
+        rc : float
+            The cutoff radius.
+        """
+        assert energy_shift > 0
+        assert nl in self.valence
+        assert self.perturbative_confinement
+
+        wf_confinement = self.wf_confinement.copy()
+
+        # Find the eigenvalue in the free atom
+        rmax = self.rgrid[-1]
+        self.wf_confinement = {nl2: SoftConfinement(rc=rmax, **kwargs)
+                               for nl2 in self.valence}
+        self.run()
+        enl_free = self.get_eigenvalue(nl)
+
+        # Bisection with confined atom
+        rc = 5.  # initial guess
+        rmin = 2.
+        diff = np.inf
+
+        while abs(diff) > tolerance:
+            if np.isfinite(diff):
+                if diff < 0:
+                    rmax = rc
+                    rc = (rc + rmin) / 2.
+                else:
+                    rmin = rc
+                    rc = (rc + rmax) / 2.
+
+            self.wf_confinement[nl].rc = rc
+            self.run()
+            de = self.get_eigenvalue(nl) - enl_free  # in Ha
+            diff = de*Ha - energy_shift  # in eV
+
+        self.wf_confinement = wf_confinement
+        self.solved = False
+        return rc
