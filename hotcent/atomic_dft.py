@@ -272,10 +272,11 @@ class AtomicDFT(AtomicBase):
     def run(self, write=None):
         """ Execute the required atomic DFT calculations
 
-        Parameters:
-
-        write: None or a filename for saving the rgrid, effective
-               potential and electron density.
+        Parameters
+        ----------
+        write : None or str, optional
+            Filename for saving the rgrid, effective
+            potential and electron density (if not None).
         """
         def header(*args):
             print('=' * 50, file=self.txt)
@@ -594,14 +595,13 @@ class AtomicDFT(AtomicBase):
 
                 it += 1
                 if it > 100:
-                    print('Epsilon history for %s' % nl, file=self.txt)
-                    for h in hist:
-                        print(h)
-                    print('nl=%s, eps=%f' % (nl,eps), file=self.txt)
+                    msg = 'Epsilon history for %s\n' % nl
+                    msg += '\n'.join(map(str, hist)) + '\n'
+                    msg += 'nl=%s, eps=%f\n' % (nl, eps)
                     if not has_finite_range:
-                        print('max epsilon', epsmax, file=self.txt)
-                    err = 'Eigensolver out of iterations. Atom not stable?'
-                    raise RuntimeError(err)
+                        msg += 'max epsilon: %f\n' % epsmax
+                    msg += 'Eigensolver out of iterations. Atom not stable?'
+                    raise RuntimeError(msg)
 
             itmax = max(it, itmax)
 
