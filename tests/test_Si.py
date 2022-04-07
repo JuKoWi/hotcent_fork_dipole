@@ -56,3 +56,12 @@ def test_on1c():
         shift = eps_conf[nl] - eps_free[nl]
         diff = abs(shift - shift_ref[nl])
         assert diff < 1e-4, 'Too large error for {0}_shift'.format(nl)
+
+    # Now check whether find_cutoff_radius() returns a similar cutoff
+    msg = 'Too large difference for {0}_rc: {1} (ref: {2})'
+    for nl in atom.valence:
+        ref = wf_confinement[nl].rc
+        rc = atom.find_cutoff_radius(nl, energy_shift=shift_ref[nl]*Ha,
+                                     tolerance=1e-3)
+        diff = abs(rc - ref)
+        assert diff < 5e-2, msg.format(nl, rc, ref)
