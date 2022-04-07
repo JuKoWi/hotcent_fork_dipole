@@ -682,8 +682,8 @@ class AtomicDFT(AtomicBase):
         enl_free = self.get_eigenvalue(nl)
 
         # Bisection with confined atom
-        rc = 5.  # initial guess
-        rmin = 2.
+        rc = 6.  # initial guess
+        rmin = 3.
         diff = np.inf
 
         while abs(diff) > tolerance:
@@ -696,9 +696,14 @@ class AtomicDFT(AtomicBase):
                     rc = (rc + rmax) / 2.
 
             self.wf_confinement[nl].rc = rc
-            self.run()
-            de = self.get_eigenvalue(nl) - enl_free  # in Ha
-            diff = de*Ha - energy_shift  # in eV
+            try:
+                self.run()
+                de = self.get_eigenvalue(nl) - enl_free  # in Ha
+                diff = de*Ha - energy_shift  # in eV
+            except RuntimeError:
+                # Convergence problems. This is usually due to
+                # too strong confinement (eigenvalues becoming positive)
+                diff = 1.
 
         self.wf_confinement = wf_confinement
         self.solved = False
