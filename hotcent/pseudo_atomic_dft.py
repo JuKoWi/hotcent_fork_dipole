@@ -8,7 +8,7 @@ import pickle
 import numpy as np
 from hotcent.atomic_base import NOT_SOLVED_MESSAGE
 from hotcent.atomic_dft import AtomicDFT
-from hotcent.confinement import ZeroConfinement
+from hotcent.confinement import SoftConfinement, ZeroConfinement
 from hotcent.interpolation import build_interpolator
 from hotcent.orbitals import ANGULAR_MOMENTUM
 try:
@@ -70,48 +70,78 @@ class PseudoAtomicDFT(AtomicDFT):
         return dens
 
     def run(self, write=None):
-        """ Execute the required atomic DFT calculations
+        """ Execute the required atomic DFT calculations.
 
-        Parameters:
-
-        write: None or a filename for saving the rgrid, effective
-               potential and electron density.
+        Parameters
+        ----------
+        write : None or str, optional
+            Filename for saving the rgrid, effective
+            potential and electron density (if not None).
         """
         def header(*args):
             print('=' * 50, file=self.txt)
             print('\n'.join(args), file=self.txt)
             print('=' * 50, file=self.txt)
 
-        val = self.get_valence_orbitals()
-
         assert self.perturbative_confinement
-        assert all([nl in val for nl in self.wf_confinement])
-        nl_x = [nl for nl in val if nl not in self.wf_confinement]
-        assert len(nl_x) == 0 or len(nl_x) == len(val), nl_x
+        assert all([nl in self.valence for nl in self.wf_confinement])
+        nl_x = [nl for nl in self.valence if nl not in self.wf_confinement]
+        assert len(nl_x) == 0 or len(nl_x) == len(self.valence), nl_x
 
         self.enl = {}
         self.unlg = {}
+        self.unl_fct = {nl: None for nl in self.valence}
         self.Rnlg = {}
-        self.unl_fct = {nl: None for nl in val}
-        self.Rnl_fct = {nl: None for nl in val}
+        self.Rnl_fct = {nl: None for nl in self.valence}
         self.Rnl_free_fct = {nl: None for nl in self.pp.get_subshells()}
 
         header('Initial run without any confinement',
                'for pre-converging orbitals and eigenvalues')
         self.confinement = ZeroConfinement()
-        # Using the pseudopotential states to ensure that we have all
-        # the required unconfined orbitals for building the projectors
-        self.valence = self.pp.get_subshells()
-        print('Pseudopotential subshells: ' + ' '.join(self.valence),
-              file=self.txt)
-        configuration = self.configuration
-        self.configuration.update({nl: 0 for nl in self.valence
-                                   if nl not in self.configuration})
-        dens_free, veff_free, enl_free, unlg_free, self.Rnlg_free = \
+        dens_free, veff_free, self.enl_free, unlg_free, self.Rnlg_free = \
                                                                 self.outer_scf()
-        self.configuration = configuration
-        self.valence = val
+        print('\nEigenvalues in the free atom:', file=self.txt)
+        for nl in self.valence:
+            print('%s: %.6f' % (nl, self.enl_free[nl]), file=self.txt)
 
+        # Additional inner SCF calls for unoccupied states
+        # that are needed for generating pseudopotential projectors
+        for nl in self.pp.get_subshells():
+            if nl not in self.valence:
+                # subshell needs to be in self.configuration
+                if nl in self.configuration:
+                    conf0 = self.configuration[nl]
+                    assert conf0 == 0
+                else:
+                    conf0 = None
+                    self.configuration[nl] = 0
+
+                l = ANGULAR_MOMENTUM[nl[1]]
+                veff = veff_free + self.pp.semilocal_potential(self.rgrid, l)
+                # Add similar weak confinement as Siesta with the
+                # KB.New.Reference.Orbitals=True option.
+                veff += SoftConfinement(rc=60.)(self.rgrid)
+
+                for enl in [{nl: -0.1}, {nl: 0.1}]:
+                    try:
+                        itmax, enl, d_enl, unlg, Rnlg = self.inner_scf(1,
+                                            veff, enl, {}, solve=[nl], ae=False)
+                        break
+                    except RuntimeError:
+                        continue
+                else:
+                    msg = 'Could not solve for %s (needed for projectors)'
+                    raise RuntimeError(msg % nl)
+
+                if conf0 is None:
+                    del self.configuration[nl]
+
+                self.enl_free.update(enl)
+                unlg_free.update(unlg)
+                self.Rnlg_free.update(Rnlg)
+                print('%s: %.6f' % (nl, self.enl_free[nl]), file=self.txt)
+
+        # Now generate the (usually confined) minimal basis states
         for nl, wf_confinement in self.wf_confinement.items():
             self.confinement = wf_confinement
             if self.confinement is None:
@@ -123,7 +153,7 @@ class PseudoAtomicDFT(AtomicDFT):
             veff = veff_free + self.confinement(self.rgrid) \
                    + self.pp.semilocal_potential(self.rgrid, l)
 
-            enl = {nl: enl_free[nl]}
+            enl = {nl: self.enl_free[nl]}
             itmax, enl, d_enl, unlg, Rnlg = self.inner_scf(0, veff, enl, {},
                                                            solve=[nl], ae=False)
             print('Confined %s eigenvalue: %.6f' % (nl, enl[nl]), file=self.txt)
@@ -132,9 +162,9 @@ class PseudoAtomicDFT(AtomicDFT):
             self.unlg.update(unlg)
             self.Rnlg.update(Rnlg)
 
-        for nl in val:
+        for nl in self.valence:
             if nl not in self.wf_confinement:
-                self.enl[nl] = enl_free[nl]
+                self.enl[nl] = self.enl_free[nl]
                 self.unlg[nl] = unlg_free[nl]
                 self.Rnlg[nl] = self.Rnlg_free[nl]
 
