@@ -66,3 +66,9 @@ def test_on1c():
                                      tolerance=1e-3)
         diff = abs(rc - rc_ref)
         assert diff < 5e-2, msg.format(nl, 'rc', rc, rc_ref)
+
+    # Also check the characteristic radius for polarization functions
+    rpol = atom.find_polarization_radius()
+    rpol_ref = 1.838  # gpaw-basis Si -f LDA -t szp
+    diff = abs(rpol - rpol_ref)
+    assert diff < 2e-2, msg.format(nl, 'rpol', rpol, rpol_ref)

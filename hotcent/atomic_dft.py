@@ -712,3 +712,23 @@ class AtomicDFT(AtomicBase):
         self.wf_confinement = wf_confinement
         self.solved = False
         return rc
+
+    def find_polarization_radius(self):
+        """
+        Returns the characteristic radius used in GPAW's quasi-Gaussian
+        method for generating polarization functions.
+
+        Returns
+        -------
+        r_pol : float
+            The characteristic radius.
+        """
+        assert self.perturbative_confinement
+
+        rcmax = -np.inf
+        for nl in self.valence:
+            rc = self.find_cutoff_radius(nl, energy_shift=0.3, amp=12, x_ri=0.6)
+            rcmax = max(rcmax, rc)
+
+        r_pol = 0.25 * rcmax
+        return r_pol
