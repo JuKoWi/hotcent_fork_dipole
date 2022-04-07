@@ -145,6 +145,7 @@ class AtomicBase:
         self.densval_fct = None
         self.vhar_fct = None
         self.vharval_fct = None
+        self.vna_fct = None
         self.energies = {}
         self.solved = False
         self.basis_sets = [valence]
@@ -318,9 +319,15 @@ class AtomicBase:
         (doi:10.1103/PhysRevB.40.3979).
         """
         assert self.solved, NOT_SOLVED_MESSAGE
-        vna = self.hartree_potential(r, only_valence=False)
-        vna += self.pp.local_potential(r)
-        return vna
+
+        if self.vna_fct is None:
+            rcs = [self.rcutnl[nl] for nl in self.valence if nl in self.rcutnl]
+            rc = max(rcs) if len(rcs) > 0 else None
+            vna = self.hartree_potential(self.rgrid, only_valence=False)
+            vna += self.pp.local_potential(self.rgrid)
+            self.vna_fct = build_interpolator(self.rgrid, vna, rc)
+
+        return self.vna_fct(r)
 
     def effective_potential(self, r, der=0):
         """ Return effective potential at r or its derivatives. """
