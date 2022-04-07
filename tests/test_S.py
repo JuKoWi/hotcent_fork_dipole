@@ -27,7 +27,7 @@ def atom(request):
         '3p': SoftConfinement(rc=7.046078),
     }
     valence = list(wf_confinement.keys())
-    pp = KleinmanBylanderPP('./pseudos/S.psf', valence)
+    pp = KleinmanBylanderPP('./pseudos/S.psf', lmax=1, local_component='d')
     xcname = request.param
     atom = PseudoAtomicDFT('S', pp,
                            xc=xcname,

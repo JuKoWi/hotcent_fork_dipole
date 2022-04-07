@@ -1,12 +1,14 @@
 """ Tests for a pseudopotential with non-linear core corrections
-by comparing with all-electron (frozen core) results. The core
-corrections are needed for a close agreement.
+by comparing with all-electron (frozen core) results (unless otherwise
+mentioned). The core corrections are needed for a close agreement.
 """
+import os
 import pytest
 from hotcent.atomic_dft import AtomicDFT
 from hotcent.confinement import SoftConfinement
 from hotcent.kleinman_bylander import KleinmanBylanderPP
 from hotcent.pseudo_atomic_dft import PseudoAtomicDFT
+from hotcent.siesta_ion import write_ion
 
 
 R1 = 4.0
@@ -37,7 +39,9 @@ def atoms(request):
     atom_ae.pp.build_projectors(atom_ae)
     atom_ae.pp.build_overlaps(atom_ae, atom_ae, rmin=3., rmax=5., N=100)
 
-    pp = KleinmanBylanderPP('./pseudos/Li.psf', valence)
+    pp = KleinmanBylanderPP('./pseudos/Li.psf', valence=valence,
+                            with_polarization=False, local_component='siesta',
+                            rcore=2.4958, verbose=True)
     atom_pp = PseudoAtomicDFT('Li', pp, **kwargs)
     atom_pp.run()
     atom_pp.pp.build_projectors(atom_pp)
@@ -48,6 +52,26 @@ def atoms(request):
 
 @pytest.mark.parametrize('atoms', [PBE_LibXC], indirect=True)
 def test_on1c(atoms):
+    atom = atoms[1]
+    assert atom.pp.lmax == 1
+
+    # Reference (ref. energy, KB energy, KB cosine) values (Siesta v4.1.5):
+    ref = {
+        '2s': (-0.211265/2., 1.857598/2., 0.213116),
+        '2p': (-0.080116/2., -0.951969/2., -0.127364),
+    }
+    msg = 'Too large difference for {0} ({1}) (PP: {2}, ref: {3})'
+    labels = ['ref. energy', 'KB energy', 'KB cosine']
+
+    for nl, references in ref.items():
+        tol = {'2s': 1e-4, '2p': 1e-3}[nl]
+        values = (atom.enl_free[nl], atom.pp.energies[nl], atom.pp.cosines[nl])
+
+        for label, ref, val in zip(labels, references, values):
+            diff = abs(val - ref)
+            assert diff < tol, msg.format(label, nl, val, ref)
+
+    # Check one-center integrals w.r.t. AE
     labels = ['AE', 'PP']
     H = {label: {} for label in labels}
     for atom, label in zip(atoms, labels):

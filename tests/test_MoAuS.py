@@ -44,11 +44,28 @@ def atoms(request):
         },
     }
 
+    pp_setup = {
+        'Mo': {
+            'local_component': 'f',
+            'lmax': 2,
+        },
+        'Au': {
+            'local_component': 'f',
+            'lmax': 2,
+        },
+        'S': {
+            'local_component': 'd',
+            'lmax': 1,
+        },
+    }
+
     atoms = []
     for element in ['Mo', 'Au', 'S']:
         valence = list(wf_confinements[element].keys())
-        pp = KleinmanBylanderPP('./pseudos/{0}.psf'.format(element), valence,
-                                verbose=True)
+
+        pp = KleinmanBylanderPP('./pseudos/{0}.psf'.format(element),
+                                verbose=True, **pp_setup[element])
+
         atom = PseudoAtomicDFT(element, pp,
                                xc=xcname,
                                nodegpts=1000,

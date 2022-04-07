@@ -39,11 +39,10 @@ def atom(request):
         '2p': SoftConfinement(rc=4.80),
     }
 
-    valence = list(wf_confinements.keys())
-
     element = 'O'
-    pp = KleinmanBylanderPP('./pseudos/{0}.psf'.format(element), valence,
-                            verbose=True)
+    valence = list(wf_confinements.keys())
+    pp = KleinmanBylanderPP('./pseudos/{0}.psf'.format(element),
+                            lmax=1, local_component='d', verbose=True)
 
     atom = PseudoAtomicDFT(element, pp,
                            xc=xc,
