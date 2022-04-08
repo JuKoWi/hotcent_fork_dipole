@@ -497,7 +497,8 @@ if __name__ == '__main__':
     parser.add_argument('--rcore', type=float, default=None)
     args = parser.parse_args()
 
-    pp = KleinmanBylanderPP(args.filename, valence=args.valence.split(','),
+    valence = None if args.valence is None else args.valence.split(',')
+    pp = KleinmanBylanderPP(args.filename, valence=valence,
                             with_polarization=args.with_polarization,
                             local_component=args.local_component,
                             lmax=args.lmax, rcore=args.rcore, verbose=True)
