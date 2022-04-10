@@ -471,7 +471,7 @@ class AtomicDFT(AtomicBase):
         self.timer.stop('outer_scf')
         return dens, veff, enl, unlg, Rnlg
 
-    def inner_scf(self, iteration, veff, enl, d_enl, dveff=None, itmax=100,
+    def inner_scf(self, iteration, veff, enl, d_enl, dveff=None, maxiter=100,
                   solve='all', ae=True):
         """
         Solve the eigenstates for given effective potential.
@@ -496,7 +496,7 @@ class AtomicDFT(AtomicBase):
         dveff : np.ndarray or None, optional
             Precomputed derivative of the effective potential
             (used in the scalar-relativistic case).
-        itmax : int, optional
+        maxiter : int, optional
             Maximum number of optimization steps per subshell
             (default: 100).
         solve : str or list of str, optional
@@ -540,6 +540,7 @@ class AtomicDFT(AtomicBase):
         xgrid = self.xgrid
         dx = xgrid[1] - xgrid[0]
         unlg, Rnlg = {}, {}
+        itmax = 0
 
         for n, l, nl in self.list_states():
             if solve != 'all' and nl not in solve:
@@ -628,7 +629,7 @@ class AtomicDFT(AtomicBase):
                 hist.append(eps)
 
                 it += 1
-                if it > 100:
+                if it > maxiter:
                     msg = 'Epsilon history for %s\n' % nl
                     msg += '\n'.join(map(str, hist)) + '\n'
                     msg += 'nl=%s, eps=%f\n' % (nl, eps)
