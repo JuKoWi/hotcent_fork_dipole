@@ -66,7 +66,7 @@ class AtomicDFT(AtomicBase):
 
         perturbative_confinement: determines which type of self-
             consistent calculation is performed when applying each
-            of the orbital- or density-confinement potentials:
+            of the subshell- or density-confinement potentials:
 
             False: apply the confinement potential in a conventional
                   calculation with self-consistency between
@@ -74,11 +74,11 @@ class AtomicDFT(AtomicBase):
 
             True: add the confinement potential to the effective
                   potential of the free (nonconfined) atom and
-                  solve for the eigenstate(s)* while keeping this
+                  solve for the subshell(s)* while keeping this
                   potential fixed.
 
-            * i.e. all valence orbitals when confining the density and
-            only the orbital in question in wave function confinement
+            * i.e. all valence subshells when confining the density and
+            only the subshell in question in wave function confinement
 
             The perturbative scheme is e.g. how basis sets are
             generated in GPAW. This option is also faster than the
@@ -170,7 +170,7 @@ class AtomicDFT(AtomicBase):
         total_energy = band_energy - har_energy - vxc_energy + exc_energy
 
         if echo is not None:
-            line = '%s orbital eigenvalues:' % echo
+            line = '%s subshell eigenvalues:' % echo
             print('\n'+line, file=self.txt)
             print('-' * len(line), file=self.txt)
             for n, l, nl in self.list_states():
@@ -287,7 +287,7 @@ class AtomicDFT(AtomicBase):
             print('\n'.join(args), file=self.txt)
             print('=' * 50, file=self.txt)
 
-        val = self.get_valence_orbitals()
+        val = self.get_valence_subshells()
         confinement = self.confinement
 
         assert all([nl in val for nl in self.wf_confinement])
@@ -303,7 +303,7 @@ class AtomicDFT(AtomicBase):
         if self.perturbative_confinement:
             self.confinement = ZeroConfinement()
             header('Initial run without any confinement',
-                   'for pre-converging orbitals and eigenvalues')
+                   'for pre-converging subshells and eigenvalues')
             dens_free, veff_free, enl_free, unlg_free, Rnlg_free = \
                                                                self.outer_scf()
 
@@ -312,7 +312,7 @@ class AtomicDFT(AtomicBase):
             if self.confinement is None:
                 self.confinement = ZeroConfinement()
             header('Applying %s' % self.confinement,
-                   'to get a confined %s orbital' % nl)
+                   'to get a confined %s subshell' % nl)
 
             if self.perturbative_confinement:
                 veff = veff_free + self.confinement(self.rgrid)
@@ -331,7 +331,7 @@ class AtomicDFT(AtomicBase):
         self.confinement = confinement
         if self.confinement is None:
             self.confinement = ZeroConfinement()
-        extra = '' if len(nl_x) == 0 else '\nand the confined %s orbital(s)' \
+        extra = '' if len(nl_x) == 0 else '\nand the confined %s subshell(s)' \
                                            % ' and '.join(nl_x)
         header('Applying %s' % self.confinement,
                'to get the confined electron density%s' % extra)
@@ -376,7 +376,7 @@ class AtomicDFT(AtomicBase):
         Parameters
         ----------
         nl1, nl2 : str
-            Orbital labels.
+            Subshell labels.
 
         Returns
         -------
@@ -473,7 +473,8 @@ class AtomicDFT(AtomicBase):
 
     def inner_scf(self, iteration, veff, enl, d_enl, dveff=None, itmax=100,
                   solve='all', ae=True):
-        """ Solve the eigenstates for given effective potential.
+        """
+        Solve the eigenstates for given effective potential.
 
         u''(r) - 2*(v_eff(r)+l*(l+1)/(2r**2)-e)*u(r)=0
         ( u''(r) + c0(r)*u(r) = 0 )
@@ -482,14 +483,42 @@ class AtomicDFT(AtomicBase):
 
         u''(x) - u'(x) + c0(x(r))*u(r) = 0
 
-        Parameters:
-
-        iteration: iteration number in the SCF cycle
-        itmax: maximum number of optimization steps per eigenstate
-        solve: which eigenstates to solve: solve='all' -> all states;
-               solve = [nl1, nl2, ...] -> only the given subset
-        ae: whether this is an all-electron calculation,
+        Parameters
+        ----------
+        iteration : int
+            Iteration number in the SCF cycle.
+        veff : np.ndarray
+            Effective potential on the radial grid.
+        enl : dict
+            Initial guesses for each subshell's eigenvalue.
+        d_enl : dict
+            Dictionary that will contain the eigenvalue residuals.
+        dveff : np.ndarray or None, optional
+            Precomputed derivative of the effective potential
+            (used in the scalar-relativistic case).
+        itmax : int, optional
+            Maximum number of optimization steps per subshell
+            (default: 100).
+        solve : str or list of str, optional
+            Which subshells to solve. The default 'all' means that all
+            subshells will be selected. To only solve for specific
+            subshells, use [nl1, nl2, ...].
+        ae : bool, optional
+            Whether this is an all-electron calculation (default: True)
             which determines the expected number of nodes.
+
+        Returns
+        -------
+        itmax : int
+            Maximum number of iterations needed for solving a subshell.
+        enl : dict of float
+            Dictionary with the solved subshell eigenvalues.
+        d_enl : dict of float
+            Dictionary with the solved subshell eigenvalue residuals.
+        unlg : dict of np.ndarray
+            Reduced radial functions on the grid for the solved subshells.
+        Rnlg : dict of np.ndarray
+            Radial functions on the grid for the solved subshells.
         """
         self.timer.start('inner_scf')
 
@@ -649,7 +678,7 @@ class AtomicDFT(AtomicBase):
     def find_cutoff_radius(self, nl, energy_shift=0.2, tolerance=1e-3,
                            **kwargs):
         """
-        Returns the orbital cutoff radius such that the corresponding
+        Returns the subshell cutoff radius such that the corresponding
         energy upshift upon soft confinement equals the given value.
 
         Parameters

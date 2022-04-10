@@ -72,13 +72,13 @@ class MultiAtomIntegrator:
     def get_range(self, wf_limit):
         """
         Get the maximal radius beyond which all involved valence
-        orbitals magnitudes are below the given value.
+        subshell magnitudes are below the given value.
 
         Parameters
         ----------
         wf_limit : float
             Threshold for the radial components of the valence
-            orbitals.
+            subshells.
 
         Returns
         -------
@@ -89,7 +89,7 @@ class MultiAtomIntegrator:
 
         for el in self.elements:
             r = max([el.get_wf_range(nl, wf_limit)
-                     for nl in el.get_valence_orbitals()])
+                     for nl in el.get_valence_subshells()])
             print('Wave function range for %s = %.5f a0' % (el.get_symbol(), r),
                   file=self.txt)
             wf_range = max(r, wf_range)

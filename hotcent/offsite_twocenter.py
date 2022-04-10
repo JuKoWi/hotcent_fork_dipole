@@ -341,12 +341,12 @@ class Offsite2cTable(MultiAtomIntegrator):
         Parameters
         ----------
         eigenvalues : None or dict, optional
-            {nl: value} dictionary with valence orbital eigenvalues
+            {nl: value} dictionary with valence subshell eigenvalues
             (or one-center onsite Hamiltonian integrals, if you will).
         hubbardvalues : None or dict, optional
-            {nl: value} dictionary with valence orbital Hubbard values.
+            {nl: value} dictionary with valence subshell Hubbard values.
         occupations : None or dict, optional
-            {nl: value} dictionary with valence orbital occupations.
+            {nl: value} dictionary with valence subshell occupations.
         spe : None or (list of) float, optional
             Spin-polarization error. Needs to be a list for non-minimal
             basis sets.

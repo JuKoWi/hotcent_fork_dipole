@@ -47,7 +47,7 @@ class SeparablePP:
         Parameters
         ----------
         e1 : AtomicBase-like object
-            Object with atomic properties (for the valence orbitals).
+            Object with atomic properties (for the valence subshells).
         e3 : AtomicBase-like object
             Object with atomic properties (for the pseudopotential
             projectors).
@@ -142,7 +142,8 @@ class SeparablePP:
 
     def get_nonlocal_integral(self, sym1, sym2, sym3, x0, z0, R, nl1, nl2,
                               lm1, lm2):
-        """ Returns the nonlocal pseudopotential integral involving
+        """
+        Returns the nonlocal pseudopotential integral involving
         orbitals on the first 2 atoms and a pseudopotential on the 3rd atom
         (sum_proj3 sum_m <phi_1|chi_proj3> e_proj3 <chi_proj3|phi_2>).
 
@@ -152,12 +153,21 @@ class SeparablePP:
         first 2 atoms and all on-site overlaps with the projectors are zero
         (as is the case in the Phillips-Kleinman scheme).
 
-        Arguments:
+        Arguments
+        ---------
+        sym1, sym2, sym3 : str
+            Chemical symbols of the three atoms.
+        x0, z0, R : float
+            Define the atomic positions (all in the xz-plane).
+        nl1, nl2 : str
+            Subshell labels ('1s', '2p', ...).
+        lm1, lm2 : str
+            Orbital labels ('s', 'px', ...)
 
-        sym1, sym2, sym3: chemical symbols of the three atoms
-        x0, z0, R: defines the atomic positions (all in the xz-plane)
-        nl1, nl2: nl orbital labels ('1s', '2p', ...)
-        lm1, lm2: lm orbital labels ('s', 'px', ...)
+        Returns
+        -------
+        result : float
+            The nonlocal pseudopotential integral.
         """
         assert sym3 == self.symbol
 

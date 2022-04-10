@@ -25,7 +25,7 @@ def select_integrals(e1, e2):
     for ival1, valence1 in enumerate(e1.basis_sets):
         for ival2, valence2 in enumerate(e2.basis_sets):
             for integral in INTEGRALS:
-                nl1, nl2 = select_orbitals(valence1, valence2, integral)
+                nl1, nl2 = select_subshells(valence1, valence2, integral)
                 if nl1 is not None and nl2 is not None:
                     lm1, lm2 = integral.split('_')
 
@@ -39,9 +39,22 @@ def select_integrals(e1, e2):
     return selected
 
 
-def select_orbitals(val1, val2, integral):
-    """ Select orbitals from given valences to evaluate the given integral.
-    e.g. ['2s', '2p'], ['4s', '3d'], 's_dxy' --> ('2s', '3d')
+def select_subshells(val1, val2, integral):
+    """
+    Select subshells from given valence sets to evaluate
+    the given integral.
+
+    Parameters
+    ----------
+    val1, val2 : list of str
+        Valence subshell sets (e.g. ['2s', '2p'], ['4s', '3d']).
+    integral : str
+        Integral label (e.g. 's_dxy').
+
+    Returns
+    -------
+    nl1, nl2 : str
+        Matching subshell pair (e.g. ('2s', '3d') in this example).
     """
     nl1 = None
     for nl in val1:

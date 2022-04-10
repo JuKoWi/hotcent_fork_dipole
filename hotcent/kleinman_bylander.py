@@ -28,7 +28,7 @@ class KleinmanBylanderPP(SeparablePP):
     filename : str
         Name of a pseudopotential file in '.psf' format.
     valence : list of str, optional
-        Set of nl values defining the set of minimal valence orbitals,
+        Set of nl values defining the set of minimal valence subshells,
         for setting the maximal angular momentum if the lmax argument
         is None.
     with_polarization : bool, optional

@@ -96,7 +96,7 @@ class PseudoAtomicDFT(AtomicDFT):
         self.Rnl_free_fct = {nl: None for nl in self.pp.get_subshells()}
 
         header('Initial run without any confinement',
-               'for pre-converging orbitals and eigenvalues')
+               'for pre-converging subshells and eigenvalues')
         self.confinement = ZeroConfinement()
         dens_free, veff_free, self.enl_free, unlg_free, self.Rnlg_free = \
                                                                 self.outer_scf()
@@ -147,7 +147,7 @@ class PseudoAtomicDFT(AtomicDFT):
             if self.confinement is None:
                 self.confinement = ZeroConfinement()
             header('Applying %s' % self.confinement,
-                   'to get a confined %s orbital' % nl)
+                   'to get a confined %s subshell' % nl)
 
             l = ANGULAR_MOMENTUM[nl[1]]
             veff = veff_free + self.confinement(self.rgrid) \
@@ -186,7 +186,7 @@ class PseudoAtomicDFT(AtomicDFT):
 
         # Calculate and print the total energy contributions
         # Note: we need to pass the eigenvalues calculated with a V_eff
-        # that is consistent with the density as a sum of orbital densities.
+        # that is consistent with the density as a sum of subshell densities.
         # The eigenvalues in self.enl, by contrast, are 'perturbative' in
         # character, calculated with V_eff = V_eff,free + V_confinement.
         enl_sc = {nl: self.get_onecenter_integrals(nl, nl)[0]

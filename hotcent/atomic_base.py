@@ -45,14 +45,14 @@ class AtomicBase:
     configuration : str
         Electronic configuration, e.g. '[He] 2s2 2p2'.
     valence : list
-        Valence orbitals, e.g. ['2s','2p'].
+        Valence subshells, e.g. ['2s','2p'].
     confinement : Confinement-like object, optional
         Confinement potential for the electron density
         (see hotcent.confinement). The default None means
         that means no density confinement will be applied.
     wf_confinement : dict, optional
         Dictionary with confinement potentials for the
-        valence orbitals. If None, the same confinement will
+        valence subshells. If None, the same confinement will
         be used as for the electron density. If a certain
         hotcent.confinement.Confinement instance is provided,
         this will be applied to all valence states. If a
@@ -74,7 +74,7 @@ class AtomicBase:
         Radial cutoff in Bohr.
     nodegpts : int, optional
         Total number of grid points is nodegpts times the max
-        number of antinodes for all orbitals.
+        number of antinodes for all subshells.
     timing : bool, optional
         Whether to produce a timing summary (default: False).
     verbose : bool, optional
@@ -248,8 +248,8 @@ class AtomicBase:
                     states.append((n, l, nl))
         return states
 
-    def get_valence_orbitals(self):
-        """ Get list of valence orbitals, e.g. ['2s','2p'] """
+    def get_valence_subshells(self):
+        """ Get list of valence subshells, e.g. ['2s','2p'] """
         return self.valence
 
     def get_energy(self):
@@ -417,16 +417,19 @@ class AtomicBase:
         plt.clf()
 
     def plot_density(self, filename=None):
-        """ Plot the electron density and valence orbital densities.
+        """ Plot the electron density and valence subshell densities.
 
         Note that the plotted electron density (rho_0) generally does
-        not correspond to the sum of the valence orbital densities in
-        the valence region. For this to be the case, the orbital densities
+        not correspond to the sum of the valence subshell densities in
+        the valence region. For this to be the case, the subshell densities
         would need to be multiplied by their occupation numbers, and
         the same confinement potential would need to be applied throughout.
 
-        filename:  output file name + extension (extension used in matplotlib)
-                   default = <Element>_rho.pdf
+        Parameters
+        ----------
+        filename : str or None, optional
+            Output file name. If None (the default), '<element>_rho.pdf'
+            will be the filename.
         """
         assert plt is not None, 'Matplotlib could not be imported!'
         assert self.solved, NOT_SOLVED_MESSAGE
@@ -459,7 +462,7 @@ class AtomicBase:
         plt.xlabel('r (Bohr)')
         plt.grid(ls='--')
         plt.legend(loc='upper right', ncol=2)
-        plt.title('Electron and orbital densities for %s' % self.symbol)
+        plt.title('Electron and subshell densities for %s' % self.symbol)
 
         if filename is None:
             filename = '%s_rho.pdf' % self.symbol
@@ -470,23 +473,26 @@ class AtomicBase:
         self.plot_density(*args, **kwargs)
 
     def write_unl(self, filename, only_valence=True, step=20):
-        """ Append functions unl=Rnl*r into file.
-            Only valence functions by default.
+        """
+        Append functions unl=Rnl*r into file.
 
-        Parameters:
-        -----------
-        filename:         output file name (e.g. XX.elm)
-        only_valence:     output of only valence orbitals
-        step:             step size for output grid
+        Parameters
+        ----------
+        filename : str
+            Output file name (e.g. '<element>.elm').
+        only_valence : bool, optional
+            Whether to write only the valence subshells.
+        step : int, optional
+            Stride applied to self.rgrid to define the output grid.
         """
         assert self.solved, NOT_SOLVED_MESSAGE
         if only_valence:
-            orbitals = self.valence
+            valence = self.valence
         else:
-            orbitals = [nl for n,l,nl in self.list_states()]
+            valence = [nl for n, l, nl in self.list_states()]
 
         with open(filename, 'a') as f:
-            for nl in orbitals:
+            for nl in valence:
                 f.write('\n\nu_%s=' % nl)
                 for r, u in zip(self.rgrid[::step], self.unlg[nl][::step]):
                     f.write(r, u)
@@ -494,21 +500,38 @@ class AtomicBase:
 
     def fit_sto(self, nl, num_exp, num_pow, regularization=1e-6,
                 filename=None):
-        """ Fit Slater-type orbitals to the one on the grid.
-            See self.write_hsd() for more information.
+        """
+        Fit Slater-type radial functions to the one on the grid.
+        See self.write_hsd() for more information.
 
-        Parameters:
-        -----------
-        nl:              the (valence) orbital of interest (e.g. '2p')
-        num_exp:         number of exponents to use
-        num_pow:         number of r-powers for each exponents
-        regularization:  penalty to be used in the L2-regularization
-        filename:        filename for a figure with the grid-based
-                         and STO-fitted orbitals (to verify that the
-                         fit is decent)
+        Parameters
+        ----------
+        nl : str
+            The (valence) subshell of interest (e.g. '2p').
+        num_exp : int
+            The number of exponents to use
+        num_pow : int
+            The number of r-powers for each exponent.
+        regularization : float, optional
+            Penalty to be used in the L2-regularization
+        filename : str or None, optional
+            Filename for a figure with the grid-based and STO-fitted
+            radial function (to verify that the fit is decent).
+            If None (the default), no plotting is performed.
+
+        Returns
+        -------
+        exponents : np.ndarray
+            Fitted Slater function exponents.
+        coeff : np.ndarray
+            Fitted coefficients for each Slater function.
+        values : np.ndarray
+            Slater function values on the grid.
+        residual : float
+            Residual of the fit.
         """
         assert self.solved, NOT_SOLVED_MESSAGE
-        print('Fitting Slater-type orbitals to eigenstate %s' % nl,
+        print('Fitting Slater-type radial functions for subshell %s' % nl,
               file=self.txt)
         r = self.rgrid
         y = self.Rnlg[nl]
@@ -557,13 +580,13 @@ class AtomicBase:
         integral = np.trapz((r * y) ** 2, x=r)
         if abs(integral - 1) > 1e-1:
             print('Warning -- significant deviation from unity for integral'
-                  ' of grid-based %s orbital: %.5f' % (nl, integral),
+                  ' of grid-based %s radial function: %.5f' % (nl, integral),
                   file=self.txt)
 
         integral = np.trapz((r * values) ** 2, x=r)
         if abs(integral - 1) > 1e-1:
             print('Warning -- significant deviation from unity for integral'
-                  ' of STO-based %s orbital: %.5f' % (nl, integral),
+                  ' of STO-based %s radial function: %.5f' % (nl, integral),
                   file=self.txt)
 
         if filename is not None:
@@ -584,13 +607,14 @@ class AtomicBase:
         return exponents, coeff, values, residual
 
     def write_hsd(self, filename=None, num_exp=None, num_pow=4, wfthr=1e-2):
-        """ Writes a HSD-format file with information on the valence
-        orbitals. This includes a projection of these orbitals
-        on a set of Slater-type orbitals, for post-processing
+        """
+        Writes a HSD-format file with information on the valence
+        subshells. This includes a projection of these subshells
+        on a set of Slater-type radial functions, for post-processing
         purposes (e.g. using the Waveplot tool part of DFTB+).
 
         The expansion is the same as in DFTB+.
-        For an atomic orbital with angular momentum l:
+        For a subshell with angular momentum l:
 
           R_l(r) = \sum_{i=0}^{num_exp-1} \sum_{j=0}^{num_pow-1}
                      coeff_{i,j} * r ^ (l + j) * \exp(-exponent_i * r)
@@ -599,21 +623,24 @@ class AtomicBase:
         This means that \int_{r=0}^{\infty} r^2 * |R_l(r)|^2 dr = 1.
 
         Starting from a reasonable initial guess, the exponents
-        are optimized to reproduce the grid-based orbitals,
+        are optimized to reproduce the grid-based radial functions,
         with the coefficient matrix being determined by
         (L2-regularized) linear regression at each iteration.
 
-        Parameters:
-        -----------
-        filename:   output file name. If None, the name
-                    defaults to wcf.<Element>.hsd
-        num_exp:    number of exponents to use
-                    default = highest principal quantum number
-        num_pow:    number of powers for each exponent
-                    default = 4
-        wfthr:      parameter determining the 'Cutoff' radius,
-                    which will be where the orbital tail goes
-                    below wfthr in absolute value
+        Parameters
+        ----------
+        filename : str or None, optional
+            Output file name. If None, the name defaults to
+            'wcf.<element>.hsd'.
+        num_exp : int or None, optional
+            Number of exponents to use. The default (None) implies
+            the highest principal quantum number will be used.
+        num_pow : int, optional
+            Number of powers for each exponent (default: 4).
+        wfthr : float, optional
+            Parameter determining the 'cutoff' radius which will be
+            where the radial function tail goes below wfthr in absolute
+            value (default: 1e-2).
         """
         assert self.solved, NOT_SOLVED_MESSAGE
         if filename is None:
@@ -652,19 +679,19 @@ class AtomicBase:
         """
         Returns <phi_nl1|H|phi_nl1> for an 'excited' electronic
         configuration involving a change in the (possible spin-resolved)
-        occupation of a second orbital.
+        occupation of a second subshell.
 
         Parameters
         ----------
         nl1 : str
-            First orbital label.
+            First subshell label.
         nl2 : str
-            Second orbital label.
+            Second subshell label.
         diff : float
-            Change in the occupation of the second orbital.
+            Change in the occupation of the second subshell.
         spin : None or str
             If None (default), the 'up' and 'down' occupations of the
-            second orbital are changed by the same amount (0.5 * 'diff'),
+            second subshell are changed by the same amount (0.5 * 'diff'),
             so that the magnetization density remains zero. When
             choosing spin='up' or 'down', only the occupation of the
             selected channel is modified (by a 'diff' amount). The nl1
@@ -739,22 +766,22 @@ class AtomicBase:
         has to be called first, because the radial functions are needed
         (and are kept fixed). This is not the case with the non-
         perturbative scheme, where a self-consistent solution is sought
-        for every orbital occupancy.
+        for every subshell occupancy.
 
         Parameters
         ----------
         nl1: str
-            First orbital label.
+            First subshell label.
         nl2: str
-            Second orbital label.
+            Second subshell label.
         maxstep : float, optional
-            The maximal step size in the orbital occupancy.
+            The maximal step size in the subshell occupancy.
             The default default value of 1 means not going further
             than the monovalent ions.
         scheme : None or str, optional
             The finite difference scheme, either 'central', 'forward'
             or 'backward' or None. In the last case the appropriate
-            scheme will be chosen based on the orbital occupation.
+            scheme will be chosen based on the subshell occupation.
 
         Other Parameters
         ----------------
@@ -809,17 +836,17 @@ class AtomicBase:
 
     def get_hubbard_value(self, nl, nl2=None, maxstep=1., scheme=None):
         """
-        Calculates the Hubbard value of the given orbital as the
+        Calculates the Hubbard value of the given subshell as the
         derivative of its eigenvalue with respect to the occupation
-        of a second orbital.
+        of a second subshell.
 
         Parameters
         ----------
         nl : str
-            First orbital label (e.g. '2p').
+            First subshell label (e.g. '2p').
         nl2 : str, optional
-            Second orbital label. If None (the default) it will be
-            taken equal to the first orbital label.
+            Second subshell label. If None (the default) it will be
+            taken equal to the first subshell label.
 
         Other Parameters
         ----------------
@@ -839,10 +866,10 @@ class AtomicBase:
         Parameters
         ----------
         nl1 : str
-            First orbital label.
+            First subshell label.
         nl2 : str
-            Second orbital label. If None (the default) it will be
-            taken equal to the first orbital label.
+            Second subshell label. If None (the default) it will be
+            taken equal to the first subshell label.
         """
         assert self.perturbative_confinement
         assert self.solved, NOT_SOLVED_MESSAGE
@@ -865,16 +892,16 @@ class AtomicBase:
 
     def get_spin_constant(self, nl, nl2=None, maxstep=0.5, scheme=None):
         """
-        Calculates the spin constant of the given orbital based on
+        Calculates the spin constant of the given subshell based on
         derivatives of its up-eigenvalue with respect to the up/down-
-        occupation of a second orbital.
+        occupation of a second subshell.
 
         Parameters
         ----------
         nl : str
-            First orbital label (e.g. '2p').
+            First subshell label (e.g. '2p').
         nl2 : str
-            Second orbital label.
+            Second subshell label.
 
         Other Parameters
         ----------------
@@ -896,10 +923,10 @@ class AtomicBase:
         Parameters
         ----------
         nl1 : str
-            First orbital label.
+            First subshell label.
         nl2 : str
-            Second orbital label. If None (the default) it will be
-            taken equal to the first orbital label.
+            Second subshell label. If None (the default) it will be
+            taken equal to the first subshell label.
         """
         assert self.perturbative_confinement
         assert self.solved, NOT_SOLVED_MESSAGE

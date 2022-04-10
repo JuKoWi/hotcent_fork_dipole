@@ -55,9 +55,22 @@ def search_integrals(lm1, lm2):
     return integrals, ordered
 
 
-def select_orbitals(val1, val2, integral):
-    """ Select orbitals from given valences to calculate given integral.
-    e.g. ['2s', '2p'], ['4s', '3d'], 'sds' --> ('2s', '3d')
+def select_subshells(val1, val2, integral):
+    """
+    Select subshells from given valence sets to calculate given
+    Slater-Koster integral.
+
+    Parameters
+    ----------
+    val1, val2 : list of str
+        Valence subshell sets (e.g. ['2s', '2p'], ['4s', '3d']).
+    integral : str
+        Slater-Koster integral label (e.g. 'sds').
+
+    Returns
+    -------
+    nl1, nl2 : str
+        Matching subshell pair (e.g. ('2s', '3d') in this example).
     """
     nl1 = None
     for nl in val1:
@@ -79,7 +92,7 @@ def select_integrals(e1, e2):
     for ival1, valence1 in enumerate(e1.basis_sets):
         for ival2, valence2 in enumerate(e2.basis_sets):
             for integral in INTEGRALS:
-                nl1, nl2 = select_orbitals(valence1, valence2, integral)
+                nl1, nl2 = select_subshells(valence1, valence2, integral)
                 if nl1 is not None and nl2 is not None:
                     selected.append((integral, nl1, nl2))
     return selected

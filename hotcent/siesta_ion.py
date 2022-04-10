@@ -77,7 +77,7 @@ def write_ion(atom, label=None, npts=500, threshold=1e-12):
             occ = atom.configuration[nl] if (ibas == 0 and is_minimal) else 0.
             items = [l, n, z, is_pol, occ]
             line = '{0:3d}{1:3d}{2:3d}{3:3d}{4:10.6f}'.format(*items)
-            line += '  # orbital l, n, zeta, is_polarized, occupation'
+            line += '  # subshell l, n, zeta, is_polarized, occupation'
             lines.append(line)
             table = get_array_table(atom.Rnl_fct[nl], npts, threshold=threshold,
                                     exponent=l)
