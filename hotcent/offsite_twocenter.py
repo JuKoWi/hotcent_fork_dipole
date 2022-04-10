@@ -18,11 +18,6 @@ try:
     import matplotlib.pyplot as plt
 except ImportError:
     plt = None
-try:
-    import _hotcent
-except ModuleNotFoundError:
-    print('Warning: C-extensions not available')
-    _hotcent = None
 
 
 class Offsite2cTable(MultiAtomIntegrator):
