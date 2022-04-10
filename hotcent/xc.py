@@ -143,6 +143,9 @@ class LibXC:
         Returns a dictionary with the arrays needed to compute
         the spin-resolved XC potentials.
 
+        Note: so far this function has only been applied with equal
+        up and down densities.
+
         Parameters
         ----------
         rho_up : np.ndarray
@@ -256,6 +259,9 @@ class LibXC:
         """
         Returns the XC potential for the 'up' spin channel.
 
+        Note: so far this function has only been applied with equal
+        up and down densities.
+
         Parameters
         ----------
         rho_up : np.ndarray
@@ -337,6 +343,9 @@ class LibXC:
         \int \int f_1(r)
                   \frac{\partial^2 E_xc}{\partial \mu(r) \partial \mu(r')}
                   f_2(r') dr dr'
+
+        Note: so far this function has only been applied with equal
+        up and down densities.
 
         Parameters
         ----------
