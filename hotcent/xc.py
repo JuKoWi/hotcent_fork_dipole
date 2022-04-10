@@ -104,7 +104,7 @@ class LibXC:
 
         Returns
         -------
-        results: dict of np.ndarray
+        results : dict of np.ndarray
             Dictionary with 'vrho' and (if fxc=True) 'v2rho2'.
             If GGA functionals are involved, also 'vsigma' and
             (if fxc=True) 'v2rhosigma' and 'v2sigma2' are included.
@@ -168,7 +168,7 @@ class LibXC:
 
         Returns
         -------
-        results: dict of np.ndarray
+        results : dict of np.ndarray
             Dictionary with 'vrho' and (if fxc=True) 'v2rho2'.
             If GGA functionals are involved, also 'vsigma' and
             (if fxc=True) 'v2rhosigma' and 'v2sigma2' are included.
@@ -475,7 +475,7 @@ class XC_PW92:
 
     def evaluate(self, n, *args, **kwargs):
         """
-        Returns the XC energy and potential.
+        Returns the XC energy density and potential.
 
         Parameters
         ----------
