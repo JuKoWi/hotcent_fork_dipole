@@ -5,10 +5,11 @@
 #   SPDX-License-Identifier: GPL-3.0-or-later                                 #
 #-----------------------------------------------------------------------------#
 import numpy as np
+from hotcent.fluctuation_onecenter import NUMLM_1CM, select_orbitals, write_1cm
 from hotcent.fluctuation_twocenter import (NUMINT_2CL, select_subshells,
                                            write_2cl)
 from hotcent.multiatom_integrator import MultiAtomIntegrator
-from hotcent.orbitals import ANGULAR_MOMENTUM
+from hotcent.orbitals import ANGULAR_MOMENTUM, ORBITAL_LABELS
 from hotcent.slako import tail_smoothening
 from hotcent.xc import LibXC
 
@@ -202,3 +203,222 @@ class Onsite2cGammaTable(MultiAtomIntegrator):
                 with open(filename, 'w') as f:
                     write_2cl(f, self.Rgrid, table, angmom1a, angmom1b)
         return
+
+
+class Onsite1cUTable:
+    """ XXX
+    Description
+    """
+    def __init__(self, el, radial_grid_factor=13, lebedev_order=47, txt=None):
+        self.el = el
+        self.radial_grid_factor = radial_grid_factor
+        self.lebedev_order = lebedev_order
+        self.txt = txt
+
+    def run(self, xc='LDA', file=None):
+        """
+        Calculates on-site, one-center, orbital-resolved "U" values
+        as matrix elements of the Hartree-XC kernel.
+
+        Parameters
+        ----------
+        xc : str, optional
+            Name of the exchange-correlation functional.
+        """
+        print('\n\n', file=self.txt)
+        print('***********************************************', file=self.txt)
+        print('Orbital-resolved onsite-U table construction for %s' % \
+              self.el.get_symbol(), file=self.txt)
+        print('***********************************************', file=self.txt)
+
+        selected = select_orbitals(self.el)
+
+        self.tables = {}
+        for bas1 in range(len(self.el.basis_sets)):
+            for bas2 in range(len(self.el.basis_sets)):
+                self.tables[(bas1, bas2)] = np.zeros((NUMLM_1CM, NUMLM_1CM))
+
+        U = self.calculate(selected, xc=xc)
+
+        for key in selected:
+            (nl1, lm1), (nl2, lm2) = key
+            bas1 = self.el.get_basis_set_index(nl1)
+            bas2 = self.el.get_basis_set_index(nl2)
+            i = ORBITAL_LABELS.index(lm1)
+            j = ORBITAL_LABELS.index(lm2)
+            self.tables[(bas1, bas2)][i, j] = U[key]
+            if i != j or bas1 != bas2:
+                self.tables[(bas2, bas1)][j, i] = U[key]
+        return
+
+    def calculate(self, selected, xc='LDA'):
+        """
+        Calculates the selected integrals involving the Hartree-XC kernel.
+
+        Parameters
+        ----------
+        selected : list of 2-tuples of 2-tuples
+            Sets of orbital pairs to evaluate.
+        xc : str, optional
+            Name of the exchange-correlation functional.
+
+        Returns
+        -------
+        U: dict
+            Dictionary containing the integral for each selected
+            orbital pair.
+        """
+        import becke
+        from hotcent.spherical_harmonics import sph_cartesian
+
+        becke.settings.radial_grid_factor = self.radial_grid_factor
+        becke.settings.lebedev_order = self.lebedev_order
+
+        xc = LibXC('LDA_X+LDA_C_PW' if xc == 'LDA' else xc)
+        dens = self.el.electron_density(self.el.rgrid)
+
+        U = {}
+        for key in selected:
+            (nl1, lm1), (nl2, lm2) = key
+            dens_nl1 = self.el.Rnlg[nl1]**2
+            dens_nl2 = self.el.Rnlg[nl2]**2
+
+            factor = self.get_angular_integral(lm1, lm2)
+            if factor is None:
+                factor = self.get_angular_integral(lm2, lm1)
+
+            # XXX presumably only correct for LDA
+            U[key] = xc.evaluate_fxc(dens, self.el.grid, dens_nl1, dens_nl2)
+            U[key] *= factor
+
+            def rho1(x, y, z):
+                r = np.sqrt(x**2 + y**2 + z**2)
+                return (self.el.Rnl(r, nl1) * sph_cartesian(x, y, z, r, lm1))**2
+
+            def rho2(x, y, z):
+                r = np.sqrt(x**2 + y**2 + z**2)
+                return (self.el.Rnl(r, nl2) * sph_cartesian(x, y, z, r, lm2))**2
+
+            atoms = [(self.el.Z, (0., 0., 0.))]
+            vhar2 = becke.poisson(atoms, rho2)
+
+            def integrand(x, y, z):
+                return rho1(x, y, z) * vhar2(x, y, z)
+
+            U[key] += becke.integral(atoms, integrand)
+            print('XXX', key, U[key], file=self.txt, flush=True)
+
+        return U
+
+    def write(self):
+        """
+        Writes all integral tables to file.
+
+        The filename template corresponds to '<el1>-<el1>_onsiteU.1cm'.
+        """
+        sym = self.el.get_symbol()
+
+        for bas1, valence1 in enumerate(self.el.basis_sets):
+            for bas2, valence2 in enumerate(self.el.basis_sets):
+                template = '%s-%s_onsiteU.1cm'
+                filename = template % (sym + '+'*bas1, sym + '+'*bas2)
+                print('Writing to %s' % filename, file=self.txt, flush=True)
+
+                table = self.tables[(bas1, bas2)]
+                with open(filename, 'w') as f:
+                    write_1cm(f, table)
+        return
+
+    def get_angular_integral(self, lm1, lm2):
+        if lm1 == 's' and lm2 == 's':
+            return 1./(16*np.pi**2)
+        elif lm1 == 'px' and lm2 == 's':
+            return 1./(16*np.pi**2)
+        elif lm1 == 'px' and lm2 == 'px':
+            return 9./(80*np.pi**2)
+        elif lm1 == 'py' and lm2 == 's':
+            return 1./(16*np.pi**2)
+        elif lm1 == 'py' and lm2 == 'px':
+            return 3./(80*np.pi**2)
+        elif lm1 == 'py' and lm2 == 'py':
+            return 9./(80*np.pi**2)
+        elif lm1 == 'pz' and lm2 == 's':
+            return 1./(16*np.pi**2)
+        elif lm1 == 'pz' and lm2 == 'px':
+            return 3./(80*np.pi**2)
+        elif lm1 == 'pz' and lm2 == 'py':
+            return 3./(80*np.pi**2)
+        elif lm1 == 'pz' and lm2 == 'pz':
+            return 9./(80*np.pi**2)
+        elif lm1 == 'dxy' and lm2 == 's':
+            return 1./(16*np.pi**2)
+        elif lm1 == 'dxy' and lm2 == 'px':
+            return 9./(112*np.pi**2)
+        elif lm1 == 'dxy' and lm2 == 'py':
+            return 9./(112*np.pi**2)
+        elif lm1 == 'dxy' and lm2 == 'pz':
+            return 3./(112*np.pi**2)
+        elif lm1 == 'dxy' and lm2 == 'dxy':
+            return 15./(112*np.pi**2)
+        elif lm1 == 'dyz' and lm2 == 's':
+            return 1./(16*np.pi**2)
+        elif lm1 == 'dyz' and lm2 == 'px':
+            return 3./(112*np.pi**2)
+        elif lm1 == 'dyz' and lm2 == 'py':
+            return 9./(112*np.pi**2)
+        elif lm1 == 'dyz' and lm2 == 'pz':
+            return 9./(112*np.pi**2)
+        elif lm1 == 'dyz' and lm2 == 'dxy':
+            return 5./(112*np.pi**2)
+        elif lm1 == 'dyz' and lm2 == 'dyz':
+            return 15./(112*np.pi**2)
+        elif lm1 == 'dxz' and lm2 == 's':
+            return 1./(16*np.pi**2)
+        elif lm1 == 'dxz' and lm2 == 'px':
+            return 9./(112*np.pi**2)
+        elif lm1 == 'dxz' and lm2 == 'py':
+            return 3./(112*np.pi**2)
+        elif lm1 == 'dxz' and lm2 == 'pz':
+            return 9./(112*np.pi**2)
+        elif lm1 == 'dxz' and lm2 == 'dxy':
+            return 5./(112*np.pi**2)
+        elif lm1 == 'dxz' and lm2 == 'dyz':
+            return 5./(112*np.pi**2)
+        elif lm1 == 'dxz' and lm2 == 'dxz':
+            return 15./(112*np.pi**2)
+        elif lm1 == 'dx2-y2' and lm2 == 's':
+            return 1./(16*np.pi**2)
+        elif lm1 == 'dx2-y2' and lm2 == 'px':
+            return 9./(112*np.pi**2)
+        elif lm1 == 'dx2-y2' and lm2 == 'py':
+            return 9./(112*np.pi**2)
+        elif lm1 == 'dx2-y2' and lm2 == 'pz':
+            return 3./(112*np.pi**2)
+        elif lm1 == 'dx2-y2' and lm2 == 'dxy':
+            return 5./(112*np.pi**2)
+        elif lm1 == 'dx2-y2' and lm2 == 'dyz':
+            return 5./(112*np.pi**2)
+        elif lm1 == 'dx2-y2' and lm2 == 'dxz':
+            return 5./(112*np.pi**2)
+        elif lm1 == 'dx2-y2' and lm2 == 'dx2-y2':
+            return 15./(112*np.pi**2)
+        elif lm1 == 'dz2' and lm2 == 's':
+            return 1./(16*np.pi**2)
+        elif lm1 == 'dz2' and lm2 == 'px':
+            return 5./(112*np.pi**2)
+        elif lm1 == 'dz2' and lm2 == 'py':
+            return 5./(112*np.pi**2)
+        elif lm1 == 'dz2' and lm2 == 'pz':
+            return 11./(112*np.pi**2)
+        elif lm1 == 'dz2' and lm2 == 'dxy':
+            return 5./(112*np.pi**2)
+        elif lm1 == 'dz2' and lm2 == 'dyz':
+            return 5./(112*np.pi**2)
+        elif lm1 == 'dz2' and lm2 == 'dxz':
+            return 5./(112*np.pi**2)
+        elif lm1 == 'dz2' and lm2 == 'dx2-y2':
+            return 5./(112*np.pi**2)
+        elif lm1 == 'dz2' and lm2 == 'dz2':
+            return 15./(112*np.pi**2)
+        else:
+            return None
