@@ -14,11 +14,10 @@ ORBITALS = {
     1: ('px', 'py', 'pz'),
     2: ('dxy', 'dyz', 'dxz', 'dx2-y2', 'dz2'),
     3: ('fx(x2-3y2)', 'fy(3x2-y2)', 'fz(x2-y2)', 'fxyz', 'fyz2', 'fxz2', 'fz3'),
+    4: tuple(['g{0}'.format(i) for i in range(1, 10)]),
 }
 
-ORBITAL_LABELS = ['s', 'px', 'py', 'pz', 'dxy', 'dyz', 'dxz', 'dx2-y2',
-                  'dz2', 'fx(x2-3y2)', 'fy(3x2-y2)', 'fz(x2-y2)', 'fxyz',
-                  'fyz2', 'fxz2', 'fz3']
+ORBITAL_LABELS = [lm for l in range(5) for lm in ORBITALS[l]]
 
 
 def calculate_slako_coeff(x, y, z, ilm, jlm, tau):

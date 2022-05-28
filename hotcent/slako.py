@@ -221,6 +221,205 @@ def dg(c1, c2, s1, s2, integral):
         return [0, 0, 105*s1**2*s2**3/32, 105*s1**3*s2**2/32]
 
 
+def get_twocenter_phi_integral(lm1, lm2, c1, c2, s1, s2):
+    """ Similar to the g() function above, but for every
+    (lm1, lm2) combination including s/p/d/f/g angular momenta.
+
+    Parameters
+    ----------
+    lm1, lm2 : str
+        Orbital labels.
+    c1, c2, s1, s2 : np.ndarray
+        Cosine (c1 and c2) and sine (s1 and s2) of the
+        theta_1 and theta2 angles, respectively.
+
+    Returns
+    -------
+    ghi : np.ndarray
+        Y_{lm1}(\theta_1) Y_{lm1}(\theta_2)
+        \int Y_{lm1}(\phi_1) Y_{lm1}(\phi_2) d\phi
+    """
+    if lm1 == 's' and lm2 == 's':
+        gphi = 1/2.
+    elif lm1 == 's' and lm2 == 'pz':
+        gphi = np.sqrt(3)*c2/2.
+    elif lm1 == 's' and lm2 == 'dz2':
+        gphi = np.sqrt(5)*(3*c2**2 - 1)/4.
+    elif lm1 == 's' and lm2 == 'fz3':
+        gphi = np.sqrt(7)*(5*c2**2 - 3)*c2/4.
+    elif lm1 == 's' and lm2 == 'g5':
+        gphi = 105*c2**4/16. - 45*c2**2/8 + 9/16.
+    elif lm1 == 'px' and lm2 == 'px':
+        gphi = 3*s2*s1/4.
+    elif lm1 == 'px' and lm2 == 'dxz':
+        gphi = 3*np.sqrt(5)*s2*s1*c2/4.
+    elif lm1 == 'px' and lm2 == 'fxz2':
+        gphi = 3*np.sqrt(14)*(5*c2**2 - 1)*s2*s1/16.
+    elif lm1 == 'px' and lm2 == 'g6':
+        gphi = 3*np.sqrt(30)*(7*c2**2 - 3)*s2*s1*c2/16.
+    elif lm1 == 'py' and lm2 == 'py':
+        gphi = 3*s2*s1/4.
+    elif lm1 == 'py' and lm2 == 'dyz':
+        gphi = 3*np.sqrt(5)*s2*s1*c2/4.
+    elif lm1 == 'py' and lm2 == 'fyz2':
+        gphi = 3*np.sqrt(14)*(5*c2**2 - 1)*s2*s1/16.
+    elif lm1 == 'py' and lm2 == 'g4':
+        gphi = 3*np.sqrt(30)*(7*c2**2 - 3)*s2*s1*c2/16.
+    elif lm1 == 'pz' and lm2 == 's':
+        gphi = np.sqrt(3)*c1/2.
+    elif lm1 == 'pz' and lm2 == 'pz':
+        gphi = 3*c2*c1/2.
+    elif lm1 == 'pz' and lm2 == 'dz2':
+        gphi = np.sqrt(15)*(3*c2**2 - 1)*c1/4.
+    elif lm1 == 'pz' and lm2 == 'fz3':
+        gphi = np.sqrt(21)*(5*c2**2 - 3)*c2*c1/4.
+    elif lm1 == 'pz' and lm2 == 'g5':
+        gphi = 3*np.sqrt(3)*(35*c2**4 - 30*c2**2 + 3)*c1/16.
+    elif lm1 == 'dxy' and lm2 == 'dxy':
+        gphi = 15*s2**2*s1**2/16.
+    elif lm1 == 'dxy' and lm2 == 'fxyz':
+        gphi = 15*np.sqrt(7)*s2**2*s1**2*c2/16.
+    elif lm1 == 'dxy' and lm2 == 'g3':
+        gphi = 15*np.sqrt(3)*(7*c2**2 - 1)*s2**2*s1**2/32.
+    elif lm1 == 'dyz' and lm2 == 'py':
+        gphi = 3*np.sqrt(5)*s2*s1*c1/4.
+    elif lm1 == 'dyz' and lm2 == 'dyz':
+        gphi = 15*s2*s1*c2*c1/4.
+    elif lm1 == 'dyz' and lm2 == 'fyz2':
+        gphi = 3*np.sqrt(70)*(5*c2**2 - 1)*s2*s1*c1/16.
+    elif lm1 == 'dyz' and lm2 == 'g4':
+        gphi = 15*np.sqrt(6)*(28*(-8*s2**3*c2 + 4*s2*c2)*s1*c1 \
+                              + 16*s2*s1*c2*c1)/512.
+    elif lm1 == 'dxz' and lm2 == 'px':
+        gphi = 3*np.sqrt(5)*s2*s1*c1/4.
+    elif lm1 == 'dxz' and lm2 == 'dxz':
+        gphi = 15*s2*s1*c2*c1/4.
+    elif lm1 == 'dxz' and lm2 == 'fxz2':
+        gphi = 3*np.sqrt(70)*(5*c2**2 - 1)*s2*s1*c1/16.
+    elif lm1 == 'dxz' and lm2 == 'g6':
+        gphi = 15*np.sqrt(6)*(28*(-8*s2**3*c2 + 4*s2*c2)*s1*c1 \
+                              + 16*s2*s1*c2*c1)/512.
+    elif lm1 == 'dx2-y2' and lm2 == 'dx2-y2':
+        gphi = 15*s2**2*s1**2/16.
+    elif lm1 == 'dx2-y2' and lm2 == 'fz(x2-y2)':
+        gphi = 15*np.sqrt(7)*s2**2*s1**2*c2/16.
+    elif lm1 == 'dx2-y2' and lm2 == 'g7':
+        gphi = 15*np.sqrt(3)*(7*c2**2 - 1)*s2**2*s1**2/32.
+    elif lm1 == 'dz2' and lm2 == 's':
+        gphi = np.sqrt(5)*(3*c1**2 - 1)/4.
+    elif lm1 == 'dz2' and lm2 == 'pz':
+        gphi = np.sqrt(15)*(3*c1**2 - 1)*c2/4.
+    elif lm1 == 'dz2' and lm2 == 'dz2':
+        gphi = 5*(3*c2**2 - 1)*(3*c1**2 - 1)/8.
+    elif lm1 == 'dz2' and lm2 == 'fz3':
+        gphi = np.sqrt(35)*(5*c2**2 - 3)*(3*c1**2 - 1)*c2/8.
+    elif lm1 == 'dz2' and lm2 == 'g5':
+        gphi = 3*np.sqrt(5)*(3*c1**2 - 1)*(35*c2**4 - 30*c2**2 + 3)/32.
+    elif lm1 == 'fx(x2-3y2)' and lm2 == 'fx(x2-3y2)':
+        gphi = 35*s2**3*s1**3/32.
+    elif lm1 == 'fx(x2-3y2)' and lm2 == 'g8':
+        gphi = 105*s2**3*s1**3*c2/32.
+    elif lm1 == 'fy(3x2-y2)' and lm2 == 'fy(3x2-y2)':
+        gphi = 35*s2**3*s1**3/32.
+    elif lm1 == 'fy(3x2-y2)' and lm2 == 'g2':
+        gphi = 105*s2**3*s1**3*c2/32.
+    elif lm1 == 'fz(x2-y2)' and lm2 == 'dx2-y2':
+        gphi = 15*np.sqrt(7)*s2**2*s1**2*c1/16.
+    elif lm1 == 'fz(x2-y2)' and lm2 == 'fz(x2-y2)':
+        gphi = 105*s2**2*s1**2*c2*c1/16.
+    elif lm1 == 'fz(x2-y2)' and lm2 == 'g7':
+        gphi = 15*np.sqrt(21)*(7*c2**2 - 1)*s2**2*s1**2*c1/32.
+    elif lm1 == 'fxyz' and lm2 == 'dxy':
+        gphi = 15*np.sqrt(7)*s2**2*s1**2*c1/16.
+    elif lm1 == 'fxyz' and lm2 == 'fxyz':
+        gphi = 105*s2**2*s1**2*c2*c1/16.
+    elif lm1 == 'fxyz' and lm2 == 'g3':
+        gphi = 15*np.sqrt(21)*(7*c2**2 - 1)*s2**2*s1**2*c1/32.
+    elif lm1 == 'fyz2' and lm2 == 'py':
+        gphi = 3*np.sqrt(14)*(5*c1**2 - 1)*s2*s1/16.
+    elif lm1 == 'fyz2' and lm2 == 'dyz':
+        gphi = 3*np.sqrt(70)*(5*c1**2 - 1)*s2*s1*c2/16.
+    elif lm1 == 'fyz2' and lm2 == 'fyz2':
+        gphi = 21*(5*c2**2 - 1)*(5*c1**2 - 1)*s2*s1/32.
+    elif lm1 == 'fyz2' and lm2 == 'g4':
+        gphi = 3*np.sqrt(105)*(7*c2**2 - 3)*(5*c1**2 - 1)*s2*s1*c2/32.
+    elif lm1 == 'fxz2' and lm2 == 'px':
+        gphi = 3*np.sqrt(14)*(5*c1**2 - 1)*s2*s1/16.
+    elif lm1 == 'fxz2' and lm2 == 'dxz':
+        gphi = 3*np.sqrt(70)*(5*c1**2 - 1)*s2*s1*c2/16.
+    elif lm1 == 'fxz2' and lm2 == 'fxz2':
+        gphi = 21*(5*c2**2 - 1)*(5*c1**2 - 1)*s2*s1/32.
+    elif lm1 == 'fxz2' and lm2 == 'g6':
+        gphi = 3*np.sqrt(105)*(7*c2**2 - 3)*(5*c1**2 - 1)*s2*s1*c2/32.
+    elif lm1 == 'fz3' and lm2 == 's':
+        gphi = np.sqrt(7)*(5*c1**2 - 3)*c1/4.
+    elif lm1 == 'fz3' and lm2 == 'pz':
+        gphi = np.sqrt(21)*(5*c1**2 - 3)*c2*c1/4.
+    elif lm1 == 'fz3' and lm2 == 'dz2':
+        gphi = np.sqrt(35)*(3*c2**2 - 1)*(5*c1**2 - 3)*c1/8.
+    elif lm1 == 'fz3' and lm2 == 'fz3':
+        gphi = 7*(5*c2**2 - 3)*(5*c1**2 - 3)*c2*c1/8.
+    elif lm1 == 'fz3' and lm2 == 'g5':
+        gphi = 3*np.sqrt(7)*(5*c1**2 - 3)*(35*c2**4 - 30*c2**2 + 3)*c1/32.
+    elif lm1 == 'g1' and lm2 == 'g1':
+        gphi = 315*s2**4*s1**4/256.
+    elif lm1 == 'g2' and lm2 == 'fy(3x2-y2)':
+        gphi = 105*s2**3*s1**3*c1/32.
+    elif lm1 == 'g2' and lm2 == 'g2':
+        gphi = 315*s2**3*s1**3*c2*c1/32.
+    elif lm1 == 'g3' and lm2 == 'dxy':
+        gphi = 15*np.sqrt(3)*(7*c1**2 - 1)*s2**2*s1**2/32.
+    elif lm1 == 'g3' and lm2 == 'fxyz':
+        gphi = 15*np.sqrt(21)*(7*c1**2 - 1)*s2**2*s1**2*c2/32.
+    elif lm1 == 'g3' and lm2 == 'g3':
+        gphi = 45*(7*c2**2 - 1)*(7*c1**2 - 1)*s2**2*s1**2/64.
+    elif lm1 == 'g4' and lm2 == 'py':
+        gphi = 3*np.sqrt(30)*(7*c1**2 - 3)*s2*s1*c1/16.
+    elif lm1 == 'g4' and lm2 == 'dyz':
+        gphi = 15*np.sqrt(6)*(14*(-8*s1**3*c1 + 4*s1*c1)*s2*c2 \
+                              - 14*(8*s1**3*c1 - 4*s1*c1)*s2*c2 \
+                              + 16*s2*s1*c2*c1)/512.
+    elif lm1 == 'g4' and lm2 == 'fyz2':
+        gphi = 3*np.sqrt(105)*(5*c2**2 - 1)*(7*c1**2 - 3)*s2*s1*c1/32.
+    elif lm1 == 'g4' and lm2 == 'g4':
+        gphi = 45*(7*c2**2 - 3)*(7*c1**2 - 3)*s2*s1*c2*c1/32.
+    elif lm1 == 'g5' and lm2 == 's':
+        gphi = 105*c1**4/16. - 45*c1**2/8 + 9/16.
+    elif lm1 == 'g5' and lm2 == 'pz':
+        gphi = 3*np.sqrt(3)*(35*c1**4 - 30*c1**2 + 3)*c2/16.
+    elif lm1 == 'g5' and lm2 == 'dz2':
+        gphi = 3*np.sqrt(5)*(3*c2**2 - 1)*(35*c1**4 - 30*c1**2 + 3)/32.
+    elif lm1 == 'g5' and lm2 == 'fz3':
+        gphi = 3*np.sqrt(7)*(5*c2**2 - 3)*(35*c1**4 - 30*c1**2 + 3)*c2/32.
+    elif lm1 == 'g5' and lm2 == 'g5':
+        gphi = 9*(35*c2**4 - 30*c2**2 + 3)*(35*c1**4 - 30*c1**2 + 3)/128.
+    elif lm1 == 'g6' and lm2 == 'px':
+        gphi = 3*np.sqrt(30)*(7*c1**2 - 3)*s2*s1*c1/16.
+    elif lm1 == 'g6' and lm2 == 'dxz':
+        gphi = 15*np.sqrt(6)*(14*(-8*s1**3*c1 + 4*s1*c1)*s2*c2 \
+                              - 14*(8*s1**3*c1 - 4*s1*c1)*s2*c2 \
+                              + 16*s2*s1*c2*c1)/512.
+    elif lm1 == 'g6' and lm2 == 'fxz2':
+        gphi = 3*np.sqrt(105)*(5*c2**2 - 1)*(7*c1**2 - 3)*s2*s1*c1/32.
+    elif lm1 == 'g6' and lm2 == 'g6':
+        gphi = 45*(7*c2**2 - 3)*(7*c1**2 - 3)*s2*s1*c2*c1/32.
+    elif lm1 == 'g7' and lm2 == 'dx2-y2':
+        gphi = 15*np.sqrt(3)*(7*c1**2 - 1)*s2**2*s1**2/32.
+    elif lm1 == 'g7' and lm2 == 'fz(x2-y2)':
+        gphi = 15*np.sqrt(21)*(7*c1**2 - 1)*s2**2*s1**2*c2/32.
+    elif lm1 == 'g7' and lm2 == 'g7':
+        gphi = 45*(7*c2**2 - 1)*(7*c1**2 - 1)*s2**2*s1**2/64.
+    elif lm1 == 'g8' and lm2 == 'fx(x2-3y2)':
+        gphi = 105*s2**3*s1**3*c1/32.
+    elif lm1 == 'g8' and lm2 == 'g8':
+        gphi = 315*s2**3*s1**3*c2*c1/32.
+    elif lm1 == 'g9' and lm2 == 'g9':
+        gphi = 315*s2**4*s1**4/256.
+    else:
+        gphi = 0
+    return gphi
+
+
 def tail_smoothening(x, y):
     """ For given grid-function y(x), make smooth tail.
 

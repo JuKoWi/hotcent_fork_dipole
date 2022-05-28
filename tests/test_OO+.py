@@ -143,8 +143,63 @@ def test_hubbard_analytical(atom):
                     U_num = atom.get_hubbard_value(nl1, nl2, scheme=None,
                                                    maxstep=0.25)
                     U_ana = atom.get_analytical_hubbard_value(nl1, nl2)
+                    print('UUU', nl1, nl2, U_num, U_ana)
                     U_diff = abs(U_num - U_ana)
                     assert U_diff < tol, msg.format(nl1, nl2, U_ana, U_num)
+
+
+@pytest.mark.parametrize('atom', [DZ_LDA],
+                         indirect=True)
+def test_chg1c(atom):
+    from hotcent.onsite_chargetransfer import Onsite1cUTable
+
+    size = atom.basis_size
+    xc = atom.xcname
+
+    chgon1c = Onsite1cUTable(atom)
+    chgon1c.run(xc=xc, use_becke=False)
+    U = chgon1c.tables
+
+    # References generated with use_becke=True.
+    U_ref = {
+        (DZ, LDA): {
+            (0, 0): np.array([
+                [0.78089901, 0.75060321, 0.75060321, 0.75060321],
+                [0.75060321, 0.74990796, 0.70746957, 0.70746957],
+                [0.75060321, 0.70746957, 0.74990796, 0.70746957],
+                [0.75060321, 0.70746957, 0.70746957, 0.74990796],
+                ]),
+            (0, 1): np.array([
+                [0.86404690, 0.83517485, 0.83517485, 0.83517485],
+                [0.82758808, 0.83207658, 0.78449443, 0.78449443],
+                [0.82758808, 0.78449443, 0.83207658, 0.78449443],
+                [0.82758808, 0.78449443, 0.78449443, 0.83207658],
+                ]),
+            (1, 0): np.array([
+                [0.86404690, 0.82758808, 0.82758808, 0.82758808],
+                [0.83517485, 0.83207658, 0.78449443, 0.78449443],
+                [0.83517485, 0.78449443, 0.83207658, 0.78449443],
+                [0.83517485, 0.78449443, 0.78449443, 0.83207658],
+                ]),
+            (1, 1): np.array([
+                [0.96962381, 0.93248328, 0.93248328, 0.93248328],
+                [0.93248328, 0.93298547, 0.87983325, 0.87983325],
+                [0.93248328, 0.87983325, 0.93298547, 0.87983325],
+                [0.93248328, 0.87983325, 0.87983325, 0.93298547],
+                ]),
+        },
+    }
+
+    msg = 'Too large error for U_{0} (value={1})'
+    tol = 2e-5
+
+    for key, ref in U_ref[(size, xc)].items():
+        nrow, ncol = np.shape(ref)
+        val = U[key]
+        ref_full = np.zeros_like(val)
+        ref_full[:nrow, :ncol] = ref
+        U_diff = np.max(np.abs(val - ref_full))
+        assert U_diff < tol, msg.format(key, str(val))
 
 
 @pytest.mark.parametrize('atom', [SZP_LDA, DZ_LDA], indirect=True)
@@ -478,6 +533,61 @@ def test_chg2c(R, atom):
         for i, (item, item_ref) in enumerate(zip(val[0, :], val_ref)):
             diff = abs(item - item_ref)
             assert diff < tol, msg.format('Gon2c', key, val[0, i], i, item)
+
+
+@pytest.mark.parametrize('R', [R1])
+@pytest.mark.parametrize('atom', [DZP_LDA], indirect=True)
+def test_chg2cm(R, atom):
+    # Regression test
+    from hotcent.fluctuation_twocenter import NUMINT_2CM
+    from hotcent.offsite_chargetransfer import Offsite2cUTable
+
+    xc = atom.xcname
+    size = atom.basis_size
+    rmin, dr, N = R, R, 2
+
+    tol = 1e-4
+    msg = 'Too large error for {0}_{1}-{2} [{3}] (value={4})'
+
+    chg2c = Offsite2cUTable(atom, atom)
+    chg2c.run(rmin=rmin, dr=dr, N=N, xc=xc, smoothen_tails=False,
+              shift=False, ntheta=300, nr=100, use_becke=False)
+    U = chg2c.tables
+
+    print('XXX TABLES:')
+    for key in sorted(U):
+        print('XXX key:', key)
+        print(U[key][0, :])
+    return
+
+    U_ref = {
+        (R1, DZP, LDA): {
+            key: np.zeros(NUMINT_2CM)
+                 for key in [(0, 0, 0), (0, 0, 1), (0, 1, 0), (0, 1, 1)]
+        },
+    }
+
+    key = (0, 0, 0)  # XXX OUTDATED
+    U_ref[(R1, DZP, LDA)][key][0:3] = [-0.00936078, -0.04028677, -0.073278430]
+    U_ref[(R1, DZP, LDA)][key][16:19] = [-0.04028641, -0.15834094, -0.291289897]
+    U_ref[(R1, DZP, LDA)][key][32:35] = [-0.07330026, -0.29129711, -0.590123930]
+    key = (0, 0, 1)
+    U_ref[(R1, DZP, LDA)][key][0:2] = [-0.00841761, -0.03756711]
+    U_ref[(R1, DZP, LDA)][key][16:18] = [-0.03740228, -0.14966198]
+    U_ref[(R1, DZP, LDA)][key][32:34] = [-0.06727325, -0.27533516]
+    key = (0, 1, 0)
+    U_ref[(R1, DZP, LDA)][key][0:3] = [-0.00440263, -0.02413183, -0.0366345]
+    U_ref[(R1, DZP, LDA)][key][16:19] = [-0.01733901, -0.08618320, -0.142976330]
+    key = (0, 1, 1)
+    U_ref[(R1, DZP, LDA)][key][0:2] = [-0.00359854, -0.02174768]
+    U_ref[(R1, DZP, LDA)][key][16:18] = [-0.01479039, -0.07878503]
+
+    for key, val in U.items():
+        val_ref = U_ref[R, size, xc][key]
+        for i, (item, item_ref) in enumerate(zip(val[0, :], val_ref)):
+            diff = abs(item - item_ref)
+            assert diff < tol, msg.format('Uoff2c', key, i, item_ref, item)
+    return
 
 
 @pytest.mark.parametrize('R', [R1])

@@ -9,7 +9,9 @@ from hotcent.fluctuation_onecenter import NUMLM_1CM, select_orbitals, write_1cm
 from hotcent.fluctuation_twocenter import (NUMINT_2CL, select_subshells,
                                            write_2cl)
 from hotcent.multiatom_integrator import MultiAtomIntegrator
-from hotcent.orbitals import ANGULAR_MOMENTUM, ORBITAL_LABELS
+from hotcent.orbital_hartree import (get_density_expansion_coefficient,
+                                     OrbitalHartreePotential)
+from hotcent.orbitals import ANGULAR_MOMENTUM, ORBITAL_LABELS, ORBITALS
 from hotcent.slako import tail_smoothening
 from hotcent.xc import LibXC
 
@@ -206,24 +208,31 @@ class Onsite2cGammaTable(MultiAtomIntegrator):
 
 
 class Onsite1cUTable:
-    """ XXX
-    Description
+    """ Calculator for on-site, one-center, orbital-resolved "U" values
+    as matrix elements of the Hartree-XC kernel.
+
+    Parameters
+    ----------
+    el : AtomicBase-like object
+        Object with atomic properties.
+    txt : None or filehandle
+        Where to print output to (None for stdout).
     """
-    def __init__(self, el, radial_grid_factor=13, lebedev_order=47, txt=None):
+    def __init__(self, el, txt=None):
         self.el = el
-        self.radial_grid_factor = radial_grid_factor
-        self.lebedev_order = lebedev_order
         self.txt = txt
 
-    def run(self, xc='LDA', file=None):
+    def run(self, xc='LDA', use_becke=False):
         """
-        Calculates on-site, one-center, orbital-resolved "U" values
-        as matrix elements of the Hartree-XC kernel.
+        Calculates on-site, one-center, orbital-resolved "U" values.
 
         Parameters
         ----------
         xc : str, optional
-            Name of the exchange-correlation functional.
+            Name of the exchange-correlation functional (default: LDA).
+        use_becke : bool, optional
+            Whether to use the 'becke' package to evaluate the Hartree
+            kernel contribution (for debugging purposes).
         """
         print('\n\n', file=self.txt)
         print('***********************************************', file=self.txt)
@@ -238,7 +247,7 @@ class Onsite1cUTable:
             for bas2 in range(len(self.el.basis_sets)):
                 self.tables[(bas1, bas2)] = np.zeros((NUMLM_1CM, NUMLM_1CM))
 
-        U = self.calculate(selected, xc=xc)
+        U = self.calculate(selected, xc=xc, use_becke=use_becke)
 
         for key in selected:
             (nl1, lm1), (nl2, lm2) = key
@@ -251,7 +260,7 @@ class Onsite1cUTable:
                 self.tables[(bas2, bas1)][j, i] = U[key]
         return
 
-    def calculate(self, selected, xc='LDA'):
+    def calculate(self, selected, xc='LDA', use_becke=False):
         """
         Calculates the selected integrals involving the Hartree-XC kernel.
 
@@ -261,6 +270,9 @@ class Onsite1cUTable:
             Sets of orbital pairs to evaluate.
         xc : str, optional
             Name of the exchange-correlation functional.
+        use_becke : bool, optional
+            Whether to use the 'becke' package to evaluate the Hartree
+            kernel contribution (for debugging purposes).
 
         Returns
         -------
@@ -268,12 +280,6 @@ class Onsite1cUTable:
             Dictionary containing the integral for each selected
             orbital pair.
         """
-        import becke
-        from hotcent.spherical_harmonics import sph_cartesian
-
-        becke.settings.radial_grid_factor = self.radial_grid_factor
-        becke.settings.lebedev_order = self.lebedev_order
-
         xc = LibXC('LDA_X+LDA_C_PW' if xc == 'LDA' else xc)
         dens = self.el.electron_density(self.el.rgrid)
 
@@ -283,31 +289,48 @@ class Onsite1cUTable:
             dens_nl1 = self.el.Rnlg[nl1]**2
             dens_nl2 = self.el.Rnlg[nl2]**2
 
-            factor = self.get_angular_integral(lm1, lm2)
-            if factor is None:
-                factor = self.get_angular_integral(lm2, lm1)
-
             # XXX presumably only correct for LDA
             U[key] = xc.evaluate_fxc(dens, self.el.grid, dens_nl1, dens_nl2)
-            U[key] *= factor
+            U[key] *= self.get_angular_integral(lm1, lm2)
 
-            def rho1(x, y, z):
-                r = np.sqrt(x**2 + y**2 + z**2)
-                return (self.el.Rnl(r, nl1) * sph_cartesian(x, y, z, r, lm1))**2
+            # Now the Hartree kernel contribution
+            if use_becke:
+                import becke
+                from hotcent.spherical_harmonics import sph_cartesian
+                becke.settings.radial_grid_factor = 5
+                becke.settings.lebedev_order = 27
+                atoms = [(self.el.Z, (0., 0., 0.))]
 
-            def rho2(x, y, z):
-                r = np.sqrt(x**2 + y**2 + z**2)
-                return (self.el.Rnl(r, nl2) * sph_cartesian(x, y, z, r, lm2))**2
+                def rho1(x, y, z):
+                    r = np.sqrt(x**2 + y**2 + z**2)
+                    return (self.el.Rnl(r, nl1) \
+                           * sph_cartesian(x, y, z, r, lm1))**2
 
-            atoms = [(self.el.Z, (0., 0., 0.))]
-            vhar2 = becke.poisson(atoms, rho2)
+                def rho2(x, y, z):
+                    r = np.sqrt(x**2 + y**2 + z**2)
+                    return (self.el.Rnl(r, nl2) \
+                           * sph_cartesian(x, y, z, r, lm2))**2
 
-            def integrand(x, y, z):
-                return rho1(x, y, z) * vhar2(x, y, z)
+                vhar2 = becke.poisson(atoms, rho2)
 
-            U[key] += becke.integral(atoms, integrand)
+                def integrand(x, y, z):
+                    return rho1(x, y, z) * vhar2(x, y, z)
+
+                U[key] += becke.integral(atoms, integrand)
+
+            else:
+                ohp = OrbitalHartreePotential(self.el.rmin, self.el.xgrid,
+                                              dens_nl2, lm2)
+                for l in range(ohp.lmax+1):
+                    for m in range(2*l+1):
+                        lm = ORBITALS[l][m]
+                        coeff = get_density_expansion_coefficient(lm1, lm)
+                        integrand = ohp.vhar_fct[(l, m)](self.el.rgrid) \
+                                    * dens_nl1 * coeff * self.el.rgrid**2
+                        U[key] += self.el.grid.integrate(integrand,
+                                                         use_dV=False)
+
             print('XXX', key, U[key], file=self.txt, flush=True)
-
         return U
 
     def write(self):
@@ -330,95 +353,113 @@ class Onsite1cUTable:
         return
 
     def get_angular_integral(self, lm1, lm2):
+        """ Calculates the integral
+        \int \int |Y_{lm1}|^2 |Ylm_{lm1}|^2 d\Omega
+        divided by \int \int d\Omega (= 4*pi).
+
+        Parameters
+        ----------
+        lm1, lm2 : str
+            Orbital labels (e.g. 'px').
+
+        Returns
+        -------
+        integral : float
+            Value of the integral.
+        """
+        if lm1[0] not in 'spd' or lm2[0] not in 'spd':
+            raise NotImplementedError('Only for angular momenta up to d.')
+
         if lm1 == 's' and lm2 == 's':
-            return 1./(16*np.pi**2)
+            integral = 1./(16*np.pi**2)
         elif lm1 == 'px' and lm2 == 's':
-            return 1./(16*np.pi**2)
+            integral = 1./(16*np.pi**2)
         elif lm1 == 'px' and lm2 == 'px':
-            return 9./(80*np.pi**2)
+            integral = 9./(80*np.pi**2)
         elif lm1 == 'py' and lm2 == 's':
-            return 1./(16*np.pi**2)
+            integral = 1./(16*np.pi**2)
         elif lm1 == 'py' and lm2 == 'px':
-            return 3./(80*np.pi**2)
+            integral = 3./(80*np.pi**2)
         elif lm1 == 'py' and lm2 == 'py':
-            return 9./(80*np.pi**2)
+            integral = 9./(80*np.pi**2)
         elif lm1 == 'pz' and lm2 == 's':
-            return 1./(16*np.pi**2)
+            integral = 1./(16*np.pi**2)
         elif lm1 == 'pz' and lm2 == 'px':
-            return 3./(80*np.pi**2)
+            integral = 3./(80*np.pi**2)
         elif lm1 == 'pz' and lm2 == 'py':
-            return 3./(80*np.pi**2)
+            integral = 3./(80*np.pi**2)
         elif lm1 == 'pz' and lm2 == 'pz':
-            return 9./(80*np.pi**2)
+            integral = 9./(80*np.pi**2)
         elif lm1 == 'dxy' and lm2 == 's':
-            return 1./(16*np.pi**2)
+            integral = 1./(16*np.pi**2)
         elif lm1 == 'dxy' and lm2 == 'px':
-            return 9./(112*np.pi**2)
+            integral = 9./(112*np.pi**2)
         elif lm1 == 'dxy' and lm2 == 'py':
-            return 9./(112*np.pi**2)
+            integral = 9./(112*np.pi**2)
         elif lm1 == 'dxy' and lm2 == 'pz':
-            return 3./(112*np.pi**2)
+            integral = 3./(112*np.pi**2)
         elif lm1 == 'dxy' and lm2 == 'dxy':
-            return 15./(112*np.pi**2)
+            integral = 15./(112*np.pi**2)
         elif lm1 == 'dyz' and lm2 == 's':
-            return 1./(16*np.pi**2)
+            integral = 1./(16*np.pi**2)
         elif lm1 == 'dyz' and lm2 == 'px':
-            return 3./(112*np.pi**2)
+            integral = 3./(112*np.pi**2)
         elif lm1 == 'dyz' and lm2 == 'py':
-            return 9./(112*np.pi**2)
+            integral = 9./(112*np.pi**2)
         elif lm1 == 'dyz' and lm2 == 'pz':
-            return 9./(112*np.pi**2)
+            integral = 9./(112*np.pi**2)
         elif lm1 == 'dyz' and lm2 == 'dxy':
-            return 5./(112*np.pi**2)
+            integral = 5./(112*np.pi**2)
         elif lm1 == 'dyz' and lm2 == 'dyz':
-            return 15./(112*np.pi**2)
+            integral = 15./(112*np.pi**2)
         elif lm1 == 'dxz' and lm2 == 's':
-            return 1./(16*np.pi**2)
+            integral = 1./(16*np.pi**2)
         elif lm1 == 'dxz' and lm2 == 'px':
-            return 9./(112*np.pi**2)
+            integral = 9./(112*np.pi**2)
         elif lm1 == 'dxz' and lm2 == 'py':
-            return 3./(112*np.pi**2)
+            integral = 3./(112*np.pi**2)
         elif lm1 == 'dxz' and lm2 == 'pz':
-            return 9./(112*np.pi**2)
+            integral = 9./(112*np.pi**2)
         elif lm1 == 'dxz' and lm2 == 'dxy':
-            return 5./(112*np.pi**2)
+            integral = 5./(112*np.pi**2)
         elif lm1 == 'dxz' and lm2 == 'dyz':
-            return 5./(112*np.pi**2)
+            integral = 5./(112*np.pi**2)
         elif lm1 == 'dxz' and lm2 == 'dxz':
-            return 15./(112*np.pi**2)
+            integral = 15./(112*np.pi**2)
         elif lm1 == 'dx2-y2' and lm2 == 's':
-            return 1./(16*np.pi**2)
+            integral = 1./(16*np.pi**2)
         elif lm1 == 'dx2-y2' and lm2 == 'px':
-            return 9./(112*np.pi**2)
+            integral = 9./(112*np.pi**2)
         elif lm1 == 'dx2-y2' and lm2 == 'py':
-            return 9./(112*np.pi**2)
+            integral = 9./(112*np.pi**2)
         elif lm1 == 'dx2-y2' and lm2 == 'pz':
-            return 3./(112*np.pi**2)
+            integral = 3./(112*np.pi**2)
         elif lm1 == 'dx2-y2' and lm2 == 'dxy':
-            return 5./(112*np.pi**2)
+            integral = 5./(112*np.pi**2)
         elif lm1 == 'dx2-y2' and lm2 == 'dyz':
-            return 5./(112*np.pi**2)
+            integral = 5./(112*np.pi**2)
         elif lm1 == 'dx2-y2' and lm2 == 'dxz':
-            return 5./(112*np.pi**2)
+            integral = 5./(112*np.pi**2)
         elif lm1 == 'dx2-y2' and lm2 == 'dx2-y2':
-            return 15./(112*np.pi**2)
+            integral = 15./(112*np.pi**2)
         elif lm1 == 'dz2' and lm2 == 's':
-            return 1./(16*np.pi**2)
+            integral = 1./(16*np.pi**2)
         elif lm1 == 'dz2' and lm2 == 'px':
-            return 5./(112*np.pi**2)
+            integral = 5./(112*np.pi**2)
         elif lm1 == 'dz2' and lm2 == 'py':
-            return 5./(112*np.pi**2)
+            integral = 5./(112*np.pi**2)
         elif lm1 == 'dz2' and lm2 == 'pz':
-            return 11./(112*np.pi**2)
+            integral = 11./(112*np.pi**2)
         elif lm1 == 'dz2' and lm2 == 'dxy':
-            return 5./(112*np.pi**2)
+            integral = 5./(112*np.pi**2)
         elif lm1 == 'dz2' and lm2 == 'dyz':
-            return 5./(112*np.pi**2)
+            integral = 5./(112*np.pi**2)
         elif lm1 == 'dz2' and lm2 == 'dxz':
-            return 5./(112*np.pi**2)
+            integral = 5./(112*np.pi**2)
         elif lm1 == 'dz2' and lm2 == 'dx2-y2':
-            return 5./(112*np.pi**2)
+            integral = 5./(112*np.pi**2)
         elif lm1 == 'dz2' and lm2 == 'dz2':
-            return 15./(112*np.pi**2)
+            integral = 15./(112*np.pi**2)
         else:
-            return None
+            integral = self.get_angular_integral(lm2, lm1)
+        return integral
