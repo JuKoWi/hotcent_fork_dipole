@@ -1062,8 +1062,8 @@ class BeckeHarris:
 
 class BeckeHarrisKernels(BeckeHarris):
     """
-    Calculator for "kernel" matrix elements involving second
-    derivatives of the Hartree and XC energies.
+    Abstract calculator for "kernel" matrix elements involving
+    second derivatives of the Hartree and XC energies.
 
     Parameters
     ----------
@@ -1073,6 +1073,63 @@ class BeckeHarrisKernels(BeckeHarris):
         BeckeHarris.__init__(self, *args, xc=xc, **kwargs)
         self.xc_polarized = LibXC(xc, spin_polarized=True)
 
+    def get_fxc(self, rho, spin):
+        assert not self.xc.add_gradient_corrections, 'Not yet implemented'
+
+        if spin:
+            out = self.xc_polarized.compute_vxc_polarized(rho / 2., rho / 2.,
+                                                          fxc=True)
+            fxc = (out['v2rho2_up'] - out['v2rho2_updown']) / 2.
+        else:
+            out = self.xc.compute_vxc(rho, fxc=True)
+            fxc = out['v2rho2']
+        return fxc
+
+    def fxc_on1c(self, x, y, z, spin):
+        rA = np.sqrt((x - self.xA)**2 + (y - self.yA)**2 + (z - self.zA)**2)
+        rho = self.elA.electron_density(rA)
+        fxc = self.get_fxc(rho, spin)
+        return fxc
+
+    def fxc_off2c(self, x, y, z, spin):
+        rA = np.sqrt((x - self.xA)**2 + (y - self.yA)**2 + (z - self.zA)**2)
+        rB = np.sqrt((x - self.xB)**2 + (y - self.yB)**2 + (z - self.zB)**2)
+        rho = self.elA.electron_density(rA) + self.elB.electron_density(rB)
+        fxc = self.get_fxc(rho, spin)
+        return fxc
+
+    def fxc_on2c(self, x, y, z, spin):
+        all_indices = list(range(len(self.atoms_becke)))
+        rA = np.sqrt((x - self.xA)**2 + (y - self.yA)**2 + (z - self.zA)**2)
+        rhoA = self.elA.electron_density(rA)
+        fxcA = self.get_fxc(rhoA, spin)
+
+        fxc = 0.
+        for iC in all_indices:
+            if iC in [self.iA, self.iB]: continue
+            symC = self.get_symbol(iC)
+            xC, yC, zC = self.get_position(iC)
+            rC = np.sqrt((x - xC)**2 + (y - yC)**2 + (z - zC)**2)
+            rhoC = self.elements[symC].electron_density(rC)
+            fxc += self.get_fxc(rhoA+rhoC, spin) - fxcA
+        return fxc
+
+    def fxc_mc(self, x, y, z, spin):
+        all_indices = list(range(len(self.atoms_becke)))
+        rho = self.get_rho(x, y, z, all_indices, only_valence=True)
+        fxc = self.get_fxc(rho, spin)
+        return fxc
+
+
+class BeckeHarrisSubshellKernels(BeckeHarrisKernels):
+    """
+    Calculator for "kernel" matrix elements involving subshell-dependent
+    second derivatives of the Hartree and XC energies.
+
+    Parameters
+    ----------
+    See BeckeHarris.__init__()
+    """
     def get_valence_subshells(self, index):
         sym = self.get_symbol(index)
         nls = []
@@ -1257,50 +1314,3 @@ class BeckeHarrisKernels(BeckeHarris):
 
         KharAB = becke.integral(atoms_B, integrand)
         return KharAB
-
-    def get_fxc(self, rho, spin):
-        assert not self.xc.add_gradient_corrections, 'Not yet implemented'
-
-        if spin:
-            out = self.xc_polarized.compute_vxc_polarized(rho / 2., rho / 2.,
-                                                          fxc=True)
-            fxc = (out['v2rho2_up'] - out['v2rho2_updown']) / 2.
-        else:
-            out = self.xc.compute_vxc(rho, fxc=True)
-            fxc = out['v2rho2']
-        return fxc
-
-    def fxc_on1c(self, x, y, z, spin):
-        rA = np.sqrt((x - self.xA)**2 + (y - self.yA)**2 + (z - self.zA)**2)
-        rho = self.elA.electron_density(rA)
-        fxc = self.get_fxc(rho, spin)
-        return fxc
-
-    def fxc_off2c(self, x, y, z, spin):
-        rA = np.sqrt((x - self.xA)**2 + (y - self.yA)**2 + (z - self.zA)**2)
-        rB = np.sqrt((x - self.xB)**2 + (y - self.yB)**2 + (z - self.zB)**2)
-        rho = self.elA.electron_density(rA) + self.elB.electron_density(rB)
-        fxc = self.get_fxc(rho, spin)
-        return fxc
-
-    def fxc_on2c(self, x, y, z, spin):
-        all_indices = list(range(len(self.atoms_becke)))
-        rA = np.sqrt((x - self.xA)**2 + (y - self.yA)**2 + (z - self.zA)**2)
-        rhoA = self.elA.electron_density(rA)
-        fxcA = self.get_fxc(rhoA, spin)
-
-        fxc = 0.
-        for iC in all_indices:
-            if iC in [self.iA, self.iB]: continue
-            symC = self.get_symbol(iC)
-            xC, yC, zC = self.get_position(iC)
-            rC = np.sqrt((x - xC)**2 + (y - yC)**2 + (z - zC)**2)
-            rhoC = self.elements[symC].electron_density(rC)
-            fxc += self.get_fxc(rhoA+rhoC, spin) - fxcA
-        return fxc
-
-    def fxc_mc(self, x, y, z, spin):
-        all_indices = list(range(len(self.atoms_becke)))
-        rho = self.get_rho(x, y, z, all_indices, only_valence=True)
-        fxc = self.get_fxc(rho, spin)
-        return fxc
