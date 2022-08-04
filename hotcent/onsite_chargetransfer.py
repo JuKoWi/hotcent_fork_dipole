@@ -5,14 +5,17 @@
 #   SPDX-License-Identifier: GPL-3.0-or-later                                 #
 #-----------------------------------------------------------------------------#
 import numpy as np
-from hotcent.fluctuation_onecenter import NUMLM_1CM, select_orbitals, write_1cm
-from hotcent.fluctuation_twocenter import (NUMINT_2CL, select_subshells,
-                                           write_2cl)
+from hotcent.fluctuation_onecenter import (
+                NUML_1CK, NUML_1CM, select_radial_function, write_1ck,
+                write_1cm)
+from hotcent.fluctuation_twocenter import (
+                INTEGRALS_2CK, NUMINT_2CL, NUMSK_2CK, select_subshells,
+                write_2cl, write_2ck)
 from hotcent.multiatom_integrator import MultiAtomIntegrator
-from hotcent.orbital_hartree import (get_density_expansion_coefficient,
-                                     OrbitalHartreePotential)
-from hotcent.orbitals import ANGULAR_MOMENTUM, ORBITAL_LABELS, ORBITALS
-from hotcent.slako import tail_smoothening
+from hotcent.orbital_hartree import OrbitalHartreePotential
+from hotcent.orbitals import ANGULAR_MOMENTUM
+from hotcent.slako import (get_integral_pair, get_twocenter_phi_integral,
+                           tail_smoothening)
 from hotcent.xc import LibXC
 
 
@@ -86,7 +89,7 @@ class Onsite2cGammaTable(MultiAtomIntegrator):
 
     def calculate(self, selected, e1, e2, R, grid, area, xc='LDA'):
         """
-        Calculates the selected integrals involving the magnetization kernel.
+        Calculates the selected integrals involving the XC kernel.
 
         Parameters
         ----------
@@ -208,7 +211,8 @@ class Onsite2cGammaTable(MultiAtomIntegrator):
 
 
 class Onsite1cUTable:
-    """ Calculator for on-site, one-center, orbital-resolved "U" values
+    """
+    Calculator for (parts of) the on-site, one-center "U" integrals
     as matrix elements of the Hartree-XC kernel.
 
     Parameters
@@ -222,244 +226,346 @@ class Onsite1cUTable:
         self.el = el
         self.txt = txt
 
-    def run(self, xc='LDA', use_becke=False):
+    def run(self, nl=None, xc='LDA'):
         """
-        Calculates on-site, one-center, orbital-resolved "U" values.
+        Calculates on-site, one-center "U" values.
 
         Parameters
         ----------
+        nl : str, optional
+            Subshell defining the radial function. If None, the subshell
+            with the lowest angular momentum will be chosen from the
+            minimal valence set.
         xc : str, optional
             Name of the exchange-correlation functional (default: LDA).
-        use_becke : bool, optional
-            Whether to use the 'becke' package to evaluate the Hartree
-            kernel contribution (for debugging purposes).
         """
         print('\n\n', file=self.txt)
         print('***********************************************', file=self.txt)
-        print('Orbital-resolved onsite-U table construction for %s' % \
-              self.el.get_symbol(), file=self.txt)
+        print('Onsite-U table construction for %s' % self.el.get_symbol(),
+              file=self.txt)
         print('***********************************************', file=self.txt)
 
-        selected = select_orbitals(self.el)
+        if nl is None:
+            nl = select_radial_function(self.el)
 
-        self.tables = {}
-        for bas1 in range(len(self.el.basis_sets)):
-            for bas2 in range(len(self.el.basis_sets)):
-                self.tables[(bas1, bas2)] = np.zeros((NUMLM_1CM, NUMLM_1CM))
-
-        U = self.calculate(selected, xc=xc, use_becke=use_becke)
-
-        for key in selected:
-            (nl1, lm1), (nl2, lm2) = key
-            bas1 = self.el.get_basis_set_index(nl1)
-            bas2 = self.el.get_basis_set_index(nl2)
-            i = ORBITAL_LABELS.index(lm1)
-            j = ORBITAL_LABELS.index(lm2)
-            self.tables[(bas1, bas2)][i, j] = U[key]
-            if i != j or bas1 != bas2:
-                self.tables[(bas2, bas1)][j, i] = U[key]
+        self.table = self.calculate(nl, xc=xc)
         return
 
-    def calculate(self, selected, xc='LDA', use_becke=False):
+    def calculate(self, nl, xc='LDA'):
         """
         Calculates the selected integrals involving the Hartree-XC kernel.
 
         Parameters
         ----------
-        selected : list of 2-tuples of 2-tuples
-            Sets of orbital pairs to evaluate.
+        nl : str
+            Subshell defining the radial function.
         xc : str, optional
-            Name of the exchange-correlation functional.
-        use_becke : bool, optional
-            Whether to use the 'becke' package to evaluate the Hartree
-            kernel contribution (for debugging purposes).
+            Name of the exchange-correlation functional (default: LDA).
 
         Returns
         -------
-        U: dict
-            Dictionary containing the integral for each selected
-            orbital pair.
+        U: np.ndarray
+            Array with the integral for each multipole.
         """
         xc = LibXC('LDA_X+LDA_C_PW' if xc == 'LDA' else xc)
-        dens = self.el.electron_density(self.el.rgrid)
+        rho = self.el.electron_density(self.el.rgrid)
 
-        U = {}
+        if xc.add_gradient_corrections:
+            drho = self.el.electron_density(self.el.rgrid, der=1)
+            sigma = drho**2
+        else:
+            sigma = None
+
+        out = xc.compute_vxc(rho, sigma=sigma, fxc=True)
+
+        U = np.zeros(NUML_1CK)
+        Rnl = np.copy(self.el.Rnlg[nl])
+        dens_nl = Rnl**2
+
+        integrand = out['v2rho2'] * dens_nl * dens_nl
+        U[:] = self.el.grid.integrate(integrand * self.el.rgrid**2,
+                                      use_dV=False)
+
+        if xc.add_gradient_corrections:
+            dnl = 2 * Rnl * self.el.Rnl(self.el.rgrid, nl, der=1)
+            grad_nl_grad_rho = dnl * drho
+            integrand = 2. * out['v2rhosigma'] * 2 * grad_nl_grad_rho * dens_nl
+            integrand += 4. * out['v2sigma2'] * grad_nl_grad_rho**2
+            integrand += 2. * out['vsigma'] * dnl**2
+            U[:] += self.el.grid.integrate(integrand * self.el.rgrid**2,
+                                           use_dV=False)
+
+            for l in range(NUML_1CK):
+                integrand = 2. * out['vsigma'] * dens_nl**2
+                U[l] += self.el.grid.integrate(integrand * l * (l+1),
+                                               use_dV=False)
+
+        for l in range(NUML_1CK):
+            ohp = OrbitalHartreePotential(self.el.rmin, self.el.xgrid,
+                                          dens_nl, lmax=NUML_1CK-1)
+            vhar = ohp.vhar_fct[l](self.el.rgrid)
+            integrand = vhar * dens_nl * self.el.rgrid**2
+            U[l] += self.el.grid.integrate(integrand, use_dV=False)
+
+        return U
+
+    def write(self):
+        """
+        Writes the integrals to file.
+
+        The filename template corresponds to '<el1>-<el1>_onsiteU.1ck'.
+        """
+        sym = self.el.get_symbol()
+        template = '%s-%s_onsiteU.1ck'
+        filename = template % (sym, sym)
+        print('Writing to %s' % filename, file=self.txt, flush=True)
+
+        with open(filename, 'w') as f:
+            write_1ck(f, self.table)
+        return
+
+
+class Onsite1cMTable:
+    """
+    Class for calculations involving on-site moment integrals "M"
+    (Boleininger, Guilbert and Horsfield (2016), doi:10.1063/1.4964391):
+
+    $M_{\mu,\nu,lm} = \int \phi_\mu(\mathbf{r}) Y_{lm}(\mathbf{r})
+                           \phi_\nu(\mathbf{r}) d\mathbf{r}$
+
+    Parameters
+    ----------
+    el : AtomicBase-like object
+        Object with atomic properties.
+    txt : None or filehandle
+        Where to print output to (None for stdout).
+    """
+    def __init__(self, el, txt=None):
+        self.el = el
+        self.txt = txt
+
+    def run(self):
+        """
+        Calculates the on-site, subshell-dependent integrals
+
+        $\int R_{nl1}(r) R_{nl2}(r) r^2 dr$
+
+        from which the moment integrals M can be obtained
+        by multiplication with the appropriate Gaunt coefficients.
+        """
+        print('\n\n', file=self.txt)
+        print('***********************************************', file=self.txt)
+        print('Onsite-M table construction for %s' % \
+              self.el.get_symbol(), file=self.txt)
+        print('***********************************************', file=self.txt)
+
+        selected = select_subshells(self.el, self.el)
+
+        self.tables = {}
+        for bas1 in range(len(self.el.basis_sets)):
+            for bas2 in range(len(self.el.basis_sets)):
+                shape = (NUML_1CM, NUML_1CM)
+                self.tables[(bas1, bas2)] = np.zeros(shape)
+
+        M = self.calculate(selected)
+
         for key in selected:
-            (nl1, lm1), (nl2, lm2) = key
-            dens_nl1 = self.el.Rnlg[nl1]**2
-            dens_nl2 = self.el.Rnlg[nl2]**2
+            nl1, nl2 = key
+            bas1 = self.el.get_basis_set_index(nl1)
+            bas2 = self.el.get_basis_set_index(nl2)
+            i = ANGULAR_MOMENTUM[nl1[1]]
+            j = ANGULAR_MOMENTUM[nl2[1]]
+            self.tables[(bas1, bas2)][i, j] = M[key]
+            if i != j or bas1 != bas2:
+                self.tables[(bas2, bas1)][j, i] = M[key]
+        return
 
-            # XXX presumably only correct for LDA
-            U[key] = xc.evaluate_fxc(dens, self.el.grid, dens_nl1, dens_nl2)
-            U[key] *= self.get_angular_integral(lm1, lm2)
+    def calculate(self, selected):
+        """
+        Calculates the selected integrals.
 
-            # Now the Hartree kernel contribution
-            if use_becke:
-                import becke
-                from hotcent.spherical_harmonics import sph_cartesian
-                becke.settings.radial_grid_factor = 5
-                becke.settings.lebedev_order = 27
-                atoms = [(self.el.Z, (0., 0., 0.))]
+        Parameters
+        ----------
+        selected : list of 2-tuples of 2-tuples
+            Sets of subshell pairs to evaluate.
 
-                def rho1(x, y, z):
-                    r = np.sqrt(x**2 + y**2 + z**2)
-                    return (self.el.Rnl(r, nl1) \
-                           * sph_cartesian(x, y, z, r, lm1))**2
+        Returns
+        -------
+        M: dict
+            Dictionary containing the integral for each selected
+            subshell pair.
+        """
+        M = {}
+        for key in selected:
+            nl1, nl2 = key
+            Rnl1 = np.copy(self.el.Rnlg[nl1])
+            Rnl2 = np.copy(self.el.Rnlg[nl2])
+            integrand = Rnl1 * Rnl2 * self.el.rgrid**2
+            M[key] = self.el.grid.integrate(integrand, use_dV=False)
+        return M
 
-                def rho2(x, y, z):
-                    r = np.sqrt(x**2 + y**2 + z**2)
-                    return (self.el.Rnl(r, nl2) \
-                           * sph_cartesian(x, y, z, r, lm2))**2
+    def write(self):
+        """
+        Writes all integral tables to file.
 
-                vhar2 = becke.poisson(atoms, rho2)
+        The filename template corresponds to '<el1>-<el1>_onsiteM.1cm'.
+        """
+        sym = self.el.get_symbol()
 
-                def integrand(x, y, z):
-                    return rho1(x, y, z) * vhar2(x, y, z)
+        for bas1, valence1 in enumerate(self.el.basis_sets):
+            for bas2, valence2 in enumerate(self.el.basis_sets):
+                template = '%s-%s_onsiteM.1cm'
+                filename = template % (sym + '+'*bas1, sym + '+'*bas2)
+                print('Writing to %s' % filename, file=self.txt, flush=True)
 
-                U[key] += becke.integral(atoms, integrand)
+                with open(filename, 'w') as f:
+                    table = self.tables[(bas1, bas2)][:, :]
+                    write_1cm(f, table)
+        return
 
-            else:
-                ohp = OrbitalHartreePotential(self.el.rmin, self.el.xgrid,
-                                              dens_nl2, lm2)
-                for l in range(ohp.lmax+1):
-                    for m in range(2*l+1):
-                        lm = ORBITALS[l][m]
-                        coeff = get_density_expansion_coefficient(lm1, lm)
-                        integrand = ohp.vhar_fct[(l, m)](self.el.rgrid) \
-                                    * dens_nl1 * coeff * self.el.rgrid**2
-                        U[key] += self.el.grid.integrate(integrand,
-                                                         use_dV=False)
 
-            print('XXX', key, U[key], file=self.txt, flush=True)
+class Onsite2cUTable(MultiAtomIntegrator):
+    def __init__(self, *args, **kwargs):
+        MultiAtomIntegrator.__init__(self, *args, grid_type='monopolar',
+                                     **kwargs)
+
+    def run(self, nl=None, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50,
+            wflimit=1e-7, xc='LDA', smoothen_tails=True):
+        """
+        Calculates on-site, orbital- and distance-dependent "U" values
+        as matrix elements of the two-center-expanded XC kernel.
+
+        Parameters
+        ----------
+        nl : str, optional
+            Subshell defining the radial function. If None, the subshell
+            with the lowest angular momentum will be chosen from the
+            minimal valence set.
+
+        Other parameters
+        ----------------
+        See Onsite2cTable.run().
+        """
+        print('\n\n', file=self.txt)
+        print('***********************************************', file=self.txt)
+        print('Onsite-U table construction for %s and %s' % \
+              (self.ela.get_symbol(), self.elb.get_symbol()), file=self.txt)
+        print('***********************************************', file=self.txt)
+        self.txt.flush()
+
+        assert N is not None, 'Need to set number of grid points N!'
+        assert rmin >= 1e-3, 'For stability, please set rmin >= 1e-3'
+        assert np.isclose(rmin / dr, np.round(rmin / dr)), \
+               'rmin must be a multiple of dr'
+
+        self.timer.start('run_onsiteU')
+        wf_range = self.get_range(wflimit)
+        grid, area = self.make_grid(wf_range, nt=ntheta, nr=nr)
+        self.Rgrid = rmin + dr * np.arange(N)
+
+        e1, e2 = self.ela, self.elb
+        self.tables = np.zeros((N, NUMSK_2CK))
+
+        if nl is None:
+            nl = select_radial_function(self.ela)
+
+        for i, R in enumerate(self.Rgrid):
+            if R > 2 * wf_range:
+                break
+
+            if i == N - 1 or N // 10 == 0 or i % (N // 10) == 0:
+                print('R=%8.2f, %i grid points ...' % (R, len(grid)),
+                      file=self.txt, flush=True)
+
+            U = self.calculate(e1, e2, R, grid, area, nl, xc=xc)
+            self.tables[i, :] = U[:]
+
+        if smoothen_tails:
+            # Smooth the curves near the cutoff
+            for i in range(NUMSK_2CK):
+                self.tables[:, i] = tail_smoothening(self.Rgrid,
+                                                     self.tables[:, i])
+
+        self.timer.stop('run_onsiteU')
+        return
+
+    def calculate(self, e1, e2, R, grid, area, nl, xc='LDA'):
+        """
+        Calculates the selected integrals involving the XC kernel.
+
+        Parameters
+        ----------
+        nl : str
+            Subshell defining the radial function.
+
+        Other parameters
+        ----------------
+        See Onsite2cTable.calculate().
+
+        Returns
+        -------
+        U: np.ndarray
+            Array containing the needed Slater-Koster integrals.
+        """
+        self.timer.start('calculate_onsiteU')
+
+        # common for all integrals (not subshell-dependent parts)
+        self.timer.start('prelude')
+        x = grid[:, 0]
+        y = grid[:, 1]
+        r1 = np.sqrt(x**2 + y**2)
+        r2 = np.sqrt(x**2 + (y - R)**2)
+        c1 = y / r1  # cosine of theta_1
+        s1 = x / r1  # sine of theta_1
+        aux = area * x
+
+        xc = LibXC('LDA_X+LDA_C_PW' if xc == 'LDA' else xc)
+
+        rho1 = e1.electron_density(r1)
+        rho2 = e2.electron_density(r2)
+        rho12 = rho1 + rho2
+
+        if xc.add_gradient_corrections:
+            raise NotImplementedError
+        else:
+            sigma1 = None
+            sigma12 = None
+        self.timer.stop('prelude')
+
+        self.timer.start('fxc')
+        out1 = xc.compute_vxc(rho1, sigma=sigma1, fxc=True)
+        out12 = xc.compute_vxc(rho12, sigma=sigma12, fxc=True)
+        self.timer.stop('fxc')
+
+        #U = np.zeros(NUMSK_2CM)
+        U = np.zeros(NUMSK_2CK)
+        dens_nl = e1.Rnl(r1, nl)**2
+
+        for index, integral in enumerate(INTEGRALS_2CK):
+            lm1a, lm1b = get_integral_pair(integral)
+            gphi = get_twocenter_phi_integral(lm1a, lm1b, c1, c1, s1, s1)
+
+            integrand = (out12['v2rho2'] - out1['v2rho2']) * dens_nl**2 * gphi
+
+            if xc.add_gradient_corrections:
+                raise NotImplementedError
+
+            U[index] = np.sum(integrand * aux)
+
+        self.timer.stop('calculate_onsiteU')
         return U
 
     def write(self):
         """
         Writes all integral tables to file.
 
-        The filename template corresponds to '<el1>-<el1>_onsiteU.1cm'.
+        The filename template corresponds to '<el1>-<el1>_onsiteU_<el2>.2ck'.
         """
-        sym = self.el.get_symbol()
+        sym1, sym2 = self.ela.get_symbol(), self.elb.get_symbol()
+        template = '%s-%s_onsiteU_%s.2ck'
+        filename = template % (sym1, sym1, sym2)
+        print('Writing to %s' % filename, file=self.txt, flush=True)
 
-        for bas1, valence1 in enumerate(self.el.basis_sets):
-            for bas2, valence2 in enumerate(self.el.basis_sets):
-                template = '%s-%s_onsiteU.1cm'
-                filename = template % (sym + '+'*bas1, sym + '+'*bas2)
-                print('Writing to %s' % filename, file=self.txt, flush=True)
-
-                table = self.tables[(bas1, bas2)]
-                with open(filename, 'w') as f:
-                    write_1cm(f, table)
+        with open(filename, 'w') as f:
+            write_2ck(f, self.Rgrid, self.tables)
         return
-
-    def get_angular_integral(self, lm1, lm2):
-        """ Calculates the integral
-        \int \int |Y_{lm1}|^2 |Ylm_{lm1}|^2 d\Omega
-        divided by \int \int d\Omega (= 4*pi).
-
-        Parameters
-        ----------
-        lm1, lm2 : str
-            Orbital labels (e.g. 'px').
-
-        Returns
-        -------
-        integral : float
-            Value of the integral.
-        """
-        if lm1[0] not in 'spd' or lm2[0] not in 'spd':
-            raise NotImplementedError('Only for angular momenta up to d.')
-
-        if lm1 == 's' and lm2 == 's':
-            integral = 1./(16*np.pi**2)
-        elif lm1 == 'px' and lm2 == 's':
-            integral = 1./(16*np.pi**2)
-        elif lm1 == 'px' and lm2 == 'px':
-            integral = 9./(80*np.pi**2)
-        elif lm1 == 'py' and lm2 == 's':
-            integral = 1./(16*np.pi**2)
-        elif lm1 == 'py' and lm2 == 'px':
-            integral = 3./(80*np.pi**2)
-        elif lm1 == 'py' and lm2 == 'py':
-            integral = 9./(80*np.pi**2)
-        elif lm1 == 'pz' and lm2 == 's':
-            integral = 1./(16*np.pi**2)
-        elif lm1 == 'pz' and lm2 == 'px':
-            integral = 3./(80*np.pi**2)
-        elif lm1 == 'pz' and lm2 == 'py':
-            integral = 3./(80*np.pi**2)
-        elif lm1 == 'pz' and lm2 == 'pz':
-            integral = 9./(80*np.pi**2)
-        elif lm1 == 'dxy' and lm2 == 's':
-            integral = 1./(16*np.pi**2)
-        elif lm1 == 'dxy' and lm2 == 'px':
-            integral = 9./(112*np.pi**2)
-        elif lm1 == 'dxy' and lm2 == 'py':
-            integral = 9./(112*np.pi**2)
-        elif lm1 == 'dxy' and lm2 == 'pz':
-            integral = 3./(112*np.pi**2)
-        elif lm1 == 'dxy' and lm2 == 'dxy':
-            integral = 15./(112*np.pi**2)
-        elif lm1 == 'dyz' and lm2 == 's':
-            integral = 1./(16*np.pi**2)
-        elif lm1 == 'dyz' and lm2 == 'px':
-            integral = 3./(112*np.pi**2)
-        elif lm1 == 'dyz' and lm2 == 'py':
-            integral = 9./(112*np.pi**2)
-        elif lm1 == 'dyz' and lm2 == 'pz':
-            integral = 9./(112*np.pi**2)
-        elif lm1 == 'dyz' and lm2 == 'dxy':
-            integral = 5./(112*np.pi**2)
-        elif lm1 == 'dyz' and lm2 == 'dyz':
-            integral = 15./(112*np.pi**2)
-        elif lm1 == 'dxz' and lm2 == 's':
-            integral = 1./(16*np.pi**2)
-        elif lm1 == 'dxz' and lm2 == 'px':
-            integral = 9./(112*np.pi**2)
-        elif lm1 == 'dxz' and lm2 == 'py':
-            integral = 3./(112*np.pi**2)
-        elif lm1 == 'dxz' and lm2 == 'pz':
-            integral = 9./(112*np.pi**2)
-        elif lm1 == 'dxz' and lm2 == 'dxy':
-            integral = 5./(112*np.pi**2)
-        elif lm1 == 'dxz' and lm2 == 'dyz':
-            integral = 5./(112*np.pi**2)
-        elif lm1 == 'dxz' and lm2 == 'dxz':
-            integral = 15./(112*np.pi**2)
-        elif lm1 == 'dx2-y2' and lm2 == 's':
-            integral = 1./(16*np.pi**2)
-        elif lm1 == 'dx2-y2' and lm2 == 'px':
-            integral = 9./(112*np.pi**2)
-        elif lm1 == 'dx2-y2' and lm2 == 'py':
-            integral = 9./(112*np.pi**2)
-        elif lm1 == 'dx2-y2' and lm2 == 'pz':
-            integral = 3./(112*np.pi**2)
-        elif lm1 == 'dx2-y2' and lm2 == 'dxy':
-            integral = 5./(112*np.pi**2)
-        elif lm1 == 'dx2-y2' and lm2 == 'dyz':
-            integral = 5./(112*np.pi**2)
-        elif lm1 == 'dx2-y2' and lm2 == 'dxz':
-            integral = 5./(112*np.pi**2)
-        elif lm1 == 'dx2-y2' and lm2 == 'dx2-y2':
-            integral = 15./(112*np.pi**2)
-        elif lm1 == 'dz2' and lm2 == 's':
-            integral = 1./(16*np.pi**2)
-        elif lm1 == 'dz2' and lm2 == 'px':
-            integral = 5./(112*np.pi**2)
-        elif lm1 == 'dz2' and lm2 == 'py':
-            integral = 5./(112*np.pi**2)
-        elif lm1 == 'dz2' and lm2 == 'pz':
-            integral = 11./(112*np.pi**2)
-        elif lm1 == 'dz2' and lm2 == 'dxy':
-            integral = 5./(112*np.pi**2)
-        elif lm1 == 'dz2' and lm2 == 'dyz':
-            integral = 5./(112*np.pi**2)
-        elif lm1 == 'dz2' and lm2 == 'dxz':
-            integral = 5./(112*np.pi**2)
-        elif lm1 == 'dz2' and lm2 == 'dx2-y2':
-            integral = 5./(112*np.pi**2)
-        elif lm1 == 'dz2' and lm2 == 'dz2':
-            integral = 15./(112*np.pi**2)
-        else:
-            integral = self.get_angular_integral(lm2, lm1)
-        return integral

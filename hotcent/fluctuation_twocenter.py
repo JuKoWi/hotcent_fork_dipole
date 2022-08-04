@@ -5,11 +5,32 @@
 #   SPDX-License-Identifier: GPL-3.0-or-later                                 #
 #-----------------------------------------------------------------------------#
 import numpy as np
-from hotcent.orbitals import ANGULAR_MOMENTUM, ORBITALS, ORBITAL_LABELS
+from hotcent.orbitals import ANGULAR_MOMENTUM, ORBITALS
 
 
 NUMINT_2CL = 4*4  # number of subshell-resolved integrals in .2cl files
-NUMINT_2CM = 16*16  # number of orbital-resolved integrals in .2cm files
+
+NUML_2CK = 3  # number of subshells included in .2ck files (3 = up to d)
+
+NUML_2CM = 3  # number of subshells included in .2cm files (3 = up to d)
+
+INTEGRALS_2CK = [
+    'sss', 'sps', 'sds', 'pss', 'pps', 'ppp', 'pds', 'pdp',
+    'dss', 'dps', 'dpp', 'dds', 'ddp', 'ddd',
+]
+
+NUMSK_2CK = len(INTEGRALS_2CK)
+
+INTEGRALS_2CM = [
+    'sss', 'sps', 'sds', 'sfs', 'sgs', 'pss', 'pps', 'ppp', 'pds', 'pdp',
+    'pfs', 'pfp', 'pgs', 'pgp', 'dss', 'dps', 'dpp', 'dds', 'ddp', 'ddd',
+    'dfs', 'dfp', 'dfd', 'dgs', 'dgp', 'dgd', 'fss', 'fps', 'fpp', 'fds',
+    'fdp', 'fdd', 'ffs', 'ffp', 'ffd', 'fff', 'fgs', 'fgp', 'fgd', 'fgf',
+    'gss', 'gps', 'gpp', 'gds', 'gdp', 'gdd', 'gfs', 'gfp', 'gfd', 'gff',
+    'ggs', 'ggp', 'ggd', 'ggf', 'ggg',
+]
+
+NUMSK_2CM = len(INTEGRALS_2CM)
 
 
 def select_subshells(e1, e2):
@@ -50,7 +71,7 @@ def select_orbitals(e1, e2):
 
 def write_2cl(handle, Rgrid, table, angmom1, angmom2):
     """
-    Writes a parameter file in '.2cl' format.
+    Writes a parameter file in '2cl' format.
 
     Parameters
     ----------
@@ -86,24 +107,17 @@ def write_2cl(handle, Rgrid, table, angmom1, angmom2):
     return
 
 
-def write_2cm(handle, Rgrid, table, angmom1, angmom2):
+def write_2ck(handle, Rgrid, table):
     """
-    Writes a parameter file in '.2cm' format.
+    Writes a parameter file in '2ck' format.
 
     Parameters
     ----------
-    angmom1: list of int
-        Included angular momenta for the first element.
-    angmom2: list of int
-        Included angular momenta for the second element.
-
-    Other parameters
-    ----------------
     See slako.write_skf()
     """
     grid_dist = Rgrid[1] - Rgrid[0]
     grid_npts, numint = np.shape(table)
-    assert numint == NUMINT_2CM
+    assert numint == NUMSK_2CK
 
     nzeros = int(np.round(Rgrid[0] / grid_dist)) - 1
     assert nzeros >= 0
@@ -111,16 +125,44 @@ def write_2cm(handle, Rgrid, table, angmom1, angmom2):
     print("%.12f, %d" % (grid_dist, grid_npts + nzeros), file=handle)
 
     for i in range(nzeros):
-        print(' '.join(['0.0'] * NUMINT_2CM), file=handle)
+        print(' '.join(['0.0'] * numint), file=handle)
 
-    formats = []
-    for i in range(NUMINT_2CM):
-        lm1 = ORBITAL_LABELS[i // 16]
-        lm2 = ORBITAL_LABELS[i % 16]
-        l1 = ANGULAR_MOMENTUM[lm1[0]]
-        l2 = ANGULAR_MOMENTUM[lm2[0]]
-        fmt = '%1.12e' if l1 in angmom1 and l2 in angmom2 else '%.1f'
-        formats.append(fmt)
+    np.savetxt(handle, table, fmt='%1.12e')
+    return
 
-    np.savetxt(handle, table, fmt=formats)
+
+def write_2cm(handle, Rgrid, table, l1, l2=None):
+    """
+    Writes (part of) a parameter file in '2cm' format.
+
+    Parameters
+    ----------
+    l1 : int or None
+        Agular momentum associated with the first element.
+    l2 : int or None, optional
+        Agular momentum associated with the second element.
+
+    Other parameters
+    ----------------
+    See slako.write_skf()
+    """
+    grid_dist = Rgrid[1] - Rgrid[0]
+    grid_npts, numint = np.shape(table)
+    assert numint == NUMSK_2CM
+
+    if l1 is not None:
+        header = '# {0}'.format('spdf'[l1])
+        if l2 is not None:
+            header += '_{0}'.format('spdf'[l2])
+        print(header, file=handle)
+
+    nzeros = int(np.round(Rgrid[0] / grid_dist)) - 1
+    assert nzeros >= 0
+
+    print("%.12f, %d" % (grid_dist, grid_npts + nzeros), file=handle)
+
+    for i in range(nzeros):
+        print(' '.join(['0.0'] * numint), file=handle)
+
+    np.savetxt(handle, table, fmt='%1.12e')
     return

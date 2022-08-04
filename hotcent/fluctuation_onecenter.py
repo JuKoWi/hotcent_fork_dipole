@@ -8,7 +8,21 @@ import numpy as np
 from hotcent.orbitals import ANGULAR_MOMENTUM, ORBITALS
 
 
-NUMLM_1CM = 16  # total number of orbitals considered for .1cm files
+NUML_1CK = 3  # total number of multipoles considered for .1ck files (up to d)
+
+NUML_1CL = 4  # total number of subshells considered for .1cl files (up to f)
+
+NUML_1CM = 4  # total number of subshells considered for .1cm files (up to f)
+
+
+def select_radial_function(el):
+    """
+    Returns the default subshell to use as a radial function,
+    i.e. the lowest subshell included in the minimal valence set.
+    """
+    valence = sorted(el.valence, key=lambda nl: ANGULAR_MOMENTUM[nl[1]])
+    nl = valence[0]
+    return nl
 
 
 def select_orbitals(el):
@@ -29,19 +43,40 @@ def select_orbitals(el):
     return selected
 
 
+def write_1ck(handle, row):
+    """
+    Writes a parameter file in '1ck' format.
+
+    Parameters
+    ----------
+    handle : file handle
+        Handle of an open file.
+    row : nd.ndarray
+        One-dimensional array of (NUML_1CK,) shape
+    """
+    assert np.shape(row) == (NUML_1CK,)
+
+    for item in row:
+        handle.write('0 ' if abs(item) < 1e-16 else '%1.12e ' % item)
+    handle.write('\n')
+    return
+
+
 def write_1cm(handle, table):
     """
-    Writes a parameter file in '.1cm' format.
+    Writes a parameter file in '1cm' format.
 
     Parameters
     ----------
     handle : file handle
         Handle of an open file.
     table : nd.ndarray
-        Two-dimensional table of (NUMLM_1CM, NUMLM_1CM) shape.
+        Two-dimensional table of (NUML_1CM, NUML_1CM) shape.
     """
-    assert np.size(table) == NUMLM_1CM**2
+    assert np.shape(table) == (NUML_1CM, NUML_1CM)
+
     for row in table:
         for item in row:
             handle.write('0 ' if abs(item) < 1e-16 else '%1.12e ' % item)
         handle.write('\n')
+    return
