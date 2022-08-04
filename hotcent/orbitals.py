@@ -7,7 +7,7 @@
 import numpy as np
 
 
-ANGULAR_MOMENTUM = {'s': 0, 'p': 1, 'd': 2, 'f': 3}
+ANGULAR_MOMENTUM = {'s': 0, 'p': 1, 'd': 2, 'f': 3, 'g': 4}
 
 ORBITALS = {
     0: ('s', ),

@@ -15,15 +15,19 @@ INTEGRALS = ['ffs', 'ffp', 'ffd', 'fff',
 
 NUMSK = len(INTEGRALS)
 
+
 INTEGRAL_PAIRS = {
     'sss': ('s', 's'),
     'sps': ('s', 'pz'),
     'sds': ('s', 'dz2'),
     'sfs': ('s', 'fz3'),
+    'sgs': ('s', 'g5'),
     'pps': ('pz', 'pz'),
     'ppp': ('px', 'px'),
     'pds': ('pz', 'dz2'),
     'pdp': ('px', 'dxz'),
+    'pgs': ('pz', 'g5'),
+    'pgp': ('px', 'g6'),
     'pfs': ('pz', 'fz3'),
     'pfp': ('px', 'fxz2'),
     'dds': ('dz2', 'dz2'),
@@ -32,11 +36,33 @@ INTEGRAL_PAIRS = {
     'dfs': ('dz2', 'fz3'),
     'dfp': ('dxz', 'fxz2'),
     'dfd': ('dxy', 'fxyz'),
+    'dgs': ('dz2', 'g5'),
+    'dgp': ('dxz', 'g6'),
+    'dgd': ('dxy', 'g3'),
     'ffs': ('fz3', 'fz3'),
     'ffp': ('fxz2', 'fxz2'),
     'ffd': ('fxyz', 'fxyz'),
     'fff': ('fx(x2-3y2)', 'fx(x2-3y2)'),
+    'fgs': ('fz3', 'g5'),
+    'fgp': ('fxz2', 'g6'),
+    'fgd': ('fxyz', 'g3'),
+    'fgf': ('fx(x2-3y2)', 'g8'),
+    'ggs': ('g5', 'g5'),
+    'ggp': ('g6', 'g6'),
+    'ggd': ('g3', 'g3'),
+    'ggf': ('g8', 'g8'),
+    'ggg': ('g1', 'g1'),
 }
+
+
+def get_integral_pair(integral):
+    """ Returns the orbital pair used for calculating
+    the given Slater-Koster integral. """
+    if integral in INTEGRAL_PAIRS:
+        lm1, lm2 = INTEGRAL_PAIRS[integral]
+    else:
+        lm2, lm1 = INTEGRAL_PAIRS[integral[1] + integral[0] + integral[2]]
+    return (lm1, lm2)
 
 
 def search_integrals(lm1, lm2):
@@ -160,6 +186,37 @@ def g(c1, c2, s1, s2, integral):
         return np.sqrt(3.) / 2 * c2
     elif integral == 'sss':
         return 0.5 * np.ones_like(c1)
+    elif integral == 'sgs':
+        return 105*c2**4/16. - 45*c2**2/8 + 9/16.
+    elif integral == 'pgs':
+        return 3*np.sqrt(3)*(35*c2**4 - 30*c2**2 + 3)*c1/16.
+    elif integral == 'pgp':
+        return 3*np.sqrt(30)*(7*c2**2 - 3)*s2*s1*c2/16.
+    elif integral == 'dgs':
+        return 3*np.sqrt(5)*(3*c1**2 - 1)*(35*c2**4 - 30*c2**2 + 3)/32.
+    elif integral == 'dgp':
+        return 15*np.sqrt(6)*(28*(-8*s2**3*c2 + 4*s2*c2)*s1*c1 \
+                              + 16*s2*s1*c2*c1)/512.
+    elif integral == 'dgd':
+        return 15*np.sqrt(3)*(7*c2**2 - 1)*s2**2*s1**2/32.
+    elif integral == 'fgs':
+        return 3*np.sqrt(7)*(5*c1**2 - 3)*(35*c2**4 - 30*c2**2 + 3)*c1/32.
+    elif integral == 'fgp':
+        return 3*np.sqrt(105)*(7*c2**2 - 3)*(5*c1**2 - 1)*s2*s1*c2/32.
+    elif integral == 'fgd':
+        return 15*np.sqrt(21)*(7*c2**2 - 1)*s2**2*s1**2*c1/32.
+    elif integral == 'fgf':
+        return 105*s2**3*s1**3*c2/32.
+    elif integral == 'ggs':
+        return 9*(35*c2**4 - 30*c2**2 + 3)*(35*c1**4 - 30*c1**2 + 3)/128.
+    elif integral == 'ggp':
+        return 45*(7*c2**2 - 3)*(7*c1**2 - 3)*s2*s1*c2*c1/32.
+    elif integral == 'ggd':
+        return 45*(7*c2**2 - 1)*(7*c1**2 - 1)*s2**2*s1**2/64.
+    elif integral == 'ggf':
+        return 315*s2**3*s1**3*c2*c1/32.
+    elif integral == 'ggg':
+        return 315*s2**4*s1**4/256.
 
 
 def dg(c1, c2, s1, s2, integral):
