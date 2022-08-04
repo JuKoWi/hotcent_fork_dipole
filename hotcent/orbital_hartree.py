@@ -7,7 +7,7 @@
 import numpy as np
 from scipy.linalg import solve_banded
 from hotcent.interpolation import build_interpolator
-from hotcent.orbitals import ANGULAR_MOMENTUM, ORBITALS
+from hotcent.orbitals import ORBITALS
 from hotcent.radial_grid import RadialGrid
 from hotcent.spherical_harmonics import sph
 
@@ -47,23 +47,21 @@ class OrbitalHartreePotential:
         Smallest radius in the radial grid.
     xgrid : np.ndarray
         Equidistant logarithmic grid.
-    Rlm : np.ndarray
+    Rl : np.ndarray
         Radial component of the orbital density on the grid
         (i.e. the square of that of the associated atomic orbital).
-    lm : str
-        Orbital label for the density (e.g. 'px').
+    lmax : int
+        Maximum angular momentum for which to solve the Poisson equation.
     """
-    def __init__(self, rmin, xgrid, Rlm, lm):
+    def __init__(self, rmin, xgrid, Rl, lmax):
         self.rmin = rmin
         self.xgrid = xgrid
-        self.lm = lm
-
-        self.lmax = 2 * ANGULAR_MOMENTUM[lm[0]]
+        self.lmax = lmax
         self.rgrid = self.rmin * np.exp(self.xgrid)
         self.grid = RadialGrid(self.rgrid)
-        self.build_potentials(Rlm)
+        self.build_potentials(Rl)
 
-    def build_potentials(self, Rlm):
+    def build_potentials(self, Rl):
         """ Solves all the needed radial Poisson equations and
         builds the corresponding V_{har,\ell,m}(r) interpolators.
 
@@ -74,63 +72,52 @@ class OrbitalHartreePotential:
         """
         self.vhar_fct = {}
         for l in range(self.lmax+1):
-            for m in range(2*l+1):
-                vhar_lm = self.solve_poisson(Rlm, l, m)
-                if vhar_lm is None:
-                    self.vhar_fct[(l, m)] = lambda r: 0.
-                else:
-                    self.vhar_fct[(l, m)] = build_interpolator(self.rgrid,
-                                                               vhar_lm)
+            vhar_l = self.solve_poisson(Rl, l)
+            if vhar_l is None:
+                self.vhar_fct[l] = lambda r: 0.
+            else:
+                self.vhar_fct[l] = build_interpolator(self.rgrid, vhar_l)
         return
 
-    def solve_poisson(self, Rlm, l, m):
-        """ Returns the (\ell', m') radial component of the Hartree
-        potential associated with the given orbital density
-        by solving the corresponding Poisson equation.
+    def solve_poisson(self, Rl, l):
+        """ Returns the radial component of the Hartree potential
+        associated with the given subshell density by solving the
+        corresponding Poisson equation.
 
         Parameters
         ----------
-        Rlm : np.ndarray
+        Rl : np.ndarray
             Radial component of the orbital density on the grid.
         l : int
             Subshell index of the spherical harmonic.
-        m : int
-            Orbital index of the spherical harmonic.
 
         Returns
         -------
-        vhar_lm : np.ndarray or None
-            Hartree potential on the grid. None gets returned if
-            the (\ell', m') component is zero.
+        vhar_l : np.ndarray or None
+            Hartree potential on the grid.
         """
-        lm = ORBITALS[l][m]
-        coefficient = get_density_expansion_coefficient(self.lm, lm)
-
-        if coefficient == 0:
-            # Quick return
-            return None
 
         c0 = -l * (l + 1) / self.rgrid**2
         c1 = -1. / self.rgrid**2
         c2 = 1. / self.rgrid**2
-        source = -4 * np.pi * self.rgrid * Rlm * coefficient
+        source = -4 * np.pi * self.rgrid * Rl
 
         h = self.xgrid[1] - self.xgrid[0]
 
-        if lm == 's':
-            v0 = self.grid.integrate(Rlm*coefficient/self.rgrid, use_dV=True)
+        if l == 0:
+            v0 = self.grid.integrate(Rl / self.rgrid, use_dV=True)
             u0 = self.rmin * np.exp(-h) * v0
         else:
             u0 = 0.
 
-        nel = self.grid.integrate(Rlm * self.rgrid**2, use_dV=False)
-        u1 = np.sqrt(4 * np.pi) * nel if l == 0 else 0.
+        nel = self.grid.integrate(Rl * self.rgrid**2, use_dV=False)
+        u1 = 4 * np.pi * nel if l == 0 else 0.
 
-        u_lm = solve_radial_dgl(c0, c1, c2, source, u0, u1, h)
-        vhar_lm = u_lm / self.rgrid
-        return vhar_lm
+        u_l = solve_radial_dgl(c0, c1, c2, source, u0, u1, h)
+        vhar_l = u_l / self.rgrid
+        return vhar_l
 
-    def __call__(self, r, c, s, phi):
+    def __call__(self, r, c, s, phi, lm):
         """ Evaluates the Hartree potential in spherical coordinates,
         using interpolation.
 
@@ -144,6 +131,8 @@ class OrbitalHartreePotential:
             Sines of the theta angle.
         phi : np.ndarray, optional
             Phi angles.
+        lm : str
+            Orbital label for the density (e.g. 'px').
 
         Returns
         -------
@@ -151,10 +140,15 @@ class OrbitalHartreePotential:
             Hartree potential at the given points.
         """
         value = np.zeros_like(r)
+
         for l in range(self.lmax+1):
+            vhar_l = self.vhar_fct[l](r)
+
             for m in range(2*l+1):
-                lm = ORBITALS[l][m]
-                value += self.vhar_fct[(l, m)](r) * sph(lm, c, s, phi)
+                lm2 = ORBITALS[l][m]
+                coeff = get_density_expansion_coefficient(lm, lm2)
+                value += vhar_l * coeff * sph(lm2, c, s, phi)
+
         return value
 
 
