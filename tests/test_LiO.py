@@ -90,7 +90,7 @@ def atoms(request):
     return atoms
 
 
-@pytest.mark.parametrize('atoms', [DZP_LDA], indirect=True)
+@pytest.mark.parametrize('atoms', [DZP_LDA, SZP_PBE], indirect=True)
 def test_on1cU(atoms):
     from hotcent.onsite_chargetransfer import Onsite1cUTable
 
@@ -103,7 +103,8 @@ def test_on1cU(atoms):
     U = chgon1c.table
 
     U_ref = {
-        LDA: np.array([9.813091, 1.739321, 0.4714054, 0.03553798]),
+        LDA: np.array([9.81309055, 1.73932124, 0.47140538]),
+        PBE: np.array([9.83795309, 1.70129873, 0.34327382]),
     }
 
     msg = 'Too large error for U_{0} (value={1})'
