@@ -1566,22 +1566,80 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
         assert self.elA.get_symbol() == self.elB.get_symbol()
 
         results = {}
-        atoms_1c = [self.atoms_becke[self.iA]]
 
+        if self.xc.add_gradient_corrections:
+            Kxcab1c, Kxcab2c = self.calculate_onsite_xc_kernel_gga(spin)
+        else:
+            Kxcab1c, Kxcab2c = self.calculate_onsite_xc_kernel_lda(spin)
+
+        print("<a|fxc1c|b> =", Kxcab1c)
+        results['K_1c'] = Kxcab1c
+
+        print("<a|fxc2c|b> =", Kxcab2c)
+        results['K_2c'] = Kxcab1c + Kxcab2c
+        return results
+
+    def calculate_onsite_xc_kernel_lda(self, spin):
+        atoms_1c = [self.atoms_becke[self.iA]]
         Kxc1c = lambda x, y, z: self.multipoleA(x, y, z) \
                                 * self.fxc_on1c(x, y, z, spin) \
                                 * self.multipoleB(x, y, z)
         Kxcab1c = becke.integral(atoms_1c, Kxc1c)
-        print("<a|fxc1c|b> =", Kxcab1c)
-        results['K_1c'] = Kxcab1c
 
         Kxc2c = lambda x, y, z: self.multipoleA(x, y, z) \
                                 * self.fxc_on2c(x, y, z, spin) \
                                 * self.multipoleB(x, y, z)
         Kxcab2c = becke.integral(self.atoms_becke, Kxc2c)
-        print("<a|fxc2c|b> =", Kxcab2c)
-        results['K_2c'] = Kxcab1c + Kxcab2c
-        return results
+        return (Kxcab1c, Kxcab2c)
+
+    def calculate_onsite_xc_kernel_gga(self, spin):
+        if spin:
+            raise NotImplementedError
+
+        assert self.nlA == self.nlB, (self.nlA, self.nlB)
+
+        atoms_1c = [self.atoms_becke[self.iA]]
+
+        def kxc_on1c(x, y, z):
+            dx, dy, dz = x - self.xA, y - self.yA, z - self.zA
+            rA = np.sqrt(dx**2 + dy**2 + dz**2)
+            rho = self.elA.electron_density(rA)
+            drho1 = self.get_rho_deriv1(x, y, z, [self.iA])
+            out = self.xc.compute_vxc(rho, fxc=True, **drho1)
+
+            mA = self.multipoleA(x, y, z)
+            mB = self.multipoleB(x, y, z)
+            dmAdr = 2 * self.elA.Rnl(rA, self.nlA) \
+                    * self.elA.Rnl(rA, self.nlA, der=1) \
+                    * sph_cartesian(dx, dy, dz, rA, self.lmA)
+            dmBdr = 2 * self.elB.Rnl(rA, self.nlB) \
+                    * self.elB.Rnl(rA, self.nlB, der=1) \
+                    * sph_cartesian(dx, dy, dz, rA, self.lmB)
+            drhodr = self.elA.electron_density(rA, der=1)
+            grad_mA_grad_rho = dmAdr * drhodr
+            grad_mB_grad_rho = dmBdr * drhodr
+
+            grad_mA_grad_mB = 0.
+            Rnl2 = self.elA.Rnl(rA, self.nlA)**2
+            drdx = [dx/rA, dy/rA, dz/rA]
+            for i in range(3):
+                der = 'xyz'[i]
+                dYlmA = sph_cartesian_der(dx, dy, dz, rA, self.lmA, der=der)
+                termA = dmAdr * drdx[i] + Rnl2 * dYlmA
+                dYlmB = sph_cartesian_der(dx, dy, dz, rA, self.lmB, der=der)
+                termB = dmBdr * drdx[i] + Rnl2 * dYlmB
+                grad_mA_grad_mB += termA * termB
+
+            k = out['v2rho2'] * mA * mB
+            k += 2 * out['v2rhosigma'] * grad_mA_grad_rho * mB
+            k += 2 * out['v2rhosigma'] * mA * grad_mB_grad_rho
+            k += 4 * out['v2sigma2'] * grad_mA_grad_rho * grad_mB_grad_rho
+            k += 2 * out['vsigma'] * grad_mA_grad_mB
+            return k
+
+        Kxcab1c = becke.integral(atoms_1c, kxc_on1c)
+        Kxcab2c = 0.  # TODO
+        return (Kxcab1c, Kxcab2c)
 
     def calculate_offsite_kernel_approximations(self, spin):
         assert self.iA != self.iB
