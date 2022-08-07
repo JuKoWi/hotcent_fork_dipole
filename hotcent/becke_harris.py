@@ -1360,10 +1360,8 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
             assert is_onsite
             for l1 in range(lmax+1):
                 for lm1 in ORBITALS[l1]:
-                    for l2 in range(lmax+1):
-                        for lm2 in ORBITALS[l2]:
-                            pair = ('%s_%s' % (lm1, lm2), (lm1, lm2))
-                            pairs.append(pair)
+                    pair = ('%s_%s' % (lm1, lm1), (lm1, lm1))
+                    pairs.append(pair)
             labels = 'on1c'
         elif N == 2:
             for integral in INTEGRALS_2CK:
