@@ -265,7 +265,7 @@ def test_on2cU(R, atoms):
 
 
 @pytest.mark.parametrize('R', [R1])
-@pytest.mark.parametrize('atoms', [DZP_LDA], indirect=True)
+@pytest.mark.parametrize('atoms', [DZP_LDA, SZP_PBE], indirect=True)
 def test_off2cU(R, atoms):
     from hotcent.offsite_chargetransfer import Offsite2cUTable
 
@@ -312,6 +312,40 @@ def test_off2cU(R, atoms):
             'dds': -0.00535135,
             'ddp': -0.03105694,
             'ddd': 0.07323594,
+            },
+        },
+        (R1, SZP, PBE): {
+            0: {
+            'sss': -1.34354020,
+            'sps': -1.43832498,
+            'sds': 0.69851735,
+            'pss': 0.32442785,
+            'pps': 0.03843244,
+            'ppp': 0.38064809,
+            'pds': -0.10279173,
+            'pdp': -0.31724836,
+            'dss': 0.01602681,
+            'dps': 0.04272861,
+            'dpp': 0.08203186,
+            'dds': -0.00572780,
+            'ddp': -0.02866380,
+            'ddd': 0.07327689,
+            },
+            1: {
+            'sss': -1.34354009,
+            'sps': -0.32442788,
+            'sds': 0.01602756,
+            'pss': 1.43832504,
+            'pps': 0.03843247,
+            'ppp': 0.38064807,
+            'pds': -0.04272675,
+            'pdp': -0.08203197,
+            'dss': 0.69851737,
+            'dps': 0.10279179,
+            'dpp': 0.31724826,
+            'dds': -0.00572528,
+            'ddp': -0.02866407,
+            'ddd': 0.07327679,
             },
         },
     }
