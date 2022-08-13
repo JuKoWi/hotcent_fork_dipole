@@ -477,6 +477,472 @@ def get_twocenter_phi_integral(lm1, lm2, c1, c2, s1, s2):
     return gphi
 
 
+def get_twocenter_phi_integrals_derivatives(lm1, lm2, c1, c2, s1, s2):
+    """
+    Returns the equivalent of get_twocenter_phi_integrals() with
+    selected derivatives of the involved spherical harmonics.
+
+    Parameters
+    ----------
+    lm1, lm2 : str
+        Orbital labels.
+    c1, c2, s1, s2 : np.ndarray
+        Cosine (c1 and c2) and sine (s1 and s2) of the
+        theta1 and theta2 angles, respectively.
+
+    Returns
+    -------
+    dghi : list of 4 np.ndarray
+        List with the following four integrals:
+            dY_{lm1}(\theta_1)/d\theta_1 dY_{lm1}(\theta_2)/d\theta_2
+            \int Y_{lm1}(\phi) Y_{lm1}(\phi) d\phi,
+            Y_{lm1}(\theta_1) Y_{lm1}(\theta_2)
+            \int dY_{lm1}(\phi)/d\phi dY_{lm1}(\phi)/d\phi d\phi,
+            dY_{lm1}(\theta_1)/d\theta_1 Y_{lm1}(\theta_2)
+            \int Y_{lm1}(\phi) Y_{lm1}(\phi) d\phi,
+            Y_{lm1}(\theta_1) dY_{lm1}(\theta_2)/d\theta_2
+            \int Y_{lm1}(\phi) Y_{lm1}(\phi) d\phi.
+    """
+    if lm1 == 's' and lm2 == 'pz':
+        dgphi = [
+            0,
+            0,
+            0,
+            -np.sqrt(3)*s2/2.,
+        ]
+    elif lm1 == 's' and lm2 == 'dz2':
+        dgphi = [
+            0,
+            0,
+            0,
+            -3*np.sqrt(5)*s2*c2/2.,
+        ]
+    elif lm1 == 'px' and lm2 == 's':
+        dgphi = [
+            0,
+            np.sqrt(3)*s1/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'px' and lm2 == 'px':
+        dgphi = [
+            3*c2*c1/4.,
+            3*s2*s1/4.,
+            3*s2*c1/4.,
+            3*s1*c2/4.,
+        ]
+    elif lm1 == 'px' and lm2 == 'py':
+        dgphi = [
+            0,
+            3*s2*s1/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'px' and lm2 == 'pz':
+        dgphi = [
+            0,
+            3*s1*c2/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'px' and lm2 == 'dxy':
+        dgphi = [
+            0,
+            3*np.sqrt(5)*s2**2*s1/8.,
+            0,
+            0,
+        ]
+    elif lm1 == 'px' and lm2 == 'dyz':
+        dgphi = [
+            0,
+            3*np.sqrt(5)*s2*s1*c2/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'px' and lm2 == 'dxz':
+        dgphi = [
+            3*np.sqrt(5)*(2*c2**2 - 1)*c1/4.,
+            3*np.sqrt(5)*s2*s1*c2/4.,
+            3*np.sqrt(5)*s2*c2*c1/4.,
+            3*np.sqrt(5)*(2*c2**2 - 1)*s1/4.,
+        ]
+    elif lm1 == 'px' and lm2 == 'dx2-y2':
+        dgphi = [
+            0,
+            3*np.sqrt(5)*s2**2*s1/8.,
+            0,
+            0,
+        ]
+    elif lm1 == 'px' and lm2 == 'dz2':
+        dgphi = [
+            0,
+            np.sqrt(15)*(3*c2**2 - 1)*s1/8.,
+            0,
+            0,
+        ]
+    elif lm1 == 'py' and lm2 == 's':
+        dgphi = [
+            0,
+            np.sqrt(3)*s1/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'py' and lm2 == 'px':
+        dgphi = [
+            0,
+            3*s2*s1/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'py' and lm2 == 'py':
+        dgphi = [
+            3*c2*c1/4.,
+            3*s2*s1/4.,
+            3*s2*c1/4.,
+            3*s1*c2/4.,
+        ]
+    elif lm1 == 'py' and lm2 == 'pz':
+        dgphi = [
+            0,
+            3*s1*c2/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'py' and lm2 == 'dxy':
+        dgphi = [
+            0,
+            3*np.sqrt(5)*s2**2*s1/8.,
+            0,
+            0,
+        ]
+    elif lm1 == 'py' and lm2 == 'dyz':
+        dgphi = [
+            3*np.sqrt(5)*(2*c2**2 - 1)*c1/4.,
+            3*np.sqrt(5)*s2*s1*c2/4.,
+            3*np.sqrt(5)*s2*c2*c1/4.,
+            3*np.sqrt(5)*(2*c2**2 - 1)*s1/4.,
+        ]
+    elif lm1 == 'py' and lm2 == 'dxz':
+        dgphi = [
+            0,
+            3*np.sqrt(5)*s2*s1*c2/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'py' and lm2 == 'dx2-y2':
+        dgphi = [
+            0,
+            3*np.sqrt(5)*s2**2*s1/8.,
+            0,
+            0,
+        ]
+    elif lm1 == 'py' and lm2 == 'dz2':
+        dgphi = [
+            0,
+            np.sqrt(15)*(3*c2**2 - 1)*s1/8.,
+            0,
+            0,
+        ]
+    elif lm1 == 'pz' and lm2 == 's':
+        dgphi = [
+            0,
+            0,
+            -np.sqrt(3)*s1/2.,
+            0,
+        ]
+    elif lm1 == 'pz' and lm2 == 'pz':
+        dgphi = [
+            3*s2*s1/2.,
+            0,
+            -3*s1*c2/2.,
+            -3*s2*c1/2.,
+        ]
+    elif lm1 == 'pz' and lm2 == 'dz2':
+        dgphi = [
+            3*np.sqrt(15)*s2*s1*c2/2.,
+            0,
+            np.sqrt(15)*(1 - 3*c2**2)*s1/4.,
+            -3*np.sqrt(15)*s2*c2*c1/2.,
+        ]
+    elif lm1 == 'dxy' and lm2 == 's':
+        dgphi = [
+            0,
+            np.sqrt(15)*s1**2/2.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dxy' and lm2 == 'px':
+        dgphi = [
+            0,
+            3*np.sqrt(5)*s2*s1**2/2.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dxy' and lm2 == 'py':
+        dgphi = [
+            0,
+            3*np.sqrt(5)*s2*s1**2/2.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dxy' and lm2 == 'pz':
+        dgphi = [
+            0,
+            3*np.sqrt(5)*s1**2*c2/2.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dxy' and lm2 == 'dxy':
+        dgphi = [
+            15*s2*s1*c2*c1/4.,
+            15*s2**2*s1**2/4.,
+            15*s2**2*s1*c1/8.,
+            15*s2*s1**2*c2/8.,
+        ]
+    elif lm1 == 'dxy' and lm2 == 'dyz':
+        dgphi = [
+            0,
+            15*s2*s1**2*c2/2.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dxy' and lm2 == 'dxz':
+        dgphi = [
+            0,
+            15*s2*s1**2*c2/2.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dxy' and lm2 == 'dx2-y2':
+        dgphi = [
+            0,
+            15*s2**2*s1**2/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dxy' and lm2 == 'dz2':
+        dgphi = [
+            0,
+            5*np.sqrt(3)*(3*c2**2 - 1)*s1**2/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dyz' and lm2 == 's':
+        dgphi = [
+            0,
+            np.sqrt(15)*s1*c1/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dyz' and lm2 == 'px':
+        dgphi = [
+            0,
+            3*np.sqrt(5)*s2*s1*c1/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dyz' and lm2 == 'py':
+        dgphi = [
+            3*np.sqrt(5)*(2*c1**2 - 1)*c2/4.,
+            3*np.sqrt(5)*s2*s1*c1/4.,
+            3*np.sqrt(5)*(2*c1**2 - 1)*s2/4.,
+            3*np.sqrt(5)*s1*c2*c1/4.,
+        ]
+    elif lm1 == 'dyz' and lm2 == 'pz':
+        dgphi = [
+            0,
+            3*np.sqrt(5)*s1*c2*c1/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dyz' and lm2 == 'dxy':
+        dgphi = [
+            0,
+            15*s2**2*s1*c1/8.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dyz' and lm2 == 'dyz':
+        dgphi = [
+            15*(2*c2**2 - 1)*(2*c1**2 - 1)/4.,
+            15*s2*s1*c2*c1/4.,
+            15*(2*c1**2 - 1)*s2*c2/4.,
+            15*(2*c2**2 - 1)*s1*c1/4.,
+        ]
+    elif lm1 == 'dyz' and lm2 == 'dxz':
+        dgphi = [
+            0,
+            15*s2*s1*c2*c1/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dyz' and lm2 == 'dx2-y2':
+        dgphi = [
+            0,
+            15*s2**2*s1*c1/8.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dyz' and lm2 == 'dz2':
+        dgphi = [
+            0,
+            5*np.sqrt(3)*(3*c2**2 - 1)*s1*c1/8.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dxz' and lm2 == 's':
+        dgphi = [
+            0,
+            np.sqrt(15)*s1*c1/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dxz' and lm2 == 'px':
+        dgphi = [
+            3*np.sqrt(5)*(2*c1**2 - 1)*c2/4.,
+            3*np.sqrt(5)*s2*s1*c1/4.,
+            3*np.sqrt(5)*(2*c1**2 - 1)*s2/4.,
+            3*np.sqrt(5)*s1*c2*c1/4.,
+        ]
+    elif lm1 == 'dxz' and lm2 == 'py':
+        dgphi = [
+            0,
+            3*np.sqrt(5)*s2*s1*c1/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dxz' and lm2 == 'pz':
+        dgphi = [
+            0,
+            3*np.sqrt(5)*s1*c2*c1/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dxz' and lm2 == 'dxy':
+        dgphi = [
+            0,
+            15*s2**2*s1*c1/8.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dxz' and lm2 == 'dyz':
+        dgphi = [
+            0,
+            15*s2*s1*c2*c1/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dxz' and lm2 == 'dxz':
+        dgphi = [
+            15*(2*c2**2 - 1)*(2*c1**2 - 1)/4.,
+            15*s2*s1*c2*c1/4.,
+            15*(2*c1**2 - 1)*s2*c2/4.,
+            15*(2*c2**2 - 1)*s1*c1/4.,
+        ]
+    elif lm1 == 'dxz' and lm2 == 'dx2-y2':
+        dgphi = [
+            0,
+            15*s2**2*s1*c1/8.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dxz' and lm2 == 'dz2':
+        dgphi = [
+            0,
+            5*np.sqrt(3)*(3*c2**2 - 1)*s1*c1/8.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dx2-y2' and lm2 == 's':
+        dgphi = [
+            0,
+            np.sqrt(15)*s1**2/2.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dx2-y2' and lm2 == 'px':
+        dgphi = [
+            0,
+            3*np.sqrt(5)*s2*s1**2/2.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dx2-y2' and lm2 == 'py':
+        dgphi = [
+            0,
+            3*np.sqrt(5)*s2*s1**2/2.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dx2-y2' and lm2 == 'pz':
+        dgphi = [
+            0,
+            3*np.sqrt(5)*s1**2*c2/2.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dx2-y2' and lm2 == 'dxy':
+        dgphi = [
+            0,
+            15*s2**2*s1**2/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dx2-y2' and lm2 == 'dyz':
+        dgphi = [
+            0,
+            15*s2*s1**2*c2/2.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dx2-y2' and lm2 == 'dxz':
+        dgphi = [
+            0,
+            15*s2*s1**2*c2/2.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dx2-y2' and lm2 == 'dx2-y2':
+        dgphi = [
+            15*s2*s1*c2*c1/4.,
+            15*s2**2*s1**2/4.,
+            15*s2**2*s1*c1/8.,
+            15*s2*s1**2*c2/8.,
+        ]
+    elif lm1 == 'dx2-y2' and lm2 == 'dz2':
+        dgphi = [
+            0,
+            5*np.sqrt(3)*(3*c2**2 - 1)*s1**2/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dz2' and lm2 == 's':
+        dgphi = [
+            0,
+            0,
+            -3*np.sqrt(5)*s1*c1/2.,
+            0,
+        ]
+    elif lm1 == 'dz2' and lm2 == 'pz':
+        dgphi = [
+            3*np.sqrt(15)*s2*s1*c1/2.,
+            0,
+            -3*np.sqrt(15)*s1*c2*c1/2.,
+            np.sqrt(15)*(1 - 3*c1**2)*s2/4.,
+        ]
+    elif lm1 == 'dz2' and lm2 == 'dz2':
+        dgphi = [
+            45*s2*s1*c2*c1/2.,
+            0,
+            15*(1 - 3*c2**2)*s1*c1/4.,
+            15*(1 - 3*c1**2)*s2*c2/4.,
+        ]
+    else:
+        dgphi = [0, 0, 0, 0]
+
+    return dgphi
+
+
 def tail_smoothening(x, y):
     """ For given grid-function y(x), make smooth tail.
 
