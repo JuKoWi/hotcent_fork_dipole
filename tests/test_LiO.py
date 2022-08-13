@@ -203,7 +203,7 @@ def test_on1cM(atoms):
 
 
 @pytest.mark.parametrize('R', [R1])
-@pytest.mark.parametrize('atoms', [DZP_LDA], indirect=True)
+@pytest.mark.parametrize('atoms', [DZP_LDA, SZP_PBE], indirect=True)
 def test_on2cU(R, atoms):
     from hotcent.onsite_chargetransfer import Onsite2cUTable
 
@@ -234,10 +234,26 @@ def test_on2cU(R, atoms):
             'ddp': 0.00742948,
             'ddd': 0.00597954,
         },
+        (R1, SZP, PBE): {
+            'sss': 0.00623313,
+            'sps': 0.00298712,
+            'sds': 0.00148664,
+            'pss': 0.00298712,
+            'pps': 0.00852381,
+            'ppp': 0.00672257,
+            'pds': 0.00450096,
+            'pdp': 0.00201647,
+            'dss': 0.00148664,
+            'dps': 0.00450096,
+            'dpp': 0.00201647,
+            'dds': 0.01204812,
+            'ddp': 0.00922716,
+            'ddd': 0.00851107,
+        }
     }
 
     msg = 'Too large error for U_{0} (value={1})'
-    tol = 1e-6
+    tol = 1e-6 if xc == 'LDA' else 1e-5
 
     for integral, ref in U_ref[R, size, xc].items():
         index = INTEGRALS_2CK.index(integral)

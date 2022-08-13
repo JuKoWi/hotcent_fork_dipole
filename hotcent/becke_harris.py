@@ -1596,14 +1596,12 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
 
         assert self.nlA == self.nlB, (self.nlA, self.nlB)
 
-        atoms_1c = [self.atoms_becke[self.iA]]
-
         def kxc_on1c(x, y, z):
             dx, dy, dz = x - self.xA, y - self.yA, z - self.zA
             rA = np.sqrt(dx**2 + dy**2 + dz**2)
             rho = self.elA.electron_density(rA)
-            drho1 = self.get_rho_deriv1(x, y, z, [self.iA])
-            out = self.xc.compute_vxc(rho, fxc=True, **drho1)
+            drho = self.get_rho_deriv1(x, y, z, [self.iA])
+            out = self.xc.compute_vxc(rho, fxc=True, **drho)
 
             mA = self.multipoleA(x, y, z)
             mB = self.multipoleB(x, y, z)
@@ -1623,10 +1621,10 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
             for i in range(3):
                 der = 'xyz'[i]
                 dYlmA = sph_cartesian_der(dx, dy, dz, rA, self.lmA, der=der)
-                termA = dmAdr * drdx[i] + Rnl2 * dYlmA
+                dmAdx = dmAdr * drdx[i] + Rnl2 * dYlmA
                 dYlmB = sph_cartesian_der(dx, dy, dz, rA, self.lmB, der=der)
-                termB = dmBdr * drdx[i] + Rnl2 * dYlmB
-                grad_mA_grad_mB += termA * termB
+                dmBdx = dmBdr * drdx[i] + Rnl2 * dYlmB
+                grad_mA_grad_mB += dmAdx * dmBdx
 
             k = out['v2rho2'] * mA * mB
             k += 2 * out['v2rhosigma'] * grad_mA_grad_rho * mB
@@ -1635,8 +1633,84 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
             k += 2 * out['vsigma'] * grad_mA_grad_mB
             return k
 
+        def kxc_on2c(x, y, z):
+            dxA, dyA, dzA = x - self.xA, y - self.yA, z - self.zA
+            rA = np.sqrt(dxA**2 + dyA**2 + dzA**2)
+            drAdx = [dxA/rA, dyA/rA, dzA/rA]
+            rhoA = self.elA.electron_density(rA)
+
+            drho = self.get_rho_deriv1(x, y, z, [self.iA])
+            outA = self.xc.compute_vxc(rhoA, fxc=True, **drho)
+            drhoAdrA = self.elA.electron_density(rA, der=1)
+            Rnl2 = self.elA.Rnl(rA, self.nlA)**2
+
+            mA = self.multipoleA(x, y, z)
+            mB = self.multipoleB(x, y, z)
+            dmAdr = 2 * self.elA.Rnl(rA, self.nlA) \
+                    * self.elA.Rnl(rA, self.nlA, der=1) \
+                    * sph_cartesian(dxA, dyA, dzA, rA, self.lmA)
+            dmBdr = 2 * self.elA.Rnl(rA, self.nlB) \
+                    * self.elA.Rnl(rA, self.nlB, der=1) \
+                    * sph_cartesian(dxA, dyA, dzA, rA, self.lmB)
+
+            dYlmAs, dYlmBs = [], []
+            grad_mA_grad_mB = 0.
+            grad_mA_grad_rho = 0.
+            grad_mB_grad_rho = 0.
+            for i in range(3):
+                der = 'xyz'[i]
+                dYlmA = sph_cartesian_der(dxA, dyA, dzA, rA, self.lmA, der=der)
+                dYlmAs.append(dYlmA)
+                dYlmB = sph_cartesian_der(dxA, dyA, dzA, rA, self.lmB, der=der)
+                dYlmBs.append(dYlmB)
+                dmAdx = dmAdr * drAdx[i] + Rnl2 * dYlmA
+                dmBdx = dmBdr * drAdx[i] + Rnl2 * dYlmB
+                grad_mA_grad_mB += dmAdx * dmBdx
+                drhodx = drhoAdrA * drAdx[i]
+                grad_mA_grad_rho += dmAdx * drhodx
+                grad_mB_grad_rho += dmBdx * drhodx
+
+            kA = 0.
+            kA += outA['v2rho2'] * mA * mB
+            kA += 2 * outA['v2rhosigma'] * grad_mA_grad_rho * mB
+            kA += 2 * outA['v2rhosigma'] * mA * grad_mB_grad_rho
+            kA += 4 * outA['v2sigma2'] * grad_mA_grad_rho * grad_mB_grad_rho
+            kA += 2 * outA['vsigma'] * grad_mA_grad_mB
+
+            k = 0.
+            for iC in list(range(len(self.atoms_ase))):
+                if iC in [self.iA, self.iB]: continue
+                symC = self.get_symbol(iC)
+                xC, yC, zC = self.get_position(iC)
+                dxC, dyC, dzC = x - xC, y - yC, z - zC
+                rC = np.sqrt(dxC**2 + dyC**2 + dzC**2)
+                drCdx = [dxC/rC, dyC/rC, dzC/rC]
+                rhoC = self.elements[symC].electron_density(rC)
+
+                drho = self.get_rho_deriv1(x, y, z, [self.iA, iC])
+                outAC = self.xc.compute_vxc(rhoA+rhoC, fxc=True, **drho)
+                drhoCdrC = self.elements[symC].electron_density(rC, der=1)
+
+                grad_mA_grad_rho = 0.
+                grad_mB_grad_rho = 0.
+                for i in range(3):
+                    drhodx = drhoAdrA * drAdx[i] + drhoCdrC * drCdx[i]
+                    dmAdx = dmAdr * drAdx[i] + Rnl2 * dYlmAs[i]
+                    dmBdx = dmBdr * drAdx[i] + Rnl2 * dYlmBs[i]
+                    grad_mA_grad_rho += dmAdx * drhodx
+                    grad_mB_grad_rho += dmBdx * drhodx
+
+                k += outAC['v2rho2'] * mA * mB
+                k += 2 * outAC['v2rhosigma'] * grad_mA_grad_rho * mB
+                k += 2 * outAC['v2rhosigma'] * mA * grad_mB_grad_rho
+                k += 4 * outAC['v2sigma2'] * grad_mA_grad_rho * grad_mB_grad_rho
+                k += 2 * outAC['vsigma'] * grad_mA_grad_mB
+                k -= kA
+            return k
+
+        atoms_1c = [self.atoms_becke[self.iA]]
         Kxcab1c = becke.integral(atoms_1c, kxc_on1c)
-        Kxcab2c = 0.  # TODO
+        Kxcab2c = becke.integral(self.atoms_becke, kxc_on2c)
         return (Kxcab1c, Kxcab2c)
 
     def calculate_offsite_kernel_approximations(self, spin):

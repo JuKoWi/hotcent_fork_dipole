@@ -15,6 +15,7 @@ from hotcent.multiatom_integrator import MultiAtomIntegrator
 from hotcent.orbital_hartree import OrbitalHartreePotential
 from hotcent.orbitals import ANGULAR_MOMENTUM
 from hotcent.slako import (get_integral_pair, get_twocenter_phi_integral,
+                           get_twocenter_phi_integrals_derivatives,
                            tail_smoothening)
 from hotcent.xc import LibXC
 
@@ -524,9 +525,37 @@ class Onsite2cUTable(MultiAtomIntegrator):
         rho1 = e1.electron_density(r1)
         rho2 = e2.electron_density(r2)
         rho12 = rho1 + rho2
+        Rnl1 = e1.Rnl(r1, nl)**2
 
         if xc.add_gradient_corrections:
-            raise NotImplementedError
+            drho1 = e1.electron_density(r1, der=1)
+            drho2 = e2.electron_density(r2, der=1)
+            c2 = (y - R) / r2  # cosine of theta_2
+            s2 = x / r2  # sine of theta_2
+
+            drho1dx = drho1 * s1
+            drho1dy = drho1 * c1
+            sigma1 = drho1dx**2 + drho1dy**2
+
+            drho12dx = drho1 * s1 + drho2 * s2
+            drho12dy = drho1 * c1 + drho2 * c2
+            sigma12 = drho12dx**2 + drho12dy**2
+
+            dr1dx = x/r1
+            ds1dx = (r1 - x*dr1dx) / r1**2
+            dr1dy = y/r1
+            ds1dy = -x*dr1dy / r1**2
+            dtheta1dx = ds1dx / c1
+            dtheta1dy = ds1dy / c1
+
+            grad_r1_grad_rho12 = dr1dx * drho12dx + dr1dy * drho12dy
+            grad_theta1_grad_rho12 = dtheta1dx * drho12dx + dtheta1dy * drho12dy
+            grad_r1_grad_theta1 = dr1dx * dtheta1dx + dr1dy * dtheta1dy
+
+            grad_r1_grad_rho1 = dr1dx * drho1dx + dr1dy * drho1dy
+            grad_theta1_grad_rho1 = dtheta1dx * drho1dx + dtheta1dy * drho1dy
+
+            dRnl1dr1 = 2 * e1.Rnl(r1, nl) * e1.Rnl(r1, nl, der=1)
         else:
             sigma1 = None
             sigma12 = None
@@ -537,18 +566,46 @@ class Onsite2cUTable(MultiAtomIntegrator):
         out12 = xc.compute_vxc(rho12, sigma=sigma12, fxc=True)
         self.timer.stop('fxc')
 
-        #U = np.zeros(NUMSK_2CM)
         U = np.zeros(NUMSK_2CK)
-        dens_nl = e1.Rnl(r1, nl)**2
 
         for index, integral in enumerate(INTEGRALS_2CK):
             lm1a, lm1b = get_integral_pair(integral)
             gphi = get_twocenter_phi_integral(lm1a, lm1b, c1, c1, s1, s1)
 
-            integrand = (out12['v2rho2'] - out1['v2rho2']) * dens_nl**2 * gphi
+            integrand = (out12['v2rho2'] - out1['v2rho2']) * Rnl1**2 * gphi
 
             if xc.add_gradient_corrections:
-                raise NotImplementedError
+                dgphi = get_twocenter_phi_integrals_derivatives(lm1a, lm1b, c1,
+                                                                c1, s1, s1)
+
+                products = 2 * dRnl1dr1 * grad_r1_grad_rho12 * Rnl1 * gphi
+                products += Rnl1**2 * grad_theta1_grad_rho12 \
+                            * (dgphi[2] + dgphi[3])
+                integrand += 2 * products * out12['v2rhosigma']
+
+                products = 2 * dRnl1dr1 * grad_r1_grad_rho1 * Rnl1 * gphi
+                products += Rnl1**2 * grad_theta1_grad_rho1 \
+                            * (dgphi[2] + dgphi[3])
+                integrand -= 2 * products * out1['v2rhosigma']
+
+                products = dRnl1dr1**2 * grad_r1_grad_rho12**2 * gphi
+                products += dRnl1dr1 * grad_r1_grad_rho12 * Rnl1 \
+                            * grad_theta1_grad_rho12 * (dgphi[2] + dgphi[3])
+                products += Rnl1**2 * grad_theta1_grad_rho12**2 * dgphi[0]
+                integrand += 4 * products * out12['v2sigma2']
+
+                products = dRnl1dr1**2 * grad_r1_grad_rho1**2 * gphi
+                products += dRnl1dr1 * grad_r1_grad_rho1 * Rnl1 \
+                            * grad_theta1_grad_rho1 * (dgphi[2] + dgphi[3])
+                products += Rnl1**2 * grad_theta1_grad_rho1**2 * dgphi[0]
+                integrand -= 4 * products * out1['v2sigma2']
+
+                products = dRnl1dr1**2 * (dr1dx**2 + dr1dy**2) * gphi
+                products += Rnl1 * grad_r1_grad_theta1 * dRnl1dr1 \
+                            * (dgphi[2] + dgphi[3])
+                products += Rnl1**2 * ((dtheta1dx**2 + dtheta1dy**2) * dgphi[0]\
+                                       + dgphi[1] / x**2)
+                integrand += 2 * products * (out12['vsigma'] - out1['vsigma'])
 
             U[index] = np.sum(integrand * aux)
 
