@@ -600,7 +600,7 @@ class Offsite2cMTable(MultiAtomIntegrator):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
 
     def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
-            smoothen_tails=True, shift=False):
+            smoothen_tails=True):
         """
         Calculates the required off-site Slater-Koster integrals for
 
@@ -660,22 +660,14 @@ class Offsite2cMTable(MultiAtomIntegrator):
                         l1 = ANGULAR_MOMENTUM[nl1[1]]
                         self.tables[(p, bas1, bas2)][l1, i, :] += M[key][:]
 
-        for key in self.tables:
-            for l1 in range(NUML_2CM):
-                for i in range(NUMSK_2CM):
-                    all0 = np.allclose(self.tables[key][l1, :, i], 0)
-                    if shift and not all0:
-                        for j in range(N-1, 1, -1):
-                            if abs(self.tables[key][l1, j, i]) > 0:
-                                self.tables[key][l1, :j+1, i] -= \
-                                                self.tables[key][l1, j, i]
-                                break
-
-                    if smoothen_tails:
-                        for key in self.tables:
-                            self.tables[key][l1, :, i] = \
-                                tail_smoothening(self.Rgrid,
-                                                 self.tables[key][l1, :, i])
+        if smoothen_tails:
+            for key in self.tables:
+                for l1 in range(NUML_2CM):
+                    for i in range(NUMSK_2CM):
+                            for key in self.tables:
+                                self.tables[key][l1, :, i] = \
+                                    tail_smoothening(self.Rgrid,
+                                                     self.tables[key][l1, :, i])
 
         self.timer.stop('run_offsiteM')
         return
