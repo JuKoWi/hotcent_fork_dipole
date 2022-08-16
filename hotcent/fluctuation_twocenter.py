@@ -107,12 +107,18 @@ def write_2cl(handle, Rgrid, table, angmom1, angmom2):
     return
 
 
-def write_2ck(handle, Rgrid, table):
+def write_2ck(handle, Rgrid, table, asymptotes=None):
     """
     Writes a parameter file in '2ck' format.
 
     Parameters
     ----------
+    asymptotes : None or np.ndarray, optional
+        Asymptotic values for every integral, evaluated at R=1.
+        If None, a zero-valued array will be used.
+
+    Other parameters
+    ----------------
     See slako.write_skf()
     """
     grid_dist = Rgrid[1] - Rgrid[0]
@@ -123,6 +129,10 @@ def write_2ck(handle, Rgrid, table):
     assert nzeros >= 0
 
     print("%.12f, %d" % (grid_dist, grid_npts + nzeros), file=handle)
+    if asymptotes is None:
+        np.savetxt(handle, np.zeros((1, NUMSK_2CK)), fmt='%.12f')
+    else:
+        np.savetxt(handle, [asymptotes], fmt='%.12f')
 
     for i in range(nzeros):
         print(' '.join(['0.0'] * numint), file=handle)

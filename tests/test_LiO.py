@@ -354,9 +354,20 @@ def test_off2cU(R, atoms):
     tol = 1e-4
 
     for p, refs in U_ref[R, size, xc].items():
+        if p == 0:
+            sym1, sym2 = chgoff2c.ela.get_symbol(), chgoff2c.elb.get_symbol()
+        elif p == 1:
+            sym2, sym1 = chgoff2c.ela.get_symbol(), chgoff2c.elb.get_symbol()
+
         for integral, ref in refs.items():
             index = INTEGRALS_2CK.index(integral)
+
             val = U[p][0, index]
+            if integral != 'sss':
+                asymptote = chgoff2c.evaluate_hartree_asymptote(sym1, sym2,
+                                                                integral, R)
+                val += asymptote
+
             U_diff = np.abs(val - ref)
             assert U_diff < tol, msg.format(integral, val)
 

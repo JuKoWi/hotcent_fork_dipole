@@ -292,14 +292,12 @@ class Offsite2cUTable(MultiAtomIntegrator):
             assert isinstance(nl, tuple)
 
         self.build_ohp(nl)
+        self.build_int1c(nl)
 
         for p, (e1, e2) in enumerate(self.pairs):
             self.tables[p] = np.zeros((N, NUMSK_2CK))
 
         for i, R in enumerate(self.Rgrid):
-            if R > 2 * wf_range:
-                break
-
             for term in ['hartree', 'xc']:
                 if term == 'hartree':
                     self.grid_type = 'monopolar'
@@ -395,6 +393,32 @@ class Offsite2cUTable(MultiAtomIntegrator):
         """
         v = self.ohp_dict[(sym, nl)].vhar_fct[l](r)
         return v
+
+    def build_int1c(self, nl):
+        """
+        Populates the self.int1c_dict dictionary with the needed
+        one-center integrals for the kernel asymptote calculations.
+        """
+        self.int1c_dict = {}
+        sym1 = self.ela.get_symbol()
+        sym2 = self.elb.get_symbol()
+        nl1, nl2 = nl
+
+        Rnl = self.ela.Rnlg[nl1]**2
+        self.int1c_dict[sym1] = []
+        for l in range(NUML_2CK):
+            int1c = self.ela.grid.integrate(Rnl * self.ela.rgrid**(l+2),
+                                            use_dV=False)
+            self.int1c_dict[sym1].append(int1c)
+
+        if sym2 != sym1:
+            Rnl = self.elb.Rnlg[nl2]**2
+            self.int1c_dict[sym2] = []
+            for l in range(NUML_2CK):
+                int1c = self.elb.grid.integrate(Rnl * self.elb.rgrid**(l+2),
+                                                use_dV=False)
+                self.int1c_dict[sym2].append(int1c)
+        return
 
     def calculate_xc(self, e1, e2, R, grid, area, nl1, nl2, xc='LDA'):
         """
@@ -519,6 +543,49 @@ class Offsite2cUTable(MultiAtomIntegrator):
         self.timer.stop('calculate_offsiteU_xc')
         return U
 
+    def evaluate_hartree_asymptote(self, sym1, sym2, integral, R):
+        """
+        Evaluates the asymptotic form of the given Hartree kernel integral
+        (i.e. the value that it should approach at large distance).
+        """
+        if integral == 'sss':
+            asymptote = 4 * np.pi
+        elif integral == 'sps':
+            asymptote = -4 * np.pi / np.sqrt(3)
+        elif integral == 'sds':
+            asymptote = 4 * np.pi / np.sqrt(5)
+        elif integral == 'pss':
+            asymptote = 4 * np.pi / np.sqrt(3)
+        elif integral == 'pps':
+            asymptote = -8 * np.pi / 3.
+        elif integral == 'ppp':
+            asymptote = 4 * np.pi / 3.
+        elif integral == 'pds':
+            asymptote = 12 * np.pi / np.sqrt(15)
+        elif integral == 'pdp':
+            asymptote = -4 * np.pi / np.sqrt(5)
+        elif integral == 'dss':
+            asymptote = 4 * np.pi / np.sqrt(5)
+        elif integral == 'dps':
+            asymptote = -12 * np.pi / np.sqrt(15)
+        elif integral == 'dpp':
+            asymptote = 4 * np.pi / np.sqrt(5)
+        elif integral == 'dds':
+            asymptote = 24 * np.pi / 5.
+        elif integral == 'ddp':
+            asymptote = -16 * np.pi / 5.
+        elif integral == 'ddd':
+            asymptote = 4 * np.pi / 5
+        else:
+            raise NotImplementedError(integral)
+
+        lm1, lm2 = get_integral_pair(integral)
+        l1 = ANGULAR_MOMENTUM[lm1[0]]
+        l2 = ANGULAR_MOMENTUM[lm2[0]]
+        asymptote *= self.int1c_dict[sym1][l1] * self.int1c_dict[sym2][l2]
+        asymptote /= R**(1 + l1 + l2)
+        return asymptote
+
     def calculate_hartree(self, e1, e2, R, grid, area, nl1, nl2):
         """
         Calculates the selected integrals involving the Hartree kernel.
@@ -552,6 +619,7 @@ class Offsite2cUTable(MultiAtomIntegrator):
         aux = area * x
         self.timer.stop('prelude')
 
+        sym1 = e1.get_symbol()
         sym2 = e2.get_symbol()
         U = np.zeros(NUMSK_2CK)
         dens_nl1 = e1.Rnl(r1, nl1)**2
@@ -564,8 +632,9 @@ class Offsite2cUTable(MultiAtomIntegrator):
             vhar = self.evaluate_ohp(sym2, nl2, l2, r2)
             U[index] = np.sum(vhar * dens_nl1 * aux * gphi)
 
-        index = INTEGRALS_2CK.index('sss')
-        U[index] -= 4 * np.pi / R
+            asymptote = self.evaluate_hartree_asymptote(sym1, sym2,
+                                                        integral, R)
+            U[index] -= asymptote
 
         self.timer.stop('calculate_offsiteU_hartree')
         return U
@@ -584,7 +653,12 @@ class Offsite2cUTable(MultiAtomIntegrator):
             print('Writing to %s' % filename, file=self.txt, flush=True)
 
             with open(filename, 'w') as f:
-                write_2ck(f, self.Rgrid, self.tables[p])
+                asymptotes = np.zeros(NUMSK_2CK)
+                for i, integral in enumerate(INTEGRALS_2CK):
+                    asymptotes[i] = self.evaluate_hartree_asymptote(
+                                                    sym1, sym2, integral, 1)
+
+                write_2ck(f, self.Rgrid, self.tables[p], asymptotes=asymptotes)
         return
 
 
