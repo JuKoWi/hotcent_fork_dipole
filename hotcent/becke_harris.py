@@ -1331,7 +1331,7 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
         BeckeHarrisKernels.__init__(self, *args, **kwargs)
 
     def run_selected_kernels(self, atoms_ase, mode, spin=False, check_mc=True,
-                             lmax=2, substract_pointcharge=False):
+                             lmax=2, subtract_delta=False):
         self.atoms_ase = atoms_ase
         self.atoms_becke = ase2becke(atoms_ase)
         assert mode in ['onsite', 'offsite']
@@ -1387,12 +1387,9 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
             else:
                 vharA = self.get_orbital_vharA()
                 KharAB = self.evaluate_KharAB(vharA)
-                if substract_pointcharge and not is_onsite and \
-                   lmA == lmB == 's':
-                    R = np.linalg.norm(self.get_position(self.iA) \
-                                       - self.get_position(self.iB))
-                    KharAB -= 4 * np.pi / R
-                print("<a|fhartree|b> =", KharAB)
+                if subtract_delta and not is_onsite:
+                    KharAB -= self.calculate_point_multipole_kernel()
+            print("<a|fhartree|b> =", KharAB)
 
             # XC contribution
             if is_onsite:
@@ -1429,9 +1426,19 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
 
         return
 
+    def calculate_point_multipole_kernel(self):
+        vec = self.get_position(self.iA) - self.get_position(self.iB)
+        R = np.linalg.norm(vec)
+
+        if self.lmA == self.lmB == 's':
+            KharAB = 4 * np.pi / R
+        else:
+            KharAB = 0  # not (yet) implemented
+        return KharAB
+
     def run_all_kernels(self, atoms_ase, indices_A=None, indices_B=None,
                         print_matrices=True, spin=False, lmax=2,
-                        substract_pointcharge=False):
+                        subtract_delta=False):
         self.atoms_ase = atoms_ase
         self.atoms_becke = ase2becke(atoms_ase)
 
@@ -1493,11 +1500,8 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
                     KharAB = 0.
                 else:
                     KharAB = self.evaluate_KharAB(vharA)
-                    if substract_pointcharge and not is_onsite and \
-                       lmA == lmB == 's':
-                        R = np.linalg.norm(self.get_position(self.iA) \
-                                           - self.get_position(self.iB))
-                        KharAB -= 4 * np.pi / R
+                    if subtract_delta and not is_onsite:
+                        KharAB -= self.calculate_point_multipole_kernel()
                 print("<a|fhartree|b> =", KharAB, flush=True)
 
                 # XC contribution
