@@ -364,9 +364,9 @@ def test_off2cU(R, atoms):
 
             val = U[p][0, index]
             if integral != 'sss':
-                asymptote = chgoff2c.evaluate_hartree_asymptote(sym1, sym2,
-                                                                integral, R)
-                val += asymptote
+                U_delta = chgoff2c.evaluate_point_multipole_hartree(sym1, sym2,
+                                                                    integral, R)
+                val += U_delta
 
             U_diff = np.abs(val - ref)
             assert U_diff < tol, msg.format(integral, val)

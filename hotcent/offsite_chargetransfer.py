@@ -251,7 +251,8 @@ class Offsite2cUTable(MultiAtomIntegrator):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
 
     def run(self, nl=None, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50,
-            wflimit=1e-7, xc='LDA', smoothen_tails=True, shift=False):
+            wflimit=1e-7, xc='LDA', smoothen_tails=True, shift=False,
+            subtract_delta=True):
         """
         Calculates off-site, orbital- and distance-dependent "U" values
         as matrix elements of the two-center-expanded Hartree-XC kernel.
@@ -262,6 +263,11 @@ class Offsite2cUTable(MultiAtomIntegrator):
             Two-tuple with the subshells defining the radial functions
             for each element. If None, the subshells with the lowest angular
             momentum will be chosen from the minimal valence sets.
+
+        subtract_delta : bool, optional
+            Whether to subtract the point multipole contributions from
+            the kernel integrals (default: True). Setting it to False
+            is only useful for debugging purposes.
 
         Other parameters
         ----------------
@@ -316,7 +322,7 @@ class Offsite2cUTable(MultiAtomIntegrator):
 
                         if term == 'hartree':
                             U = self.calculate_hartree(e1, e2, R, grid, area,
-                                                       nl1, nl2)
+                                                       nl1, nl2, subtract_delta)
                         else:
                             U = self.calculate_xc(e1, e2, R, grid, area,
                                                   nl1, nl2, xc=xc)
@@ -397,7 +403,7 @@ class Offsite2cUTable(MultiAtomIntegrator):
     def build_int1c(self, nl):
         """
         Populates the self.int1c_dict dictionary with the needed
-        one-center integrals for the kernel asymptote calculations.
+        one-center integrals for the point multipole contributions.
         """
         self.int1c_dict = {}
         sym1 = self.ela.get_symbol()
@@ -543,50 +549,66 @@ class Offsite2cUTable(MultiAtomIntegrator):
         self.timer.stop('calculate_offsiteU_xc')
         return U
 
-    def evaluate_hartree_asymptote(self, sym1, sym2, integral, R):
+    def evaluate_point_multipole_hartree(self, sym1, sym2, integral, R):
         """
-        Evaluates the asymptotic form of the given Hartree kernel integral
-        (i.e. the value that it should approach at large distance).
+        Evaluates the point multipole contribution for the given Hartree
+        kernel integral (which is also the value that it should approach
+        at large distance R).
+
+        Parameters
+        ----------
+        sym1, sym2 : str
+            Chemical symbols of the first and second element.
+        integral : str
+            Integral label.
+        R : float
+            Interatomic distance
+
+        Returns
+        -------
+        U_delta : float
+            The point multipole contribution.
         """
         if integral == 'sss':
-            asymptote = 4 * np.pi
+            U_delta = 4 * np.pi
         elif integral == 'sps':
-            asymptote = -4 * np.pi / np.sqrt(3)
+            U_delta = -4 * np.pi / np.sqrt(3)
         elif integral == 'sds':
-            asymptote = 4 * np.pi / np.sqrt(5)
+            U_delta = 4 * np.pi / np.sqrt(5)
         elif integral == 'pss':
-            asymptote = 4 * np.pi / np.sqrt(3)
+            U_delta = 4 * np.pi / np.sqrt(3)
         elif integral == 'pps':
-            asymptote = -8 * np.pi / 3.
+            U_delta = -8 * np.pi / 3.
         elif integral == 'ppp':
-            asymptote = 4 * np.pi / 3.
+            U_delta = 4 * np.pi / 3.
         elif integral == 'pds':
-            asymptote = 12 * np.pi / np.sqrt(15)
+            U_delta = 12 * np.pi / np.sqrt(15)
         elif integral == 'pdp':
-            asymptote = -4 * np.pi / np.sqrt(5)
+            U_delta = -4 * np.pi / np.sqrt(5)
         elif integral == 'dss':
-            asymptote = 4 * np.pi / np.sqrt(5)
+            U_delta = 4 * np.pi / np.sqrt(5)
         elif integral == 'dps':
-            asymptote = -12 * np.pi / np.sqrt(15)
+            U_delta = -12 * np.pi / np.sqrt(15)
         elif integral == 'dpp':
-            asymptote = 4 * np.pi / np.sqrt(5)
+            U_delta = 4 * np.pi / np.sqrt(5)
         elif integral == 'dds':
-            asymptote = 24 * np.pi / 5.
+            U_delta = 24 * np.pi / 5.
         elif integral == 'ddp':
-            asymptote = -16 * np.pi / 5.
+            U_delta = -16 * np.pi / 5.
         elif integral == 'ddd':
-            asymptote = 4 * np.pi / 5
+            U_delta = 4 * np.pi / 5
         else:
             raise NotImplementedError(integral)
 
         lm1, lm2 = get_integral_pair(integral)
         l1 = ANGULAR_MOMENTUM[lm1[0]]
         l2 = ANGULAR_MOMENTUM[lm2[0]]
-        asymptote *= self.int1c_dict[sym1][l1] * self.int1c_dict[sym2][l2]
-        asymptote /= R**(1 + l1 + l2)
-        return asymptote
+        U_delta *= self.int1c_dict[sym1][l1] * self.int1c_dict[sym2][l2]
+        U_delta /= R**(1 + l1 + l2)
+        return U_delta
 
-    def calculate_hartree(self, e1, e2, R, grid, area, nl1, nl2):
+    def calculate_hartree(self, e1, e2, R, grid, area, nl1, nl2,
+                          subtract_delta):
         """
         Calculates the selected integrals involving the Hartree kernel.
 
@@ -594,6 +616,9 @@ class Offsite2cUTable(MultiAtomIntegrator):
         ----------
         nl1, nl2 : str
             Subshells defining the radial functions.
+        subtract_delta : bool
+            Whether to subtract the point multipole contributions from
+            the kernel integrals.
 
         Other parameters
         ----------------
@@ -632,9 +657,10 @@ class Offsite2cUTable(MultiAtomIntegrator):
             vhar = self.evaluate_ohp(sym2, nl2, l2, r2)
             U[index] = np.sum(vhar * dens_nl1 * aux * gphi)
 
-            asymptote = self.evaluate_hartree_asymptote(sym1, sym2,
-                                                        integral, R)
-            U[index] -= asymptote
+            if subtract_delta:
+                U_delta = self.evaluate_point_multipole_hartree(sym1, sym2,
+                                                                integral, R)
+                U[index] -= U_delta
 
         self.timer.stop('calculate_offsiteU_hartree')
         return U
@@ -653,12 +679,13 @@ class Offsite2cUTable(MultiAtomIntegrator):
             print('Writing to %s' % filename, file=self.txt, flush=True)
 
             with open(filename, 'w') as f:
-                asymptotes = np.zeros(NUMSK_2CK)
+                point_kernels = np.zeros(NUMSK_2CK)
                 for i, integral in enumerate(INTEGRALS_2CK):
-                    asymptotes[i] = self.evaluate_hartree_asymptote(
+                    point_kernels[i] = self.evaluate_point_multipole_hartree(
                                                     sym1, sym2, integral, 1)
 
-                write_2ck(f, self.Rgrid, self.tables[p], asymptotes=asymptotes)
+                write_2ck(f, self.Rgrid, self.tables[p],
+                          point_kernels=point_kernels)
         return
 
 

@@ -1141,7 +1141,7 @@ class BeckeHarrisSubshellKernels(BeckeHarrisKernels):
 
     def run_all_kernels(self, atoms_ase, indices_A=None, indices_B=None,
                         print_matrices=True, spin=False,
-                        substract_pointcharge=False):
+                        subtract_delta=False):
         self.atoms_ase = atoms_ase
         self.atoms_becke = ase2becke(atoms_ase)
 
@@ -1199,7 +1199,7 @@ class BeckeHarrisSubshellKernels(BeckeHarrisKernels):
                     KharAB = 0.
                 else:
                     KharAB = self.evaluate_KharAB(vharA)
-                    if substract_pointcharge and not is_onsite:
+                    if subtract_delta and not is_onsite:
                         R = np.linalg.norm(self.get_position(self.iA) \
                                            - self.get_position(self.iB))
                         KharAB -= 1. / R
@@ -1971,7 +1971,7 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
             kernel = self.run_all_kernels(atoms_ase, indices_A=indices,
                                           indices_B=indices, lmax=lmax,
                                           print_matrices=print_matrices,
-                                          substract_pointcharge=False,
+                                          subtract_delta=False,
                                           spin=False)['K_mc']
 
         # Calculate the multipoles charges Q

@@ -107,15 +107,16 @@ def write_2cl(handle, Rgrid, table, angmom1, angmom2):
     return
 
 
-def write_2ck(handle, Rgrid, table, asymptotes=None):
+def write_2ck(handle, Rgrid, table, point_kernels=None):
     """
     Writes a parameter file in '2ck' format.
 
     Parameters
     ----------
-    asymptotes : None or np.ndarray, optional
-        Asymptotic values for every integral, evaluated at R=1.
-        If None, a zero-valued array will be used.
+    point_kernels : None or np.ndarray, optional
+        Point multipole kernel values for every integral,
+        evaluated at R = 1 Bohr. If None, a zero-valued array
+        will be used.
 
     Other parameters
     ----------------
@@ -129,10 +130,10 @@ def write_2ck(handle, Rgrid, table, asymptotes=None):
     assert nzeros >= 0
 
     print("%.12f, %d" % (grid_dist, grid_npts + nzeros), file=handle)
-    if asymptotes is None:
+    if point_kernels is None:
         np.savetxt(handle, np.zeros((1, NUMSK_2CK)), fmt='%.12f')
     else:
-        np.savetxt(handle, [asymptotes], fmt='%.12f')
+        np.savetxt(handle, [point_kernels], fmt='%.12f')
 
     for i in range(nzeros):
         print(' '.join(['0.0'] * numint), file=handle)
