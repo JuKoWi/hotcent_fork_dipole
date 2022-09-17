@@ -9,6 +9,7 @@ examples/*
 tests/*.skf
 tests/*.3cf
 tests/*.spl
+tests/.hypothesis
 tutorials/*
 !tutorials/*.ipynb
 !tutorials/*.json
