@@ -249,7 +249,7 @@ class Onsite1cUTable:
         if nl is None:
             nl = select_radial_function(self.el)
 
-        self.table = self.calculate(nl, xc=xc)
+        self.table, self.radmom = self.calculate(nl, xc=xc)
         return
 
     def calculate(self, nl, xc='LDA'):
@@ -267,6 +267,9 @@ class Onsite1cUTable:
         -------
         U: np.ndarray
             Array with the integral for each multipole.
+        radmom : np.ndarray
+            Array with the radial moments of the associated density
+            (\int R_{nl}^2 r^{l+2} dr, l = 0, 1, ...).
         """
         xc = LibXC('LDA_X+LDA_C_PW' if xc == 'LDA' else xc)
         rho = self.el.electron_density(self.el.rgrid)
@@ -280,6 +283,8 @@ class Onsite1cUTable:
         out = xc.compute_vxc(rho, sigma=sigma, fxc=True)
 
         U = np.zeros(NUML_1CK)
+        radmom = np.zeros(NUML_1CK)
+
         Rnl = np.copy(self.el.Rnlg[nl])
         dens_nl = Rnl**2
 
@@ -308,7 +313,10 @@ class Onsite1cUTable:
             integrand = vhar * dens_nl * self.el.rgrid**2
             U[l] += self.el.grid.integrate(integrand, use_dV=False)
 
-        return U
+            radmom[l] = self.el.grid.integrate(dens_nl * self.el.rgrid**(l+2),
+                                               use_dV=False)
+
+        return (U, radmom)
 
     def write(self):
         """
@@ -322,7 +330,7 @@ class Onsite1cUTable:
         print('Writing to %s' % filename, file=self.txt, flush=True)
 
         with open(filename, 'w') as f:
-            write_1ck(f, self.table)
+            write_1ck(f, self.radmom, self.table)
         return
 
 

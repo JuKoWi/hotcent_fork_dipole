@@ -43,7 +43,7 @@ def select_orbitals(el):
     return selected
 
 
-def write_1ck(handle, row):
+def write_1ck(handle, radmom, kernels):
     """
     Writes a parameter file in '1ck' format.
 
@@ -51,14 +51,18 @@ def write_1ck(handle, row):
     ----------
     handle : file handle
         Handle of an open file.
-    row : nd.ndarray
+    radmom : nd.ndarray
+        One-dimensional array of (NUML_1CK,) shape
+    kernels : nd.ndarray
         One-dimensional array of (NUML_1CK,) shape
     """
-    assert np.shape(row) == (NUML_1CK,)
+    assert np.shape(radmom) == (NUML_1CK,)
+    assert np.shape(kernels) == (NUML_1CK,)
 
-    for item in row:
-        handle.write('0 ' if abs(item) < 1e-16 else '%1.12e ' % item)
-    handle.write('\n')
+    for row in [radmom, kernels]:
+        for item in row:
+            handle.write('0 ' if abs(item) < 1e-16 else '%1.12e ' % item)
+        handle.write('\n')
     return
 
 
