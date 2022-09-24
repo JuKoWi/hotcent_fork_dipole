@@ -20,7 +20,39 @@ from hotcent.slako import (get_integral_pair, get_twocenter_phi_integral,
 from hotcent.xc import LibXC
 
 
-class Onsite2cGammaTable(MultiAtomIntegrator):
+class Onsite2cUTable:
+    """
+    Convenience wrapper around the Onsite2cUMonopoleTable
+    and Onsite2cUMultipoleTable classes.
+
+    Parameters
+    ----------
+    use_multipoles : bool
+        Whether to consider a multipole expansion of the difference
+        density (rather than a monopole approximation).
+    """
+    def __init__(self, *args, use_multipoles=None, **kwargs):
+        msg = '"use_multipoles" is required and must be either True or False'
+        assert use_multipoles is not None, msg
+
+        if use_multipoles:
+            self.calc = Onsite2cUMultipoleTable(*args, **kwargs)
+        else:
+            self.calc = Onsite2cUMonopoleTable(*args, **kwargs)
+
+    def __getattr__(self, attr):
+        return getattr(self.calc, attr)
+
+    def run(self, *args, **kwargs):
+        self.calc.run(*args, **kwargs)
+        return
+
+    def write(self, *args, **kwargs):
+        self.calc.write(*args, **kwargs)
+        return
+
+
+class Onsite2cUMonopoleTable(MultiAtomIntegrator):
     def __init__(self, *args, **kwargs):
         MultiAtomIntegrator.__init__(self, *args, grid_type='monopolar',
                                      **kwargs)
@@ -28,8 +60,9 @@ class Onsite2cGammaTable(MultiAtomIntegrator):
     def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
             xc='LDA', smoothen_tails=True):
         """
-        Calculates on-site, distance dependent "Gamma" values as matrix
-        elements of the two-center-expanded XC kernel.
+        Calculates on-site, distance dependent U (or "Gamma") values
+        as matrix elements of the two-center-expanded XC kernel
+        in the monopole approximation.
 
         Parameters
         ----------
@@ -37,7 +70,7 @@ class Onsite2cGammaTable(MultiAtomIntegrator):
         """
         print('\n\n', file=self.txt)
         print('***********************************************', file=self.txt)
-        print('Onsite-Gamma table construction for %s and %s' % \
+        print('Monopole onsite-U table construction for %s and %s' % \
               (self.ela.get_symbol(), self.elb.get_symbol()), file=self.txt)
         print('***********************************************', file=self.txt)
         self.txt.flush()
@@ -47,7 +80,7 @@ class Onsite2cGammaTable(MultiAtomIntegrator):
         assert np.isclose(rmin / dr, np.round(rmin / dr)), \
                'rmin must be a multiple of dr'
 
-        self.timer.start('run_onsiteG')
+        self.timer.start('run_onsiteU')
         wf_range = self.get_range(wflimit)
         grid, area = self.make_grid(wf_range, nt=ntheta, nr=nr)
 
@@ -69,7 +102,7 @@ class Onsite2cGammaTable(MultiAtomIntegrator):
                 print('R=%8.2f, %i grid points ...' % (R, len(grid)),
                       file=self.txt, flush=True)
 
-            G = self.calculate(selected, e1, e2, R, grid, area, xc=xc)
+            U = self.calculate(selected, e1, e2, R, grid, area, xc=xc)
 
             for key in selected:
                 nl1a, nl1b = key
@@ -77,7 +110,7 @@ class Onsite2cGammaTable(MultiAtomIntegrator):
                 bas1b = e1.get_basis_set_index(nl1b)
                 index = ANGULAR_MOMENTUM[nl1a[1]] * 4
                 index += ANGULAR_MOMENTUM[nl1b[1]]
-                self.tables[(bas1a, bas1b)][i, index] = G[key]
+                self.tables[(bas1a, bas1b)][i, index] = U[key]
 
         if smoothen_tails:
             # Smooth the curves near the cutoff
@@ -86,7 +119,7 @@ class Onsite2cGammaTable(MultiAtomIntegrator):
                     self.tables[key][:, i] = \
                             tail_smoothening(self.Rgrid, self.tables[key][:, i])
 
-        self.timer.stop('run_onsiteG')
+        self.timer.stop('run_onsiteU')
 
     def calculate(self, selected, e1, e2, R, grid, area, xc='LDA'):
         """
@@ -98,11 +131,11 @@ class Onsite2cGammaTable(MultiAtomIntegrator):
 
         Returns
         -------
-        G: dict
+        U : dict
             Dictionary containing the integral for each selected
             subshell pair.
         """
-        self.timer.start('calculate_onsiteG')
+        self.timer.start('calculate_onsiteU')
 
         # common for all integrals (not subshell-dependent parts)
         self.timer.start('prelude')
@@ -143,7 +176,7 @@ class Onsite2cGammaTable(MultiAtomIntegrator):
         out12 = xc.compute_vxc(rho12, sigma=sigma12, fxc=True)
         self.timer.stop('fxc')
 
-        G = {}
+        U = {}
         for key in selected:
             nl1a, nl1b = key
             dens_nl1a = e1.Rnl(r1, nl1a)**2 / (4 * np.pi)
@@ -182,16 +215,16 @@ class Onsite2cGammaTable(MultiAtomIntegrator):
                              * grad_nl1a_grad_rho1 * grad_nl1b_grad_rho1
                 integrand -= 2. * out1['vsigma'] * grad_nl1a_grad_nl1b
 
-            G[key] = np.sum(integrand * aux)
+            U[key] = np.sum(integrand * aux)
 
-        self.timer.stop('calculate_onsiteG')
-        return G
+        self.timer.stop('calculate_onsiteU')
+        return U
 
     def write(self):
         """
         Writes all integral tables to file.
 
-        The filename template corresponds to '<el1>-<el1>_onsiteG_<el2>.2cl'.
+        The filename template corresponds to '<el1>-<el1>_onsiteU_<el2>.2cl'.
         """
         sym1, sym2 = self.ela.get_symbol(), self.elb.get_symbol()
 
@@ -201,7 +234,7 @@ class Onsite2cGammaTable(MultiAtomIntegrator):
             for bas1b, valence1b in enumerate(self.ela.basis_sets):
                 angmom1b = [ANGULAR_MOMENTUM[nl[1]] for nl in valence1b]
 
-                template = '%s-%s_onsiteG_%s.2cl'
+                template = '%s-%s_onsiteU_%s.2cl'
                 filename = template % (sym1 + '+'*bas1a, sym1 + '+'*bas1b, sym2)
                 print('Writing to %s' % filename, file=self.txt, flush=True)
 
@@ -242,8 +275,8 @@ class Onsite1cUTable:
         """
         print('\n\n', file=self.txt)
         print('***********************************************', file=self.txt)
-        print('Onsite-U table construction for %s' % self.el.get_symbol(),
-              file=self.txt)
+        print('Multipole onsite-U table construction for %s' % \
+              self.el.get_symbol(), file=self.txt)
         print('***********************************************', file=self.txt)
 
         if nl is None:
@@ -364,7 +397,7 @@ class Onsite1cMTable:
         """
         print('\n\n', file=self.txt)
         print('***********************************************', file=self.txt)
-        print('Onsite-M table construction for %s' % \
+        print('Multipole onsite-M table construction for %s' % \
               self.el.get_symbol(), file=self.txt)
         print('***********************************************', file=self.txt)
 
@@ -433,7 +466,7 @@ class Onsite1cMTable:
         return
 
 
-class Onsite2cUTable(MultiAtomIntegrator):
+class Onsite2cUMultipoleTable(MultiAtomIntegrator):
     def __init__(self, *args, **kwargs):
         MultiAtomIntegrator.__init__(self, *args, grid_type='monopolar',
                                      **kwargs)
@@ -442,7 +475,8 @@ class Onsite2cUTable(MultiAtomIntegrator):
             wflimit=1e-7, xc='LDA', smoothen_tails=True):
         """
         Calculates on-site, orbital- and distance-dependent "U" values
-        as matrix elements of the two-center-expanded XC kernel.
+        as matrix elements of the two-center-expanded XC kernel
+        in a multipole expansion.
 
         Parameters
         ----------
@@ -457,7 +491,7 @@ class Onsite2cUTable(MultiAtomIntegrator):
         """
         print('\n\n', file=self.txt)
         print('***********************************************', file=self.txt)
-        print('Onsite-U table construction for %s and %s' % \
+        print('Multipole onsite-U table construction for %s and %s' % \
               (self.ela.get_symbol(), self.elb.get_symbol()), file=self.txt)
         print('***********************************************', file=self.txt)
         self.txt.flush()

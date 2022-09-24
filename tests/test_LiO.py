@@ -212,7 +212,7 @@ def test_on2cU(R, atoms):
     xc = atom_O.xcname
     rmin, dr, N = R, R, 2
 
-    chgon2c = Onsite2cUTable(atom_O, atom_Li)
+    chgon2c = Onsite2cUTable(atom_O, atom_Li, use_multipoles=True)
     chgon2c.run(nl='2s', rmin=rmin, dr=dr, N=N, xc=xc, ntheta=300, nr=100,
                 smoothen_tails=False)
     U = chgon2c.tables
@@ -274,7 +274,7 @@ def test_off2cU(R, atoms):
     xc = atom_O.xcname
     rmin, dr, N = R, R, 2
 
-    chgoff2c = Offsite2cUTable(atom_O, atom_Li)
+    chgoff2c = Offsite2cUTable(atom_O, atom_Li, use_multipoles=True)
     chgoff2c.run(nl=('2s', '2s'), rmin=rmin, dr=dr, N=N, xc=xc, ntheta=300,
                  nr=100, smoothen_tails=False)
     U = chgoff2c.tables

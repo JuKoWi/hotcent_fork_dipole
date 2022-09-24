@@ -390,8 +390,8 @@ def test_on2c(R, atom):
 @pytest.mark.parametrize('atom', [DZP_LDA, DZP_PBE], indirect=True)
 def test_chg2c(R, atom):
     # Regression test
-    from hotcent.offsite_chargetransfer import Offsite2cGammaTable
-    from hotcent.onsite_chargetransfer import Onsite2cGammaTable
+    from hotcent.offsite_chargetransfer import Offsite2cUTable
+    from hotcent.onsite_chargetransfer import Onsite2cUTable
 
     xc = atom.xcname
     size = atom.basis_size
@@ -400,7 +400,7 @@ def test_chg2c(R, atom):
     tol = 1e-9
     msg = 'Too large error for {0}_{1}-{2} [{3}] (value={4})'
 
-    chg2c = Offsite2cGammaTable(atom, atom)
+    chg2c = Offsite2cUTable(atom, atom, use_multipoles=False)
     chg2c.run(rmin=rmin, dr=dr, N=N, xc=xc, smoothen_tails=False,
               shift=False, ntheta=300, nr=100)
     G = chg2c.tables
@@ -452,7 +452,7 @@ def test_chg2c(R, atom):
             diff = abs(item - item_ref)
             assert diff < tol, msg.format('Goff2c', key, val[0, i], i, item)
 
-    chg2c = Onsite2cGammaTable(atom, atom)
+    chg2c = Onsite2cUTable(atom, atom, use_multipoles=False)
     chg2c.run(rmin=rmin, dr=dr, N=N, xc=xc, smoothen_tails=False,
               ntheta=300, nr=100)
     G = chg2c.tables

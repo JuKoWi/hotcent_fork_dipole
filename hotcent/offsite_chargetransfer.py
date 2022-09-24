@@ -20,15 +20,48 @@ from hotcent.slako import (get_integral_pair, get_twocenter_phi_integral,
 from hotcent.xc import LibXC
 
 
-class Offsite2cGammaTable(MultiAtomIntegrator):
+class Offsite2cUTable:
+    """
+    Convenience wrapper around the Offsite2cUMonopoleTable
+    and Offsite2cUMultipoleTable classes.
+
+    Parameters
+    ----------
+    use_multipoles : bool
+        Whether to consider a multipole expansion of the difference
+        density (rather than a monopole approximation).
+    """
+    def __init__(self, *args, use_multipoles=None, **kwargs):
+        msg = '"use_multipoles" is required and must be either True or False'
+        assert use_multipoles is not None, msg
+
+        if use_multipoles:
+            self.calc = Offsite2cUMultipoleTable(*args, **kwargs)
+        else:
+            self.calc = Offsite2cUMonopoleTable(*args, **kwargs)
+
+    def __getattr__(self, attr):
+        return getattr(self.calc, attr)
+
+    def run(self, *args, **kwargs):
+        self.calc.run(*args, **kwargs)
+        return
+
+    def write(self, *args, **kwargs):
+        self.calc.write(*args, **kwargs)
+        return
+
+
+class Offsite2cUMonopoleTable(MultiAtomIntegrator):
     def __init__(self, *args, **kwargs):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
 
     def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
             xc='LDA', smoothen_tails=True, shift=False):
         """
-        Calculates off-site, distance dependent "Gamma" values as matrix
-        elements of the two-center-expanded Hartree-XC kernel.
+        Calculates off-site, distance dependent U (or "Gamma") values
+        as matrix elements of the two-center-expanded Hartree-XC kernel
+        in the monopole approximation.
 
         Parameters
         ----------
@@ -36,7 +69,7 @@ class Offsite2cGammaTable(MultiAtomIntegrator):
         """
         print('\n\n', file=self.txt)
         print('***********************************************', file=self.txt)
-        print('Offsite-Gamma table construction for %s and %s' % \
+        print('Monopole offsite-U table construction for %s and %s' % \
               (self.ela.get_symbol(), self.elb.get_symbol()), file=self.txt)
         print('***********************************************', file=self.txt)
         self.txt.flush()
@@ -46,7 +79,7 @@ class Offsite2cGammaTable(MultiAtomIntegrator):
         assert np.isclose(rmin / dr, np.round(rmin / dr)), \
                'rmin must be a multiple of dr'
 
-        self.timer.start('run_offsiteG')
+        self.timer.start('run_offsiteU')
         wf_range = self.get_range(wflimit)
         self.Rgrid = rmin + dr * np.arange(N)
         self.tables = {}
@@ -77,10 +110,10 @@ class Offsite2cGammaTable(MultiAtomIntegrator):
                         selected = select_subshells(e1, e2)
 
                         if term == 'hartree':
-                            G = self.calculate_hartree(selected, e1, e2, R,
+                            U = self.calculate_hartree(selected, e1, e2, R,
                                                        grid, area)
                         else:
-                            G = self.calculate_xc(selected, e1, e2, R, grid,
+                            U = self.calculate_xc(selected, e1, e2, R, grid,
                                                   area, xc=xc)
 
                         for key in selected:
@@ -89,7 +122,7 @@ class Offsite2cGammaTable(MultiAtomIntegrator):
                             bas2 = e2.get_basis_set_index(nl2)
                             index = ANGULAR_MOMENTUM[nl1[1]] * 4
                             index += ANGULAR_MOMENTUM[nl2[1]]
-                            self.tables[(p, bas1, bas2)][i, index] += G[key]
+                            self.tables[(p, bas1, bas2)][i, index] += U[key]
 
         for key in self.tables:
             for i in range(NUMINT_2CL):
@@ -104,7 +137,7 @@ class Offsite2cGammaTable(MultiAtomIntegrator):
                         self.tables[key][:, i] = \
                             tail_smoothening(self.Rgrid, self.tables[key][:, i])
 
-        self.timer.stop('run_offsiteG')
+        self.timer.stop('run_offsiteU')
 
     def calculate_xc(self, selected, e1, e2, R, grid, area, xc='LDA'):
         """
@@ -116,11 +149,11 @@ class Offsite2cGammaTable(MultiAtomIntegrator):
 
         Returns
         -------
-        G: dict
+        U : dict
             Dictionary containing the integral for each selected
             subshell pair.
         """
-        self.timer.start('calculate_offsiteG_xc')
+        self.timer.start('calculate_offsiteU_xc')
 
         # common for all integrals (not subshell-dependent parts)
         self.timer.start('prelude')
@@ -153,7 +186,7 @@ class Offsite2cGammaTable(MultiAtomIntegrator):
         out = xc.compute_vxc(rho, sigma=sigma, fxc=True)
         self.timer.stop('fxc')
 
-        G = {}
+        U = {}
         for key in selected:
             nl1, nl2 = key
             dens_nl1 = e1.Rnl(r1, nl1)**2 / (4 * np.pi)
@@ -177,10 +210,10 @@ class Offsite2cGammaTable(MultiAtomIntegrator):
                              * grad_nl1_grad_rho * grad_nl2_grad_rho
                 integrand += 2. * out['vsigma'] * grad_nl1_grad_nl2
 
-            G[key] = np.sum(integrand * aux)
+            U[key] = np.sum(integrand * aux)
 
-        self.timer.stop('calculate_offsiteG_xc')
-        return G
+        self.timer.stop('calculate_offsiteU_xc')
+        return U
 
     def calculate_hartree(self, selected, e1, e2, R, grid, area):
         """
@@ -192,11 +225,11 @@ class Offsite2cGammaTable(MultiAtomIntegrator):
 
         Returns
         -------
-        G: dict
+        U : dict
             Dictionary containing the integral for each selected
             subshell pair.
         """
-        self.timer.start('calculate_offsiteG_hartree')
+        self.timer.start('calculate_offsiteU_hartree')
 
         # common for all integrals (not subshell-dependent parts)
         self.timer.start('prelude')
@@ -207,7 +240,7 @@ class Offsite2cGammaTable(MultiAtomIntegrator):
         aux = 2 * np.pi * area * x
         self.timer.stop('prelude')
 
-        G = {}
+        U = {}
         for key in selected:
             nl1, nl2 = key
             dens_nl1 = e1.Rnl(r1, nl1)**2 / (4 * np.pi)
@@ -216,16 +249,16 @@ class Offsite2cGammaTable(MultiAtomIntegrator):
             vhar2 = e2.calculate_hartree_potential(dens_nl2, nel=1.)
             spl = CubicSplineFunction(e2.rgrid, vhar2)
 
-            G[key] = np.sum(dens_nl1 * spl(r2) * aux) - 1./R
+            U[key] = np.sum(dens_nl1 * spl(r2) * aux) - 1./R
 
-        self.timer.stop('calculate_offsiteG_hartree')
-        return G
+        self.timer.stop('calculate_offsiteU_hartree')
+        return U
 
     def write(self):
         """
         Writes all integral tables to file.
 
-        The filename template corresponds to '<el1>-<el2>_offsiteG.2cl'.
+        The filename template corresponds to '<el1>-<el2>_offsiteU.2cl'.
         """
         for p, (e1, e2) in enumerate(self.pairs):
             sym1, sym2 = e1.get_symbol(), e2.get_symbol()
@@ -236,7 +269,7 @@ class Offsite2cGammaTable(MultiAtomIntegrator):
                 for bas2, valence2 in enumerate(e2.basis_sets):
                     angmom2 = [ANGULAR_MOMENTUM[nl[1]] for nl in valence2]
 
-                    template = '%s-%s_offsiteG.2cl'
+                    template = '%s-%s_offsiteU.2cl'
                     filename = template % (sym1 + '+'*bas1, sym2  + '+'*bas2)
                     print('Writing to %s' % filename, file=self.txt, flush=True)
 
@@ -246,7 +279,7 @@ class Offsite2cGammaTable(MultiAtomIntegrator):
         return
 
 
-class Offsite2cUTable(MultiAtomIntegrator):
+class Offsite2cUMultipoleTable(MultiAtomIntegrator):
     def __init__(self, *args, **kwargs):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
 
@@ -255,7 +288,8 @@ class Offsite2cUTable(MultiAtomIntegrator):
             subtract_delta=True):
         """
         Calculates off-site, orbital- and distance-dependent "U" values
-        as matrix elements of the two-center-expanded Hartree-XC kernel.
+        as matrix elements of the two-center-expanded Hartree-XC kernel
+        in a multipole expansion.
 
         Parameters
         ----------
@@ -275,7 +309,7 @@ class Offsite2cUTable(MultiAtomIntegrator):
         """
         print('\n\n', file=self.txt)
         print('***********************************************', file=self.txt)
-        print('Offsite-U table construction for %s and %s' % \
+        print('Multipole offsite-U table construction for %s and %s' % \
               (self.ela.get_symbol(), self.elb.get_symbol()), file=self.txt)
         print('***********************************************', file=self.txt)
         self.txt.flush()
@@ -717,7 +751,7 @@ class Offsite2cMTable(MultiAtomIntegrator):
         """
         print('\n\n', file=self.txt)
         print('***********************************************', file=self.txt)
-        print('Offsite-M table construction for %s and %s' % \
+        print('Multipole offsite-M table construction for %s and %s' % \
               (self.ela.get_symbol(), self.elb.get_symbol()), file=self.txt)
         print('***********************************************', file=self.txt)
         self.txt.flush()
