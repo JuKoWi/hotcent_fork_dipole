@@ -1595,17 +1595,25 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
         return (Kxcab1c, Kxcab2c)
 
     def calculate_onsite_xc_kernel_gga(self, spin):
-        if spin:
-            raise NotImplementedError
-
         assert self.nlA == self.nlB, (self.nlA, self.nlB)
 
         def kxc_on1c(x, y, z):
             dx, dy, dz = x - self.xA, y - self.yA, z - self.zA
             rA = np.sqrt(dx**2 + dy**2 + dz**2)
             rho = self.elA.electron_density(rA)
+            drhodr = self.elA.electron_density(rA, der=1)
             drho = self.get_rho_deriv1(x, y, z, [self.iA])
-            out = self.xc.compute_vxc(rho, fxc=True, **drho)
+
+            if spin:
+                rho /= 2
+                drhodr /= 2
+                drho = dict(sigma_up=drho['sigma'] / 4,
+                            sigma_updown=drho['sigma'] / 4,
+                            sigma_down=drho['sigma'] / 4)
+                out = self.xc_polarized.compute_vxc_polarized(rho, rho,
+                                                              fxc=True, **drho)
+            else:
+                out = self.xc.compute_vxc(rho, fxc=True, **drho)
 
             mA = self.multipoleA(x, y, z)
             mB = self.multipoleB(x, y, z)
@@ -1615,7 +1623,6 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
             dmBdr = 2 * self.elB.Rnl(rA, self.nlB) \
                     * self.elB.Rnl(rA, self.nlB, der=1) \
                     * sph_cartesian(dx, dy, dz, rA, self.lmB)
-            drhodr = self.elA.electron_density(rA, der=1)
             grad_mA_grad_rho = dmAdr * drhodr
             grad_mB_grad_rho = dmBdr * drhodr
 
@@ -1630,23 +1637,46 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
                 dmBdx = dmBdr * drdx[i] + Rnl2 * dYlmB
                 grad_mA_grad_mB += dmAdx * dmBdx
 
-            k = out['v2rho2'] * mA * mB
-            k += 2 * out['v2rhosigma'] * grad_mA_grad_rho * mB
-            k += 2 * out['v2rhosigma'] * mA * grad_mB_grad_rho
-            k += 4 * out['v2sigma2'] * grad_mA_grad_rho * grad_mB_grad_rho
-            k += 2 * out['vsigma'] * grad_mA_grad_mB
+            if spin:
+                k = (out['v2rho2_up'] - out['v2rho2_updown']) * mA * mB
+                k += 2 * (out['v2rhosigma_up_up'] - out['v2rhosigma_up_down']) \
+                     * grad_mA_grad_rho * mB
+                k += 2 * (out['v2rhosigma_up_up'] - out['v2rhosigma_up_down']) \
+                     * mA * grad_mB_grad_rho
+                k += 4 * (out['v2sigma2_up_up'] - out['v2sigma2_up_down']) \
+                     * grad_mA_grad_rho * grad_mB_grad_rho
+                k += 2 * (out['v2sigma2_up_updown'] - out['v2sigma2_updown_down']) \
+                     * grad_mA_grad_rho * grad_mB_grad_rho
+                k += (2 * out['vsigma_up'] - out['vsigma_updown']) \
+                     * grad_mA_grad_mB
+                k /= 2
+            else:
+                k = out['v2rho2'] * mA * mB
+                k += 2 * out['v2rhosigma'] * grad_mA_grad_rho * mB
+                k += 2 * out['v2rhosigma'] * mA * grad_mB_grad_rho
+                k += 4 * out['v2sigma2'] * grad_mA_grad_rho * grad_mB_grad_rho
+                k += 2 * out['vsigma'] * grad_mA_grad_mB
             return k
 
         def kxc_on2c(x, y, z):
             dxA, dyA, dzA = x - self.xA, y - self.yA, z - self.zA
             rA = np.sqrt(dxA**2 + dyA**2 + dzA**2)
             drAdx = [dxA/rA, dyA/rA, dzA/rA]
-            rhoA = self.elA.electron_density(rA)
 
-            drho = self.get_rho_deriv1(x, y, z, [self.iA])
-            outA = self.xc.compute_vxc(rhoA, fxc=True, **drho)
+            rhoA = self.elA.electron_density(rA)
             drhoAdrA = self.elA.electron_density(rA, der=1)
-            Rnl2 = self.elA.Rnl(rA, self.nlA)**2
+            drho = self.get_rho_deriv1(x, y, z, [self.iA])
+
+            if spin:
+                rhoA /= 2
+                drhoAdrA /= 2
+                drho = dict(sigma_up=drho['sigma'] / 4,
+                            sigma_updown=drho['sigma'] / 4,
+                            sigma_down=drho['sigma'] / 4)
+                outA = self.xc_polarized.compute_vxc_polarized(rhoA, rhoA,
+                                                               fxc=True, **drho)
+            else:
+                outA = self.xc.compute_vxc(rhoA, fxc=True, **drho)
 
             mA = self.multipoleA(x, y, z)
             mB = self.multipoleB(x, y, z)
@@ -1661,6 +1691,7 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
             grad_mA_grad_mB = 0.
             grad_mA_grad_rho = 0.
             grad_mB_grad_rho = 0.
+            Rnl2 = self.elA.Rnl(rA, self.nlA)**2
             for i in range(3):
                 der = 'xyz'[i]
                 dYlmA = sph_cartesian_der(dxA, dyA, dzA, rA, self.lmA, der=der)
@@ -1674,12 +1705,25 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
                 grad_mA_grad_rho += dmAdx * drhodx
                 grad_mB_grad_rho += dmBdx * drhodx
 
-            kA = 0.
-            kA += outA['v2rho2'] * mA * mB
-            kA += 2 * outA['v2rhosigma'] * grad_mA_grad_rho * mB
-            kA += 2 * outA['v2rhosigma'] * mA * grad_mB_grad_rho
-            kA += 4 * outA['v2sigma2'] * grad_mA_grad_rho * grad_mB_grad_rho
-            kA += 2 * outA['vsigma'] * grad_mA_grad_mB
+            if spin:
+                kA = (outA['v2rho2_up'] - outA['v2rho2_updown']) * mA * mB
+                kA += 2 * (outA['v2rhosigma_up_up'] - outA['v2rhosigma_up_down']) \
+                      * grad_mA_grad_rho * mB
+                kA += 2 * (outA['v2rhosigma_up_up'] - outA['v2rhosigma_up_down']) \
+                      * mA * grad_mB_grad_rho
+                kA += 4 * (outA['v2sigma2_up_up'] - outA['v2sigma2_up_down']) \
+                      * grad_mA_grad_rho * grad_mB_grad_rho
+                kA += 2 * (outA['v2sigma2_up_updown'] - outA['v2sigma2_updown_down']) \
+                      * grad_mA_grad_rho * grad_mB_grad_rho
+                kA += (2 * outA['vsigma_up'] - outA['vsigma_updown']) \
+                      * grad_mA_grad_mB
+                kA /= 2
+            else:
+                kA = outA['v2rho2'] * mA * mB
+                kA += 2 * outA['v2rhosigma'] * grad_mA_grad_rho * mB
+                kA += 2 * outA['v2rhosigma'] * mA * grad_mB_grad_rho
+                kA += 4 * outA['v2sigma2'] * grad_mA_grad_rho * grad_mB_grad_rho
+                kA += 2 * outA['vsigma'] * grad_mA_grad_mB
 
             k = 0.
             for iC in list(range(len(self.atoms_ase))):
@@ -1689,11 +1733,21 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
                 dxC, dyC, dzC = x - xC, y - yC, z - zC
                 rC = np.sqrt(dxC**2 + dyC**2 + dzC**2)
                 drCdx = [dxC/rC, dyC/rC, dzC/rC]
-                rhoC = self.elements[symC].electron_density(rC)
 
-                drho = self.get_rho_deriv1(x, y, z, [self.iA, iC])
-                outAC = self.xc.compute_vxc(rhoA+rhoC, fxc=True, **drho)
+                rhoC = self.elements[symC].electron_density(rC)
                 drhoCdrC = self.elements[symC].electron_density(rC, der=1)
+                drho = self.get_rho_deriv1(x, y, z, [self.iA, iC])
+
+                if spin:
+                    rhoC /= 2
+                    drhoCdrC /= 2
+                    drho = dict(sigma_up=drho['sigma'] / 4,
+                                sigma_updown=drho['sigma'] / 4,
+                                sigma_down=drho['sigma'] / 4)
+                    outAC = self.xc_polarized.compute_vxc_polarized(rhoA+rhoC,
+                                                rhoA+rhoC, fxc=True, **drho)
+                else:
+                    outAC = self.xc.compute_vxc(rhoA+rhoC, fxc=True, **drho)
 
                 grad_mA_grad_rho = 0.
                 grad_mB_grad_rho = 0.
@@ -1704,12 +1758,28 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
                     grad_mA_grad_rho += dmAdx * drhodx
                     grad_mB_grad_rho += dmBdx * drhodx
 
-                k += outAC['v2rho2'] * mA * mB
-                k += 2 * outAC['v2rhosigma'] * grad_mA_grad_rho * mB
-                k += 2 * outAC['v2rhosigma'] * mA * grad_mB_grad_rho
-                k += 4 * outAC['v2sigma2'] * grad_mA_grad_rho * grad_mB_grad_rho
-                k += 2 * outAC['vsigma'] * grad_mA_grad_mB
-                k -= kA
+                if spin:
+                    kAC = (outAC['v2rho2_up'] - outAC['v2rho2_updown']) * mA * mB
+                    kAC += 2 * (outAC['v2rhosigma_up_up'] - outAC['v2rhosigma_up_down']) \
+                            * grad_mA_grad_rho * mB
+                    kAC += 2 * (outAC['v2rhosigma_up_up'] - outAC['v2rhosigma_up_down']) \
+                            * mA * grad_mB_grad_rho
+                    kAC += 4 * (outAC['v2sigma2_up_up'] - outAC['v2sigma2_up_down']) \
+                            * grad_mA_grad_rho * grad_mB_grad_rho
+                    kAC += 2 * (outAC['v2sigma2_up_updown'] - outAC['v2sigma2_updown_down']) \
+                            * grad_mA_grad_rho * grad_mB_grad_rho
+                    kAC += (2 * outAC['vsigma_up'] - outAC['vsigma_updown']) \
+                            * grad_mA_grad_mB
+                    kAC /= 2
+                else:
+                    kAC = outAC['v2rho2'] * mA * mB
+                    kAC += 2 * outAC['v2rhosigma'] * grad_mA_grad_rho * mB
+                    kAC += 2 * outAC['v2rhosigma'] * mA * grad_mB_grad_rho
+                    kAC += 4 * outAC['v2sigma2'] * grad_mA_grad_rho \
+                         * grad_mB_grad_rho
+                    kAC += 2 * outAC['vsigma'] * grad_mA_grad_mB
+
+                k += kAC - kA
             return k
 
         atoms_1c = [self.atoms_becke[self.iA]]
@@ -1739,9 +1809,6 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
         return Kxcab2c
 
     def calculate_offsite_xc_kernel_gga(self, spin):
-        if spin:
-            raise NotImplementedError
-
         def kxc_off2c(x, y, z):
             dxA, dyA, dzA = x - self.xA, y - self.yA, z - self.zA
             dxB, dyB, dzB = x - self.xB, y - self.yB, z - self.zB
@@ -1749,16 +1816,28 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
             rB = np.sqrt(dxB**2 + dyB**2 + dzB**2)
             drAdx = [dxA/rA, dyA/rA, dzA/rA]
             drBdx = [dxB/rB, dyB/rB, dzB/rB]
+
             rhoA = self.elA.electron_density(rA)
             rhoB = self.elB.electron_density(rB)
-
-            drho = self.get_rho_deriv1(x, y, z, [self.iA, self.iB])
-            outAB = self.xc.compute_vxc(rhoA+rhoB, fxc=True, **drho)
             drhoAdrA = self.elA.electron_density(rA, der=1)
             drhoBdrB = self.elB.electron_density(rB, der=1)
+            drho = self.get_rho_deriv1(x, y, z, [self.iA, self.iB])
+
+            if spin:
+                rhoA /= 2
+                rhoB /= 2
+                drhoAdrA /= 2
+                drhoBdrB /= 2
+                drho = dict(sigma_up=drho['sigma'] / 4,
+                            sigma_updown=drho['sigma'] / 4,
+                            sigma_down=drho['sigma'] / 4)
+                outAB = self.xc_polarized.compute_vxc_polarized(rhoA+rhoB,
+                                            rhoA+rhoB, fxc=True, **drho)
+            else:
+                outAB = self.xc.compute_vxc(rhoA+rhoB, fxc=True, **drho)
+
             RnlA2 = self.elA.Rnl(rA, self.nlA)**2
             RnlB2 = self.elB.Rnl(rB, self.nlB)**2
-
             mA = self.multipoleA(x, y, z)
             mB = self.multipoleB(x, y, z)
             dmAdr = 2 * self.elA.Rnl(rA, self.nlA) \
@@ -1782,11 +1861,25 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
                 grad_mA_grad_rho += dmAdx * drhodx
                 grad_mB_grad_rho += dmBdx * drhodx
 
-            k = outAB['v2rho2'] * mA * mB
-            k += 2 * outAB['v2rhosigma'] * grad_mA_grad_rho * mB
-            k += 2 * outAB['v2rhosigma'] * mA * grad_mB_grad_rho
-            k += 4 * outAB['v2sigma2'] * grad_mA_grad_rho * grad_mB_grad_rho
-            k += 2 * outAB['vsigma'] * grad_mA_grad_mB
+            if spin:
+                k = (outAB['v2rho2_up'] - outAB['v2rho2_updown']) * mA * mB
+                k += 2 * (outAB['v2rhosigma_up_up'] - outAB['v2rhosigma_up_down']) \
+                        * grad_mA_grad_rho * mB
+                k += 2 * (outAB['v2rhosigma_up_up'] - outAB['v2rhosigma_up_down']) \
+                        * mA * grad_mB_grad_rho
+                k += 4 * (outAB['v2sigma2_up_up'] - outAB['v2sigma2_up_down']) \
+                        * grad_mA_grad_rho * grad_mB_grad_rho
+                k += 2 * (outAB['v2sigma2_up_updown'] - outAB['v2sigma2_updown_down']) \
+                        * grad_mA_grad_rho * grad_mB_grad_rho
+                k += (2 * outAB['vsigma_up'] - outAB['vsigma_updown']) \
+                        * grad_mA_grad_mB
+                k /= 2
+            else:
+                k = outAB['v2rho2'] * mA * mB
+                k += 2 * outAB['v2rhosigma'] * grad_mA_grad_rho * mB
+                k += 2 * outAB['v2rhosigma'] * mA * grad_mB_grad_rho
+                k += 4 * outAB['v2sigma2'] * grad_mA_grad_rho * grad_mB_grad_rho
+                k += 2 * outAB['vsigma'] * grad_mA_grad_mB
             return k
 
         Kxcab2c = becke.integral(self.atoms_becke, kxc_off2c)

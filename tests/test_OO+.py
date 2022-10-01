@@ -519,7 +519,7 @@ def test_mag2c(R, atom):
     tol = 1e-9
     msg = 'Too large error for {0}_{1}-{2} [{3}] (value={4})'
 
-    mag2c = Offsite2cWTable(atom, atom)
+    mag2c = Offsite2cWTable(atom, atom, use_multipoles=False)
     mag2c.run(rmin=rmin, dr=dr, N=N, xc=xc, smoothen_tails=False,
               ntheta=300, nr=100)
     W = mag2c.tables
@@ -571,7 +571,7 @@ def test_mag2c(R, atom):
             diff = abs(item - item_ref)
             assert diff < tol, msg.format('Woff2c', key, val[0, i], i, item)
 
-    mag2c = Onsite2cWTable(atom, atom)
+    mag2c = Onsite2cWTable(atom, atom, use_multipoles=False)
     mag2c.run(rmin=rmin, dr=dr, N=N, xc=xc, smoothen_tails=False,
               ntheta=300, nr=100)
     W = mag2c.tables

@@ -58,6 +58,10 @@ Development version
     integrals associated with the SCC and spin polarization energies,
     respectively.
 
+* Added the possibility to calculate the needed (Hartree-)XC kernel
+  and moment integrals when the difference density is expanded in
+  spherical-harmonic multipoles (up to and including quadrupole moments).
+
 
 Version 1.0
 ===========

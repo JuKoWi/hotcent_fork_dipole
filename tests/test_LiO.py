@@ -117,6 +117,33 @@ def test_on1cU(atoms):
     return
 
 
+@pytest.mark.parametrize('atoms', [DZP_LDA, SZP_PBE], indirect=True)
+def test_on1cW(atoms):
+    from hotcent.onsite_magnetization import Onsite1cWTable
+
+    atom_Li, atom_O = atoms
+    size = atom_O.basis_size
+    xc = atom_O.xcname
+
+    magon1c = Onsite1cWTable(atom_O)
+    magon1c.run(nl='2s', xc=xc)
+    W = magon1c.table
+
+    W_ref = {
+        LDA: np.array([-0.40022678]*3),
+        PBE: np.array([-0.42228170, -0.54340035, -0.78563764]),
+    }
+
+    msg = 'Too large error for W_{0} (value={1})'
+    tol = 1e-4
+
+    for i, (val, ref) in enumerate(zip(W, W_ref[xc])):
+        W_diff = np.abs(val - ref)
+        assert W_diff < tol, msg.format(i, val)
+
+    return
+
+
 @pytest.mark.parametrize('atoms', [DZP_LDA], indirect=True)
 def test_on1cM(atoms):
     # Regression test
@@ -266,6 +293,68 @@ def test_on2cU(R, atoms):
 
 @pytest.mark.parametrize('R', [R1])
 @pytest.mark.parametrize('atoms', [DZP_LDA, SZP_PBE], indirect=True)
+def test_on2cW(R, atoms):
+    from hotcent.onsite_magnetization import Onsite2cWTable
+
+    atom_Li, atom_O = atoms
+    size = atom_O.basis_size
+    xc = atom_O.xcname
+    rmin, dr, N = R, R, 2
+
+    magon2c = Onsite2cWTable(atom_O, atom_Li, use_multipoles=True)
+    magon2c.run(nl='2s', rmin=rmin, dr=dr, N=N, xc=xc, ntheta=300, nr=100,
+                smoothen_tails=False)
+    W = magon2c.tables
+
+    W_ref = {
+        (R1, DZP, LDA): {
+            'sss': 0.00488524,
+            'sps': 0.00306412,
+            'sds': 0.00187013,
+            'pss': 0.00306412,
+            'pps': 0.00655794,
+            'ppp': 0.00404889,
+            'pds': 0.00408701,
+            'pdp': 0.00159612,
+            'dss': 0.00187013,
+            'dps': 0.00408701,
+            'dpp': 0.00159612,
+            'dds': 0.00714514,
+            'ddp': 0.00477255,
+            'ddd': 0.00386798,
+        },
+        (R1, SZP, PBE): {
+            'sss': 0.00569793,
+            'sps': 0.00233432,
+            'sds': 0.00038207,
+            'pss': 0.00233432,
+            'pps': 0.00713610,
+            'ppp': 0.00672668,
+            'pds': 0.00302457,
+            'pdp': 0.00172639,
+            'dss': 0.00038207,
+            'dps': 0.00302457,
+            'dpp': 0.00172639,
+            'dds': 0.01089620,
+            'ddp': 0.00854817,
+            'ddd': 0.00898777,
+        }
+    }
+
+    msg = 'Too large error for W_{0} (value={1})'
+    tol = 1e-6 if xc == 'LDA' else 1e-5
+
+    for integral, ref in W_ref[R, size, xc].items():
+        index = INTEGRALS_2CK.index(integral)
+        val = W[0, index]
+        W_diff = np.abs(val - ref)
+        assert W_diff < tol, msg.format(integral, val)
+
+    return
+
+
+@pytest.mark.parametrize('R', [R1])
+@pytest.mark.parametrize('atoms', [DZP_LDA, SZP_PBE], indirect=True)
 def test_off2cU(R, atoms):
     from hotcent.offsite_chargetransfer import Offsite2cUTable
 
@@ -371,6 +460,109 @@ def test_off2cU(R, atoms):
             U_diff = np.abs(val - ref)
             assert U_diff < tol, msg.format(integral, val)
 
+    return
+
+
+@pytest.mark.parametrize('R', [R1])
+@pytest.mark.parametrize('atoms', [DZP_LDA, SZP_PBE], indirect=True)
+def test_off2cW(R, atoms):
+    from hotcent.offsite_magnetization import Offsite2cWTable
+
+    atom_Li, atom_O = atoms
+    size = atom_O.basis_size
+    xc = atom_O.xcname
+    rmin, dr, N = R, R, 2
+
+    magoff2c = Offsite2cWTable(atom_O, atom_Li, use_multipoles=True)
+    magoff2c.run(nl=('2s', '2s'), rmin=rmin, dr=dr, N=N, xc=xc, ntheta=300,
+                 nr=100, smoothen_tails=False)
+    W = magoff2c.tables
+
+    W_ref = {
+        (R1, DZP, LDA): {
+            0: {
+            'sss': -0.03630386,
+            'sps': 0.05251373,
+            'sds': -0.04758354,
+            'pss': -0.01040472,
+            'pps': 0.01111905,
+            'ppp': -0.02166012,
+            'pds': -0.00252751,
+            'pdp': 0.03744352,
+            'dss': 0.00401262,
+            'dps': -0.00557701,
+            'dpp': -0.01133170,
+            'dds': 0.00283175,
+            'ddp': 0.01573443,
+            'ddd': -0.01354332,
+            },
+            1: {
+            'sss': -0.03630386,
+            'sps': 0.01040472,
+            'sds': 0.00401262,
+            'pss': -0.05251373,
+            'pps': 0.01111905,
+            'ppp': -0.02166012,
+            'pds': 0.00557701,
+            'pdp': 0.01133170,
+            'dss': -0.04758354,
+            'dps': 0.00252751,
+            'dpp': -0.03744352,
+            'dds': 0.00283175,
+            'ddp': 0.01573443,
+            'ddd': -0.01354332,
+            },
+        },
+        (R1, SZP, PBE): {
+            0: {
+            'sss': -0.04047031,
+            'sps': 0.05907080,
+            'sds': -0.05258252,
+            'pss': -0.01147600,
+            'pps': 0.01287661,
+            'ppp': -0.02679979,
+            'pds': -0.00240487,
+            'pdp': 0.04753129,
+            'dss': 0.00638664,
+            'dps': -0.00826532,
+            'dpp': -0.01467610,
+            'dds': 0.00393776,
+            'ddp': 0.02209740,
+            'ddd': -0.01966919,
+            },
+            1: {
+            'sss': -0.04047031,
+            'sps': 0.01147600,
+            'sds': 0.00638664,
+            'pss': -0.05907080,
+            'pps': 0.01287661,
+            'ppp': -0.02679979,
+            'pds': 0.00826532,
+            'pdp': 0.01467610,
+            'dss': -0.05258252,
+            'dps': 0.00240487,
+            'dpp': -0.04753129,
+            'dds': 0.00393776,
+            'ddp': 0.02209740,
+            'ddd': -0.01966919,
+            },
+        },
+    }
+
+    msg = 'Too large error for W_{0} (value={1})'
+    tol = 1e-4
+
+    for p, refs in W_ref[R, size, xc].items():
+        if p == 0:
+            sym1, sym2 = magoff2c.ela.get_symbol(), magoff2c.elb.get_symbol()
+        elif p == 1:
+            sym2, sym1 = magoff2c.ela.get_symbol(), magoff2c.elb.get_symbol()
+
+        for integral, ref in refs.items():
+            index = INTEGRALS_2CK.index(integral)
+            val = W[p][0, index]
+            W_diff = np.abs(val - ref)
+            assert W_diff < tol, msg.format(integral, val)
     return
 
 
