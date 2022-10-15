@@ -60,7 +60,9 @@ Development version
 
 * Added the possibility to calculate the needed (Hartree-)XC kernel
   and moment integrals when the difference density is expanded in
-  spherical-harmonic multipoles (up to and including quadrupole moments).
+  spherical-harmonic multipoles (up to and including quadrupole moments
+  and with as many radial functions as the 'zeta' count of the main
+  basis set).
 
 
 Version 1.0

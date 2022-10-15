@@ -8,7 +8,7 @@ import numpy as np
 from scipy import linalg
 import becke
 from ase.units import Bohr
-from hotcent.fluctuation_onecenter import select_radial_function
+from hotcent.fluctuation_onecenter import select_radial_functions
 from hotcent.fluctuation_twocenter import INTEGRALS_2CK
 from hotcent.kleinman_bylander import KleinmanBylanderPP
 from hotcent.orbitals import ANGULAR_MOMENTUM, ORBITAL_LABELS, ORBITALS
@@ -1331,11 +1331,13 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
         BeckeHarrisKernels.__init__(self, *args, **kwargs)
 
     def run_selected_kernels(self, atoms_ase, mode, spin=False, check_mc=True,
-                             lmax=2, subtract_delta=False):
+                             lmax=2, subtract_delta=False,
+                             subshell_dependence='none'):
         self.atoms_ase = atoms_ase
         self.atoms_becke = ase2becke(atoms_ase)
         assert mode in ['onsite', 'offsite']
         tol = 1e-3 if check_mc else None
+        assert subshell_dependence in ['none', 'zeta']
 
         N = len(atoms_ase)
         assert N in [1, 2]
@@ -1347,12 +1349,10 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
         symA = self.get_symbol(self.iA)
         self.elA = self.elements[symA]
         self.xA, self.yA, self.zA = self.get_position(self.iA)
-        self.nlA = self.elA.basis_sets[0][0]
 
         symB = self.get_symbol(self.iB)
         self.elB = self.elements[symB]
         self.xB, self.yB, self.zB = self.get_position(self.iB)
-        self.nlB = self.elB.basis_sets[0][0]
 
         # Find out which integrals need to be calculated
         pairs = []
@@ -1374,55 +1374,64 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
             labels = 'on2c' if is_onsite else 'off2c'
 
         # Evaluate the integrals
-        results = {}
-        for integral, (lmA, lmB) in pairs:
-            self.lmA = lmA
-            self.lmB = lmB
-            print('\nRunning iA %d iB %d lmA %s lmB %s %s' % \
-                  (self.iA, self.iB, lmA, lmB, spin), flush=True)
+        for ibasisA, valenceA in enumerate(self.elA.basis_sets):
+            for ibasisB, valenceB in enumerate(self.elB.basis_sets):
+                if subshell_dependence == 'none':
+                    if ibasisA > 1 or ibasisB > 1:
+                        continue
 
-            # Hartree contribution
-            if spin:
-                KharAB = 0.
-            else:
-                vharA = self.get_orbital_vharA()
-                KharAB = self.evaluate_KharAB(vharA)
-                if subtract_delta and not is_onsite:
-                    KharAB -= self.calculate_point_multipole_kernel()
-            print("<a|fhartree|b> =", KharAB)
+                self.nlA = self.elA.basis_sets[ibasisA][0]
+                self.nlB = self.elB.basis_sets[ibasisB][0]
 
-            # XC contribution
-            if is_onsite:
-                out = self.calculate_onsite_kernel_approximations(spin)
-            else:
-                out = self.calculate_offsite_kernel_approximations(spin)
+                results = {}
+                for integral, (lmA, lmB) in pairs:
+                    self.lmA = lmA
+                    self.lmB = lmB
+                    print('\nRunning iA %d iB %d lmA %s lmB %s %s' % \
+                          (self.iA, self.iB, lmA, lmB, spin), flush=True)
 
-            if check_mc:
-                out.update(self.calculate_multicenter_kernel(spin))
-            print(out, flush=True)
+                    # Hartree contribution
+                    if spin:
+                        KharAB = 0.
+                    else:
+                        vharA = self.get_orbital_vharA()
+                        KharAB = self.evaluate_KharAB(vharA)
+                        if subtract_delta and not is_onsite:
+                            KharAB -= self.calculate_point_multipole_kernel()
+                    print("<a|fhartree|b> =", KharAB)
 
-            if N == 1:
-                if check_mc:
-                    assert abs(out['K_mc'] - out['K_1c']) < tol
-                results[integral] = out['K_1c'] + KharAB
-            elif N == 2:
-                if check_mc:
-                    assert abs(out['K_mc'] - out['K_2c']) < tol
-                if is_onsite:
-                    results[integral] = out['K_2c'] - out['K_1c']
-                else:
-                    results[integral] = out['K_2c'] + KharAB
+                    # XC contribution
+                    if is_onsite:
+                        out = self.calculate_onsite_kernel_approximations(spin)
+                    else:
+                        out = self.calculate_offsite_kernel_approximations(spin)
 
-        # Print summary
-        print('=== {0} ==='.format(labels))
-        for integral, values in results.items():
-            print("'%s': " % integral, end='')
-            fmt = lambda x: '%.8f' % x
-            if isinstance(values, tuple):
-                print("(%s)," % ', '.join(map(fmt, values)))
-            else:
-                print(fmt(values) + ",")
-        print()
+                    if check_mc:
+                        out.update(self.calculate_multicenter_kernel(spin))
+                    print(out, flush=True)
+
+                    if N == 1:
+                        if check_mc:
+                            assert abs(out['K_mc'] - out['K_1c']) < tol
+                        results[integral] = out['K_1c'] + KharAB
+                    elif N == 2:
+                        if check_mc:
+                            assert abs(out['K_mc'] - out['K_2c']) < tol
+                        if is_onsite:
+                            results[integral] = out['K_2c'] - out['K_1c']
+                        else:
+                            results[integral] = out['K_2c'] + KharAB
+
+                # Print summary
+                print('=== {0} [{1}, {2}] ==='.format(labels, ibasisA, ibasisB))
+                for integral, values in results.items():
+                    print("'%s': " % integral, end='')
+                    fmt = lambda x: '%.8f' % x
+                    if isinstance(values, tuple):
+                        print("(%s)," % ', '.join(map(fmt, values)))
+                    else:
+                        print(fmt(values) + ",")
+                print()
 
         return
 
@@ -1436,11 +1445,28 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
             KharAB = 0  # not (yet) implemented
         return KharAB
 
+    def get_multipoles(self, lmax):
+        lms = []
+        for l in range(lmax+1):
+            for lm in ORBITALS[l]:
+                lms.append(lm)
+        return lms
+
+    def get_subshells(self, index, lmax):
+        # From each basis 'subset' the subshell with lowest angular
+        # momentum is selected as radial function.
+        sym = self.get_symbol(index)
+        nls = [nl for nl in select_radial_functions(self.elements[sym])
+               for imp in self.get_multipoles(lmax)]
+        return nls
+
     def run_all_kernels(self, atoms_ase, indices_A=None, indices_B=None,
                         print_matrices=True, spin=False, lmax=2,
-                        subtract_delta=False):
+                        subtract_delta=False, subshell_dependence='none'):
         self.atoms_ase = atoms_ase
         self.atoms_becke = ase2becke(atoms_ase)
+
+        assert subshell_dependence in ['none', 'zeta']
 
         # Collect atom indices and multipole labels
         if indices_A is None:
@@ -1453,10 +1479,14 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
         else:
             assert len(indices_B) == len(set(indices_B)), indices_B
 
+        nmulti = len(self.get_multipoles(lmax))
+
         iAs, nlAs, lmAs = [], [], []
         for index in indices_A:
             nls = self.get_subshells(index, lmax)
-            lms = self.get_multipoles(lmax)
+            if subshell_dependence == 'none':
+                nls = nls[:nmulti]
+            lms = self.get_multipoles(lmax) * (len(nls) // nmulti)
             iAs.extend([index] * len(lms))
             nlAs.extend(nls)
             lmAs.extend(lms)
@@ -1464,7 +1494,9 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
         iBs, nlBs, lmBs = [], [], []
         for index in indices_B:
             nls = self.get_subshells(index, lmax)
-            lms = self.get_multipoles(lmax)
+            if subshell_dependence == 'none':
+                nls = nls[:nmulti]
+            lms = self.get_multipoles(lmax) * (len(nls) // nmulti)
             iBs.extend([index] * len(lms))
             nlBs.extend(nls)
             lmBs.extend(lms)
@@ -1483,7 +1515,8 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
             symA = self.get_symbol(self.iA)
             self.elA = self.elements[symA]
 
-            vharA = self.get_orbital_vharA()
+            if not spin:
+                vharA = self.get_orbital_vharA()
 
             for indexB, (iB, nlB, lmB) in enumerate(zip(iBs, nlBs, lmBs)):
                 self.iB, self.nlB, self.lmB = iB, nlB, lmB
@@ -1491,8 +1524,8 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
                 symB = self.get_symbol(self.iB)
                 self.elB = self.elements[symB]
 
-                print('\nRunning iA %d iB %d lmA %s lmB %s %s' % \
-                      (self.iA, self.iB, lmA, lmB, spin), flush=True)
+                print('\nRunning iA %d iB %d nlA %s nlB %s lmA %s lmB %s %s' % \
+                      (iA, iB, nlA, nlB, lmA, lmB, spin), flush=True)
                 is_onsite = self.iA == self.iB
 
                 # Hartree contribution
@@ -1548,21 +1581,6 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
                    'K_mc': K_mc}
         return results
 
-    def get_multipoles(self, lmax):
-        lms = []
-        for l in range(lmax+1):
-            for lm in ORBITALS[l]:
-                lms.append(lm)
-        return lms
-
-    def get_subshells(self, index, lmax):
-        # Note: the same minimal valence subshell (with lowest angular
-        # momentum) is selected as radial function for all multipoles.
-        sym = self.get_symbol(index)
-        nl = select_radial_function(self.elements[sym])
-        nls = [nl]*len(self.get_multipoles(lmax))
-        return nls
-
     def calculate_onsite_kernel_approximations(self, spin):
         assert self.iA == self.iB
         assert self.elA.get_symbol() == self.elB.get_symbol()
@@ -1595,8 +1613,6 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
         return (Kxcab1c, Kxcab2c)
 
     def calculate_onsite_xc_kernel_gga(self, spin):
-        assert self.nlA == self.nlB, (self.nlA, self.nlB)
-
         def kxc_on1c(x, y, z):
             dx, dy, dz = x - self.xA, y - self.yA, z - self.zA
             rA = np.sqrt(dx**2 + dy**2 + dz**2)
@@ -1627,14 +1643,15 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
             grad_mB_grad_rho = dmBdr * drhodr
 
             grad_mA_grad_mB = 0.
-            Rnl2 = self.elA.Rnl(rA, self.nlA)**2
+            Rnl2A = self.elA.Rnl(rA, self.nlA)**2
+            Rnl2B = self.elA.Rnl(rA, self.nlB)**2
             drdx = [dx/rA, dy/rA, dz/rA]
             for i in range(3):
                 der = 'xyz'[i]
                 dYlmA = sph_cartesian_der(dx, dy, dz, rA, self.lmA, der=der)
-                dmAdx = dmAdr * drdx[i] + Rnl2 * dYlmA
+                dmAdx = dmAdr * drdx[i] + Rnl2A * dYlmA
                 dYlmB = sph_cartesian_der(dx, dy, dz, rA, self.lmB, der=der)
-                dmBdx = dmBdr * drdx[i] + Rnl2 * dYlmB
+                dmBdx = dmBdr * drdx[i] + Rnl2B * dYlmB
                 grad_mA_grad_mB += dmAdx * dmBdx
 
             if spin:
@@ -1691,15 +1708,16 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
             grad_mA_grad_mB = 0.
             grad_mA_grad_rho = 0.
             grad_mB_grad_rho = 0.
-            Rnl2 = self.elA.Rnl(rA, self.nlA)**2
+            Rnl2A = self.elA.Rnl(rA, self.nlA)**2
+            Rnl2B = self.elA.Rnl(rA, self.nlB)**2
             for i in range(3):
                 der = 'xyz'[i]
                 dYlmA = sph_cartesian_der(dxA, dyA, dzA, rA, self.lmA, der=der)
                 dYlmAs.append(dYlmA)
                 dYlmB = sph_cartesian_der(dxA, dyA, dzA, rA, self.lmB, der=der)
                 dYlmBs.append(dYlmB)
-                dmAdx = dmAdr * drAdx[i] + Rnl2 * dYlmA
-                dmBdx = dmBdr * drAdx[i] + Rnl2 * dYlmB
+                dmAdx = dmAdr * drAdx[i] + Rnl2A * dYlmA
+                dmBdx = dmBdr * drAdx[i] + Rnl2B * dYlmB
                 grad_mA_grad_mB += dmAdx * dmBdx
                 drhodx = drhoAdrA * drAdx[i]
                 grad_mA_grad_rho += dmAdx * drhodx
@@ -1753,8 +1771,8 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
                 grad_mB_grad_rho = 0.
                 for i in range(3):
                     drhodx = drhoAdrA * drAdx[i] + drhoCdrC * drCdx[i]
-                    dmAdx = dmAdr * drAdx[i] + Rnl2 * dYlmAs[i]
-                    dmBdx = dmBdr * drAdx[i] + Rnl2 * dYlmBs[i]
+                    dmAdx = dmAdr * drAdx[i] + Rnl2A * dYlmAs[i]
+                    dmBdx = dmBdr * drAdx[i] + Rnl2B * dYlmBs[i]
                     grad_mA_grad_rho += dmAdx * drhodx
                     grad_mB_grad_rho += dmBdx * drhodx
 
@@ -2036,13 +2054,16 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
         return (m_1, m_2)
 
     def run_all_dH(self, atoms_ase, density_matrix, Zval, lmax=0,
-                   kernel=None, print_matrices=True):
+                   kernel=None, print_matrices=True,
+                   subshell_dependence='none'):
         self.atoms_ase = atoms_ase
         self.atoms_becke = ase2becke(atoms_ase)
         indices = list(range(len(self.atoms_ase)))
 
         assert np.allclose(density_matrix, density_matrix.T), \
                'Density matrix needs to be symmetric'
+
+        assert subshell_dependence == 'none'
 
         counter = 0
         start_indices, end_indices = [], []

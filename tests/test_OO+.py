@@ -151,12 +151,11 @@ def test_hubbard_analytical(atom):
 def test_chg1c(atom):
     from hotcent.onsite_chargetransfer import Onsite1cUTable
 
-    size = atom.basis_size
     xc = atom.xcname
 
     chgon1c = Onsite1cUTable(atom)
-    chgon1c.run(xc=xc)
-    U = chgon1c.table
+    chgon1c.run(subshells=None, xc=xc)
+    U = chgon1c.tables[(0, 0)][0, :]
 
     U_ref = {
         LDA: np.array([9.813091, 1.739321, 0.4714054, 0.03553798]),

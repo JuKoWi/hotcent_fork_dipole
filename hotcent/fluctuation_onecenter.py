@@ -15,14 +15,16 @@ NUML_1CL = 4  # total number of subshells considered for .1cl files (up to f)
 NUML_1CM = 4  # total number of subshells considered for .1cm files (up to f)
 
 
-def select_radial_function(el):
+def select_radial_functions(el):
     """
-    Returns the default subshell to use as a radial function,
-    i.e. the lowest subshell included in the minimal valence set.
+    Returns the default subshells to use as a radial functions,
+    i.e. the lowest subshell included in each basis subset.
     """
-    valence = sorted(el.valence, key=lambda nl: ANGULAR_MOMENTUM[nl[1]])
-    nl = valence[0]
-    return nl
+    nls = []
+    for valence in el.basis_sets:
+        nl = sorted(valence, key=lambda nl: ANGULAR_MOMENTUM[nl[1]])[0]
+        nls.append(nl)
+    return nls
 
 
 def select_orbitals(el):

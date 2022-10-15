@@ -5,7 +5,7 @@
 #   SPDX-License-Identifier: GPL-3.0-or-later                                 #
 #-----------------------------------------------------------------------------#
 import numpy as np
-from hotcent.fluctuation_onecenter import select_radial_function
+from hotcent.fluctuation_onecenter import select_radial_functions
 from hotcent.fluctuation_twocenter import (
                 INTEGRALS_2CK, NUMINT_2CL, NUMSK_2CK,
                 select_subshells, write_2cl, write_2ck)
@@ -262,9 +262,8 @@ class Offsite2cWMultipoleTable(MultiAtomIntegrator):
     def __init__(self, *args, **kwargs):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
 
-    def run(self, nl=None, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50,
-            wflimit=1e-7, xc='LDA', smoothen_tails=True, shift=False,
-            subtract_delta=True):
+    def run(self, subshells=None, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50,
+            wflimit=1e-7, xc='LDA', smoothen_tails=True, shift=False):
         """
         Calculates offsite, orbital- and distance-dependent "W" values
         as matrix elements of the two-center-expanded spin-polarized
@@ -272,15 +271,11 @@ class Offsite2cWMultipoleTable(MultiAtomIntegrator):
 
         Parameters
         ----------
-        nl : tuple of str, optional
-            Two-tuple with the subshells defining the radial functions
-            for each element. If None, the subshells with the lowest angular
-            momentum will be chosen from the minimal valence sets.
-
-        subtract_delta : bool, optional
-            Whether to subtract the point multipole contributions from
-            the kernel integrals (default: True). Setting it to False
-            is only useful for debugging purposes.
+        subshells : dict, optional
+            Dictionary with the list of subshells to use as radial functions
+            (one for every 'basis subset') for every element. By default,
+            the subshell with lowest angular momentum is chosen from each
+            subset.
 
         Other parameters
         ----------------
@@ -301,31 +296,42 @@ class Offsite2cWMultipoleTable(MultiAtomIntegrator):
         self.timer.start('run_offsiteW')
         wf_range = self.get_range(wflimit)
         self.Rgrid = rmin + dr * np.arange(N)
-        self.tables = {}
 
-        if nl is None:
-            nl1 = select_radial_function(self.ela)
-            nl2 = select_radial_function(self.elb)
-            nl = (nl1, nl2)
+        if subshells is None:
+            selected = {el.get_symbol(): select_radial_functions(el)
+                        for el in [self.ela, self.elb]}
         else:
-            assert isinstance(nl, tuple)
+            for el in [self.ela, self.elb]:
+                sym = el.get_symbol()
+                assert sym in subshells, \
+                       'Missing entry for element {0} in subshells'.format(sym)
+                assert len(subshells[sym]) == len(el.basis_sets), \
+                       'Need one subshell per basis subset for {0}'.format(sym)
+            selected = subshells
+        print('Selected subshells:', selected, file=self.txt)
 
+        self.tables = {}
         for p, (e1, e2) in enumerate(self.pairs):
-            self.tables[p] = np.zeros((N, NUMSK_2CK))
+            for bas1 in range(len(e1.basis_sets)):
+                for bas2 in range(len(e2.basis_sets)):
+                    self.tables[(p, bas1, bas2)] = np.zeros((N, NUMSK_2CK))
 
         for i, R in enumerate(self.Rgrid):
-                grid, area = self.make_grid(R, wf_range, nt=ntheta, nr=nr)
+            grid, area = self.make_grid(R, wf_range, nt=ntheta, nr=nr)
 
-                if i == N - 1 or N // 10 == 0 or i % (N // 10) == 0:
-                    print('R=%8.2f, %i grid points ...' % \
-                          (R, len(grid)), file=self.txt, flush=True)
+            if i == N - 1 or N // 10 == 0 or i % (N // 10) == 0:
+                print('R=%8.2f, %i grid points ...' % \
+                      (R, len(grid)), file=self.txt, flush=True)
 
-                if len(grid) > 0:
-                    for p, (e1, e2) in enumerate(self.pairs):
-                        nl1, nl2 = nl if p == 0 else nl[::-1]
-                        W = self.calculate(e1, e2, R, grid, area, nl1, nl2,
-                                           xc=xc)
-                        self.tables[p][i, :] += W[:]
+            if len(grid) > 0:
+                for p, (e1, e2) in enumerate(self.pairs):
+                    W = self.calculate(e1, e2, R, grid, area, selected, xc=xc)
+
+                    for key in W:
+                        nl1, nl2 = key
+                        bas1 = e1.get_basis_set_index(nl1)
+                        bas2 = e2.get_basis_set_index(nl2)
+                        self.tables[(p, bas1, bas2)][i, :] = W[key][:]
 
         for key in self.tables:
             for i in range(NUMSK_2CK):
@@ -344,15 +350,16 @@ class Offsite2cWMultipoleTable(MultiAtomIntegrator):
         self.timer.stop('run_offsiteW')
         return
 
-    def calculate(self, e1, e2, R, grid, area, nl1, nl2, xc='LDA'):
+    def calculate(self, e1, e2, R, grid, area, selected, xc='LDA'):
         """
         Calculates the selected integrals involving the spin-polarized
         XC kernel.
 
         Parameters
         ----------
-        nl1, nl2 : str
-            Subshells defining the radial functions.
+        selected : dict
+            Dictionary with the list of subshells to use as radial functions
+            (one for every 'basis subset') for every element.
 
         Other parameters
         ----------------
@@ -360,8 +367,8 @@ class Offsite2cWMultipoleTable(MultiAtomIntegrator):
 
         Returns
         -------
-        W : np.ndarray
-            Array with the needed Slater-Koster integrals.
+        W : dict of np.ndarray
+            Dictionary with the needed Slater-Koster integrals.
         """
         self.timer.start('calculate_offsiteW')
 
@@ -376,6 +383,8 @@ class Offsite2cWMultipoleTable(MultiAtomIntegrator):
         s1 = x / r1  # sine of theta_1
         s2 = x / r2  # sine of theta_2
         aux = area * x
+        sym1 = e1.get_symbol()
+        sym2 = e2.get_symbol()
 
         xc = LibXC('LDA_X+LDA_C_PW' if xc == 'LDA' else xc,
                    spin_polarized=True)
@@ -383,8 +392,8 @@ class Offsite2cWMultipoleTable(MultiAtomIntegrator):
         rho1 = e1.electron_density(r1) / 2
         rho2 = e2.electron_density(r2) / 2
         rho12 = rho1 + rho2
-        Rnl1 = e1.Rnl(r1, nl1)**2
-        Rnl2 = e2.Rnl(r2, nl2)**2
+        Rnl1 = {nl1: e1.Rnl(r1, nl1)**2 for nl1 in selected[sym1]}
+        Rnl2 = {nl2: e2.Rnl(r2, nl2)**2 for nl2 in selected[sym2]}
 
         if xc.add_gradient_corrections:
             drho1 = e1.electron_density(r1, der=1) / 2
@@ -405,7 +414,8 @@ class Offsite2cWMultipoleTable(MultiAtomIntegrator):
 
             grad_r1_grad_rho12 = dr1dx * drho12dx + dr1dy * drho12dy
             grad_theta1_grad_rho12 = dtheta1dx * drho12dx + dtheta1dy * drho12dy
-            dRnl1dr1 = 2 * e1.Rnl(r1, nl1) * e1.Rnl(r1, nl1, der=1)
+            dRnl1dr1 = {nl1: 2 * e1.Rnl(r1, nl1) * e1.Rnl(r1, nl1, der=1)
+                        for nl1 in selected[sym1]}
 
             dr2dx = x/r2
             ds2dx = (r2 - x*dr2dx) / r2**2
@@ -416,7 +426,8 @@ class Offsite2cWMultipoleTable(MultiAtomIntegrator):
 
             grad_r2_grad_rho12 = dr2dx * drho12dx + dr2dy * drho12dy
             grad_theta2_grad_rho12 = dtheta2dx * drho12dx + dtheta2dy * drho12dy
-            dRnl2dr2 = 2 * e2.Rnl(r2, nl2) * e2.Rnl(r2, nl2, der=1)
+            dRnl2dr2 = {nl2: 2 * e2.Rnl(r2, nl2) * e2.Rnl(r2, nl2, der=1)
+                        for nl2 in selected[sym2]}
 
             grad_r1_grad_r2 = dr1dx*dr2dx + dr1dy*dr2dy
             grad_r1_grad_theta2 = dr1dx * dtheta2dx + dr1dy * dtheta2dy
@@ -432,49 +443,61 @@ class Offsite2cWMultipoleTable(MultiAtomIntegrator):
                                          sigma_down=sigma12, fxc=True)
         self.timer.stop('fxc')
 
-        W = np.zeros(NUMSK_2CK)
+        keys = [(nl1, nl2) for nl1 in selected[sym1] for nl2 in selected[sym2]]
+        W = {key: np.zeros(NUMSK_2CK) for key in keys}
 
         for index, integral in enumerate(INTEGRALS_2CK):
             lm1, lm2 = get_integral_pair(integral)
             gphi = get_twocenter_phi_integral(lm1, lm2, c1, c2, s1, s2)
-            integrand = (out12['v2rho2_up'] - out12['v2rho2_updown']) \
-                        * Rnl1 * Rnl2 * gphi
 
             if xc.add_gradient_corrections:
                 dgphi = get_twocenter_phi_integrals_derivatives(lm1, lm2, c1,
                                                                 c2, s1, s2)
 
-                products = dRnl1dr1 * grad_r1_grad_rho12 * Rnl2 * gphi
-                products += dRnl2dr2 * grad_r2_grad_rho12 * Rnl1 * gphi
-                products += Rnl1 * Rnl2 * grad_theta1_grad_rho12 * dgphi[2]
-                products += Rnl1 * Rnl2 * grad_theta2_grad_rho12 * dgphi[3]
-                integrand += 2 * products * (out12['v2rhosigma_up_up'] \
-                                             - out12['v2rhosigma_up_down'])
+            for key in keys:
+                nl1, nl2 = key
+                integrand = Rnl1[nl1] * Rnl2[nl2] * gphi \
+                            * (out12['v2rho2_up'] - out12['v2rho2_updown'])
 
-                products = dRnl1dr1 * dRnl2dr2 * grad_r1_grad_rho12 \
-                           * grad_r2_grad_rho12 * gphi
-                products += dRnl2dr2 * grad_r2_grad_rho12 * Rnl1 \
-                            * grad_theta1_grad_rho12 * dgphi[2]
-                products += dRnl1dr1 * grad_r1_grad_rho12 * Rnl2 \
-                            * grad_theta2_grad_rho12 * dgphi[3]
-                products += Rnl1 * Rnl2 * grad_theta1_grad_rho12 \
-                            * grad_theta2_grad_rho12 * dgphi[0]
-                integrand += 4 * products * (out12['v2sigma2_up_up'] \
-                                             - out12['v2sigma2_up_down'])
-                integrand += 2 * products * (out12['v2sigma2_up_updown'] \
-                                             - out12['v2sigma2_updown_down'])
+                if xc.add_gradient_corrections:
+                    products = dRnl1dr1[nl1] * grad_r1_grad_rho12 \
+                               * Rnl2[nl2] * gphi
+                    products += dRnl2dr2[nl2] * grad_r2_grad_rho12 \
+                                * Rnl1[nl1] * gphi
+                    products += Rnl1[nl1] * Rnl2[nl2] \
+                                * grad_theta1_grad_rho12 * dgphi[2]
+                    products += Rnl1[nl1] * Rnl2[nl2] \
+                                * grad_theta2_grad_rho12 * dgphi[3]
+                    integrand += 2 * products * (out12['v2rhosigma_up_up'] \
+                                                 - out12['v2rhosigma_up_down'])
 
-                products = dRnl1dr1 * dRnl2dr2 * grad_r1_grad_r2 * gphi
-                products += Rnl1 * grad_r2_grad_theta1 * dRnl2dr2 * dgphi[2]
-                products += Rnl2 * grad_r1_grad_theta2 * dRnl1dr1 * dgphi[3]
-                products += Rnl1 * Rnl2 * (grad_theta1_grad_theta2 * dgphi[0] \
-                                           + dgphi[1] / x**2)
-                integrand += products * (2 * out12['vsigma_up'] \
-                                         - out12['vsigma_updown'])
+                    products = dRnl1dr1[nl1] * dRnl2dr2[nl2] \
+                               * grad_r1_grad_rho12 * grad_r2_grad_rho12 * gphi
+                    products += dRnl2dr2[nl2] * grad_r2_grad_rho12 * Rnl1[nl1] \
+                                * grad_theta1_grad_rho12 * dgphi[2]
+                    products += dRnl1dr1[nl1] * grad_r1_grad_rho12 * Rnl2[nl2] \
+                                * grad_theta2_grad_rho12 * dgphi[3]
+                    products += Rnl1[nl1] * Rnl2[nl2] * grad_theta1_grad_rho12 \
+                                * grad_theta2_grad_rho12 * dgphi[0]
+                    integrand += 4 * products * (out12['v2sigma2_up_up'] \
+                                                 - out12['v2sigma2_up_down'])
+                    integrand += 2 * products * (out12['v2sigma2_up_updown'] \
+                                            - out12['v2sigma2_updown_down'])
 
-            W[index] = np.sum(integrand * aux)
+                    products = dRnl1dr1[nl1] * dRnl2dr2[nl2] \
+                               * grad_r1_grad_r2 * gphi
+                    products += Rnl1[nl1] * grad_r2_grad_theta1 \
+                                * dRnl2dr2[nl2] * dgphi[2]
+                    products += Rnl2[nl2] * grad_r1_grad_theta2 \
+                                * dRnl1dr1[nl1] * dgphi[3]
+                    products += Rnl1[nl1] * Rnl2[nl2] \
+                                * (grad_theta1_grad_theta2 * dgphi[0] \
+                                   + dgphi[1] / x**2)
+                    integrand += products * (2 * out12['vsigma_up'] \
+                                             - out12['vsigma_updown'])
 
-        W /= 2
+                W[key][index] = np.sum(integrand * aux) / 2
+
         self.timer.stop('calculate_offsiteW')
         return W
 
@@ -487,10 +510,12 @@ class Offsite2cWMultipoleTable(MultiAtomIntegrator):
         for p, (e1, e2) in enumerate(self.pairs):
             sym1, sym2 = e1.get_symbol(), e2.get_symbol()
 
-            template = '%s-%s_offsiteW.2ck'
-            filename = template % (sym1, sym2)
-            print('Writing to %s' % filename, file=self.txt, flush=True)
+            for bas1, valence1 in enumerate(e1.basis_sets):
+                for bas2, valence2 in enumerate(e2.basis_sets):
+                    template = '%s-%s_offsiteW.2ck'
+                    filename = template % (sym1 + '+'*bas1, sym2  + '+'*bas2)
+                    print('Writing to %s' % filename, file=self.txt, flush=True)
 
-            with open(filename, 'w') as f:
-                write_2ck(f, self.Rgrid, self.tables[p])
+                    with open(filename, 'w') as f:
+                        write_2ck(f, self.Rgrid, self.tables[(p, bas1, bas2)])
         return

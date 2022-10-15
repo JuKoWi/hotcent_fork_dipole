@@ -5,7 +5,7 @@
 #   SPDX-License-Identifier: GPL-3.0-or-later                                 #
 #-----------------------------------------------------------------------------#
 import numpy as np
-from hotcent.fluctuation_onecenter import select_radial_function
+from hotcent.fluctuation_onecenter import select_radial_functions
 from hotcent.fluctuation_twocenter import (
                 INTEGRALS_2CK, INTEGRALS_2CM, NUMINT_2CL, NUML_2CK, NUML_2CM,
                 NUMSK_2CK, NUMSK_2CM, select_subshells, write_2cl, write_2ck,
@@ -283,7 +283,7 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
     def __init__(self, *args, **kwargs):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
 
-    def run(self, nl=None, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50,
+    def run(self, subshells=None, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50,
             wflimit=1e-7, xc='LDA', smoothen_tails=True, shift=False,
             subtract_delta=True):
         """
@@ -293,11 +293,15 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
 
         Parameters
         ----------
+        subshells : dict, optional
+            Dictionary with the list of subshells to use as radial functions
+            (one for every 'basis subset') for every element. By default,
+            the subshell with lowest angular momentum is chosen from each
+            subset.
         nl : tuple of str, optional
             Two-tuple with the subshells defining the radial functions
             for each element. If None, the subshells with the lowest angular
             momentum will be chosen from the minimal valence sets.
-
         subtract_delta : bool, optional
             Whether to subtract the point multipole contributions from
             the kernel integrals (default: True). Setting it to False
@@ -322,20 +326,29 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
         self.timer.start('run_offsiteU')
         wf_range = self.get_range(wflimit)
         self.Rgrid = rmin + dr * np.arange(N)
-        self.tables = {}
 
-        if nl is None:
-            nl1 = select_radial_function(self.ela)
-            nl2 = select_radial_function(self.elb)
-            nl = (nl1, nl2)
+        if subshells is None:
+            selected = {el.get_symbol(): select_radial_functions(el)
+                        for el in [self.ela, self.elb]}
         else:
-            assert isinstance(nl, tuple)
+            for el in [self.ela, self.elb]:
+                sym = el.get_symbol()
+                assert sym in subshells, \
+                       'Missing entry for element {0} in subshells'.format(sym)
+                assert len(subshells[sym]) == len(el.basis_sets), \
+                       'Need one subshell per basis subset for {0}'.format(sym)
+            selected = subshells
+        print('Selected subshells:', selected, file=self.txt)
 
-        self.build_ohp(nl)
-        self.build_int1c(nl)
+        self.build_ohp(selected)
+        self.build_int1c(selected)
+        self.build_point_kernels(selected)
 
+        self.tables = {}
         for p, (e1, e2) in enumerate(self.pairs):
-            self.tables[p] = np.zeros((N, NUMSK_2CK))
+            for bas1 in range(len(e1.basis_sets)):
+                for bas2 in range(len(e2.basis_sets)):
+                    self.tables[(p, bas1, bas2)] = np.zeros((N, NUMSK_2CK))
 
         for i, R in enumerate(self.Rgrid):
             for term in ['hartree', 'xc']:
@@ -352,16 +365,18 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
 
                 if len(grid) > 0:
                     for p, (e1, e2) in enumerate(self.pairs):
-                        nl1, nl2 = nl if p == 0 else nl[::-1]
-
                         if term == 'hartree':
                             U = self.calculate_hartree(e1, e2, R, grid, area,
-                                                       nl1, nl2, subtract_delta)
+                                                       selected, subtract_delta)
                         else:
                             U = self.calculate_xc(e1, e2, R, grid, area,
-                                                  nl1, nl2, xc=xc)
+                                                  selected, xc=xc)
 
-                        self.tables[p][i, :] += U[:]
+                        for key in U:
+                            nl1, nl2 = key
+                            bas1 = e1.get_basis_set_index(nl1)
+                            bas2 = e2.get_basis_set_index(nl2)
+                            self.tables[(p, bas1, bas2)][i, :] += U[key][:]
 
         for key in self.tables:
             for i in range(NUMSK_2CK):
@@ -380,7 +395,7 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
         self.timer.stop('run_offsiteU')
         return
 
-    def build_ohp(self, nl):
+    def build_ohp(self, selected):
         """
         Populates the self.ohp_dict dictionary with the needed
         Hartree potential interpolators.
@@ -393,19 +408,22 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
         for p, (e1, e2) in enumerate(self.pairs):
             sym1 = e1.get_symbol()
             sym2 = e2.get_symbol()
-            nl1, nl2 = nl if p == 0 else nl[::-1]
 
-            if (sym1, nl1) not in self.ohp_dict:
-                lmax = NUML_2CK
-                rho = e1.Rnlg[nl1]**2
-                self.ohp_dict[(sym1, nl1)] = \
-                    OrbitalHartreePotential(e1.rmin, e1.xgrid, rho, lmax)
+            for nl1 in selected[sym1]:
+                for nl2 in selected[sym2]:
+                    if (sym1, nl1) not in self.ohp_dict:
+                        lmax = NUML_2CK
+                        rho = e1.Rnlg[nl1]**2
+                        self.ohp_dict[(sym1, nl1)] = \
+                            OrbitalHartreePotential(e1.rmin, e1.xgrid, rho,
+                                                    lmax)
 
-            if (sym2, nl2) not in self.ohp_dict:
-                lmax = NUML_2CK
-                rho = e2.Rnlg[nl2]**2
-                self.ohp_dict[(sym2, nl2)] = \
-                    OrbitalHartreePotential(e2.rmin, e2.xgrid, rho, lmax)
+                    if (sym2, nl2) not in self.ohp_dict:
+                        lmax = NUML_2CK
+                        rho = e2.Rnlg[nl2]**2
+                        self.ohp_dict[(sym2, nl2)] = \
+                            OrbitalHartreePotential(e2.rmin, e2.xgrid, rho,
+                                                    lmax)
 
         self.timer.stop('build_ohp')
         return
@@ -434,7 +452,7 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
         v = self.ohp_dict[(sym, nl)].vhar_fct[l](r)
         return v
 
-    def build_int1c(self, nl):
+    def build_int1c(self, selected):
         """
         Populates the self.int1c_dict dictionary with the needed
         one-center integrals for the point multipole contributions.
@@ -442,32 +460,57 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
         self.int1c_dict = {}
         sym1 = self.ela.get_symbol()
         sym2 = self.elb.get_symbol()
-        nl1, nl2 = nl
-
-        Rnl = self.ela.Rnlg[nl1]**2
-        self.int1c_dict[sym1] = []
-        for l in range(NUML_2CK):
-            int1c = self.ela.grid.integrate(Rnl * self.ela.rgrid**(l+2),
-                                            use_dV=False)
-            self.int1c_dict[sym1].append(int1c)
+        for nl1 in selected[sym1]:
+            Rnl = self.ela.Rnlg[nl1]**2
+            self.int1c_dict[(sym1, nl1)] = []
+            for l in range(NUML_2CK):
+                int1c = self.ela.grid.integrate(Rnl * self.ela.rgrid**(l+2),
+                                                use_dV=False)
+                self.int1c_dict[(sym1, nl1)].append(int1c)
 
         if sym2 != sym1:
-            Rnl = self.elb.Rnlg[nl2]**2
-            self.int1c_dict[sym2] = []
-            for l in range(NUML_2CK):
-                int1c = self.elb.grid.integrate(Rnl * self.elb.rgrid**(l+2),
-                                                use_dV=False)
-                self.int1c_dict[sym2].append(int1c)
+            for nl2 in selected[sym2]:
+                Rnl = self.elb.Rnlg[nl2]**2
+                self.int1c_dict[(sym2, nl2)] = []
+                for l in range(NUML_2CK):
+                    int1c = self.elb.grid.integrate(Rnl * self.elb.rgrid**(l+2),
+                                                    use_dV=False)
+                    self.int1c_dict[(sym2, nl2)].append(int1c)
         return
 
-    def calculate_xc(self, e1, e2, R, grid, area, nl1, nl2, xc='LDA'):
+    def build_point_kernels(self, selected):
+        """
+        Populates the self.point_kernels dictionary with the needed
+        point multipole contributions.
+        """
+        self.point_kernels = {}
+
+        for p, (e1, e2) in enumerate(self.pairs):
+            sym1 = e1.get_symbol()
+            sym2 = e2.get_symbol()
+
+            for bas1 in range(len(e1.basis_sets)):
+                nl1 = selected[sym1][bas1]
+
+                for bas2 in range(len(e2.basis_sets)):
+                    nl2 = selected[sym2][bas2]
+                    self.point_kernels[(p, bas1, bas2)] = np.zeros(NUMSK_2CK)
+
+                    for i, integral in enumerate(INTEGRALS_2CK):
+                        self.point_kernels[(p, bas1, bas2)][i] = \
+                            self.evaluate_point_multipole_hartree(
+                                    sym1, sym2, nl1, nl2, integral, 1)
+        return
+
+    def calculate_xc(self, e1, e2, R, grid, area, selected, xc='LDA'):
         """
         Calculates the selected integrals involving the XC kernel.
 
         Parameters
         ----------
-        nl1, nl2 : str
-            Subshells defining the radial functions.
+        selected : dict
+            Dictionary with the list of subshells to use as radial functions
+            (one for every 'basis subset') for every element.
 
         Other parameters
         ----------------
@@ -475,8 +518,8 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
 
         Returns
         -------
-        U: np.ndarray
-            Array with the needed Slater-Koster integrals.
+        U: dict of np.ndarray
+            Dictionary with the needed Slater-Koster integrals.
         """
         self.timer.start('calculate_offsiteU_xc')
 
@@ -491,14 +534,16 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
         s1 = x / r1  # sine of theta_1
         s2 = x / r2  # sine of theta_2
         aux = area * x
+        sym1 = e1.get_symbol()
+        sym2 = e2.get_symbol()
 
         xc = LibXC('LDA_X+LDA_C_PW' if xc == 'LDA' else xc)
 
         rho1 = e1.electron_density(r1)
         rho2 = e2.electron_density(r2)
         rho12 = rho1 + rho2
-        Rnl1 = e1.Rnl(r1, nl1)**2
-        Rnl2 = e2.Rnl(r2, nl2)**2
+        Rnl1 = {nl1: e1.Rnl(r1, nl1)**2 for nl1 in selected[sym1]}
+        Rnl2 = {nl2: e2.Rnl(r2, nl2)**2 for nl2 in selected[sym2]}
 
         if xc.add_gradient_corrections:
             drho1 = e1.electron_density(r1, der=1)
@@ -519,7 +564,8 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
 
             grad_r1_grad_rho12 = dr1dx * drho12dx + dr1dy * drho12dy
             grad_theta1_grad_rho12 = dtheta1dx * drho12dx + dtheta1dy * drho12dy
-            dRnl1dr1 = 2 * e1.Rnl(r1, nl1) * e1.Rnl(r1, nl1, der=1)
+            dRnl1dr1 = {nl1: 2 * e1.Rnl(r1, nl1) * e1.Rnl(r1, nl1, der=1)
+                        for nl1 in selected[sym1]}
 
             dr2dx = x/r2
             ds2dx = (r2 - x*dr2dx) / r2**2
@@ -530,7 +576,8 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
 
             grad_r2_grad_rho12 = dr2dx * drho12dx + dr2dy * drho12dy
             grad_theta2_grad_rho12 = dtheta2dx * drho12dx + dtheta2dy * drho12dy
-            dRnl2dr2 = 2 * e2.Rnl(r2, nl2) * e2.Rnl(r2, nl2, der=1)
+            dRnl2dr2 = {nl2: 2 * e2.Rnl(r2, nl2) * e2.Rnl(r2, nl2, der=1)
+                        for nl2 in selected[sym2]}
 
             grad_r1_grad_r2 = dr1dx*dr2dx + dr1dy*dr2dy
             grad_r1_grad_theta2 = dr1dx * dtheta2dx + dr1dy * dtheta2dy
@@ -544,46 +591,60 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
         out12 = xc.compute_vxc(rho12, sigma=sigma12, fxc=True)
         self.timer.stop('fxc')
 
-        U = np.zeros(NUMSK_2CK)
+        keys = [(nl1, nl2) for nl1 in selected[sym1] for nl2 in selected[sym2]]
+        U = {key: np.zeros(NUMSK_2CK) for key in keys}
 
         for index, integral in enumerate(INTEGRALS_2CK):
             lm1, lm2 = get_integral_pair(integral)
             gphi = get_twocenter_phi_integral(lm1, lm2, c1, c2, s1, s2)
-            integrand = out12['v2rho2'] * Rnl1 * Rnl2 * gphi
 
             if xc.add_gradient_corrections:
-                dgphi = get_twocenter_phi_integrals_derivatives(lm1, lm2, c1,
-                                                                c2, s1, s2)
+                dgphi = get_twocenter_phi_integrals_derivatives(lm1, lm2,
+                                                            c1, c2, s1, s2)
 
-                products = dRnl1dr1 * grad_r1_grad_rho12 * Rnl2 * gphi
-                products += dRnl2dr2 * grad_r2_grad_rho12 * Rnl1 * gphi
-                products += Rnl1 * Rnl2 * grad_theta1_grad_rho12 * dgphi[2]
-                products += Rnl1 * Rnl2 * grad_theta2_grad_rho12 * dgphi[3]
-                integrand += 2 * products * out12['v2rhosigma']
+            for key in keys:
+                nl1, nl2 = key
+                integrand = Rnl1[nl1] * Rnl2[nl2] * gphi * out12['v2rho2']
 
-                products = dRnl1dr1 * dRnl2dr2 * grad_r1_grad_rho12 \
-                           * grad_r2_grad_rho12 * gphi
-                products += dRnl2dr2 * grad_r2_grad_rho12 * Rnl1 \
-                            * grad_theta1_grad_rho12 * dgphi[2]
-                products += dRnl1dr1 * grad_r1_grad_rho12 * Rnl2 \
-                            * grad_theta2_grad_rho12 * dgphi[3]
-                products += Rnl1 * Rnl2 * grad_theta1_grad_rho12 \
-                            * grad_theta2_grad_rho12 * dgphi[0]
-                integrand += 4 * products * out12['v2sigma2']
+                if xc.add_gradient_corrections:
+                    products = dRnl1dr1[nl1] * grad_r1_grad_rho12 \
+                               * Rnl2[nl2] * gphi
+                    products += dRnl2dr2[nl2] * grad_r2_grad_rho12 \
+                                * Rnl1[nl1] * gphi
+                    products += Rnl1[nl1] * Rnl2[nl2] * grad_theta1_grad_rho12 \
+                                * dgphi[2]
+                    products += Rnl1[nl1] * Rnl2[nl2] * grad_theta2_grad_rho12 \
+                                * dgphi[3]
+                    integrand += 2 * products * out12['v2rhosigma']
 
-                products = dRnl1dr1 * dRnl2dr2 * grad_r1_grad_r2 * gphi
-                products += Rnl1 * grad_r2_grad_theta1 * dRnl2dr2 * dgphi[2]
-                products += Rnl2 * grad_r1_grad_theta2 * dRnl1dr1 * dgphi[3]
-                products += Rnl1 * Rnl2 * (grad_theta1_grad_theta2 * dgphi[0] \
-                                           + dgphi[1] / x**2)
-                integrand += 2 * products * out12['vsigma']
+                    products = dRnl1dr1[nl1] * dRnl2dr2[nl2] \
+                               * grad_r1_grad_rho12 * grad_r2_grad_rho12 * gphi
+                    products += dRnl2dr2[nl2] * grad_r2_grad_rho12 * Rnl1[nl1] \
+                                * grad_theta1_grad_rho12 * dgphi[2]
+                    products += dRnl1dr1[nl1] * grad_r1_grad_rho12 * Rnl2[nl2] \
+                                * grad_theta2_grad_rho12 * dgphi[3]
+                    products += Rnl1[nl1] * Rnl2[nl2] * grad_theta1_grad_rho12 \
+                                * grad_theta2_grad_rho12 * dgphi[0]
+                    integrand += 4 * products * out12['v2sigma2']
 
-            U[index] = np.sum(integrand * aux)
+                    products = dRnl1dr1[nl1] * dRnl2dr2[nl2] \
+                               * grad_r1_grad_r2 * gphi
+                    products += Rnl1[nl1] * grad_r2_grad_theta1 \
+                                * dRnl2dr2[nl2] * dgphi[2]
+                    products += Rnl2[nl2] * grad_r1_grad_theta2 \
+                                * dRnl1dr1[nl1] * dgphi[3]
+                    products += Rnl1[nl1] * Rnl2[nl2] * \
+                                (grad_theta1_grad_theta2 * dgphi[0] \
+                                 + dgphi[1] / x**2)
+                    integrand += 2 * products * out12['vsigma']
+
+                U[key][index] = np.sum(integrand * aux)
 
         self.timer.stop('calculate_offsiteU_xc')
         return U
 
-    def evaluate_point_multipole_hartree(self, sym1, sym2, integral, R):
+    def evaluate_point_multipole_hartree(self, sym1, sym2, nl1, nl2, integral,
+                                         R):
         """
         Evaluates the point multipole contribution for the given Hartree
         kernel integral (which is also the value that it should approach
@@ -593,6 +654,8 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
         ----------
         sym1, sym2 : str
             Chemical symbols of the first and second element.
+        nl1, nl2 : str
+            Subshell labels.
         integral : str
             Integral label.
         R : float
@@ -637,19 +700,21 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
         lm1, lm2 = get_integral_pair(integral)
         l1 = ANGULAR_MOMENTUM[lm1[0]]
         l2 = ANGULAR_MOMENTUM[lm2[0]]
-        U_delta *= self.int1c_dict[sym1][l1] * self.int1c_dict[sym2][l2]
+        U_delta *= self.int1c_dict[(sym1, nl1)][l1]
+        U_delta *= self.int1c_dict[(sym2, nl2)][l2]
         U_delta /= R**(1 + l1 + l2)
         return U_delta
 
-    def calculate_hartree(self, e1, e2, R, grid, area, nl1, nl2,
+    def calculate_hartree(self, e1, e2, R, grid, area, selected,
                           subtract_delta):
         """
         Calculates the selected integrals involving the Hartree kernel.
 
         Parameters
         ----------
-        nl1, nl2 : str
-            Subshells defining the radial functions.
+        selected : dict
+            Dictionary with the list of subshells to use as radial functions
+            (one for every 'basis subset') for every element.
         subtract_delta : bool
             Whether to subtract the point multipole contributions from
             the kernel integrals.
@@ -680,21 +745,25 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
 
         sym1 = e1.get_symbol()
         sym2 = e2.get_symbol()
-        U = np.zeros(NUMSK_2CK)
-        dens_nl1 = e1.Rnl(r1, nl1)**2
+        dens_nl1 = {nl1: e1.Rnl(r1, nl1)**2 for nl1 in selected[sym1]}
+
+        keys = [(nl1, nl2) for nl1 in selected[sym1] for nl2 in selected[sym2]]
+        U = {key: np.zeros(NUMSK_2CK) for key in keys}
 
         for index, integral in enumerate(INTEGRALS_2CK):
             lm1, lm2 = get_integral_pair(integral)
             gphi = get_twocenter_phi_integral(lm1, lm2, c1, c2, s1, s2)
 
-            l2 = ANGULAR_MOMENTUM[lm2[0]]
-            vhar = self.evaluate_ohp(sym2, nl2, l2, r2)
-            U[index] = np.sum(vhar * dens_nl1 * aux * gphi)
+            for key in keys:
+                nl1, nl2 = key
+                l2 = ANGULAR_MOMENTUM[lm2[0]]
+                vhar = self.evaluate_ohp(sym2, nl2, l2, r2)
+                U[key][index] = np.sum(vhar * dens_nl1[nl1] * aux * gphi)
 
-            if subtract_delta:
-                U_delta = self.evaluate_point_multipole_hartree(sym1, sym2,
-                                                                integral, R)
-                U[index] -= U_delta
+                if subtract_delta:
+                    U_delta = self.evaluate_point_multipole_hartree(sym1, sym2,
+                                                        nl1, nl2, integral, R)
+                    U[key][index] -= U_delta
 
         self.timer.stop('calculate_offsiteU_hartree')
         return U
@@ -708,18 +777,15 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
         for p, (e1, e2) in enumerate(self.pairs):
             sym1, sym2 = e1.get_symbol(), e2.get_symbol()
 
-            template = '%s-%s_offsiteU.2ck'
-            filename = template % (sym1, sym2)
-            print('Writing to %s' % filename, file=self.txt, flush=True)
+            for bas1, valence1 in enumerate(e1.basis_sets):
+                for bas2, valence2 in enumerate(e2.basis_sets):
+                    template = '%s-%s_offsiteU.2ck'
+                    filename = template % (sym1 + '+'*bas1, sym2  + '+'*bas2)
+                    print('Writing to %s' % filename, file=self.txt, flush=True)
 
-            with open(filename, 'w') as f:
-                point_kernels = np.zeros(NUMSK_2CK)
-                for i, integral in enumerate(INTEGRALS_2CK):
-                    point_kernels[i] = self.evaluate_point_multipole_hartree(
-                                                    sym1, sym2, integral, 1)
-
-                write_2ck(f, self.Rgrid, self.tables[p],
-                          point_kernels=point_kernels)
+                    with open(filename, 'w') as f:
+                        write_2ck(f, self.Rgrid, self.tables[(p, bas1, bas2)],
+                            point_kernels=self.point_kernels[(p, bas1, bas2)])
         return
 
 
