@@ -168,6 +168,7 @@ class Onsite1cUMonopoleTable:
     def __init__(self, el, txt=None):
         self.el = el
         self.txt = txt
+        self.methods = ['Numerical', 'Analytical']
 
     def run(self, maxstep=0.25):
         """
@@ -179,10 +180,13 @@ class Onsite1cUMonopoleTable:
             Step size to use for integrals evaluated via
             numerical differentiation.
         """
-        self.U = {
-            'Numerical': {},
-            'Analytical': {},
-        }
+        print('\n\n', file=self.txt)
+        print('***********************************************', file=self.txt)
+        print('Monopole onsite-U table construction for %s' % \
+              self.el.get_symbol(), file=self.txt)
+        print('***********************************************', file=self.txt)
+
+        self.tables = {method: {} for method in self.methods}
         self.keys = []
 
         for valence1 in self.el.basis_sets:
@@ -194,10 +198,10 @@ class Onsite1cUMonopoleTable:
 
                         U = self.el.get_hubbard_value(nl1, nl2, scheme=None,
                                                       maxstep=maxstep)
-                        self.U['Numerical'][key] = U
+                        self.tables['Numerical'][key] = U
 
                         U = self.el.get_analytical_hubbard_value(nl1, nl2)
-                        self.U['Analytical'][key] = U
+                        self.tables['Analytical'][key] = U
         return
 
     def write(self):
@@ -217,16 +221,16 @@ class Onsite1cUMonopoleTable:
             for key in self.keys:
                 nl1, nl2 = key
 
-                for method in ['Numerical', 'Analytical']:
-                    U = self.U[method][key]
+                for method in self.methods:
+                    U = self.tables[method][key]
                     f.write(template % (method, sym, nl1, nl2, 'Ha', U))
                     f.write(template % (method, sym, nl1, nl2, 'eV', U * Ha))
 
             # Repeat in list form for convenience (only eV)
             template = '%s Hubbard value list for %s [eV]: %s\n'
 
-            for method in ['Numerical', 'Analytical']:
-                U = [self.U[method][key] * Ha for key in self.keys]
+            for method in self.methods:
+                U = [self.tables[method][key] * Ha for key in self.keys]
                 lst = '[' + ', '.join(list(map(lambda x: '%.3f' % x, U))) + ']'
                 f.write(template % (method, sym, lst))
 

@@ -67,6 +67,7 @@ class Onsite1cWMonopoleTable:
     def __init__(self, el, txt=None):
         self.el = el
         self.txt = txt
+        self.methods = ['Numerical', 'Analytical']
 
     def run(self, maxstep=0.25):
         """
@@ -78,10 +79,13 @@ class Onsite1cWMonopoleTable:
             Step size to use for integrals evaluated via
             numerical differentiation.
         """
-        self.W = {
-            'Numerical': {},
-            'Analytical': {},
-        }
+        print('\n\n', file=self.txt)
+        print('***********************************************', file=self.txt)
+        print('Monopole onsite-W table construction for %s' % \
+              self.el.get_symbol(), file=self.txt)
+        print('***********************************************', file=self.txt)
+
+        self.tables = {method: {} for method in self.methods}
         self.keys = []
 
         for valence1 in self.el.basis_sets:
@@ -93,10 +97,10 @@ class Onsite1cWMonopoleTable:
 
                         W = self.el.get_spin_constant(nl1, nl2, scheme=None,
                                                       maxstep=maxstep)
-                        self.W['Numerical'][key] = W
+                        self.tables['Numerical'][key] = W
 
                         W = self.el.get_analytical_spin_constant(nl1, nl2)
-                        self.W['Analytical'][key] = W
+                        self.tables['Analytical'][key] = W
         return
 
     def write(self):
@@ -116,16 +120,16 @@ class Onsite1cWMonopoleTable:
             for key in self.keys:
                 nl1, nl2 = key
 
-                for method in ['Numerical', 'Analytical']:
-                    W = self.W[method][key]
+                for method in self.methods:
+                    W = self.tables[method][key]
                     f.write(template % (method, sym, nl1, nl2, 'Ha', W))
                     f.write(template % (method, sym, nl1, nl2, 'eV', W * Ha))
 
             # Repeat in list form for convenience (only eV)
             template = '%s spin constant list for %s [eV]: %s\n'
 
-            for method in ['Numerical', 'Analytical']:
-                W = [self.W[method][key] * Ha for key in self.keys]
+            for method in self.methods:
+                W = [self.tables[method][key] * Ha for key in self.keys]
                 lst = '[' + ', '.join(list(map(lambda x: '%.3f' % x, W))) + ']'
                 f.write(template % (method, sym, lst))
 
