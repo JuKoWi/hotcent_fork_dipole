@@ -40,7 +40,11 @@ def build_interpolator(x, y, cutoff=None):
     if cutoff is None:
         fct = CubicSplineFunction(x, y)
     else:
-        N = np.argmax(x > cutoff)
+        if (x[-1] < cutoff):
+            N = len(x)
+        else:
+            N = np.argmax(x > cutoff)
+
         bc_type = ('natural', 'clamped')
         fct = CubicSplineFunction(x[:N], y[:N], bc_type=bc_type)
     return fct
