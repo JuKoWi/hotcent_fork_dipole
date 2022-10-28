@@ -105,14 +105,8 @@ def find_cutoff_radii(symbol, pp, rcut_approach, amp, x_ri, atom_kwargs,
                       shifts=None, verbose=True):
     assert rcut_approach in ['energy_shift_hubbard', 'energy_shift_user']
 
-    valence = atom_kwargs['valence']
-    rc = 50.  # very weak confinement
-    wf_conf = {
-        nl: SoftConfinement(amp=amp, x_ri=x_ri, rc=rc)
-        for nl in valence
-    }
-    atom = PseudoAtomicDFT(symbol, pp, txt='-' if verbose else None,
-                           wf_confinement=wf_conf, **atom_kwargs)
+    conf_kwargs = dict(amp=amp, x_ri=x_ri, rcuts=50.)
+    atom = get_atom(symbol, pp, atom_kwargs, verbose=verbose, **conf_kwargs)
     atom.run()
 
     if rcut_approach == 'energy_shift_user':
@@ -121,7 +115,7 @@ def find_cutoff_radii(symbol, pp, rcut_approach, amp, x_ri, atom_kwargs,
         shifts = find_energy_shifts(atom, model='hubbard')
 
     rcuts = {}
-    for nl in valence:
+    for nl in atom_kwargs['valence']:
         rcut = atom.find_cutoff_radius(nl, energy_shift=shifts[nl],
                                        amp=amp, x_ri=x_ri)
         rcuts[nl] = float(rcut)
@@ -130,41 +124,43 @@ def find_cutoff_radii(symbol, pp, rcut_approach, amp, x_ri, atom_kwargs,
 
 
 def find_polarization_radius(symbol, pp, amp, x_ri, atom_kwargs, verbose=True):
-    valence = atom_kwargs['valence']
-    rc = 50.  # very weak confinement
-    wf_conf = {
-        nl: SoftConfinement(amp=amp, x_ri=x_ri, rc=rc)
-        for nl in valence
-    }
-    atom = PseudoAtomicDFT(symbol, pp, txt='-' if verbose else None,
-                           wf_confinement=wf_conf, **atom_kwargs)
+    conf_kwargs = dict(amp=amp, x_ri=x_ri, rcuts=50.)
+    atom = get_atom(symbol, pp, atom_kwargs, verbose=verbose, **conf_kwargs)
     r_pol = float(atom.find_polarization_radius())
     return r_pol
 
 
 def generate_basis(symbol, pp, atom_kwargs, basis_kwargs, conf_kwargs,
                    verbose=True):
-    wf_conf = {
-        nl: SoftConfinement(amp=conf_kwargs['amp'], x_ri=conf_kwargs['x_ri'],
-                            rc=conf_kwargs['rcuts'][nl])
-        for nl in atom_kwargs['valence']
-    }
-    atom = PseudoAtomicDFT(symbol, pp, txt='-' if verbose else None,
-                           wf_confinement=wf_conf, **atom_kwargs)
-
+    atom = get_atom(symbol, pp, atom_kwargs, verbose=verbose, **conf_kwargs)
     atom.run()
     atom.generate_nonminimal_basis(**basis_kwargs)
     atom.pp.build_projectors(atom)
-
-    # Sanity check
-    for i, valence in enumerate(atom.basis_sets):
-        for nl in valence:
-            H1c, S1c = atom.get_onecenter_integrals(nl, nl)
-            msg = 'Suspicious eigenvalue {0:.3f} for {1}_{2}. Consider ' + \
-                  're-running with a smaller rmin parameter (e.g. 1e-4).'
-            assert abs(H1c) < 50., msg.format(H1c, symbol, nl)
-
     return atom
+
+
+def get_atom(symbol, pp, atom_kwargs, verbose, amp, x_ri, rcuts):
+    wf_conf = {}
+    for nl in atom_kwargs['valence']:
+        rc = rcuts if isinstance(rcuts, (int, float)) else rcuts[nl]
+        wf_conf[nl] = SoftConfinement(amp=amp, x_ri=x_ri, rc=rc)
+
+    atom = PseudoAtomicDFT(symbol, pp, txt='-' if verbose else None,
+                           wf_confinement=wf_conf, **atom_kwargs)
+    return atom
+
+
+def sanity_check_atom(symbol, pp, amp, x_ri, atom_kwargs, verbose=True):
+    conf_kwargs = dict(amp=amp, x_ri=x_ri, rcuts=50.)
+    atom = get_atom(symbol, pp, atom_kwargs, verbose=verbose, **conf_kwargs)
+    atom.run()
+
+    for nl in atom_kwargs['valence']:
+        H1c, S1c = atom.get_onecenter_integrals(nl, nl)
+        msg = 'Suspicious eigenvalue {0:.3f} for {1}_{2}. Consider ' + \
+              're-running with a smaller rmin parameter (e.g. 1e-4).'
+        assert abs(H1c) < 50., msg.format(H1c, symbol, nl)
+    return
 
 
 def write_yaml(symbol, atom_kwargs, basis_kwargs, conf_kwargs, pp_kwargs,
@@ -194,13 +190,19 @@ def write_yaml(symbol, atom_kwargs, basis_kwargs, conf_kwargs, pp_kwargs,
 def main():
     args = parse_arguments()
 
+    symbol = args.symbol
+    verify_chemical_symbols(symbol)
+
     configuration = args.configuration.replace(',', ' ')
+    pseudo_label = '' if args.pseudo_label is None else '.' + args.pseudo_label
     rmin = None if args.rmin is None else float(args.rmin)
     r_pol = None if args.rchar_pol is None else float(args.rchar_pol)
     verbose = not args.quiet
-    verify_chemical_symbols(args.symbol)
-    with_polarization = args.type.endswith('p')
     valence = args.valence.split(',')
+    amp = args.vconf_amplitude
+    x_ri = args.vconf_rstart_rel
+
+    with_polarization = args.type.endswith('p')
 
     if args.rcut_approach == 'user':
         assert args.rcut is not None, 'For --rcut-approach=user, ' + \
@@ -235,8 +237,7 @@ def main():
         local_component='siesta',
     )
 
-    pseudo_label = '' if args.pseudo_label is None else '.' + args.pseudo_label
-    pp_filename = '{0}{1}.psf'.format(args.symbol, pseudo_label)
+    pp_filename = '{0}{1}.psf'.format(symbol, pseudo_label)
     pp_path = os.path.join(args.pseudo_path, pp_filename)
     if verbose:
         print('Using pseudopotential file {0}'.format(pp_path))
@@ -252,9 +253,10 @@ def main():
         xc=args.xcfunctional,
     )
 
+    sanity_check_atom(symbol, pp, amp, x_ri, atom_kwargs, verbose=verbose)
+
     if with_polarization and r_pol is None:
-        r_pol = find_polarization_radius(args.symbol, pp, args.vconf_amplitude,
-                                         args.vconf_rstart_rel, atom_kwargs,
+        r_pol = find_polarization_radius(symbol, pp, amp, x_ri, atom_kwargs,
                                          verbose=verbose)
 
     basis_kwargs = dict(
@@ -264,28 +266,22 @@ def main():
     )
 
     if rcuts is None:
-        rcuts = find_cutoff_radii(args.symbol, pp, args.rcut_approach,
-                                  args.vconf_amplitude, args.vconf_rstart_rel,
+        rcuts = find_cutoff_radii(symbol, pp, args.rcut_approach, amp, x_ri,
                                   atom_kwargs, shifts=shifts, verbose=verbose)
 
-    conf_kwargs = dict(
-        amp=args.vconf_amplitude,
-        x_ri=args.vconf_rstart_rel,
-        rcuts=rcuts,
-    )
+    conf_kwargs = dict(amp=amp, x_ri=x_ri, rcuts=rcuts)
 
-    atom = generate_basis(args.symbol, pp, atom_kwargs, basis_kwargs,
-                          conf_kwargs, verbose=verbose)
+    atom = generate_basis(symbol, pp, atom_kwargs, basis_kwargs, conf_kwargs,
+                          verbose=verbose)
 
-    stem = args.symbol
+    stem = symbol
     if args.label is not None:
         stem += '.' + args.label
 
     write_ion(atom, label=stem)
 
     pp_kwargs.update(filename=pp_filename)
-    write_yaml(args.symbol, atom_kwargs, basis_kwargs, conf_kwargs, pp_kwargs,
-               stem)
+    write_yaml(symbol, atom_kwargs, basis_kwargs, conf_kwargs, pp_kwargs, stem)
     return
 
 
