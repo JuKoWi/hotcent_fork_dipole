@@ -263,7 +263,7 @@ class Offsite2cWMultipoleTable(MultiAtomIntegrator):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
 
     def run(self, subshells=None, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50,
-            wflimit=1e-7, xc='LDA', smoothen_tails=True, shift=False):
+            wflimit=1e-7, xc='LDA', smoothen_tails=True):
         """
         Calculates offsite, orbital- and distance-dependent "W" values
         as matrix elements of the two-center-expanded spin-polarized
@@ -335,13 +335,6 @@ class Offsite2cWMultipoleTable(MultiAtomIntegrator):
 
         for key in self.tables:
             for i in range(NUMSK_2CK):
-                all0 = np.allclose(self.tables[key][:, i], 0)
-                if shift and not all0:
-                    for j in range(N-1, 1, -1):
-                        if abs(self.tables[key][j, i]) > 0:
-                            self.tables[key][:j+1, i] -= self.tables[key][j, i]
-                            break
-
                 if smoothen_tails:
                     for key in self.tables:
                         self.tables[key][:, i] = \
