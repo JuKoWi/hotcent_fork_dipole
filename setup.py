@@ -1,6 +1,10 @@
+import re
 import sys
-from distutils.core import setup
-from distutils.extension import Extension
+from setuptools import Extension, find_packages, setup
+
+# Get the version number:
+with open('hotcent/__init__.py') as f:
+    version = re.search("__version__ = '(.*)'", f.read()).group(1)
 
 USE_CYTHON = False
 if '--use-cython' in sys.argv:
@@ -9,22 +13,34 @@ if '--use-cython' in sys.argv:
 
 ext = '.pyx' if USE_CYTHON else '.c'
 
-extensions = [Extension('_hotcent',
-                        sources=['hotcent/extensions' + ext],
-                        language='c',
-                        extra_compile_args=['-O3', '-ffast-math',
-                                            '-march=native'],
-                        ),
-              ]
+extensions = [
+    Extension('_hotcent',
+              sources=['hotcent/extensions' + ext],
+              language='c',
+              extra_compile_args=['-O3', '-ffast-math',
+                                  '-march=native'],
+              ),
+]
 
 if USE_CYTHON:
     from Cython.Build import cythonize
     extensions = cythonize(extensions, annotate=True)
 
+install_requires = [
+    'ase>=3.21.1',
+    'matplotlib',
+    'numpy',
+    'pytest',
+    'pyyaml',
+    'scipy',
+]
+
 setup(
-  name='hotcent',
   ext_modules=extensions,
-  url='https://gitlab.com/mvdb/hotcent',
+  install_requires=install_requires,
   license='LICENSE',
-  install_requires=['numpy', 'scipy', 'matplotlib', 'ase', 'pytest'],
+  name='hotcent',
+  packages=find_packages(),
+  url='https://gitlab.com/mvdb/hotcent',
+  version=version,
 )
