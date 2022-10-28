@@ -1,7 +1,9 @@
-build
 *.pyc
 *~
 *.so
+build
+dist
+hotcent.egg-info
 hotcent/*.html
 examples/*
 !examples/*.py
