@@ -33,50 +33,28 @@ Hotcent.
 
 ## Installation
 
-### Manually
-
-* Set up the [ASE](https://wiki.fysik.dtu.dk/ase/) Python module
-  (version 3.21.1 or newer).
-
-* Clone / download the Hotcent repository and update the
-`$PYTHONPATH` accordingly, e.g. like this:
+Clone or download Hotcent and install with e.g.
 ```shell
-cd <your_location_of_choice>
-git clone https://gitlab.com/mvdb/hotcent
-export PYTHONPATH=$PWD/hotcent:$PYTHONPATH
+pip install .
 ```
 
-* If you want significantly faster calculations (who doesn't?),
-you will want to build the optional C-extensions:
+If you have Cython installed and want to regenerate the C extensions:
 ```shell
-python setup.py build_ext --inplace
-```
-If you have Cython installed and want/need to regenerate the C-code,
-just run:
-```shell
-python setup.py build_ext --inplace --use-cython
+rm hotcent/extensions.c
+pip install . --verbose --install-option="--use-cython"
 ```
 
-* If you want to use functionals other than the PW92 LDA (again, who doesn't?),
-the [PyLibXC](https://www.tddft.org/programs/libxc/installation/#python-library)
-module needs to be available, which provides a Python interface to all
-LibXC functionals. A recent LibXC version is required (>= v5.1).
-Installing this module can e.g. be done as follows (modify as needed):
-```shell
-cd <your_libxc_directory>
-python setup.py develop --prefix=$PWD
-export PYTHONPATH=$PWD:$PYTHONPATH
-```
-
-### With pip
-
-Hotcent (with C-extensions) and its minimal dependencies can also be
-installed via pip:
+For developing Hotcent it is more convenient to install in editable mode:
 ```shell
 pip install -e .
 ```
-Note that the optional PyLibXC dependency still needs to be installed
-separately.
+
+### PyLibXC
+
+If you want to use functionals other than the PW92 LDA, the [PyLibXC](
+https://www.tddft.org/programs/libxc/installation/#python-library) module
+needs to be available, which provides a Python interface to all
+LibXC functionals. A recent LibXC version is required (>= v5.1).
 
 
 ## Testing
