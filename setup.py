@@ -1,5 +1,6 @@
 import re
 import sys
+from pathlib import Path
 from setuptools import Extension, find_packages, setup
 
 # Get the version number:
@@ -26,6 +27,12 @@ if USE_CYTHON:
     from Cython.Build import cythonize
     extensions = cythonize(extensions, annotate=True)
 
+files = [
+    'hotcent-basis',
+    'hotcent-tables',
+]
+scripts = [str(Path('tools') / f) for f in files]
+
 install_requires = [
     'ase>=3.21.1',
     'matplotlib',
@@ -41,6 +48,7 @@ setup(
   license='LICENSE',
   name='hotcent',
   packages=find_packages(),
+  scripts=scripts,
   url='https://gitlab.com/mvdb/hotcent',
   version=version,
 )

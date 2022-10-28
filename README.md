@@ -49,6 +49,11 @@ For developing Hotcent it is more convenient to install in editable mode:
 pip install -e .
 ```
 
+Aside from the Python module and the compiled extensions (`_hotcent.so`),
+the installation should also provide the `hotcent-basis` and `hotcent-setup`
+command line tools.
+
+
 ### PyLibXC
 
 If you want to use functionals other than the PW92 LDA, the [PyLibXC](
