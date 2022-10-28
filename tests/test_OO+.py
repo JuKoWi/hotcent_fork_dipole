@@ -153,7 +153,7 @@ def test_chg1c(atom):
 
     xc = atom.xcname
 
-    chgon1c = Onsite1cUTable(atom)
+    chgon1c = Onsite1cUTable(atom, use_multipoles=True)
     chgon1c.run(subshells=None, xc=xc)
     U = chgon1c.tables[(0, 0)][0, :]
 

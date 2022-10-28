@@ -99,7 +99,7 @@ def test_on1cU(atoms):
     size = atom_O.basis_size
     xc = atom_O.xcname
 
-    chgon1c = Onsite1cUTable(atom_O)
+    chgon1c = Onsite1cUTable(atom_O, use_multipoles=True)
     chgon1c.run(subshells=None, xc=xc)
     U = chgon1c.tables
 
@@ -127,6 +127,10 @@ def test_on1cU(atoms):
         for i, (val, ref) in enumerate(zip(U[key][0, :], refs)):
             U_diff = np.abs(val - ref)
             assert U_diff < tol, msg.format(key, i, val)
+
+    # Simple test of monopole variant
+    chgon1c = Onsite1cUTable(atom_Li, use_multipoles=False)
+    chgon1c.run()
     return
 
 
@@ -139,7 +143,7 @@ def test_on1cW(atoms):
     size = atom_O.basis_size
     xc = atom_O.xcname
 
-    magon1c = Onsite1cWTable(atom_O)
+    magon1c = Onsite1cWTable(atom_O, use_multipoles=True)
     magon1c.run(subshells=None, xc=xc)
     W = magon1c.tables
 
@@ -167,6 +171,10 @@ def test_on1cW(atoms):
         for i, (val, ref) in enumerate(zip(W[key][0, :], refs)):
             W_diff = np.abs(val - ref)
             assert W_diff < tol, msg.format(key, i, val)
+
+    # Simple test of monopole variant
+    chgon1c = Onsite1cWTable(atom_Li, use_multipoles=False)
+    chgon1c.run()
     return
 
 

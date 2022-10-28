@@ -5,6 +5,7 @@
 #   SPDX-License-Identifier: GPL-3.0-or-later                                 #
 #-----------------------------------------------------------------------------#
 import numpy as np
+from ase.units import Ha
 from hotcent.fluctuation_onecenter import (
                 NUML_1CK, NUML_1CM, select_radial_functions,
                 write_1ck, write_1cm)
@@ -18,6 +19,367 @@ from hotcent.slako import (get_integral_pair, get_twocenter_phi_integral,
                            get_twocenter_phi_integrals_derivatives,
                            tail_smoothening)
 from hotcent.xc import LibXC
+
+
+class Onsite1cMTable:
+    """
+    Class for calculations involving on-site moment integrals "M"
+    (Boleininger, Guilbert and Horsfield (2016), doi:10.1063/1.4964391):
+
+    $M_{\mu,\nu,lm} = \int \phi_\mu(\mathbf{r}) Y_{lm}(\mathbf{r})
+                           \phi_\nu(\mathbf{r}) d\mathbf{r}$
+
+    Parameters
+    ----------
+    el : AtomicBase-like object
+        Object with atomic properties.
+    txt : None or filehandle
+        Where to print output to (None for stdout).
+    """
+    def __init__(self, el, txt=None):
+        self.el = el
+        self.txt = txt
+
+    def run(self):
+        """
+        Calculates the on-site, subshell-dependent integrals
+
+        $\int R_{nl1}(r) R_{nl2}(r) r^2 dr$
+
+        from which the moment integrals M can be obtained
+        by multiplication with the appropriate Gaunt coefficients.
+        """
+        print('\n\n', file=self.txt)
+        print('***********************************************', file=self.txt)
+        print('Multipole onsite-M table construction for %s' % \
+              self.el.get_symbol(), file=self.txt)
+        print('***********************************************', file=self.txt)
+
+        selected = select_subshells(self.el, self.el)
+
+        self.tables = {}
+        for bas1 in range(len(self.el.basis_sets)):
+            for bas2 in range(len(self.el.basis_sets)):
+                shape = (NUML_1CM, NUML_1CM)
+                self.tables[(bas1, bas2)] = np.zeros(shape)
+
+        M = self.calculate(selected)
+
+        for key in selected:
+            nl1, nl2 = key
+            bas1 = self.el.get_basis_set_index(nl1)
+            bas2 = self.el.get_basis_set_index(nl2)
+            i = ANGULAR_MOMENTUM[nl1[1]]
+            j = ANGULAR_MOMENTUM[nl2[1]]
+            self.tables[(bas1, bas2)][i, j] = M[key]
+            if i != j or bas1 != bas2:
+                self.tables[(bas2, bas1)][j, i] = M[key]
+        return
+
+    def calculate(self, selected):
+        """
+        Calculates the selected integrals.
+
+        Parameters
+        ----------
+        selected : list of 2-tuples of 2-tuples
+            Sets of subshell pairs to evaluate.
+
+        Returns
+        -------
+        M: dict
+            Dictionary containing the integral for each selected
+            subshell pair.
+        """
+        M = {}
+        for key in selected:
+            nl1, nl2 = key
+            Rnl1 = np.copy(self.el.Rnlg[nl1])
+            Rnl2 = np.copy(self.el.Rnlg[nl2])
+            integrand = Rnl1 * Rnl2 * self.el.rgrid**2
+            M[key] = self.el.grid.integrate(integrand, use_dV=False)
+        return M
+
+    def write(self):
+        """
+        Writes all integral tables to file.
+
+        The filename template corresponds to '<el1>-<el1>_onsiteM.1cm'.
+        """
+        sym = self.el.get_symbol()
+
+        for bas1, valence1 in enumerate(self.el.basis_sets):
+            for bas2, valence2 in enumerate(self.el.basis_sets):
+                template = '%s-%s_onsiteM.1cm'
+                filename = template % (sym + '+'*bas1, sym + '+'*bas2)
+                print('Writing to %s' % filename, file=self.txt, flush=True)
+
+                with open(filename, 'w') as f:
+                    table = self.tables[(bas1, bas2)][:, :]
+                    write_1cm(f, table)
+        return
+
+
+class Onsite1cUTable:
+    """
+    Convenience wrapper around the Onsite1cUMonopoleTable
+    and Onsite1cUMultipoleTable classes.
+
+    Parameters
+    ----------
+    use_multipoles : bool
+        Whether to consider a multipole expansion of the difference
+        density (rather than a monopole approximation).
+    """
+    def __init__(self, *args, use_multipoles=None, **kwargs):
+        msg = '"use_multipoles" is required and must be either True or False'
+        assert use_multipoles is not None, msg
+
+        if use_multipoles:
+            self.calc = Onsite1cUMultipoleTable(*args, **kwargs)
+        else:
+            self.calc = Onsite1cUMonopoleTable(*args, **kwargs)
+
+    def __getattr__(self, attr):
+        return getattr(self.calc, attr)
+
+    def run(self, *args, **kwargs):
+        self.calc.run(*args, **kwargs)
+        return
+
+    def write(self, *args, **kwargs):
+        self.calc.write(*args, **kwargs)
+        return
+
+
+class Onsite1cUMonopoleTable:
+    """
+    Calculator for the "U" integrals as matrix elements of the
+    one-center-expanded Hartree-XC kernel in a monopole
+    approximation.
+
+    Parameters
+    ----------
+    el : AtomicBase-like object
+        Object with atomic properties.
+    txt : None or filehandle
+        Where to print output to (None for stdout).
+    """
+    def __init__(self, el, txt=None):
+        self.el = el
+        self.txt = txt
+
+    def run(self, maxstep=0.25):
+        """
+        Calculates the onsite, one-center "U" integrals.
+
+        Parameters
+        ----------
+        maxstep : float, optional
+            Step size to use for integrals evaluated via
+            numerical differentiation.
+        """
+        self.U = {
+            'Numerical': {},
+            'Analytical': {},
+        }
+        self.keys = []
+
+        for valence1 in self.el.basis_sets:
+            for nl1 in valence1:
+                for valence2 in self.el.basis_sets:
+                    for nl2 in valence2:
+                        key = (nl1, nl2)
+                        self.keys.append(key)
+
+                        U = self.el.get_hubbard_value(nl1, nl2, scheme=None,
+                                                      maxstep=maxstep)
+                        self.U['Numerical'][key] = U
+
+                        U = self.el.get_analytical_hubbard_value(nl1, nl2)
+                        self.U['Analytical'][key] = U
+        return
+
+    def write(self):
+        """
+        Writes the Hubbard values to file.
+
+        The filename template corresponds to '<el>_hubbard_values.txt'.
+        """
+        sym = self.el.get_symbol()
+
+        filename = '%s_hubbard_values.txt' % sym
+        print('Writing to %s' % filename, file=self.txt)
+
+        with open(filename, 'w') as f:
+            template = '%s Hubbard value for %s (%s, %s) [%s]: %.6f\n'
+
+            for key in self.keys:
+                nl1, nl2 = key
+
+                for method in ['Numerical', 'Analytical']:
+                    U = self.U[method][key]
+                    f.write(template % (method, sym, nl1, nl2, 'Ha', U))
+                    f.write(template % (method, sym, nl1, nl2, 'eV', U * Ha))
+
+            # Repeat in list form for convenience (only eV)
+            template = '%s Hubbard value list for %s [eV]: %s\n'
+
+            for method in ['Numerical', 'Analytical']:
+                U = [self.U[method][key] * Ha for key in self.keys]
+                lst = '[' + ', '.join(list(map(lambda x: '%.3f' % x, U))) + ']'
+                f.write(template % (method, sym, lst))
+
+        return
+
+
+class Onsite1cUMultipoleTable:
+    """
+    Calculator for (parts of) the "U" integrals as matrix elements of the
+    one-center-expanded Hartree-XC kernel in a multipole expansion.
+
+    Parameters
+    ----------
+    el : AtomicBase-like object
+        Object with atomic properties.
+    txt : None or filehandle
+        Where to print output to (None for stdout).
+    """
+    def __init__(self, el, txt=None):
+        self.el = el
+        self.txt = txt
+
+    def run(self, subshells=None, xc='LDA'):
+        """
+        Calculates the onsite, one-center "U" integrals.
+
+        Parameters
+        ----------
+        subshells : list, optional
+            Specific subshells to use as radial functions (one for
+            every 'basis subset'). By default, the subshell with lowest
+            angular momentum is chosen from each subset.
+        xc : str, optional
+            Name of the exchange-correlation functional (default: LDA).
+        """
+        print('\n\n', file=self.txt)
+        print('***********************************************', file=self.txt)
+        print('Multipole onsite-U table construction for %s' % \
+              self.el.get_symbol(), file=self.txt)
+        print('***********************************************', file=self.txt)
+
+        self.tables = {}
+        for bas1 in range(len(self.el.basis_sets)):
+            for bas2 in range(len(self.el.basis_sets)):
+                self.tables[(bas1, bas2)] = np.zeros((2, NUML_1CK))
+
+        if subshells is None:
+            selected = select_radial_functions(self.el)
+        else:
+            assert len(subshells) == len(self.el.basis_sets), \
+                   'Expecting one subshell per basis subset'
+            selected = subshells
+        print('Selected subshells:', selected, file=self.txt)
+
+        for nl1 in selected:
+            for nl2 in selected:
+                U, radmom = self.calculate(nl1, nl2, xc=xc)
+                bas1 = self.el.get_basis_set_index(nl1)
+                bas2 = self.el.get_basis_set_index(nl2)
+                self.tables[(bas1, bas2)][0, :] = U
+                self.tables[(bas1, bas2)][1, :] = radmom
+        return
+
+    def calculate(self, nl1, nl2, xc='LDA'):
+        """
+        Calculates the selected integrals involving the Hartree-XC kernel.
+
+        Parameters
+        ----------
+        nl1, nl2 : str
+            Subshells defining the radial functions.
+        xc : str, optional
+            Name of the exchange-correlation functional (default: LDA).
+
+        Returns
+        -------
+        U: np.ndarray
+            Array with the integral for each multipole.
+        radmom : np.ndarray
+            Array with the radial moments of the associated density
+            (\int R_{nl}^2 r^{l+2} dr, l = 0, 1, ...).
+        """
+        xc = LibXC('LDA_X+LDA_C_PW' if xc == 'LDA' else xc)
+        rho = self.el.electron_density(self.el.rgrid)
+
+        if xc.add_gradient_corrections:
+            drho = self.el.electron_density(self.el.rgrid, der=1)
+            sigma = drho**2
+        else:
+            sigma = None
+
+        out = xc.compute_vxc(rho, sigma=sigma, fxc=True)
+
+        U = np.zeros(NUML_1CK)
+        radmom = np.zeros(NUML_1CK)
+
+        Rnl1 = np.copy(self.el.Rnlg[nl1])
+        dens_nl1 = Rnl1**2
+        Rnl2 = np.copy(self.el.Rnlg[nl2])
+        dens_nl2 = Rnl2**2
+
+        integrand = out['v2rho2'] * dens_nl1 * dens_nl2
+        U[:] = self.el.grid.integrate(integrand * self.el.rgrid**2,
+                                      use_dV=False)
+
+        if xc.add_gradient_corrections:
+            dnl1 = 2 * Rnl1 * self.el.Rnl(self.el.rgrid, nl1, der=1)
+            dnl2 = 2 * Rnl2 * self.el.Rnl(self.el.rgrid, nl2, der=1)
+            grad_nl1_grad_rho = dnl1 * drho
+            grad_nl2_grad_rho = dnl2 * drho
+            integrand = 2. * out['v2rhosigma'] * grad_nl1_grad_rho * dens_nl2
+            integrand += 2. * out['v2rhosigma'] * grad_nl2_grad_rho * dens_nl1
+            integrand += 4. * out['v2sigma2'] * grad_nl1_grad_rho \
+                         * grad_nl2_grad_rho
+            integrand += 2. * out['vsigma'] * dnl1 * dnl2
+            U[:] += self.el.grid.integrate(integrand * self.el.rgrid**2,
+                                           use_dV=False)
+
+            for l in range(NUML_1CK):
+                integrand = 2. * out['vsigma'] * dens_nl1 * dens_nl2
+                U[l] += self.el.grid.integrate(integrand * l * (l+1),
+                                               use_dV=False)
+
+        for l in range(NUML_1CK):
+            ohp = OrbitalHartreePotential(self.el.rmin, self.el.xgrid,
+                                          dens_nl1, lmax=NUML_1CK-1)
+            vhar = ohp.vhar_fct[l](self.el.rgrid)
+            integrand = vhar * dens_nl2 * self.el.rgrid**2
+            U[l] += self.el.grid.integrate(integrand, use_dV=False)
+
+            integrand = Rnl1 * Rnl2 * self.el.rgrid**(l+2)
+            radmom[l] = self.el.grid.integrate(integrand, use_dV=False)
+
+        return (U, radmom)
+
+    def write(self):
+        """
+        Writes the integrals to file.
+
+        The filename template corresponds to '<el>-<el>_onsiteU.1ck'.
+        """
+        sym = self.el.get_symbol()
+
+        for bas1, valence1 in enumerate(self.el.basis_sets):
+            for bas2, valence2 in enumerate(self.el.basis_sets):
+                template = '%s-%s_onsiteU.1ck'
+                filename = template % (sym + '+'*bas1, sym + '+'*bas2)
+                print('Writing to %s' % filename, file=self.txt, flush=True)
+
+                table = self.tables[(bas1, bas2)]
+                with open(filename, 'w') as f:
+                    write_1ck(f, table[1, :], table[0, :])
+        return
 
 
 class Onsite2cUTable:
@@ -241,254 +603,6 @@ class Onsite2cUMonopoleTable(MultiAtomIntegrator):
                 table = self.tables[(bas1a, bas1b)]
                 with open(filename, 'w') as f:
                     write_2cl(f, self.Rgrid, table, angmom1a, angmom1b)
-        return
-
-
-class Onsite1cUTable:
-    """
-    Calculator for (parts of) the on-site, one-center "U" integrals
-    as matrix elements of the Hartree-XC kernel.
-
-    Parameters
-    ----------
-    el : AtomicBase-like object
-        Object with atomic properties.
-    txt : None or filehandle
-        Where to print output to (None for stdout).
-    """
-    def __init__(self, el, txt=None):
-        self.el = el
-        self.txt = txt
-
-    def run(self, subshells=None, xc='LDA'):
-        """
-        Calculates on-site, one-center "U" values.
-
-        Parameters
-        ----------
-        subshells : list, optional
-            Specific subshells to use as radial functions (one for
-            every 'basis subset'). By default, the subshell with lowest
-            angular momentum is chosen from each subset.
-        xc : str, optional
-            Name of the exchange-correlation functional (default: LDA).
-        """
-        print('\n\n', file=self.txt)
-        print('***********************************************', file=self.txt)
-        print('Multipole onsite-U table construction for %s' % \
-              self.el.get_symbol(), file=self.txt)
-        print('***********************************************', file=self.txt)
-
-        self.tables = {}
-        for bas1 in range(len(self.el.basis_sets)):
-            for bas2 in range(len(self.el.basis_sets)):
-                self.tables[(bas1, bas2)] = np.zeros((2, NUML_1CK))
-
-        if subshells is None:
-            selected = select_radial_functions(self.el)
-        else:
-            assert len(subshells) == len(self.el.basis_sets), \
-                   'Expecting one subshell per basis subset'
-            selected = subshells
-        print('Selected subshells:', selected, file=self.txt)
-
-        for nl1 in selected:
-            for nl2 in selected:
-                U, radmom = self.calculate(nl1, nl2, xc=xc)
-                bas1 = self.el.get_basis_set_index(nl1)
-                bas2 = self.el.get_basis_set_index(nl2)
-                self.tables[(bas1, bas2)][0, :] = U
-                self.tables[(bas1, bas2)][1, :] = radmom
-        return
-
-    def calculate(self, nl1, nl2, xc='LDA'):
-        """
-        Calculates the selected integrals involving the Hartree-XC kernel.
-
-        Parameters
-        ----------
-        nl1, nl2 : str
-            Subshells defining the radial functions.
-        xc : str, optional
-            Name of the exchange-correlation functional (default: LDA).
-
-        Returns
-        -------
-        U: np.ndarray
-            Array with the integral for each multipole.
-        radmom : np.ndarray
-            Array with the radial moments of the associated density
-            (\int R_{nl}^2 r^{l+2} dr, l = 0, 1, ...).
-        """
-        xc = LibXC('LDA_X+LDA_C_PW' if xc == 'LDA' else xc)
-        rho = self.el.electron_density(self.el.rgrid)
-
-        if xc.add_gradient_corrections:
-            drho = self.el.electron_density(self.el.rgrid, der=1)
-            sigma = drho**2
-        else:
-            sigma = None
-
-        out = xc.compute_vxc(rho, sigma=sigma, fxc=True)
-
-        U = np.zeros(NUML_1CK)
-        radmom = np.zeros(NUML_1CK)
-
-        Rnl1 = np.copy(self.el.Rnlg[nl1])
-        dens_nl1 = Rnl1**2
-        Rnl2 = np.copy(self.el.Rnlg[nl2])
-        dens_nl2 = Rnl2**2
-
-        integrand = out['v2rho2'] * dens_nl1 * dens_nl2
-        U[:] = self.el.grid.integrate(integrand * self.el.rgrid**2,
-                                      use_dV=False)
-
-        if xc.add_gradient_corrections:
-            dnl1 = 2 * Rnl1 * self.el.Rnl(self.el.rgrid, nl1, der=1)
-            dnl2 = 2 * Rnl2 * self.el.Rnl(self.el.rgrid, nl2, der=1)
-            grad_nl1_grad_rho = dnl1 * drho
-            grad_nl2_grad_rho = dnl2 * drho
-            integrand = 2. * out['v2rhosigma'] * grad_nl1_grad_rho * dens_nl2
-            integrand += 2. * out['v2rhosigma'] * grad_nl2_grad_rho * dens_nl1
-            integrand += 4. * out['v2sigma2'] * grad_nl1_grad_rho \
-                         * grad_nl2_grad_rho
-            integrand += 2. * out['vsigma'] * dnl1 * dnl2
-            U[:] += self.el.grid.integrate(integrand * self.el.rgrid**2,
-                                           use_dV=False)
-
-            for l in range(NUML_1CK):
-                integrand = 2. * out['vsigma'] * dens_nl1 * dens_nl2
-                U[l] += self.el.grid.integrate(integrand * l * (l+1),
-                                               use_dV=False)
-
-        for l in range(NUML_1CK):
-            ohp = OrbitalHartreePotential(self.el.rmin, self.el.xgrid,
-                                          dens_nl1, lmax=NUML_1CK-1)
-            vhar = ohp.vhar_fct[l](self.el.rgrid)
-            integrand = vhar * dens_nl2 * self.el.rgrid**2
-            U[l] += self.el.grid.integrate(integrand, use_dV=False)
-
-            integrand = Rnl1 * Rnl2 * self.el.rgrid**(l+2)
-            radmom[l] = self.el.grid.integrate(integrand, use_dV=False)
-
-        return (U, radmom)
-
-    def write(self):
-        """
-        Writes the integrals to file.
-
-        The filename template corresponds to '<el>-<el>_onsiteU.1ck'.
-        """
-        sym = self.el.get_symbol()
-
-        for bas1, valence1 in enumerate(self.el.basis_sets):
-            for bas2, valence2 in enumerate(self.el.basis_sets):
-                template = '%s-%s_onsiteU.1ck'
-                filename = template % (sym + '+'*bas1, sym + '+'*bas2)
-                print('Writing to %s' % filename, file=self.txt, flush=True)
-
-                table = self.tables[(bas1, bas2)]
-                with open(filename, 'w') as f:
-                    write_1ck(f, table[1, :], table[0, :])
-        return
-
-
-class Onsite1cMTable:
-    """
-    Class for calculations involving on-site moment integrals "M"
-    (Boleininger, Guilbert and Horsfield (2016), doi:10.1063/1.4964391):
-
-    $M_{\mu,\nu,lm} = \int \phi_\mu(\mathbf{r}) Y_{lm}(\mathbf{r})
-                           \phi_\nu(\mathbf{r}) d\mathbf{r}$
-
-    Parameters
-    ----------
-    el : AtomicBase-like object
-        Object with atomic properties.
-    txt : None or filehandle
-        Where to print output to (None for stdout).
-    """
-    def __init__(self, el, txt=None):
-        self.el = el
-        self.txt = txt
-
-    def run(self):
-        """
-        Calculates the on-site, subshell-dependent integrals
-
-        $\int R_{nl1}(r) R_{nl2}(r) r^2 dr$
-
-        from which the moment integrals M can be obtained
-        by multiplication with the appropriate Gaunt coefficients.
-        """
-        print('\n\n', file=self.txt)
-        print('***********************************************', file=self.txt)
-        print('Multipole onsite-M table construction for %s' % \
-              self.el.get_symbol(), file=self.txt)
-        print('***********************************************', file=self.txt)
-
-        selected = select_subshells(self.el, self.el)
-
-        self.tables = {}
-        for bas1 in range(len(self.el.basis_sets)):
-            for bas2 in range(len(self.el.basis_sets)):
-                shape = (NUML_1CM, NUML_1CM)
-                self.tables[(bas1, bas2)] = np.zeros(shape)
-
-        M = self.calculate(selected)
-
-        for key in selected:
-            nl1, nl2 = key
-            bas1 = self.el.get_basis_set_index(nl1)
-            bas2 = self.el.get_basis_set_index(nl2)
-            i = ANGULAR_MOMENTUM[nl1[1]]
-            j = ANGULAR_MOMENTUM[nl2[1]]
-            self.tables[(bas1, bas2)][i, j] = M[key]
-            if i != j or bas1 != bas2:
-                self.tables[(bas2, bas1)][j, i] = M[key]
-        return
-
-    def calculate(self, selected):
-        """
-        Calculates the selected integrals.
-
-        Parameters
-        ----------
-        selected : list of 2-tuples of 2-tuples
-            Sets of subshell pairs to evaluate.
-
-        Returns
-        -------
-        M: dict
-            Dictionary containing the integral for each selected
-            subshell pair.
-        """
-        M = {}
-        for key in selected:
-            nl1, nl2 = key
-            Rnl1 = np.copy(self.el.Rnlg[nl1])
-            Rnl2 = np.copy(self.el.Rnlg[nl2])
-            integrand = Rnl1 * Rnl2 * self.el.rgrid**2
-            M[key] = self.el.grid.integrate(integrand, use_dV=False)
-        return M
-
-    def write(self):
-        """
-        Writes all integral tables to file.
-
-        The filename template corresponds to '<el1>-<el1>_onsiteM.1cm'.
-        """
-        sym = self.el.get_symbol()
-
-        for bas1, valence1 in enumerate(self.el.basis_sets):
-            for bas2, valence2 in enumerate(self.el.basis_sets):
-                template = '%s-%s_onsiteM.1cm'
-                filename = template % (sym + '+'*bas1, sym + '+'*bas2)
-                print('Writing to %s' % filename, file=self.txt, flush=True)
-
-                with open(filename, 'w') as f:
-                    table = self.tables[(bas1, bas2)][:, :]
-                    write_1cm(f, table)
         return
 
 

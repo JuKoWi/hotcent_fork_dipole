@@ -5,6 +5,7 @@
 #   SPDX-License-Identifier: GPL-3.0-or-later                                 #
 #-----------------------------------------------------------------------------#
 import numpy as np
+from ase.units import Ha
 from hotcent.fluctuation_onecenter import (
                 NUML_1CK, select_radial_functions, write_1ck)
 from hotcent.fluctuation_twocenter import (
@@ -16,6 +17,282 @@ from hotcent.slako import (get_integral_pair, get_twocenter_phi_integral,
                            get_twocenter_phi_integrals_derivatives,
                            tail_smoothening)
 from hotcent.xc import LibXC
+
+
+class Onsite1cWTable:
+    """
+    Convenience wrapper around the Onsite1cWMonopoleTable
+    and Onsite1cWMultipoleTable classes.
+
+    Parameters
+    ----------
+    use_multipoles : bool
+        Whether to consider a multipole expansion of the magnetization
+        density (rather than a monopole approximation).
+    """
+    def __init__(self, *args, use_multipoles=None, **kwargs):
+        msg = '"use_multipoles" is required and must be either True or False'
+        assert use_multipoles is not None, msg
+
+        if use_multipoles:
+            self.calc = Onsite1cWMultipoleTable(*args, **kwargs)
+        else:
+            self.calc = Onsite1cWMonopoleTable(*args, **kwargs)
+
+    def __getattr__(self, attr):
+        return getattr(self.calc, attr)
+
+    def run(self, *args, **kwargs):
+        self.calc.run(*args, **kwargs)
+        return
+
+    def write(self, *args, **kwargs):
+        self.calc.write(*args, **kwargs)
+        return
+
+
+class Onsite1cWMonopoleTable:
+    """
+    Calculator for the "W" integrals as matrix elements of the
+    one-center-expanded spin-polarized XC kernel in a monopole
+    approximation.
+
+    Parameters
+    ----------
+    el : AtomicBase-like object
+        Object with atomic properties.
+    txt : None or filehandle
+        Where to print output to (None for stdout).
+    """
+    def __init__(self, el, txt=None):
+        self.el = el
+        self.txt = txt
+
+    def run(self, maxstep=0.25):
+        """
+        Calculates the onsite, one-center "W" integrals.
+
+        Parameters
+        ----------
+        maxstep : float, optional
+            Step size to use for integrals evaluated via
+            numerical differentiation.
+        """
+        self.W = {
+            'Numerical': {},
+            'Analytical': {},
+        }
+        self.keys = []
+
+        for valence1 in self.el.basis_sets:
+            for nl1 in valence1:
+                for valence2 in self.el.basis_sets:
+                    for nl2 in valence2:
+                        key = (nl1, nl2)
+                        self.keys.append(key)
+
+                        W = self.el.get_spin_constant(nl1, nl2, scheme=None,
+                                                      maxstep=maxstep)
+                        self.W['Numerical'][key] = W
+
+                        W = self.el.get_analytical_spin_constant(nl1, nl2)
+                        self.W['Analytical'][key] = W
+        return
+
+    def write(self):
+        """
+        Writes the spin constants to file.
+
+        The filename template corresponds to '<el>_spin_constants.txt'.
+        """
+        sym = self.el.get_symbol()
+
+        filename = '%s_spin_constants.txt' % sym
+        print('Writing to %s' % filename, file=self.txt)
+
+        with open(filename, 'w') as f:
+            template = '%s spin constant for %s (%s, %s) [%s]: %.6f\n'
+
+            for key in self.keys:
+                nl1, nl2 = key
+
+                for method in ['Numerical', 'Analytical']:
+                    W = self.W[method][key]
+                    f.write(template % (method, sym, nl1, nl2, 'Ha', W))
+                    f.write(template % (method, sym, nl1, nl2, 'eV', W * Ha))
+
+            # Repeat in list form for convenience (only eV)
+            template = '%s spin constant list for %s [eV]: %s\n'
+
+            for method in ['Numerical', 'Analytical']:
+                W = [self.W[method][key] * Ha for key in self.keys]
+                lst = '[' + ', '.join(list(map(lambda x: '%.3f' % x, W))) + ']'
+                f.write(template % (method, sym, lst))
+
+        return
+
+
+class Onsite1cWMultipoleTable:
+    """
+    Calculator for (parts of) the "W" integrals as matrix elements of the
+    one-center-expanded spin-polarized XC kernel in a multipole expansion.
+
+    Parameters
+    ----------
+    el : AtomicBase-like object
+        Object with atomic properties.
+    txt : None or filehandle
+        Where to print output to (None for stdout).
+    """
+    def __init__(self, el, txt=None):
+        self.el = el
+        self.txt = txt
+
+    def run(self, subshells=None, xc='LDA'):
+        """
+        Calculates the onsite, one-center "W" integrals.
+
+        Parameters
+        ----------
+        subshells : list, optional
+            Specific subshells to use as radial functions (one for
+            every 'basis subset'). By default, the subshell with lowest
+            angular momentum is chosen from each subset.
+        xc : str, optional
+            Name of the exchange-correlation functional (default: LDA).
+        """
+        print('\n\n', file=self.txt)
+        print('***********************************************', file=self.txt)
+        print('Multipole onsite-W table construction for %s' % \
+              self.el.get_symbol(), file=self.txt)
+        print('***********************************************', file=self.txt)
+
+        self.tables = {}
+        for bas1 in range(len(self.el.basis_sets)):
+            for bas2 in range(len(self.el.basis_sets)):
+                self.tables[(bas1, bas2)] = np.zeros((2, NUML_1CK))
+
+        if subshells is None:
+            selected = select_radial_functions(self.el)
+        else:
+            assert len(subshells) == len(self.el.basis_sets), \
+                   'Expecting one subshell per basis subset'
+            selected = subshells
+        print('Selected subshells:', selected, file=self.txt)
+
+        for nl1 in selected:
+            for nl2 in selected:
+                W, radmom = self.calculate(nl1, nl2, xc=xc)
+                bas1 = self.el.get_basis_set_index(nl1)
+                bas2 = self.el.get_basis_set_index(nl2)
+                self.tables[(bas1, bas2)][0, :] = W
+                self.tables[(bas1, bas2)][1, :] = radmom
+        return
+
+    def calculate(self, nl1, nl2, xc='LDA'):
+        """
+        Calculates the selected integrals involving the spin-polarized
+        XC kernel.
+
+        Parameters
+        ----------
+        nl1, nl2 : str
+            Subshells defining the radial functions.
+        xc : str, optional
+            Name of the exchange-correlation functional (default: LDA).
+
+        Returns
+        -------
+        W: np.ndarray
+            Array with the integral for each multipole.
+        radmom : np.ndarray
+            Array with the radial moments of the associated density
+            (\int R_{nl}^2 r^{l+2} dr, l = 0, 1, ...).
+        """
+        xc = LibXC('LDA_X+LDA_C_PW' if xc == 'LDA' else xc,
+                   spin_polarized=True)
+
+        rho_up = self.el.electron_density(self.el.rgrid) / 2.
+        rho_down = np.copy(rho_up)
+
+        if xc.add_gradient_corrections:
+            drho = self.el.electron_density(self.el.rgrid, der=1) / 2.
+            sigma = drho**2
+        else:
+            sigma = None
+
+        out = xc.compute_vxc_polarized(rho_up, rho_down, sigma_up=sigma,
+                                       sigma_updown=sigma, sigma_down=sigma,
+                                       fxc=True)
+
+        W = np.zeros(NUML_1CK)
+        radmom = np.zeros(NUML_1CK)
+
+        Rnl1 = np.copy(self.el.Rnlg[nl1])
+        dens_nl1 = Rnl1**2
+        Rnl2 = np.copy(self.el.Rnlg[nl2])
+        dens_nl2 = Rnl2**2
+
+        integrand = (out['v2rho2_up'] - out['v2rho2_updown']) \
+                    * dens_nl1 * dens_nl2
+        W[:] = self.el.grid.integrate(integrand * self.el.rgrid**2,
+                                      use_dV=False)
+
+        if xc.add_gradient_corrections:
+            dnl1 = 2 * Rnl1 * self.el.Rnl(self.el.rgrid, nl1, der=1)
+            dnl2 = 2 * Rnl2 * self.el.Rnl(self.el.rgrid, nl2, der=1)
+            grad_nl1_grad_rho = dnl1 * drho
+            grad_nl2_grad_rho = dnl2 * drho
+
+            products = grad_nl1_grad_rho * dens_nl2 \
+                       + grad_nl2_grad_rho * dens_nl1
+            integrand = 2. * products \
+                        * (out['v2rhosigma_up_up'] - out['v2rhosigma_up_down'])
+
+            products = grad_nl1_grad_rho * grad_nl2_grad_rho
+            integrand += 4. * products \
+                         * (out['v2sigma2_up_up'] - out['v2sigma2_up_down'])
+            integrand += 2. * products \
+                     * (out['v2sigma2_up_updown'] - out['v2sigma2_updown_down'])
+
+            products = dnl1 * dnl2
+            integrand += products \
+                         * (2. * out['vsigma_up'] - out['vsigma_updown'])
+
+            W[:] += self.el.grid.integrate(integrand * self.el.rgrid**2,
+                                           use_dV=False)
+
+            for l in range(NUML_1CK):
+                integrand = (2. * out['vsigma_up'] - out['vsigma_updown']) \
+                            * dens_nl1 * dens_nl2
+                W[l] += self.el.grid.integrate(integrand * l * (l+1),
+                                               use_dV=False)
+
+        for l in range(NUML_1CK):
+            integrand = Rnl1 * Rnl2 * self.el.rgrid**(l+2)
+            radmom[l] = self.el.grid.integrate(integrand, use_dV=False)
+
+        W /= 2
+        return (W, radmom)
+
+    def write(self):
+        """
+        Writes the integrals to file.
+
+        The filename template corresponds to '<el>-<el>_onsiteW.1ck'.
+        """
+        sym = self.el.get_symbol()
+
+        for bas1, valence1 in enumerate(self.el.basis_sets):
+            for bas2, valence2 in enumerate(self.el.basis_sets):
+                template = '%s-%s_onsiteW.1ck'
+                filename = template % (sym + '+'*bas1, sym + '+'*bas2)
+                print('Writing to %s' % filename, file=self.txt, flush=True)
+
+                table = self.tables[(bas1, bas2)]
+                with open(filename, 'w') as f:
+                    write_1ck(f, table[1, :], table[0, :])
+        return
 
 
 class Onsite2cWTable:
@@ -334,169 +611,6 @@ class Onsite2cWMonopoleTable(MultiAtomIntegrator):
                 table = self.tables[(bas1a, bas1b)]
                 with open(filename, 'w') as f:
                     write_2cl(f, self.Rgrid, table, angmom1a, angmom1b)
-        return
-
-
-class Onsite1cWTable:
-    """
-    Calculator for (parts of) the onsite, one-center "W" integrals
-    as matrix elements of the spin-polarized XC kernel.
-
-    Parameters
-    ----------
-    el : AtomicBase-like object
-        Object with atomic properties.
-    txt : None or filehandle
-        Where to print output to (None for stdout).
-    """
-    def __init__(self, el, txt=None):
-        self.el = el
-        self.txt = txt
-
-    def run(self, subshells=None, xc='LDA'):
-        """
-        Calculates onsite, one-center "W" values.
-
-        Parameters
-        ----------
-        subshells : list, optional
-            Specific subshells to use as radial functions (one for
-            every 'basis subset'). By default, the subshell with lowest
-            angular momentum is chosen from each subset.
-        xc : str, optional
-            Name of the exchange-correlation functional (default: LDA).
-        """
-        print('\n\n', file=self.txt)
-        print('***********************************************', file=self.txt)
-        print('Multipole onsite-W table construction for %s' % \
-              self.el.get_symbol(), file=self.txt)
-        print('***********************************************', file=self.txt)
-
-        self.tables = {}
-        for bas1 in range(len(self.el.basis_sets)):
-            for bas2 in range(len(self.el.basis_sets)):
-                self.tables[(bas1, bas2)] = np.zeros((2, NUML_1CK))
-
-        if subshells is None:
-            selected = select_radial_functions(self.el)
-        else:
-            assert len(subshells) == len(self.el.basis_sets), \
-                   'Expecting one subshell per basis subset'
-            selected = subshells
-        print('Selected subshells:', selected, file=self.txt)
-
-        for nl1 in selected:
-            for nl2 in selected:
-                W, radmom = self.calculate(nl1, nl2, xc=xc)
-                bas1 = self.el.get_basis_set_index(nl1)
-                bas2 = self.el.get_basis_set_index(nl2)
-                self.tables[(bas1, bas2)][0, :] = W
-                self.tables[(bas1, bas2)][1, :] = radmom
-        return
-
-    def calculate(self, nl1, nl2, xc='LDA'):
-        """
-        Calculates the selected integrals involving the spin-polarized
-        XC kernel.
-
-        Parameters
-        ----------
-        nl1, nl2 : str
-            Subshells defining the radial functions.
-        xc : str, optional
-            Name of the exchange-correlation functional (default: LDA).
-
-        Returns
-        -------
-        W: np.ndarray
-            Array with the integral for each multipole.
-        radmom : np.ndarray
-            Array with the radial moments of the associated density
-            (\int R_{nl}^2 r^{l+2} dr, l = 0, 1, ...).
-        """
-        xc = LibXC('LDA_X+LDA_C_PW' if xc == 'LDA' else xc,
-                   spin_polarized=True)
-
-        rho_up = self.el.electron_density(self.el.rgrid) / 2.
-        rho_down = np.copy(rho_up)
-
-        if xc.add_gradient_corrections:
-            drho = self.el.electron_density(self.el.rgrid, der=1) / 2.
-            sigma = drho**2
-        else:
-            sigma = None
-
-        out = xc.compute_vxc_polarized(rho_up, rho_down, sigma_up=sigma,
-                                       sigma_updown=sigma, sigma_down=sigma,
-                                       fxc=True)
-
-        W = np.zeros(NUML_1CK)
-        radmom = np.zeros(NUML_1CK)
-
-        Rnl1 = np.copy(self.el.Rnlg[nl1])
-        dens_nl1 = Rnl1**2
-        Rnl2 = np.copy(self.el.Rnlg[nl2])
-        dens_nl2 = Rnl2**2
-
-        integrand = (out['v2rho2_up'] - out['v2rho2_updown']) \
-                    * dens_nl1 * dens_nl2
-        W[:] = self.el.grid.integrate(integrand * self.el.rgrid**2,
-                                      use_dV=False)
-
-        if xc.add_gradient_corrections:
-            dnl1 = 2 * Rnl1 * self.el.Rnl(self.el.rgrid, nl1, der=1)
-            dnl2 = 2 * Rnl2 * self.el.Rnl(self.el.rgrid, nl2, der=1)
-            grad_nl1_grad_rho = dnl1 * drho
-            grad_nl2_grad_rho = dnl2 * drho
-
-            products = grad_nl1_grad_rho * dens_nl2 \
-                       + grad_nl2_grad_rho * dens_nl1
-            integrand = 2. * products \
-                        * (out['v2rhosigma_up_up'] - out['v2rhosigma_up_down'])
-
-            products = grad_nl1_grad_rho * grad_nl2_grad_rho
-            integrand += 4. * products \
-                         * (out['v2sigma2_up_up'] - out['v2sigma2_up_down'])
-            integrand += 2. * products \
-                     * (out['v2sigma2_up_updown'] - out['v2sigma2_updown_down'])
-
-            products = dnl1 * dnl2
-            integrand += products \
-                         * (2. * out['vsigma_up'] - out['vsigma_updown'])
-
-            W[:] += self.el.grid.integrate(integrand * self.el.rgrid**2,
-                                           use_dV=False)
-
-            for l in range(NUML_1CK):
-                integrand = (2. * out['vsigma_up'] - out['vsigma_updown']) \
-                            * dens_nl1 * dens_nl2
-                W[l] += self.el.grid.integrate(integrand * l * (l+1),
-                                               use_dV=False)
-
-        for l in range(NUML_1CK):
-            integrand = Rnl1 * Rnl2 * self.el.rgrid**(l+2)
-            radmom[l] = self.el.grid.integrate(integrand, use_dV=False)
-
-        W /= 2
-        return (W, radmom)
-
-    def write(self):
-        """
-        Writes the integrals to file.
-
-        The filename template corresponds to '<el>-<el>_onsiteW.1ck'.
-        """
-        sym = self.el.get_symbol()
-
-        for bas1, valence1 in enumerate(self.el.basis_sets):
-            for bas2, valence2 in enumerate(self.el.basis_sets):
-                template = '%s-%s_onsiteW.1ck'
-                filename = template % (sym + '+'*bas1, sym + '+'*bas2)
-                print('Writing to %s' % filename, file=self.txt, flush=True)
-
-                table = self.tables[(bas1, bas2)]
-                with open(filename, 'w') as f:
-                    write_1ck(f, table[1, :], table[0, :])
         return
 
 

@@ -20,6 +20,185 @@ from hotcent.slako import (get_integral_pair, get_twocenter_phi_integral,
 from hotcent.xc import LibXC
 
 
+class Offsite2cMTable(MultiAtomIntegrator):
+    """
+    Calculator for (parts of) the off-site moment integrals "M"
+    (Boleininger, Guilbert and Horsfield (2016), doi:10.1063/1.4964391):
+
+    $M_{\mu,\nu,lm} = \int \phi_\mu(\mathbf{r_1}) Y_{lm}(\mathbf{r_1})
+                           \phi_\nu(\mathbf{r_2}) d\mathbf{r}$
+    """
+    def __init__(self, *args, **kwargs):
+        MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
+
+    def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
+            smoothen_tails=True):
+        """
+        Calculates the required off-site Slater-Koster integrals for
+
+        $\int R_{nl1}(\mathbf{r}) Y_{lm}(\mathbf{r_1}
+              \phi_\nu(\mathbf{r_2}) d\mathbf{r}$
+
+        from which the moment integrals M can be obtained by rotation
+        after multiplication with the appropriate Gaunt coefficients.
+
+        Parameters
+        ----------
+        See Offsite2cTable.run() and Onsite2cTable.run().
+        """
+        print('\n\n', file=self.txt)
+        print('***********************************************', file=self.txt)
+        print('Multipole offsite-M table construction for %s and %s' % \
+              (self.ela.get_symbol(), self.elb.get_symbol()), file=self.txt)
+        print('***********************************************', file=self.txt)
+        self.txt.flush()
+
+        assert N is not None, 'Need to set number of grid points N!'
+        assert rmin >= 1e-3, 'For stability, please set rmin >= 1e-3'
+        assert np.isclose(rmin / dr, np.round(rmin / dr)), \
+               'rmin must be a multiple of dr'
+
+        self.timer.start('run_offsiteM')
+        wf_range = self.get_range(wflimit)
+        self.Rgrid = rmin + dr * np.arange(N)
+        self.tables = {}
+
+        for p, (e1, e2) in enumerate(self.pairs):
+            for bas1 in range(len(e1.basis_sets)):
+                for bas2 in range(len(e2.basis_sets)):
+                    shape = (NUML_2CM, N, NUMSK_2CM)
+                    self.tables[(p, bas1, bas2)] = np.zeros(shape)
+
+        for i, R in enumerate(self.Rgrid):
+            if R > 2 * wf_range:
+                break
+
+            grid, area = self.make_grid(R, wf_range, nt=ntheta, nr=nr)
+
+            if i == N - 1 or N // 10 == 0 or i % (N // 10) == 0:
+                print('R=%8.2f, %i grid points ...' % \
+                      (R, len(grid)), file=self.txt, flush=True)
+
+            if len(grid) > 0:
+                for p, (e1, e2) in enumerate(self.pairs):
+                    selected = self.select_integrals(e1, e2)
+
+                    M = self.calculate(selected, e1, e2, R, grid, area)
+
+                    for key in selected:
+                        nl1, nl2, integrals = key
+                        bas1 = e1.get_basis_set_index(nl1)
+                        bas2 = e2.get_basis_set_index(nl2)
+                        l1 = ANGULAR_MOMENTUM[nl1[1]]
+                        self.tables[(p, bas1, bas2)][l1, i, :] += M[key][:]
+
+        if smoothen_tails:
+            for key in self.tables:
+                for l1 in range(NUML_2CM):
+                    for i in range(NUMSK_2CM):
+                            for key in self.tables:
+                                self.tables[key][l1, :, i] = \
+                                    tail_smoothening(self.Rgrid,
+                                                     self.tables[key][l1, :, i])
+
+        self.timer.stop('run_offsiteM')
+        return
+
+    def select_integrals(self, e1, e2, expand2=True):
+        """ Returns the list of (nl1, nl2, integrals) tuples with
+        the integrals to evaluate for every subshell pair of the given
+        elements. """
+        selected = []
+        for ival1, valence1 in enumerate(e1.basis_sets):
+            for nl1 in valence1:
+                lmax1 = 4
+
+                for ival2, valence2 in enumerate(e2.basis_sets):
+                    for nl2 in valence2:
+                        angmom2 = [ANGULAR_MOMENTUM[nl2[1]]]
+
+                        integrals = []
+                        for integral in INTEGRALS_2CM:
+                            l1 = ANGULAR_MOMENTUM[integral[0]]
+                            l2 = ANGULAR_MOMENTUM[integral[1]]
+                            if l1 <= lmax1 and l2 in angmom2:
+                                integrals.append(integral)
+
+                        selected.append((nl1, nl2, tuple(integrals)))
+        return selected
+
+    def calculate(self, selected, e1, e2, R, grid, area):
+        """
+        Calculates the selected integrals.
+
+        Parameters
+        ----------
+        See Offsite2cTable.calculate().
+
+        Returns
+        -------
+        M: dict of np.ndarray
+            Dictionary containing the integrals for each selected
+            orbital pair.
+        """
+        self.timer.start('calculate_offsiteM')
+
+        # common for all integrals (not subshell-dependent parts)
+        self.timer.start('prelude')
+        x = grid[:, 0]
+        y = grid[:, 1]
+        r1 = np.sqrt(x**2 + y**2)
+        r2 = np.sqrt(x**2 + (y - R)**2)
+        c1 = y / r1  # cosine of theta_1
+        c2 = (y - R) / r2  # cosine of theta_2
+        s1 = x / r1  # sine of theta_1
+        s2 = x / r2  # sine of theta_2
+        aux = area * x
+        self.timer.stop('prelude')
+
+        M = {}
+        for key in selected:
+            nl1, nl2, integrals = key
+            M[key] = np.zeros(NUMSK_2CM)
+
+            Rnl1 = e1.Rnl(r1, nl1)
+            Rnl2 = e2.Rnl(r2, nl2)
+
+            for integral in integrals:
+                lm1, lm2 = get_integral_pair(integral)
+                gphi = get_twocenter_phi_integral(lm1, lm2, c1, c2, s1, s2)
+
+                index = INTEGRALS_2CM.index(integral)
+                M[key][index] = np.sum(Rnl1 * Rnl2 * aux * gphi)
+
+        self.timer.stop('calculate_offsiteM')
+        return M
+
+    def write(self):
+        """
+        Writes all integral tables to file.
+
+        The filename template corresponds to '<el1>-<el2>_offsiteM.2cm'.
+        """
+        for p, (e1, e2) in enumerate(self.pairs):
+            sym1, sym2 = e1.get_symbol(), e2.get_symbol()
+
+            for bas1, valence1 in enumerate(e1.basis_sets):
+                for bas2, valence2 in enumerate(e2.basis_sets):
+                    template = '%s-%s_offsiteM.2cm'
+                    filename = template % (sym1 + '+'*bas1, sym2  + '+'*bas2)
+                    print('Writing to %s' % filename, file=self.txt, flush=True)
+
+                    with open(filename, 'a') as f:
+                        # ensure that we start from empty file
+                        f.truncate(0)
+
+                        for l1 in range(NUML_2CM):
+                            table = self.tables[(p, bas1, bas2)][l1, :, :]
+                            write_2cm(f, self.Rgrid, table, l1)
+        return
+
+
 class Offsite2cUTable:
     """
     Convenience wrapper around the Offsite2cUMonopoleTable
@@ -789,180 +968,3 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
         return
 
 
-class Offsite2cMTable(MultiAtomIntegrator):
-    """
-    Calculator for (parts of) the off-site moment integrals "M"
-    (Boleininger, Guilbert and Horsfield (2016), doi:10.1063/1.4964391):
-
-    $M_{\mu,\nu,lm} = \int \phi_\mu(\mathbf{r_1}) Y_{lm}(\mathbf{r_1})
-                           \phi_\nu(\mathbf{r_2}) d\mathbf{r}$
-    """
-    def __init__(self, *args, **kwargs):
-        MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
-
-    def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
-            smoothen_tails=True):
-        """
-        Calculates the required off-site Slater-Koster integrals for
-
-        $\int R_{nl1}(\mathbf{r}) Y_{lm}(\mathbf{r_1}
-              \phi_\nu(\mathbf{r_2}) d\mathbf{r}$
-
-        from which the moment integrals M can be obtained by rotation
-        after multiplication with the appropriate Gaunt coefficients.
-
-        Parameters
-        ----------
-        See Offsite2cTable.run() and Onsite2cTable.run().
-        """
-        print('\n\n', file=self.txt)
-        print('***********************************************', file=self.txt)
-        print('Multipole offsite-M table construction for %s and %s' % \
-              (self.ela.get_symbol(), self.elb.get_symbol()), file=self.txt)
-        print('***********************************************', file=self.txt)
-        self.txt.flush()
-
-        assert N is not None, 'Need to set number of grid points N!'
-        assert rmin >= 1e-3, 'For stability, please set rmin >= 1e-3'
-        assert np.isclose(rmin / dr, np.round(rmin / dr)), \
-               'rmin must be a multiple of dr'
-
-        self.timer.start('run_offsiteM')
-        wf_range = self.get_range(wflimit)
-        self.Rgrid = rmin + dr * np.arange(N)
-        self.tables = {}
-
-        for p, (e1, e2) in enumerate(self.pairs):
-            for bas1 in range(len(e1.basis_sets)):
-                for bas2 in range(len(e2.basis_sets)):
-                    shape = (NUML_2CM, N, NUMSK_2CM)
-                    self.tables[(p, bas1, bas2)] = np.zeros(shape)
-
-        for i, R in enumerate(self.Rgrid):
-            if R > 2 * wf_range:
-                break
-
-            grid, area = self.make_grid(R, wf_range, nt=ntheta, nr=nr)
-
-            if i == N - 1 or N // 10 == 0 or i % (N // 10) == 0:
-                print('R=%8.2f, %i grid points ...' % \
-                      (R, len(grid)), file=self.txt, flush=True)
-
-            if len(grid) > 0:
-                for p, (e1, e2) in enumerate(self.pairs):
-                    selected = self.select_integrals(e1, e2)
-
-                    M = self.calculate(selected, e1, e2, R, grid, area)
-
-                    for key in selected:
-                        nl1, nl2, integrals = key
-                        bas1 = e1.get_basis_set_index(nl1)
-                        bas2 = e2.get_basis_set_index(nl2)
-                        l1 = ANGULAR_MOMENTUM[nl1[1]]
-                        self.tables[(p, bas1, bas2)][l1, i, :] += M[key][:]
-
-        if smoothen_tails:
-            for key in self.tables:
-                for l1 in range(NUML_2CM):
-                    for i in range(NUMSK_2CM):
-                            for key in self.tables:
-                                self.tables[key][l1, :, i] = \
-                                    tail_smoothening(self.Rgrid,
-                                                     self.tables[key][l1, :, i])
-
-        self.timer.stop('run_offsiteM')
-        return
-
-    def select_integrals(self, e1, e2, expand2=True):
-        """ Returns the list of (nl1, nl2, integrals) tuples with
-        the integrals to evaluate for every subshell pair of the given
-        elements. """
-        selected = []
-        for ival1, valence1 in enumerate(e1.basis_sets):
-            for nl1 in valence1:
-                lmax1 = 4
-
-                for ival2, valence2 in enumerate(e2.basis_sets):
-                    for nl2 in valence2:
-                        angmom2 = [ANGULAR_MOMENTUM[nl2[1]]]
-
-                        integrals = []
-                        for integral in INTEGRALS_2CM:
-                            l1 = ANGULAR_MOMENTUM[integral[0]]
-                            l2 = ANGULAR_MOMENTUM[integral[1]]
-                            if l1 <= lmax1 and l2 in angmom2:
-                                integrals.append(integral)
-
-                        selected.append((nl1, nl2, tuple(integrals)))
-        return selected
-
-    def calculate(self, selected, e1, e2, R, grid, area):
-        """
-        Calculates the selected integrals.
-
-        Parameters
-        ----------
-        See Offsite2cTable.calculate().
-
-        Returns
-        -------
-        M: dict of np.ndarray
-            Dictionary containing the integrals for each selected
-            orbital pair.
-        """
-        self.timer.start('calculate_offsiteM')
-
-        # common for all integrals (not subshell-dependent parts)
-        self.timer.start('prelude')
-        x = grid[:, 0]
-        y = grid[:, 1]
-        r1 = np.sqrt(x**2 + y**2)
-        r2 = np.sqrt(x**2 + (y - R)**2)
-        c1 = y / r1  # cosine of theta_1
-        c2 = (y - R) / r2  # cosine of theta_2
-        s1 = x / r1  # sine of theta_1
-        s2 = x / r2  # sine of theta_2
-        aux = area * x
-        self.timer.stop('prelude')
-
-        M = {}
-        for key in selected:
-            nl1, nl2, integrals = key
-            M[key] = np.zeros(NUMSK_2CM)
-
-            Rnl1 = e1.Rnl(r1, nl1)
-            Rnl2 = e2.Rnl(r2, nl2)
-
-            for integral in integrals:
-                lm1, lm2 = get_integral_pair(integral)
-                gphi = get_twocenter_phi_integral(lm1, lm2, c1, c2, s1, s2)
-
-                index = INTEGRALS_2CM.index(integral)
-                M[key][index] = np.sum(Rnl1 * Rnl2 * aux * gphi)
-
-        self.timer.stop('calculate_offsiteM')
-        return M
-
-    def write(self):
-        """
-        Writes all integral tables to file.
-
-        The filename template corresponds to '<el1>-<el2>_offsiteM.2cm'.
-        """
-        for p, (e1, e2) in enumerate(self.pairs):
-            sym1, sym2 = e1.get_symbol(), e2.get_symbol()
-
-            for bas1, valence1 in enumerate(e1.basis_sets):
-                for bas2, valence2 in enumerate(e2.basis_sets):
-                    template = '%s-%s_offsiteM.2cm'
-                    filename = template % (sym1 + '+'*bas1, sym2  + '+'*bas2)
-                    print('Writing to %s' % filename, file=self.txt, flush=True)
-
-                    with open(filename, 'a') as f:
-                        # ensure that we start from empty file
-                        f.truncate(0)
-
-                        for l1 in range(NUML_2CM):
-                            table = self.tables[(p, bas1, bas2)][l1, :, :]
-                            write_2cm(f, self.Rgrid, table, l1)
-        return

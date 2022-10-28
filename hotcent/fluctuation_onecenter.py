@@ -10,8 +10,6 @@ from hotcent.orbitals import ANGULAR_MOMENTUM, ORBITALS
 
 NUML_1CK = 3  # total number of multipoles considered for .1ck files (up to d)
 
-NUML_1CL = 4  # total number of subshells considered for .1cl files (up to f)
-
 NUML_1CM = 4  # total number of subshells considered for .1cm files (up to f)
 
 
