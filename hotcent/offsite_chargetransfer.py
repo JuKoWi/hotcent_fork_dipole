@@ -506,17 +506,20 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
         wf_range = self.get_range(wflimit)
         self.Rgrid = rmin + dr * np.arange(N)
 
-        if subshells is None:
-            selected = {el.get_symbol(): select_radial_functions(el)
-                        for el in [self.ela, self.elb]}
-        else:
-            for el in [self.ela, self.elb]:
-                sym = el.get_symbol()
-                assert sym in subshells, \
-                       'Missing entry for element {0} in subshells'.format(sym)
-                assert len(subshells[sym]) == len(el.basis_sets), \
-                       'Need one subshell per basis subset for {0}'.format(sym)
-            selected = subshells
+        selected = {}
+        for el in [self.ela, self.elb]:
+            sym = el.get_symbol()
+
+            if subshells is None or sym not in subshells:
+                selected[sym] = None
+            else:
+                selected[sym] = subshells[sym]
+
+            if selected[sym] is None:
+                selected[sym] = select_radial_functions(el)
+
+            assert len(selected[sym]) == len(el.basis_sets), \
+                    'Need one subshell per basis subset for {0}'.format(sym)
         print('Selected subshells:', selected, file=self.txt)
 
         self.build_ohp(selected)
