@@ -355,8 +355,8 @@ class Onsite1cUMultipoleTable:
                                                use_dV=False)
 
         for l in range(NUML_1CK):
-            ohp = OrbitalHartreePotential(self.el.rmin, self.el.xgrid,
-                                          dens_nl1, lmax=NUML_1CK-1)
+            ohp = OrbitalHartreePotential(self.el.rgrid, dens_nl1,
+                                          lmax=NUML_1CK-1)
             vhar = ohp.vhar_fct[l](self.el.rgrid)
             integrand = vhar * dens_nl2 * self.el.rgrid**2
             U[l] += self.el.grid.integrate(integrand, use_dV=False)

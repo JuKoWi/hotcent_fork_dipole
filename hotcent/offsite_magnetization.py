@@ -336,12 +336,11 @@ class Offsite2cWMultipoleTable(MultiAtomIntegrator):
                         bas2 = e2.get_basis_set_index(nl2)
                         self.tables[(p, bas1, bas2)][i, :] = W[key][:]
 
-        for key in self.tables:
-            for i in range(NUMSK_2CK):
-                if smoothen_tails:
-                    for key in self.tables:
-                        self.tables[key][:, i] = \
-                            tail_smoothening(self.Rgrid, self.tables[key][:, i])
+        if smoothen_tails:
+            for key in self.tables:
+                for i in range(NUMSK_2CK):
+                    self.tables[key][:, i] = \
+                        tail_smoothening(self.Rgrid, self.tables[key][:, i])
 
         self.timer.stop('run_offsiteW')
         return

@@ -96,10 +96,9 @@ class Offsite2cMTable(MultiAtomIntegrator):
             for key in self.tables:
                 for l1 in range(NUML_2CM):
                     for i in range(NUMSK_2CM):
-                            for key in self.tables:
-                                self.tables[key][l1, :, i] = \
-                                    tail_smoothening(self.Rgrid,
-                                                     self.tables[key][l1, :, i])
+                        self.tables[key][l1, :, i] = \
+                            tail_smoothening(self.Rgrid,
+                                             self.tables[key][l1, :, i])
 
         self.timer.stop('run_offsiteM')
         return
@@ -312,9 +311,8 @@ class Offsite2cUMonopoleTable(MultiAtomIntegrator):
                             break
 
                 if smoothen_tails:
-                    for key in self.tables:
-                        self.tables[key][:, i] = \
-                            tail_smoothening(self.Rgrid, self.tables[key][:, i])
+                    self.tables[key][:, i] = \
+                        tail_smoothening(self.Rgrid, self.tables[key][:, i])
 
         self.timer.stop('run_offsiteU')
 
@@ -570,8 +568,7 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
                             break
 
                 if smoothen_tails:
-                    for key in self.tables:
-                        self.tables[key][:, i] = \
+                    self.tables[key][:, i] = \
                             tail_smoothening(self.Rgrid, self.tables[key][:, i])
 
         self.timer.stop('run_offsiteU')
@@ -592,20 +589,18 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
             sym2 = e2.get_symbol()
 
             for nl1 in selected[sym1]:
-                for nl2 in selected[sym2]:
-                    if (sym1, nl1) not in self.ohp_dict:
-                        lmax = NUML_2CK
-                        rho = e1.Rnlg[nl1]**2
-                        self.ohp_dict[(sym1, nl1)] = \
-                            OrbitalHartreePotential(e1.rmin, e1.xgrid, rho,
-                                                    lmax)
+                if (sym1, nl1) not in self.ohp_dict:
+                    lmax = NUML_2CK
+                    rho = e1.Rnlg[nl1]**2
+                    self.ohp_dict[(sym1, nl1)] = \
+                        OrbitalHartreePotential(e1.rgrid, rho, lmax)
 
-                    if (sym2, nl2) not in self.ohp_dict:
-                        lmax = NUML_2CK
-                        rho = e2.Rnlg[nl2]**2
-                        self.ohp_dict[(sym2, nl2)] = \
-                            OrbitalHartreePotential(e2.rmin, e2.xgrid, rho,
-                                                    lmax)
+            for nl2 in selected[sym2]:
+                if (sym2, nl2) not in self.ohp_dict:
+                    lmax = NUML_2CK
+                    rho = e2.Rnlg[nl2]**2
+                    self.ohp_dict[(sym2, nl2)] = \
+                        OrbitalHartreePotential(e2.rgrid, rho, lmax)
 
         self.timer.stop('build_ohp')
         return
@@ -969,5 +964,3 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
                         write_2ck(f, self.Rgrid, self.tables[(p, bas1, bas2)],
                             point_kernels=self.point_kernels[(p, bas1, bas2)])
         return
-
-

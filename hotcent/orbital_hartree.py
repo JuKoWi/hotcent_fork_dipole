@@ -8,7 +8,6 @@ import numpy as np
 from scipy.linalg import solve_banded
 from hotcent.interpolation import build_interpolator
 from hotcent.orbitals import ORBITALS
-from hotcent.radial_grid import RadialGrid
 from hotcent.spherical_harmonics import sph
 
 
@@ -43,40 +42,64 @@ class OrbitalHartreePotential:
 
     Parameters
     ----------
-    rmin : float
-        Smallest radius in the radial grid.
-    xgrid : np.ndarray
-        Equidistant logarithmic grid.
+    rgrid : np.ndarray
+        Radial grid.
     Rl : np.ndarray
-        Radial component of the orbital density on the grid
+        Radial component of the orbital density on the radial grid
         (i.e. the square of that of the associated atomic orbital).
     lmax : int
         Maximum angular momentum for which to solve the Poisson equation.
     """
-    def __init__(self, rmin, xgrid, Rl, lmax):
-        self.rmin = rmin
-        self.xgrid = xgrid
+    def __init__(self, rgrid, Rl, lmax):
         self.lmax = lmax
-        self.rgrid = self.rmin * np.exp(self.xgrid)
-        self.grid = RadialGrid(self.rgrid)
-        self.build_potentials(Rl)
+        self.build_grids(rgrid[0], len(rgrid))
+        self.build_potentials(rgrid, Rl)
 
-    def build_potentials(self, Rl):
+    def build_grids(self, rmin, N):
+        """ Sets up the integration grids.
+
+        A uniform integration grid in an 'x' variable is used,
+        which is related to the distance 'r' as:
+
+        r = r_m * (1 + x) / (1 - x)
+
+        Hence r = 0 corresponds to x = -1 and r = +inf to x = 1.
+        These will be used as ghost points.
+
+        Parameters
+        ----------
+        rmin : float
+            Smallest radius in the radial grid.
+        N : int
+            Number of grid points.
+        """
+        xgrid = np.linspace(-1, 1, num=N, endpoint=True)[1:-1]
+        self.h = xgrid[1] - xgrid[0]
+
+        self.r_m = rmin * (1 - xgrid[0]) / (1 + xgrid[0])
+        self.rgrid = self.r_m * (1 + xgrid) / (1 - xgrid)
+        assert np.isclose(self.rgrid[0], rmin), (self.rgrid[0], rmin)
+        return
+
+    def build_potentials(self, rgrid, Rl):
         """ Solves all the needed radial Poisson equations and
         builds the corresponding V_{har,\ell,m}(r) interpolators.
 
         Parameters
         ----------
-        Rlm : np.ndarray
-            Radial component of the orbital density on the grid.
+        rgrid : np.ndarray
+            Radial grid.
+        Rl : np.ndarray
+            Radial component of the orbital density on the given
+            radial grid.
         """
+        # Interpolate Rl on own radial grid
+        Rl_fct = build_interpolator(rgrid, Rl)
+        Rl_rgrid = Rl_fct(self.rgrid)
+
         self.vhar_fct = {}
         for l in range(self.lmax+1):
-            vhar_l = self.solve_poisson(Rl, l)
-            if vhar_l is None:
-                self.vhar_fct[l] = lambda r: 0.
-            else:
-                self.vhar_fct[l] = build_interpolator(self.rgrid, vhar_l)
+            self.vhar_fct[l] = self.solve_poisson(Rl_rgrid, l)
         return
 
     def solve_poisson(self, Rl, l):
@@ -93,29 +116,22 @@ class OrbitalHartreePotential:
 
         Returns
         -------
-        vhar_l : np.ndarray or None
-            Hartree potential on the grid.
+        vhar_fct : CubicSplineFunction
+            Hartree potential interpolator.
         """
-
         c0 = -l * (l + 1) / self.rgrid**2
-        c1 = -1. / self.rgrid**2
-        c2 = 1. / self.rgrid**2
+        c1 = (-4 * self.r_m) / (self.r_m + self.rgrid)**3
+        c2 = ((2 * self.r_m) / (self.r_m + self.rgrid)**2)**2
         source = -4 * np.pi * self.rgrid * Rl
 
-        h = self.xgrid[1] - self.xgrid[0]
+        u0 = 0.
+        u1 = 4 * np.pi if l == 0 else 0.
 
-        if l == 0:
-            v0 = self.grid.integrate(Rl / self.rgrid, use_dV=True)
-            u0 = self.rmin * np.exp(-h) * v0
-        else:
-            u0 = 0.
-
-        nel = self.grid.integrate(Rl * self.rgrid**2, use_dV=False)
-        u1 = 4 * np.pi * nel if l == 0 else 0.
-
-        u_l = solve_radial_dgl(c0, c1, c2, source, u0, u1, h)
+        u_l = solve_radial_dgl(c0, c1, c2, source, u0, u1, self.h)
         vhar_l = u_l / self.rgrid
-        return vhar_l
+
+        vhar_fct = build_interpolator(self.rgrid, vhar_l)
+        return vhar_fct
 
     def __call__(self, r, c, s, phi, lm):
         """ Evaluates the Hartree potential in spherical coordinates,
@@ -264,7 +280,7 @@ def diagonal2banded(l_and_u, a):
         msg = "Number of nonzero diagonals must be less than square dimension"
         raise ValueError(msg)
 
-    diagonal_ordered = np.empty((nlower + nupper + 1, n), dtype=a.dtype)
+    diagonal_ordered = np.zeros((nlower + nupper + 1, n), dtype=a.dtype)
 
     for i in range(1, nupper + 1):
         for j in range(n - i):
