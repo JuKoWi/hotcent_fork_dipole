@@ -943,7 +943,7 @@ def get_twocenter_phi_integrals_derivatives(lm1, lm2, c1, c2, s1, s2):
     return dgphi
 
 
-def tail_smoothening(x, y):
+def tail_smoothening(x, y, eps=1e-16):
     """ For given grid-function y(x), make smooth tail.
 
     Aim is to get (e.g. for Slater-Koster tables and repulsions) smoothly
@@ -954,15 +954,17 @@ def tail_smoothening(x, y):
     that line through them passes zero below x_(N-1). Then fit
     third-order polynomial through points y_k, y_k+1 and y_N-1.
 
-    Return:
-    smoothed y-function on same grid.
+    Returns
+    -------
+    y : np.array
+        Smoothed y values on the same grid.
     """
-    if np.all(abs(y) < 1e-10):
+    if np.all(abs(y) < eps):
         return y
 
     Nzero = 0
     for i in range(len(y) - 1, 1, -1):
-        if abs(y[i]) < 1e-60:
+        if abs(y[i]) < eps:
             Nzero += 1
         else:
             break
