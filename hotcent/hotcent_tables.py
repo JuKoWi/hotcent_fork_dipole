@@ -47,7 +47,7 @@ def parse_arguments():
                         'printing the task overview, without executing them.')
     parser.add_argument('--exclude', help='Element combinations to exclude. '
                         'To e.g. skip those involving only H or just H and '
-                        'Si, write "H,H+Si". By default no combinations get '
+                        'Si, write "H,H-Si". By default no combinations get '
                         'excluded.')
     parser.add_argument('--label', help='Label to use when searching for the '
                         'input YAML files. The expected file names correspond '
@@ -182,7 +182,7 @@ class TaskGenerator:
         return needed
 
     def get_workdir(self, *elements, rootdir='.', prefix='tables_'):
-        subdir = prefix + '_'.join(sorted(elements))
+        subdir = prefix + '-'.join(sorted(set(elements)))
         workdir = os.path.join(rootdir, subdir)
         return workdir
 
@@ -272,7 +272,7 @@ def main():
     excluded = []
     if args.exclude is not None:
         for item in args.exclude.split(','):
-            elements = tuple(set(item.split('+')))
+            elements = tuple(set(item.split('-')))
             verify_chemical_symbols(*elements)
             excluded.append(elements)
 
@@ -353,9 +353,9 @@ def callback(messages):
 
 
 def wrapper(task):
-    element_str = '_'.join(task.elements)
+    element_str = '-'.join(task.elements)
 
-    suffix = '{0}-{1}'.format(task.task_type, element_str)
+    suffix = '{0}_{1}'.format(element_str, task.task_type)
     stdout = os.path.join(task.workdir, 'out_{0}.txt'.format(suffix))
     sys.stdout = open(stdout, 'w')
     stderr = os.path.join(task.workdir, 'err_{0}.txt'.format(suffix))
