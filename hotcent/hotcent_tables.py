@@ -65,7 +65,7 @@ def parse_arguments():
                         'ntheta_600.')
     parser.add_argument('--opts-3c', help='Option for controlling the three-'
                         'center integration grids. The default settings are '
-                        'rather tight and correspond to --opts-2c=nr_50,'
+                        'rather tight and correspond to --opts-3c=nr_50,'
                         'ntheta_150,nphi_13.')
     parser.add_argument('--processes', type=int, default=1, help='Number of '
                         'processes to use for multiprocessing (default: 1).')
