@@ -29,6 +29,7 @@ if USE_CYTHON:
 
 files = [
     'hotcent-basis',
+    'hotcent-concat',
     'hotcent-tables',
 ]
 scripts = [str(Path('tools') / f) for f in files]
