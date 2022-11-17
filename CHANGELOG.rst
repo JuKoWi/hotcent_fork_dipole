@@ -64,6 +64,9 @@ Development version
   and with as many radial functions as the 'zeta' count of the main
   basis set).
 
+* Changed the tail smoothening procedure to a moving average for
+  simplicity and robustness.
+
 
 Version 1.0
 ===========

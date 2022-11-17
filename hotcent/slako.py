@@ -943,82 +943,63 @@ def get_twocenter_phi_integrals_derivatives(lm1, lm2, c1, c2, s1, s2):
     return dgphi
 
 
-def tail_smoothening(x, y, eps=1e-16):
-    """ For given grid-function y(x), make smooth tail.
+def tail_smoothening(x, y_in, eps_inner=1e-8, eps_outer=1e-16, window_size=5):
+    """ Smoothens the tail for the given function y(x).
 
-    Aim is to get (e.g. for Slater-Koster tables and repulsions) smoothly
-    behaving energies and forces near cutoff region.
-
-    Make is such that y and y' go smoothly exactly to zero at last point.
-    Method: take largest neighboring points y_k and y_(k+1) (k<N-3) such
-    that line through them passes zero below x_(N-1). Then fit
-    third-order polynomial through points y_k, y_k+1 and y_N-1.
+    Parameters
+    ----------
+    x : np.array
+        Array with grid points (strictly increasing).
+    y_in : np.array
+        Array with function values.
+    eps_inner : float, optional
+        Inner threshold. Tail values with magnitudes between this value and
+        the outer threshold are subjected to moving window averaging to
+        reduce noise.
+    eps_outer : float, optional
+        Outer threshold. Tail values with magnitudes below this value
+        are set to zero.
+    window_size : int, optional
+        Moving average window size (odd integers only).
 
     Returns
     -------
-    y : np.array
-        Smoothed y values on the same grid.
+    y_out : np.array
+        Array with function values with a smoothed tail.
     """
-    if np.all(abs(y) < eps):
-        return y
+    assert window_size % 2 == 1, 'Window size needs to be odd.'
+
+    y_out = np.copy(y_in)
+    N = len(y_out)
+
+    if np.all(abs(y_in) < eps_outer):
+        return y_out
 
     Nzero = 0
-    for i in range(len(y) - 1, 1, -1):
-        if abs(y[i]) < eps:
+    for izero in range(N-1, 1, -1):
+        if abs(y_out[izero]) < eps_outer:
             Nzero += 1
         else:
             break
 
-    N = len(y) - Nzero
-    y = y[:N]
-    xmax = x[:N][-1]
+    y_out[izero+1:] = 0.
 
-    for i in range(N - 3, 1, -1):
-        x0i = x[i] - y[i] / ((y[i + 1] - y[i]) /(x[i + 1] - x[i]))
-        if x0i < xmax:
-            k = i
+    Nsmall = 0
+    for ismall in range(izero, 1, -1):
+        if abs(y_out[ismall]) < eps_inner:
+            Nsmall += 1
+        else:
             break
-    else:
-        print('N:', N, 'len(y):', len(y))
-        for i in range(len(y)):
-            print(x[i], y[i])
-        raise RuntimeError('Problem with tail smoothening')
 
-    if k < N / 4:
-        for i in range(N):
-            print(x[i], y[i])
-        msg = 'Problem with tail smoothening: requires too large tail.'
-        raise RuntimeError(msg)
+    if Nsmall > 0:
+        tail = np.empty(Nsmall-1)
+        half = (window_size - 1) // 2
+        for j, i in enumerate(range(ismall+1, izero)):
+            tail[j] = np.mean(y_out[i-half:i+half+1])
 
-    if k == N - 3:
-        y[-1] = 0.
-        y = np.append(y, np.zeros(Nzero))
-        return y
-    else:
-        # g(x)=c2*(xmax-x)**m + c3*(xmax-x)**(m+1) goes through
-        # (xk,yk),(xk+1,yk+1) and (xmax,0)
-        # Try different m if g(x) should change sign (this we do not want)
-        sgn = np.sign(y[k])
-        for m in range(2, 10):
-            a1, a2 = (xmax - x[k]) ** m, (xmax - x[k]) ** (m + 1)
-            b1, b2 = (xmax-  x[k + 1]) ** m, (xmax - x[k + 1]) ** (m + 1)
-            c3 = (y[k] - a1 * y[k + 1] / b1) / (a2 - a1 * b2 / b1)
-            c2 = (y[k] - a2 * c3) / a1
+        y_out[ismall+1:izero] = tail
 
-            for i in range(k + 2,N):
-                y[i] = c2 * (xmax - x[i]) ** 2 + c3 * (xmax - x[i]) ** 3
-
-            y[-1] = 0.  # once more explicitly
-
-            if np.all(y[k:] * sgn >= 0):
-                y = np.append(y, np.zeros(Nzero))
-                break
-
-            if m == 9:
-                msg = 'Problems with smoothening; need for new algorithm?'
-                raise RuntimeError(msg)
-
-    return y
+    return y_out
 
 
 def write_skf(handle, Rgrid, table, has_diagonal_data, is_extended, eigval,
