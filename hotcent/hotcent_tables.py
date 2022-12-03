@@ -477,6 +477,7 @@ def get_atoms(*elements, label=None, only_1c=False, pseudo_path='.', txt='-',
 
     for el1 in set(elements):
         atoms[el1].pp.build_projectors(atoms[el1])
+        atoms[el1].generate_auxiliary_basis()
 
     if not only_1c:
         dr = 0.02

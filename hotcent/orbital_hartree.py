@@ -145,7 +145,7 @@ class OrbitalHartreePotential:
             Cosines of the theta angle.
         s : np.ndarray
             Sines of the theta angle.
-        phi : np.ndarray, optional
+        phi : np.ndarray
             Phi angles.
         lm : str
             Orbital label for the density (e.g. 'px').

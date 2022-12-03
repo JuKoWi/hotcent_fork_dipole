@@ -36,7 +36,7 @@ class Offsite2cMTable(MultiAtomIntegrator):
         """
         Calculates the required off-site Slater-Koster integrals for
 
-        $\int R_{nl1}(\mathbf{r}) Y_{lm}(\mathbf{r_1}
+        $\int R_{nl1}(\mathbf{r_1}) Y_{lm}(\mathbf{r_1}
               \phi_\nu(\mathbf{r_2}) d\mathbf{r}$
 
         from which the moment integrals M can be obtained by rotation
@@ -589,18 +589,20 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
             sym2 = e2.get_symbol()
 
             for nl1 in selected[sym1]:
-                if (sym1, nl1) not in self.ohp_dict:
-                    lmax = NUML_2CK
-                    rho = e1.Rnlg[nl1]**2
-                    self.ohp_dict[(sym1, nl1)] = \
-                        OrbitalHartreePotential(e1.rgrid, rho, lmax)
+                for l in range(NUML_2CK):
+                    if (sym1, nl1, l) not in self.ohp_dict:
+                        lmax = NUML_2CK
+                        Anl = np.copy(e1.aux_basis.Anlg[(nl1, l)])
+                        self.ohp_dict[(sym1, nl1, l)] = \
+                            OrbitalHartreePotential(e1.rgrid, Anl, lmax)
 
             for nl2 in selected[sym2]:
-                if (sym2, nl2) not in self.ohp_dict:
-                    lmax = NUML_2CK
-                    rho = e2.Rnlg[nl2]**2
-                    self.ohp_dict[(sym2, nl2)] = \
-                        OrbitalHartreePotential(e2.rgrid, rho, lmax)
+                for l in range(NUML_2CK):
+                    if (sym2, nl2, l) not in self.ohp_dict:
+                        lmax = NUML_2CK
+                        Anl = np.copy(e2.aux_basis.Anlg[(nl2, l)])
+                        self.ohp_dict[(sym2, nl2, l)] = \
+                            OrbitalHartreePotential(e2.rgrid, Anl, lmax)
 
         self.timer.stop('build_ohp')
         return
@@ -626,7 +628,7 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
         v : np.ndarray
             Hartree potential at the given distances.
         """
-        v = self.ohp_dict[(sym, nl)].vhar_fct[l](r)
+        v = self.ohp_dict[(sym, nl, l)].vhar_fct[l](r)
         return v
 
     def build_int1c(self, selected):
@@ -637,21 +639,24 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
         self.int1c_dict = {}
         sym1 = self.ela.get_symbol()
         sym2 = self.elb.get_symbol()
+
         for nl1 in selected[sym1]:
-            Rnl = self.ela.Rnlg[nl1]**2
             self.int1c_dict[(sym1, nl1)] = []
+
             for l in range(NUML_2CK):
-                int1c = self.ela.grid.integrate(Rnl * self.ela.rgrid**(l+2),
-                                                use_dV=False)
+                Anl = np.copy(self.ela.aux_basis.Anlg[(nl1, l)])
+                int1c = self.ela.grid.integrate(
+                                Anl * self.ela.rgrid**(l+2), use_dV=False)
                 self.int1c_dict[(sym1, nl1)].append(int1c)
 
         if sym2 != sym1:
             for nl2 in selected[sym2]:
-                Rnl = self.elb.Rnlg[nl2]**2
                 self.int1c_dict[(sym2, nl2)] = []
+
                 for l in range(NUML_2CK):
-                    int1c = self.elb.grid.integrate(Rnl * self.elb.rgrid**(l+2),
-                                                    use_dV=False)
+                    Anl = np.copy(self.elb.aux_basis.Anlg[(nl2, l)])
+                    int1c = self.elb.grid.integrate(
+                                    Anl * self.elb.rgrid**(l+2), use_dV=False)
                     self.int1c_dict[(sym2, nl2)].append(int1c)
         return
 
@@ -719,8 +724,10 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
         rho1 = e1.electron_density(r1)
         rho2 = e2.electron_density(r2)
         rho12 = rho1 + rho2
-        Rnl1 = {nl1: e1.Rnl(r1, nl1)**2 for nl1 in selected[sym1]}
-        Rnl2 = {nl2: e2.Rnl(r2, nl2)**2 for nl2 in selected[sym2]}
+        Anl1 = {(nl1, l): e1.aux_basis(r1, nl1, l) for nl1 in selected[sym1]
+                for l in range(NUML_2CK)}
+        Anl2 = {(nl2, l): e2.aux_basis(r2, nl2, l) for nl2 in selected[sym2]
+                for l in range(NUML_2CK)}
 
         if xc.add_gradient_corrections:
             drho1 = e1.electron_density(r1, der=1)
@@ -741,8 +748,8 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
 
             grad_r1_grad_rho12 = dr1dx * drho12dx + dr1dy * drho12dy
             grad_theta1_grad_rho12 = dtheta1dx * drho12dx + dtheta1dy * drho12dy
-            dRnl1dr1 = {nl1: 2 * e1.Rnl(r1, nl1) * e1.Rnl(r1, nl1, der=1)
-                        for nl1 in selected[sym1]}
+            dAnl1dr1 = {(nl1, l): e1.aux_basis(r1, nl1, l, der=1)
+                        for nl1 in selected[sym1] for l in range(NUML_2CK)}
 
             dr2dx = x/r2
             ds2dx = (r2 - x*dr2dx) / r2**2
@@ -753,8 +760,8 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
 
             grad_r2_grad_rho12 = dr2dx * drho12dx + dr2dy * drho12dy
             grad_theta2_grad_rho12 = dtheta2dx * drho12dx + dtheta2dy * drho12dy
-            dRnl2dr2 = {nl2: 2 * e2.Rnl(r2, nl2) * e2.Rnl(r2, nl2, der=1)
-                        for nl2 in selected[sym2]}
+            dAnl2dr2 = {(nl2, l): e2.aux_basis(r2, nl2, l, der=1)
+                        for nl2 in selected[sym2] for l in range(NUML_2CK)}
 
             grad_r1_grad_r2 = dr1dx*dr2dx + dr1dy*dr2dy
             grad_r1_grad_theta2 = dr1dx * dtheta2dx + dr1dy * dtheta2dy
@@ -779,38 +786,45 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
                 dgphi = get_twocenter_phi_integrals_derivatives(lm1, lm2,
                                                             c1, c2, s1, s2)
 
+            l1 = ANGULAR_MOMENTUM[lm1[0]]
+            l2 = ANGULAR_MOMENTUM[lm2[0]]
+
             for key in keys:
                 nl1, nl2 = key
-                integrand = Rnl1[nl1] * Rnl2[nl2] * gphi * out12['v2rho2']
+                integrand = Anl1[(nl1, l1)] * Anl2[(nl2, l2)] * gphi \
+                            * out12['v2rho2']
 
                 if xc.add_gradient_corrections:
-                    products = dRnl1dr1[nl1] * grad_r1_grad_rho12 \
-                               * Rnl2[nl2] * gphi
-                    products += dRnl2dr2[nl2] * grad_r2_grad_rho12 \
-                                * Rnl1[nl1] * gphi
-                    products += Rnl1[nl1] * Rnl2[nl2] * grad_theta1_grad_rho12 \
-                                * dgphi[2]
-                    products += Rnl1[nl1] * Rnl2[nl2] * grad_theta2_grad_rho12 \
-                                * dgphi[3]
+                    products = dAnl1dr1[(nl1, l1)] * grad_r1_grad_rho12 \
+                               * Anl2[(nl2, l2)] * gphi
+                    products += dAnl2dr2[(nl2, l2)] * grad_r2_grad_rho12 \
+                                * Anl1[(nl1, l1)] * gphi
+                    products += Anl1[(nl1, l1)] * Anl2[(nl2, l2)] \
+                                * grad_theta1_grad_rho12 * dgphi[2]
+                    products += Anl1[(nl1, l1)] * Anl2[(nl2, l2)] \
+                                * grad_theta2_grad_rho12 * dgphi[3]
                     integrand += 2 * products * out12['v2rhosigma']
 
-                    products = dRnl1dr1[nl1] * dRnl2dr2[nl2] \
+                    products = dAnl1dr1[(nl1, l1)] * dAnl2dr2[(nl2, l2)] \
                                * grad_r1_grad_rho12 * grad_r2_grad_rho12 * gphi
-                    products += dRnl2dr2[nl2] * grad_r2_grad_rho12 * Rnl1[nl1] \
-                                * grad_theta1_grad_rho12 * dgphi[2]
-                    products += dRnl1dr1[nl1] * grad_r1_grad_rho12 * Rnl2[nl2] \
-                                * grad_theta2_grad_rho12 * dgphi[3]
-                    products += Rnl1[nl1] * Rnl2[nl2] * grad_theta1_grad_rho12 \
+                    products += dAnl2dr2[(nl2, l2)] * grad_r2_grad_rho12 \
+                                * Anl1[(nl1, l1)] * grad_theta1_grad_rho12 \
+                                * dgphi[2]
+                    products += dAnl1dr1[(nl1, l1)] * grad_r1_grad_rho12 \
+                                * Anl2[(nl2, l2)] * grad_theta2_grad_rho12 \
+                                * dgphi[3]
+                    products += Anl1[(nl1, l1)] * Anl2[(nl2, l2)] \
+                                * grad_theta1_grad_rho12 \
                                 * grad_theta2_grad_rho12 * dgphi[0]
                     integrand += 4 * products * out12['v2sigma2']
 
-                    products = dRnl1dr1[nl1] * dRnl2dr2[nl2] \
+                    products = dAnl1dr1[(nl1, l1)] * dAnl2dr2[(nl2, l2)] \
                                * grad_r1_grad_r2 * gphi
-                    products += Rnl1[nl1] * grad_r2_grad_theta1 \
-                                * dRnl2dr2[nl2] * dgphi[2]
-                    products += Rnl2[nl2] * grad_r1_grad_theta2 \
-                                * dRnl1dr1[nl1] * dgphi[3]
-                    products += Rnl1[nl1] * Rnl2[nl2] * \
+                    products += Anl1[(nl1, l1)] * grad_r2_grad_theta1 \
+                                * dAnl2dr2[(nl2, l2)] * dgphi[2]
+                    products += Anl2[(nl2, l2)] * grad_r1_grad_theta2 \
+                                * dAnl1dr1[(nl1, l1)] * dgphi[3]
+                    products += Anl1[(nl1, l1)] * Anl2[(nl2, l2)] * \
                                 (grad_theta1_grad_theta2 * dgphi[0] \
                                  + dgphi[1] / x**2)
                     integrand += 2 * products * out12['vsigma']
@@ -922,7 +936,8 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
 
         sym1 = e1.get_symbol()
         sym2 = e2.get_symbol()
-        dens_nl1 = {nl1: e1.Rnl(r1, nl1)**2 for nl1 in selected[sym1]}
+        Anl1 = {(nl1, l): e1.aux_basis(r1, nl1, l) for nl1 in selected[sym1]
+                for l in range(NUML_2CK)}
 
         keys = [(nl1, nl2) for nl1 in selected[sym1] for nl2 in selected[sym2]]
         U = {key: np.zeros(NUMSK_2CK) for key in keys}
@@ -931,11 +946,13 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
             lm1, lm2 = get_integral_pair(integral)
             gphi = get_twocenter_phi_integral(lm1, lm2, c1, c2, s1, s2)
 
+            l1 = ANGULAR_MOMENTUM[lm1[0]]
+            l2 = ANGULAR_MOMENTUM[lm2[0]]
+
             for key in keys:
                 nl1, nl2 = key
-                l2 = ANGULAR_MOMENTUM[lm2[0]]
                 vhar = self.evaluate_ohp(sym2, nl2, l2, r2)
-                U[key][index] = np.sum(vhar * dens_nl1[nl1] * aux * gphi)
+                U[key][index] = np.sum(vhar * Anl1[(nl1, l1)] * aux * gphi)
 
                 if subtract_delta:
                     U_delta = self.evaluate_point_multipole_hartree(sym1, sym2,

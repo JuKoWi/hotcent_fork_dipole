@@ -57,6 +57,7 @@ def atom(request):
                            )
     atom.run()
     atom.generate_nonminimal_basis(size=size, tail_norm=0.15, r_pol=1.125)
+    atom.generate_auxiliary_basis()
     atom.pp.build_projectors(atom)
     atom.pp.build_overlaps(atom, atom, rmin=1., rmax=4., N=200)
     return atom

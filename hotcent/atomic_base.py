@@ -19,6 +19,7 @@ from scipy.optimize import minimize
 from ase.data import atomic_numbers, covalent_radii
 from ase.units import Bohr
 from hotcent.confinement import Confinement, ZeroConfinement
+from hotcent.fluctuation_basis import AuxiliaryBasis
 from hotcent.interpolation import build_interpolator, CubicSplineFunction
 from hotcent.orbitals import ANGULAR_MOMENTUM
 from hotcent.phillips_kleinman import PhillipsKleinmanPP
@@ -150,6 +151,7 @@ class AtomicBase:
         self.solved = False
         self.basis_sets = [valence]
         self.basis_size = 'sz'
+        self.aux_basis = AuxiliaryBasis()
 
         # Set default 'pseudopotential':
         self.pp = PhillipsKleinmanPP(self.symbol)
@@ -1135,6 +1137,17 @@ class AtomicBase:
 
         norm = self.grid.integrate(u**2)
         u /= np.sqrt(norm)
+
+    def generate_auxiliary_basis(self, *args, **kwargs):
+        """
+        Sets up the auxiliary basis functions (handled via self.aux_basis).
+
+        Parameters
+        ----------
+        See AuxiliaryBasis.build_basis_functions().
+        """
+        self.aux_basis.build_basis_functions(self, *args, **kwargs)
+        return
 
 
 SUBSHELLS = ['s', 'p', 'd', 'f', 'g', 'h', 'i', 'j', 'k', 'l']

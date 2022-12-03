@@ -9,8 +9,8 @@ from ase.units import Ha
 from hotcent.fluctuation_onecenter import (
                 NUML_1CK, select_radial_functions, write_1ck)
 from hotcent.fluctuation_twocenter import (
-                INTEGRALS_2CK, NUMINT_2CL, NUMSK_2CK, select_subshells,
-                write_2cl, write_2ck)
+                INTEGRALS_2CK, NUMINT_2CL, NUML_2CK, NUMSK_2CK,
+                select_subshells, write_2cl, write_2ck)
 from hotcent.multiatom_integrator import MultiAtomIntegrator
 from hotcent.orbitals import ANGULAR_MOMENTUM
 from hotcent.slako import (get_integral_pair, get_twocenter_phi_integral,
@@ -210,8 +210,8 @@ class Onsite1cWMultipoleTable:
         W: np.ndarray
             Array with the integral for each multipole.
         radmom : np.ndarray
-            Array with the radial moments of the associated density
-            (\int R_{nl}^2 r^{l+2} dr, l = 0, 1, ...).
+            Array with the radial moments of the auxiliary basis function
+            if nl1 equals nl2 (\int \chi_{nl} r^{l+2} dr).
         """
         xc = LibXC('LDA_X+LDA_C_PW' if xc == 'LDA' else xc,
                    spin_polarized=True)
@@ -232,49 +232,48 @@ class Onsite1cWMultipoleTable:
         W = np.zeros(NUML_1CK)
         radmom = np.zeros(NUML_1CK)
 
-        Rnl1 = np.copy(self.el.Rnlg[nl1])
-        dens_nl1 = Rnl1**2
-        Rnl2 = np.copy(self.el.Rnlg[nl2])
-        dens_nl2 = Rnl2**2
+        for l in range(NUML_1CK):
+            Anl1 = self.el.aux_basis(self.el.rgrid, nl1, l)
+            Anl2 = self.el.aux_basis(self.el.rgrid, nl2, l)
 
-        integrand = (out['v2rho2_up'] - out['v2rho2_updown']) \
-                    * dens_nl1 * dens_nl2
-        W[:] = self.el.grid.integrate(integrand * self.el.rgrid**2,
-                                      use_dV=False)
+            integrand = (out['v2rho2_up'] - out['v2rho2_updown']) * Anl1 * Anl2
+            W[l] = self.el.grid.integrate(integrand * self.el.rgrid**2,
+                                          use_dV=False)
 
-        if xc.add_gradient_corrections:
-            dnl1 = 2 * Rnl1 * self.el.Rnl(self.el.rgrid, nl1, der=1)
-            dnl2 = 2 * Rnl2 * self.el.Rnl(self.el.rgrid, nl2, der=1)
-            grad_nl1_grad_rho = dnl1 * drho
-            grad_nl2_grad_rho = dnl2 * drho
+            if xc.add_gradient_corrections:
+                dnl1 = self.el.aux_basis(self.el.rgrid, nl1, l, der=1)
+                dnl2 = self.el.aux_basis(self.el.rgrid, nl2, l, der=1)
+                grad_nl1_grad_rho = dnl1 * drho
+                grad_nl2_grad_rho = dnl2 * drho
 
-            products = grad_nl1_grad_rho * dens_nl2 \
-                       + grad_nl2_grad_rho * dens_nl1
-            integrand = 2. * products \
+                products = grad_nl1_grad_rho * Anl2 \
+                           + grad_nl2_grad_rho * Anl1
+                integrand = 2. * products \
                         * (out['v2rhosigma_up_up'] - out['v2rhosigma_up_down'])
 
-            products = grad_nl1_grad_rho * grad_nl2_grad_rho
-            integrand += 4. * products \
-                         * (out['v2sigma2_up_up'] - out['v2sigma2_up_down'])
-            integrand += 2. * products \
-                     * (out['v2sigma2_up_updown'] - out['v2sigma2_updown_down'])
+                products = grad_nl1_grad_rho * grad_nl2_grad_rho
+                integrand += 4. * products \
+                        * (out['v2sigma2_up_up'] - out['v2sigma2_up_down'])
+                integrand += 2. * products \
+                    * (out['v2sigma2_up_updown'] - out['v2sigma2_updown_down'])
 
-            products = dnl1 * dnl2
-            integrand += products \
-                         * (2. * out['vsigma_up'] - out['vsigma_updown'])
+                products = dnl1 * dnl2
+                integrand += products \
+                             * (2. * out['vsigma_up'] - out['vsigma_updown'])
 
-            W[:] += self.el.grid.integrate(integrand * self.el.rgrid**2,
-                                           use_dV=False)
+                W[l] += self.el.grid.integrate(integrand * self.el.rgrid**2,
+                                               use_dV=False)
 
-            for l in range(NUML_1CK):
                 integrand = (2. * out['vsigma_up'] - out['vsigma_updown']) \
-                            * dens_nl1 * dens_nl2
+                            * Anl1 * Anl2
                 W[l] += self.el.grid.integrate(integrand * l * (l+1),
                                                use_dV=False)
 
-        for l in range(NUML_1CK):
-            integrand = Rnl1 * Rnl2 * self.el.rgrid**(l+2)
-            radmom[l] = self.el.grid.integrate(integrand, use_dV=False)
+            if nl1 == nl2:
+                integrand = Anl1 * self.el.rgrid**(l+2)
+                radmom[l] = self.el.grid.integrate(integrand, use_dV=False)
+            else:
+                radmom[l] = 0
 
         W /= 2
         return (W, radmom)
@@ -737,7 +736,8 @@ class Onsite2cWMultipoleTable(MultiAtomIntegrator):
         rho1 = e1.electron_density(r1) / 2
         rho2 = e2.electron_density(r2) / 2
         rho12 = rho1 + rho2
-        Rnl1 = {nl: e1.Rnl(r1, nl)**2 for nl in selected}
+        Anl1 = {(nl, l): e1.aux_basis(r1, nl, l) for nl in selected
+                for l in range(NUML_2CK)}
 
         if xc.add_gradient_corrections:
             drho1 = e1.electron_density(r1, der=1) / 2
@@ -767,8 +767,8 @@ class Onsite2cWMultipoleTable(MultiAtomIntegrator):
             grad_r1_grad_rho1 = dr1dx * drho1dx + dr1dy * drho1dy
             grad_theta1_grad_rho1 = dtheta1dx * drho1dx + dtheta1dy * drho1dy
 
-            dRnl1dr1 = {nl: 2 * e1.Rnl(r1, nl) * e1.Rnl(r1, nl, der=1)
-                        for nl in selected}
+            dAnl1dr1 = {(nl, l): e1.aux_basis(r1, nl, l, der=1)
+                        for nl in selected for l in range(NUML_2CK)}
         else:
             sigma1 = None
             sigma12 = None
@@ -794,70 +794,77 @@ class Onsite2cWMultipoleTable(MultiAtomIntegrator):
                 dgphi = get_twocenter_phi_integrals_derivatives(lm1a, lm1b, c1,
                                                                 c1, s1, s1)
 
+            l1a = ANGULAR_MOMENTUM[lm1a[0]]
+            l1b = ANGULAR_MOMENTUM[lm1b[0]]
+
             for key in keys:
                 nl1a, nl1b = key
 
                 integrand = (out12['v2rho2_up'] - out12['v2rho2_updown']) \
-                            * Rnl1[nl1a] * Rnl1[nl1b] * gphi
+                            * Anl1[(nl1a, l1a)] * Anl1[(nl1b, l1b)] * gphi
                 integrand -= (out1['v2rho2_up'] - out1['v2rho2_updown']) \
-                             * Rnl1[nl1a] * Rnl1[nl1b] * gphi
+                             * Anl1[(nl1a, l1a)] * Anl1[(nl1b, l1b)] * gphi
 
                 if xc.add_gradient_corrections:
-                    products = dRnl1dr1[nl1a] * grad_r1_grad_rho12 \
-                               * Rnl1[nl1b] * gphi
-                    products += dRnl1dr1[nl1b] * grad_r1_grad_rho12 \
-                                * Rnl1[nl1a] * gphi
-                    products += Rnl1[nl1a] * Rnl1[nl1b] \
+                    products = dAnl1dr1[(nl1a, l1a)] * grad_r1_grad_rho12 \
+                               * Anl1[(nl1b, l1b)] * gphi
+                    products += dAnl1dr1[(nl1b, l1b)] * grad_r1_grad_rho12 \
+                                * Anl1[(nl1a, l1a)] * gphi
+                    products += Anl1[(nl1a, l1a)] * Anl1[(nl1b, l1b)] \
                                 * grad_theta1_grad_rho12 * dgphi[2]
-                    products += Rnl1[nl1b] * Rnl1[nl1a] \
+                    products += Anl1[(nl1b, l1b)] * Anl1[(nl1a, l1a)] \
                                 * grad_theta1_grad_rho12 * dgphi[3]
                     integrand += 2 * products * (out12['v2rhosigma_up_up'] \
                                                  - out12['v2rhosigma_up_down'])
 
-                    products = dRnl1dr1[nl1a] * grad_r1_grad_rho1 \
-                               * Rnl1[nl1b] * gphi
-                    products += dRnl1dr1[nl1b] * grad_r1_grad_rho1 \
-                                * Rnl1[nl1a] * gphi
-                    products += Rnl1[nl1a] * Rnl1[nl1b] \
+                    products = dAnl1dr1[(nl1a, l1a)] * grad_r1_grad_rho1 \
+                               * Anl1[(nl1b, l1b)] * gphi
+                    products += dAnl1dr1[(nl1b, l1b)] * grad_r1_grad_rho1 \
+                                * Anl1[(nl1a, l1a)] * gphi
+                    products += Anl1[(nl1a, l1a)] * Anl1[(nl1b, l1b)] \
                                 * grad_theta1_grad_rho1 * dgphi[2]
-                    products += Rnl1[nl1b] * Rnl1[nl1a] \
+                    products += Anl1[(nl1b, l1b)] * Anl1[(nl1a, l1a)] \
                                 * grad_theta1_grad_rho1 * dgphi[3]
                     integrand -= 2 * products * (out1['v2rhosigma_up_up'] \
                                                  - out1['v2rhosigma_up_down'])
 
-                    products = dRnl1dr1[nl1a] * dRnl1dr1[nl1b] \
+                    products = dAnl1dr1[(nl1a, l1a)] * dAnl1dr1[(nl1b, l1b)] \
                                * grad_r1_grad_rho12**2 * gphi
-                    products += dRnl1dr1[nl1b] * grad_r1_grad_rho12 \
-                                * Rnl1[nl1a] * grad_theta1_grad_rho12 * dgphi[2]
-                    products += dRnl1dr1[nl1a] * grad_r1_grad_rho12 \
-                                * Rnl1[nl1b] * grad_theta1_grad_rho12 * dgphi[3]
-                    products += Rnl1[nl1a] * Rnl1[nl1b] \
+                    products += dAnl1dr1[(nl1b, l1b)] * grad_r1_grad_rho12 \
+                                * Anl1[(nl1a, l1a)] * grad_theta1_grad_rho12 \
+                                * dgphi[2]
+                    products += dAnl1dr1[(nl1a, l1a)] * grad_r1_grad_rho12 \
+                                * Anl1[(nl1b, l1b)] * grad_theta1_grad_rho12 \
+                                * dgphi[3]
+                    products += Anl1[(nl1a, l1a)] * Anl1[(nl1b, l1b)] \
                                 * grad_theta1_grad_rho12**2 * dgphi[0]
                     integrand += 4 * products * (out12['v2sigma2_up_up'] \
                                                  - out12['v2sigma2_up_down'])
                     integrand += 2 * products * (out12['v2sigma2_up_updown'] \
                                              - out12['v2sigma2_updown_down'])
 
-                    products = dRnl1dr1[nl1a] * dRnl1dr1[nl1b] \
+                    products = dAnl1dr1[(nl1a, l1a)] * dAnl1dr1[(nl1b, l1b)] \
                                * grad_r1_grad_rho1**2 * gphi
-                    products += dRnl1dr1[nl1b] * grad_r1_grad_rho1 \
-                                * Rnl1[nl1a] * grad_theta1_grad_rho1 * dgphi[2]
-                    products += dRnl1dr1[nl1a] * grad_r1_grad_rho1 \
-                                 * Rnl1[nl1b]* grad_theta1_grad_rho1 * dgphi[3]
-                    products += Rnl1[nl1a] * Rnl1[nl1b] \
+                    products += dAnl1dr1[(nl1b, l1b)] * grad_r1_grad_rho1 \
+                                * Anl1[(nl1a, l1a)] * grad_theta1_grad_rho1 \
+                                * dgphi[2]
+                    products += dAnl1dr1[(nl1a, l1a)] * grad_r1_grad_rho1 \
+                                * Anl1[(nl1b, l1b)] * grad_theta1_grad_rho1 \
+                                * dgphi[3]
+                    products += Anl1[(nl1a, l1a)] * Anl1[(nl1b, l1b)] \
                                 * grad_theta1_grad_rho1**2 * dgphi[0]
                     integrand -= 4 * products * (out1['v2sigma2_up_up'] \
                                                  - out1['v2sigma2_up_down'])
                     integrand -= 2 * products * (out1['v2sigma2_up_updown'] \
                                                  - out1['v2sigma2_updown_down'])
 
-                    products = dRnl1dr1[nl1a] * dRnl1dr1[nl1b] \
+                    products = dAnl1dr1[(nl1a, l1a)] * dAnl1dr1[(nl1b, l1b)] \
                                * (dr1dx**2 + dr1dy**2) * gphi
-                    products += Rnl1[nl1a] * grad_r1_grad_theta1 \
-                                * dRnl1dr1[nl1b] * dgphi[2]
-                    products += Rnl1[nl1b] * grad_r1_grad_theta1 \
-                                * dRnl1dr1[nl1a] * dgphi[3]
-                    products += Rnl1[nl1a] * Rnl1[nl1b] \
+                    products += Anl1[(nl1a, l1a)] * grad_r1_grad_theta1 \
+                                * dAnl1dr1[(nl1b, l1b)] * dgphi[2]
+                    products += Anl1[(nl1b, l1b)] * grad_r1_grad_theta1 \
+                                * dAnl1dr1[(nl1a, l1a)] * dgphi[3]
+                    products += Anl1[(nl1a, l1a)] * Anl1[(nl1b, l1b)] \
                                 * ((dtheta1dx**2 + dtheta1dy**2) * dgphi[0] \
                                    + dgphi[1] / x**2)
                     integrand += products * (2 * out12['vsigma_up'] \

@@ -85,6 +85,7 @@ def atoms(request):
         atom.run()
         atom.generate_nonminimal_basis(size=size, tail_norm=0.15,
                                        r_pol=r_pol[element])
+        atom.generate_auxiliary_basis()
         atoms.append(atom)
 
     return atoms
