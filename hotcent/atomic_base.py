@@ -1018,48 +1018,6 @@ class AtomicBase:
                 assert 0 <= l_pol <= 3 and l_pol not in l_val
             print('Polarization l: {0}'.format(l_pol), file=self.txt)
 
-
-        def get_split_valence_unl(nl, tail_norm):
-            # Find split radius based on the tail norm
-            u = np.copy(self.unlg[nl])
-            norm2 = 1.
-            index = len(self.rgrid)
-            while norm2 > (1. - tail_norm**2):
-                index -= 1
-                u[index] = 0.
-                norm2 = self.grid.integrate(u**2)
-            r_split = self.rgrid[index]
-
-            # Fit the polynomial coefficients
-            l = ANGULAR_MOMENTUM[nl[1]]
-            f0 = self.Rnl(r_split, nl, der=0)
-            f1 = self.Rnl(r_split, nl, der=1)
-            b = (f1 - l*f0/r_split) / (-2. * r_split**(l+1))
-            a = f0/r_split**l + b*r_split**2
-
-            # Build the new radial function
-            u = self.unlg[nl] - self.rgrid**(l+1) * (a - b*self.rgrid**2)
-            u[index:] = 0.
-            norm2 = self.grid.integrate(u**2)
-            u /= np.sqrt(norm2)
-            self.smoothen_tail(u, index)
-            return u, r_split
-
-        def get_quasi_gaussian_unl(nl, l_pol, r_pol, r_cut):
-            alpha = 1. / r_pol**2
-            alpha_rc2 = (r_cut / r_pol)**2
-            a = (1 + alpha_rc2) * np.exp(-alpha_rc2)
-            b = alpha * np.exp(-alpha_rc2)
-
-            u = self.rgrid**(l_pol+1) * (np.exp(-alpha * self.rgrid**2) \
-                                         - (a - b*self.rgrid**2))
-            index = np.argmax(self.rgrid > r_cut)
-            u[index:] = 0.
-            norm2 = self.grid.integrate(u**2)
-            u /= np.sqrt(norm2)
-            self.smoothen_tail(u, index)
-            return u
-
         self.basis_size = size
         self.basis_sets = [[nl for nl in self.valence]]
 
@@ -1069,7 +1027,8 @@ class AtomicBase:
             for nl in self.valence:
                 nldz = nl + '+'
 
-                self.unlg[nldz], r_split = get_split_valence_unl(nl, tail_norm)
+                self.unlg[nldz], r_split = self.get_split_valence_unl(nl,
+                                                                      tail_norm)
                 print('Split radius ({0}): {1:.3f}'.format(nldz, r_split),
                       file=self.txt)
 
@@ -1084,7 +1043,8 @@ class AtomicBase:
         if needs_pol:
             nlp = '0' + 'spdf'[l_pol]
             r_cut = max([self.rcutnl[nl] for nl in self.valence])
-            self.unlg[nlp] = get_quasi_gaussian_unl(nlp, l_pol, r_pol, r_cut)
+            self.unlg[nlp] = self.get_quasi_gaussian_unl(nlp, l_pol, r_pol,
+                                                         r_cut)
             self.unl_fct[nlp] = None
             self.Rnlg[nlp] = self.unlg[nlp] / self.rgrid
             self.Rnl_fct[nlp] = None
@@ -1101,6 +1061,49 @@ class AtomicBase:
         else:
             assert nl[:2] in self.valence, nl
             return nl.count('+')
+
+    def get_split_valence_unl(self, nl, tail_norm):
+        """Generates a split-valence radial function."""
+        # Find split radius based on the tail norm
+        u = np.copy(self.unlg[nl])
+        norm2 = 1.
+        index = len(self.rgrid)
+        while norm2 > (1. - tail_norm**2):
+            index -= 1
+            u[index] = 0.
+            norm2 = self.grid.integrate(u**2)
+        r_split = self.rgrid[index]
+
+        # Fit the polynomial coefficients
+        l = ANGULAR_MOMENTUM[nl[1]]
+        f0 = self.Rnl(r_split, nl, der=0)
+        f1 = self.Rnl(r_split, nl, der=1)
+        b = (f1 - l*f0/r_split) / (-2. * r_split**(l+1))
+        a = f0/r_split**l + b*r_split**2
+
+        # Build the new radial function
+        u = self.unlg[nl] - self.rgrid**(l+1) * (a - b*self.rgrid**2)
+        u[index:] = 0.
+        norm2 = self.grid.integrate(u**2)
+        u /= np.sqrt(norm2)
+        self.smoothen_tail(u, index)
+        return u, r_split
+
+    def get_quasi_gaussian_unl(self, nl, l_pol, r_pol, r_cut):
+        """Generates a quasi-Gaussian radial function."""
+        alpha = 1. / r_pol**2
+        alpha_rc2 = (r_cut / r_pol)**2
+        a = (1 + alpha_rc2) * np.exp(-alpha_rc2)
+        b = alpha * np.exp(-alpha_rc2)
+
+        u = self.rgrid**(l_pol+1) * (np.exp(-alpha * self.rgrid**2) \
+                                        - (a - b*self.rgrid**2))
+        index = np.argmax(self.rgrid > r_cut)
+        u[index:] = 0.
+        norm2 = self.grid.integrate(u**2)
+        u /= np.sqrt(norm2)
+        self.smoothen_tail(u, index)
+        return u
 
     def smoothen_tail(self, u, N):
         """
@@ -1144,9 +1147,9 @@ class AtomicBase:
 
         Parameters
         ----------
-        See AuxiliaryBasis.build_basis_functions().
+        See AuxiliaryBasis.build().
         """
-        self.aux_basis.build_basis_functions(self, *args, **kwargs)
+        self.aux_basis.build(self, *args, **kwargs)
         return
 
 

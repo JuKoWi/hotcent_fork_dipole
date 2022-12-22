@@ -10,7 +10,7 @@ from hotcent.orbitals import ANGULAR_MOMENTUM, ORBITALS
 
 NUML_1CK = 3  # total number of multipoles considered for .1ck files (up to d)
 
-NUML_1CM = 4  # total number of subshells considered for .1cm files (up to f)
+NUMLM_1CM = 9  # number of orbitals considered for .1cm files (up to d)
 
 
 def select_radial_functions(el):
@@ -75,12 +75,13 @@ def write_1cm(handle, table):
     handle : file handle
         Handle of an open file.
     table : nd.ndarray
-        Two-dimensional table of (NUML_1CM, NUML_1CM) shape.
+        Three-dimensional table.
     """
-    assert np.shape(table) == (NUML_1CM, NUML_1CM)
+    assert table.ndim == 3
 
-    for row in table:
-        for item in row:
-            handle.write('0 ' if abs(item) < 1e-16 else '%1.12e ' % item)
-        handle.write('\n')
+    for i in range(table.shape[0]):
+        for j in range(table.shape[1]):
+            for item in table[i, j, :]:
+                handle.write('0 ' if abs(item) < 1e-16 else '%1.12e ' % item)
+            handle.write('\n')
     return

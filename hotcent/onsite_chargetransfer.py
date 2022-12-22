@@ -7,27 +7,25 @@
 import numpy as np
 from ase.units import Ha
 from hotcent.fluctuation_onecenter import (
-                NUML_1CK, NUML_1CM, select_radial_functions,
-                write_1ck, write_1cm)
+                NUML_1CK, NUMLM_1CM, write_1ck, write_1cm)
 from hotcent.fluctuation_twocenter import (
                 INTEGRALS_2CK, NUMINT_2CL, NUML_2CK, NUMSK_2CK,
-                select_subshells, write_2cl, write_2ck)
+                select_orbitals, select_subshells, write_2cl, write_2ck)
+from hotcent.gaunt import get_gaunt_coefficient
 from hotcent.multiatom_integrator import MultiAtomIntegrator
 from hotcent.orbital_hartree import OrbitalHartreePotential
-from hotcent.orbitals import ANGULAR_MOMENTUM
+from hotcent.orbitals import ANGULAR_MOMENTUM, ORBITAL_LABELS, ORBITALS
 from hotcent.slako import (get_integral_pair, get_twocenter_phi_integral,
                            get_twocenter_phi_integrals_derivatives,
                            tail_smoothening)
+from hotcent.solid_harmonics import sph_solid_radial
 from hotcent.xc import LibXC
 
 
 class Onsite1cMTable:
     """
-    Class for calculations involving on-site moment integrals "M"
-    (Boleininger, Guilbert and Horsfield (2016), doi:10.1063/1.4964391):
-
-    $M_{\mu,\nu,lm} = \int \phi_\mu(\mathbf{r}) Y_{lm}(\mathbf{r})
-                           \phi_\nu(\mathbf{r}) d\mathbf{r}$
+    Class for calculations involving on-site mapping coefficients
+    (see Giese and York (2011), doi:10.1063/1.3587052).
 
     Parameters
     ----------
@@ -41,82 +39,141 @@ class Onsite1cMTable:
         self.txt = txt
 
     def run(self):
-        """
-        Calculates the on-site, subshell-dependent integrals
-
-        $\int R_{nl1}(r) R_{nl2}(r) r^2 dr$
-
-        from which the moment integrals M can be obtained
-        by multiplication with the appropriate Gaunt coefficients.
-        """
+        """Calculates the required mapping coefficients."""
         print('\n\n', file=self.txt)
         print('***********************************************', file=self.txt)
         print('Multipole onsite-M table construction for %s' % \
               self.el.get_symbol(), file=self.txt)
         print('***********************************************', file=self.txt)
 
-        selected = select_subshells(self.el, self.el)
+        selected = select_orbitals(self.el, self.el)
 
         self.tables = {}
         for bas1 in range(len(self.el.basis_sets)):
             for bas2 in range(len(self.el.basis_sets)):
-                shape = (NUML_1CM, NUML_1CM)
+                shape = (NUMLM_1CM, NUMLM_1CM, self.el.aux_basis.get_size())
                 self.tables[(bas1, bas2)] = np.zeros(shape)
 
         M = self.calculate(selected)
 
         for key in selected:
-            nl1, nl2 = key
+            (nl1, lm1), (nl2, lm2) = key
             bas1 = self.el.get_basis_set_index(nl1)
             bas2 = self.el.get_basis_set_index(nl2)
-            i = ANGULAR_MOMENTUM[nl1[1]]
-            j = ANGULAR_MOMENTUM[nl2[1]]
-            self.tables[(bas1, bas2)][i, j] = M[key]
-            if i != j or bas1 != bas2:
-                self.tables[(bas2, bas1)][j, i] = M[key]
+            ilm = ORBITAL_LABELS.index(lm1)
+            jlm = ORBITAL_LABELS.index(lm2)
+            self.tables[(bas1, bas2)][ilm, jlm, :] = M[key][:]
+            if ilm != jlm or bas1 != bas2:
+                self.tables[(bas2, bas1)][jlm, ilm, :] = M[key][:]
         return
 
     def calculate(self, selected):
         """
-        Calculates the selected integrals.
+        Calculates the selected mapping coefficients.
 
         Parameters
         ----------
         selected : list of 2-tuples of 2-tuples
-            Sets of subshell pairs to evaluate.
+            Sets of orbital pairs to evaluate.
 
         Returns
         -------
         M : dict
-            Dictionary containing the integrals for each selected
-            subshell pair.
+            Dictionary containing the mapping coefficients
+            for each selected orbital pair.
         """
+        rgrid = np.copy(self.el.rgrid)
+
+        Naux = self.el.aux_basis.get_size()
+        g = np.zeros(Naux)
+        vhar = []
+
+        lmax = self.el.aux_basis.get_lmax()
+        Nmom = (lmax + 1)**2
+        d = np.zeros(Nmom)
+
+        moments = []
+        for l in range(lmax+1):
+            for lm in ORBITALS[l]:
+                moments.append((l, lm))
+        assert len(moments) == Nmom, (len(moments), Nmom)
+
+        # (inv)eta matrix
+        eta = np.zeros((Naux, Naux))
+        for iaux in range(Naux):
+            ilm = self.el.aux_basis.get_orbital_label(iaux)
+            vhar.append(self.el.aux_basis.vhar(rgrid, iaux))
+
+            for jaux in range(Naux):
+                jlm = self.el.aux_basis.get_orbital_label(jaux)
+
+                if ilm == jlm:
+                    Anl = self.el.aux_basis.eval(rgrid, jaux)
+                    integrand = vhar[iaux] * Anl * rgrid**2
+                    eta[iaux, jaux] = self.el.grid.integrate(integrand,
+                                                             use_dV=False)
+        inveta = np.linalg.inv(eta)
+
+        # D matrix
+        D = np.zeros((Naux, Nmom))
+        for imom, (l, lm) in enumerate(moments):
+            Clm = sph_solid_radial(rgrid, l)
+
+            for iaux in range(Naux):
+                ilm = self.el.aux_basis.get_orbital_label(iaux)
+
+                if lm == ilm:
+                    integrand = self.el.aux_basis.eval(rgrid, iaux) * Clm \
+                                * rgrid**2
+                    D[iaux, imom] = self.el.grid.integrate(integrand,
+                                                           use_dV=False)
+
         M = {}
         for key in selected:
-            nl1, nl2 = key
-            Rnl1 = np.copy(self.el.Rnlg[nl1])
-            Rnl2 = np.copy(self.el.Rnlg[nl2])
-            integrand = Rnl1 * Rnl2 * self.el.rgrid**2
-            M[key] = self.el.grid.integrate(integrand, use_dV=False)
+            (nl1, lm1), (nl2, lm2) = key
+            Rnl1 = self.el.Rnlg[nl1]
+            Rnl2 = self.el.Rnlg[nl2]
+
+            # g vector
+            for iaux in range(Naux):
+                ilm = self.el.aux_basis.get_orbital_label(iaux)
+                gaunt = get_gaunt_coefficient(lm1, lm2, ilm)
+                integrand = Rnl1 * Rnl2 * vhar[iaux] * gaunt * rgrid**2
+                g[iaux] = self.el.grid.integrate(integrand, use_dV=False)
+
+            # d vector
+            for imom, (l, lm) in enumerate(moments):
+                Clm = sph_solid_radial(rgrid, l)
+                gaunt = get_gaunt_coefficient(lm1, lm2, lm)
+                integrand = Rnl1 * Rnl2 * Clm * gaunt * rgrid**2
+                d[imom] = self.el.grid.integrate(integrand, use_dV=False)
+
+            # u vector
+            u1 = np.linalg.inv(np.matmul(D.T, np.matmul(inveta, D)))
+            u2 = np.matmul(D.T, np.matmul(inveta, g)) - d
+            u = np.matmul(u1, u2)
+
+            # M vector
+            M[key] = np.matmul(inveta, (g - np.matmul(D, u)))
         return M
 
     def write(self):
         """
         Writes all integral tables to file.
 
-        The filename template corresponds to '<el1>-<el1>_onsiteM.1cm'.
+        The filename template corresponds to '<el1>-<el1>_onsiteM_<label>.1cm'.
         """
         sym = self.el.get_symbol()
+        label = self.el.aux_basis.get_basis_set_label()
 
         for bas1, valence1 in enumerate(self.el.basis_sets):
             for bas2, valence2 in enumerate(self.el.basis_sets):
-                template = '%s-%s_onsiteM.1cm'
-                filename = template % (sym + '+'*bas1, sym + '+'*bas2)
+                template = '%s-%s_onsiteM_%s.1cm'
+                filename = template % (sym + '+'*bas1, sym + '+'*bas2, label)
                 print('Writing to %s' % filename, file=self.txt, flush=True)
 
                 with open(filename, 'w') as f:
-                    table = self.tables[(bas1, bas2)][:, :]
-                    write_1cm(f, table)
+                    write_1cm(f, self.tables[(bas1, bas2)])
         return
 
 
@@ -253,16 +310,12 @@ class Onsite1cUMultipoleTable:
         self.el = el
         self.txt = txt
 
-    def run(self, subshells=None, xc='LDA'):
+    def run(self, xc='LDA'):
         """
         Calculates the onsite, one-center "U" integrals.
 
         Parameters
         ----------
-        subshells : list, optional
-            Specific subshells to use as radial functions (one for
-            every 'basis subset'). By default, the subshell with lowest
-            angular momentum is chosen from each subset.
         xc : str, optional
             Name of the exchange-correlation functional (default: LDA).
         """
@@ -273,24 +326,19 @@ class Onsite1cUMultipoleTable:
         print('***********************************************', file=self.txt)
 
         self.tables = {}
-        for bas1 in range(len(self.el.basis_sets)):
-            for bas2 in range(len(self.el.basis_sets)):
+        for bas1 in range(self.el.aux_basis.get_nzeta()):
+            for bas2 in range(self.el.aux_basis.get_nzeta()):
                 shape = (2, NUML_1CK)
                 self.tables[(bas1, bas2)] = np.zeros(shape)
 
-        if subshells is None:
-            selected = select_radial_functions(self.el)
-        else:
-            assert len(subshells) == len(self.el.basis_sets), \
-                   'Expecting one subshell per basis subset'
-            selected = subshells
+        selected = self.el.aux_basis.select_radial_functions()
         print('Selected subshells:', selected, file=self.txt)
 
         for nl1 in selected:
             for nl2 in selected:
                 U, radmom = self.calculate(nl1, nl2, xc=xc)
-                bas1 = self.el.get_basis_set_index(nl1)
-                bas2 = self.el.get_basis_set_index(nl2)
+                bas1 = self.el.aux_basis.get_zeta_index(nl1)
+                bas2 = self.el.aux_basis.get_zeta_index(nl2)
                 self.tables[(bas1, bas2)][0, :] = U[:]
                 self.tables[(bas1, bas2)][1, :] = radmom[:]
         return
@@ -374,8 +422,8 @@ class Onsite1cUMultipoleTable:
         """
         sym = self.el.get_symbol()
 
-        for bas1, valence1 in enumerate(self.el.basis_sets):
-            for bas2, valence2 in enumerate(self.el.basis_sets):
+        for bas1 in range(self.el.aux_basis.get_nzeta()):
+            for bas2 in range(self.el.aux_basis.get_nzeta()):
                 template = '%s-%s_onsiteU.1ck'
                 filename = template % (sym + '+'*bas1, sym + '+'*bas2)
                 print('Writing to %s' % filename, file=self.txt, flush=True)
@@ -615,8 +663,8 @@ class Onsite2cUMultipoleTable(MultiAtomIntegrator):
         MultiAtomIntegrator.__init__(self, *args, grid_type='monopolar',
                                      **kwargs)
 
-    def run(self, subshells=None, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50,
-            wflimit=1e-7, xc='LDA', smoothen_tails=True):
+    def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
+            xc='LDA', smoothen_tails=True):
         """
         Calculates on-site, orbital- and distance-dependent "U" values
         as matrix elements of the two-center-expanded XC kernel
@@ -624,13 +672,6 @@ class Onsite2cUMultipoleTable(MultiAtomIntegrator):
 
         Parameters
         ----------
-        subshells : list, optional
-            Specific subshells to use as radial functions (one for
-            every 'basis subset'). By default, the subshell with lowest
-            angular momentum is chosen from each subset.
-
-        Other parameters
-        ----------------
         See Onsite2cTable.run().
         """
         print('\n\n', file=self.txt)
@@ -652,17 +693,12 @@ class Onsite2cUMultipoleTable(MultiAtomIntegrator):
 
         e1, e2 = self.ela, self.elb
 
-        if subshells is None:
-            selected = select_radial_functions(e1)
-        else:
-            assert len(subshells) == len(e1.basis_sets), \
-                   'Need one subshell per basis subset'
-            selected = subshells
+        selected = e1.aux_basis.select_radial_functions()
         print('Selected subshells:', selected, file=self.txt)
 
         self.tables = {}
-        for bas1a in range(len(e1.basis_sets)):
-            for bas1b in range(len(e1.basis_sets)):
+        for bas1a in range(e1.aux_basis.get_nzeta()):
+            for bas1b in range(e1.aux_basis.get_nzeta()):
                 self.tables[(bas1a, bas1b)] = np.zeros((N, NUMSK_2CK))
 
         for i, R in enumerate(self.Rgrid):
@@ -677,8 +713,8 @@ class Onsite2cUMultipoleTable(MultiAtomIntegrator):
 
             for key in U:
                 nl1a, nl1b = key
-                bas1a = e1.get_basis_set_index(nl1a)
-                bas1b = e1.get_basis_set_index(nl1b)
+                bas1a = e1.aux_basis.get_zeta_index(nl1a)
+                bas1b = e1.aux_basis.get_zeta_index(nl1b)
                 self.tables[(bas1a, bas1b)][i, :] = U[key][:]
 
         if smoothen_tails:
@@ -697,9 +733,8 @@ class Onsite2cUMultipoleTable(MultiAtomIntegrator):
 
         Parameters
         ----------
-        selected : dict
-            List of subshells to use as radial functions
-            (one for every 'basis subset') for every element.
+        selected : list
+            List of subshells to use as radial functions.
 
         Other parameters
         ----------------
@@ -860,8 +895,8 @@ class Onsite2cUMultipoleTable(MultiAtomIntegrator):
         """
         sym1, sym2 = self.ela.get_symbol(), self.elb.get_symbol()
 
-        for bas1a in range(len(self.ela.basis_sets)):
-            for bas1b in range(len(self.ela.basis_sets)):
+        for bas1a in range(self.ela.aux_basis.get_nzeta()):
+            for bas1b in range(self.ela.aux_basis.get_nzeta()):
                 template = '%s-%s_onsiteU_%s.2ck'
                 filename = template % (sym1+'+'*bas1a, sym1+'+'*bas1b, sym2)
                 print('Writing to %s' % filename, file=self.txt, flush=True)

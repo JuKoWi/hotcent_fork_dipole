@@ -31,6 +31,7 @@ DZP_PBE = DZP + '-' + PBE
 @pytest.fixture(scope='module')
 def atom(request):
     size, xc = request.param.split('-')
+    nzeta = {'sz': 1, 'dz': 2}[size[:2]]
 
     configuration = '[He] 2s2 2p4'
 
@@ -57,7 +58,7 @@ def atom(request):
                            )
     atom.run()
     atom.generate_nonminimal_basis(size=size, tail_norm=0.15, r_pol=1.125)
-    atom.generate_auxiliary_basis()
+    atom.generate_auxiliary_basis(nzeta=nzeta, tail_norm=0.2, lmax=2)
     atom.pp.build_projectors(atom)
     atom.pp.build_overlaps(atom, atom, rmin=1., rmax=4., N=200)
     return atom
@@ -155,7 +156,7 @@ def test_chg1c(atom):
     xc = atom.xcname
 
     chgon1c = Onsite1cUTable(atom, use_multipoles=True)
-    chgon1c.run(subshells=None, xc=xc)
+    chgon1c.run(xc=xc)
     U = chgon1c.tables[(0, 0)][0, :]
 
     U_ref = {

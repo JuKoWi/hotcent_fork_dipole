@@ -5,28 +5,26 @@
 #   SPDX-License-Identifier: GPL-3.0-or-later                                 #
 #-----------------------------------------------------------------------------#
 import numpy as np
-from hotcent.fluctuation_onecenter import select_radial_functions
 from hotcent.fluctuation_twocenter import (
-                INTEGRALS_2CK, INTEGRALS_2CM, NUMINT_2CL, NUML_2CK, NUML_2CM,
-                NUMSK_2CK, NUMSK_2CM, select_subshells, write_2cl, write_2ck,
-                write_2cm)
+                INTEGRALS_2CK, NUMINT_2CL, NUML_2CK, NUMLM_2CM,
+                NUMSK_2CK, select_orbitals, select_subshells,
+                write_2cl, write_2ck, write_2cm)
+from hotcent.gaunt import get_gaunt_coefficient
 from hotcent.multiatom_integrator import MultiAtomIntegrator
 from hotcent.interpolation import CubicSplineFunction
 from hotcent.orbital_hartree import OrbitalHartreePotential
-from hotcent.orbitals import ANGULAR_MOMENTUM
+from hotcent.orbitals import ANGULAR_MOMENTUM, ORBITAL_LABELS, ORBITALS
 from hotcent.slako import (get_integral_pair, get_twocenter_phi_integral,
                            get_twocenter_phi_integrals_derivatives,
                            tail_smoothening)
+from hotcent.solid_harmonics import sph_solid_radial
 from hotcent.xc import LibXC
 
 
 class Offsite2cMTable(MultiAtomIntegrator):
     """
-    Calculator for (parts of) the off-site moment integrals "M"
-    (Boleininger, Guilbert and Horsfield (2016), doi:10.1063/1.4964391):
-
-    $M_{\mu,\nu,lm} = \int \phi_\mu(\mathbf{r_1}) Y_{lm}(\mathbf{r_1})
-                           \phi_\nu(\mathbf{r_2}) d\mathbf{r}$
+    Class for calculations involving off-site mapping coefficients
+    (see Giese and York (2011), doi:10.1063/1.3587052).
     """
     def __init__(self, *args, **kwargs):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
@@ -34,13 +32,7 @@ class Offsite2cMTable(MultiAtomIntegrator):
     def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
             smoothen_tails=True):
         """
-        Calculates the required off-site Slater-Koster integrals for
-
-        $\int R_{nl1}(\mathbf{r_1}) Y_{lm}(\mathbf{r_1}
-              \phi_\nu(\mathbf{r_2}) d\mathbf{r}$
-
-        from which the moment integrals M can be obtained by rotation
-        after multiplication with the appropriate Gaunt coefficients.
+        Calculates the required mapping coefficients.
 
         Parameters
         ----------
@@ -63,72 +55,61 @@ class Offsite2cMTable(MultiAtomIntegrator):
         self.Rgrid = rmin + dr * np.arange(N)
         self.tables = {}
 
+        Naux12 = self.ela.aux_basis.get_size() + self.elb.aux_basis.get_size()
+
         for p, (e1, e2) in enumerate(self.pairs):
             for bas1 in range(len(e1.basis_sets)):
                 for bas2 in range(len(e2.basis_sets)):
-                    shape = (NUML_2CM, N, NUMSK_2CM)
+                    shape = (NUMLM_2CM, NUMLM_2CM, N, Naux12)
                     self.tables[(p, bas1, bas2)] = np.zeros(shape)
 
         for i, R in enumerate(self.Rgrid):
             if R > 2 * wf_range:
                 break
 
-            grid, area = self.make_grid(R, wf_range, nt=ntheta, nr=nr)
+            for p, (e1, e2) in enumerate(self.pairs):
+                selected = select_orbitals(e1, e2)
 
-            if i == N - 1 or N // 10 == 0 or i % (N // 10) == 0:
-                print('R=%8.2f, %i grid points ...' % \
-                      (R, len(grid)), file=self.txt, flush=True)
+                self.grid_type = 'monopolar'
+                grid, area = self.make_grid(wf_range, nt=ntheta, nr=nr)
+                inveta = self.calculate_inveta_matrix(e1, e2, R, grid, area)
+                D = self.calculate_D_matrix(e1, e2, R, grid, area)
 
-            if len(grid) > 0:
-                for p, (e1, e2) in enumerate(self.pairs):
-                    selected = self.select_integrals(e1, e2)
+                self.grid_type = 'bipolar'
+                grid, area = self.make_grid(R, wf_range, nt=ntheta, nr=nr)
 
-                    M = self.calculate(selected, e1, e2, R, grid, area)
+                if i == N - 1 or N // 10 == 0 or i % (N // 10) == 0:
+                    print('R=%8.2f, %i grid points ...' % \
+                        (R, len(grid)), file=self.txt, flush=True)
+
+                if len(grid) > 0:
+                    M = self.calculate(selected, e1, e2, R, grid, area, D,
+                                       inveta)
 
                     for key in selected:
-                        nl1, nl2, integrals = key
+                        (nl1, lm1), (nl2, lm2) = key
                         bas1 = e1.get_basis_set_index(nl1)
                         bas2 = e2.get_basis_set_index(nl2)
-                        l1 = ANGULAR_MOMENTUM[nl1[1]]
-                        self.tables[(p, bas1, bas2)][l1, i, :] += M[key][:]
+                        ilm = ORBITAL_LABELS.index(lm1)
+                        jlm = ORBITAL_LABELS.index(lm2)
+                        self.tables[(p, bas1, bas2)][ilm, jlm, i, :] = M[key][:]
 
         if smoothen_tails:
             for key in self.tables:
-                for l1 in range(NUML_2CM):
-                    for i in range(NUMSK_2CM):
-                        self.tables[key][l1, :, i] = \
-                            tail_smoothening(self.Rgrid,
-                                             self.tables[key][l1, :, i])
+                for i in range(NUMLM_2CM):
+                    for j in range(NUMLM_2CM):
+                        for k in range(Naux12):
+                            self.tables[key][i, j, :, k] = \
+                                tail_smoothening(self.Rgrid,
+                                            self.tables[key][i, j, :, k])
 
         self.timer.stop('run_offsiteM')
         return
 
-    def select_integrals(self, e1, e2, expand2=True):
-        """ Returns the list of (nl1, nl2, integrals) tuples with
-        the integrals to evaluate for every subshell pair of the given
-        elements. """
-        selected = []
-        for ival1, valence1 in enumerate(e1.basis_sets):
-            for nl1 in valence1:
-                lmax1 = 4
-
-                for ival2, valence2 in enumerate(e2.basis_sets):
-                    for nl2 in valence2:
-                        angmom2 = [ANGULAR_MOMENTUM[nl2[1]]]
-
-                        integrals = []
-                        for integral in INTEGRALS_2CM:
-                            l1 = ANGULAR_MOMENTUM[integral[0]]
-                            l2 = ANGULAR_MOMENTUM[integral[1]]
-                            if l1 <= lmax1 and l2 in angmom2:
-                                integrals.append(integral)
-
-                        selected.append((nl1, nl2, tuple(integrals)))
-        return selected
-
-    def calculate(self, selected, e1, e2, R, grid, area):
+    def calculate_D_matrix(self, e1, e2, R, grid, area):
         """
-        Calculates the selected integrals.
+        Calculates the 'D' matrix with the multipole moments of the
+        atomic orbital products.
 
         Parameters
         ----------
@@ -136,9 +117,151 @@ class Offsite2cMTable(MultiAtomIntegrator):
 
         Returns
         -------
+        D : np.ndarray
+            D matrix.
+        """
+        self.timer.start('prelude')
+        x = grid[:, 0]
+        y = grid[:, 1]
+        r1 = np.sqrt(x**2 + y**2)
+        r2 = np.sqrt(x**2 + (y + R)**2)
+        c1 = y / r1  # cosine of theta_1
+        c2 = (y + R) / r2  # cosine of theta_2
+        s1 = x / r1  # sine of theta_1
+        s2 = x / r2  # sine of theta_2
+        aux = area * x
+        self.timer.stop('prelude')
+
+        Naux1 = e1.aux_basis.get_size()
+        Naux2 = e2.aux_basis.get_size()
+        Naux12 = Naux1 + Naux2
+
+        lmax1 = e1.aux_basis.get_lmax()
+        lmax2 = e2.aux_basis.get_lmax()
+        lmax12 = max(lmax1, lmax2)
+        Nmom = (lmax12 + 1)**2
+
+        moments = []
+        for l in range(lmax12+1):
+            for lm in ORBITALS[l]:
+                moments.append((l, lm))
+
+        D = np.zeros((Naux12, Nmom))
+
+        for imom, (l, lm) in enumerate(moments):
+            Clm = sph_solid_radial(e1.rgrid, l)
+            for iaux in range(Naux1):
+                ilm = e1.aux_basis.get_orbital_label(iaux)
+
+                if lm == ilm:
+                    integrand = e1.aux_basis.eval(e1.rgrid, iaux) * Clm \
+                                * e1.rgrid**2
+                    D[iaux, imom] = e1.grid.integrate(integrand, use_dV=False)
+
+            Clm = sph_solid_radial(r2, l)
+            for iaux in range(Naux2):
+                ilm = e2.aux_basis.get_orbital_label(iaux)
+                Anl = e2.aux_basis.eval(r1, iaux)
+                gphi = get_twocenter_phi_integral(ilm, lm, c1, c2, s1, s2)
+                D[Naux1+iaux, imom] = np.sum(Clm * Anl * aux * gphi)
+
+        return D
+
+    def calculate_inveta_matrix(self, e1, e2, R, grid, area):
+        """
+        Calculates the inverse of the 'eta' matrix with the
+        Hartree kernel integrals.
+
+        Parameters
+        ----------
+        See Offsite2cTable.calculate().
+
+        Returns
+        -------
+        inveta : np.ndarray
+            Inverse of the 'eta' matrix.
+        """
+        self.timer.start('calculate_inveta')
+
+        self.timer.start('prelude')
+        x = grid[:, 0]
+        y = grid[:, 1]
+        r1 = np.sqrt(x**2 + y**2)
+        r2 = np.sqrt(x**2 + (y - R)**2)
+        c1 = y / r1  # cosine of theta_1
+        c2 = (y - R) / r2  # cosine of theta_2
+        s1 = x / r1  # sine of theta_1
+        s2 = x / r2  # sine of theta_2
+        aux = area * x
+        self.timer.stop('prelude')
+
+        Naux1 = e1.aux_basis.get_size()
+        Naux2 = e2.aux_basis.get_size()
+        Naux12 = Naux1 + Naux2
+        eta = np.zeros((Naux12, Naux12))
+
+        for iaux in range(Naux1):
+            ilm = e1.aux_basis.get_orbital_label(iaux)
+            vhar = e1.aux_basis.vhar(e1.rgrid, iaux)
+
+            for jaux in range(Naux1):
+                jlm = e1.aux_basis.get_orbital_label(jaux)
+
+                if ilm == jlm:
+                    Anl = e1.aux_basis.eval(e1.rgrid, jaux)
+                    integrand = vhar * Anl * e1.rgrid**2
+                    eta[iaux, jaux] = e1.grid.integrate(integrand, use_dV=False)
+
+        for iaux in range(Naux2):
+            ilm = e2.aux_basis.get_orbital_label(iaux)
+            vhar = e2.aux_basis.vhar(e2.rgrid, iaux)
+
+            for jaux in range(Naux2):
+                jlm = e2.aux_basis.get_orbital_label(jaux)
+
+                if ilm == jlm:
+                    Anl = e2.aux_basis.eval(e2.rgrid, jaux)
+                    integrand = vhar * Anl * e2.rgrid**2
+                    eta[Naux1+iaux, Naux1+jaux] = \
+                                      e2.grid.integrate(integrand, use_dV=False)
+
+        for iaux in range(Naux1):
+            ilm = e1.aux_basis.get_orbital_label(iaux)
+            Anl = e1.aux_basis.eval(r1, iaux)
+
+            for jaux in range(Naux2):
+                jlm = e2.aux_basis.get_orbital_label(jaux)
+                vhar = e2.aux_basis.vhar(r2, jaux)
+                gphi = get_twocenter_phi_integral(ilm, jlm, c1, c2, s1, s2)
+
+                eta[iaux, Naux1+jaux] = np.sum(vhar * Anl * aux * gphi)
+                eta[Naux1+jaux, iaux] = eta[iaux, Naux1 + jaux]
+
+        inveta = np.linalg.inv(eta)
+
+        self.timer.stop('calculate_inveta')
+        return inveta
+
+    def calculate(self, selected, e1, e2, R, grid, area, D, inveta):
+        """
+        Calculates the selected mapping coefficients.
+
+        Parameters
+        ----------
+        D : np.ndarray
+            Matrix with multipole moments of the atomic orbital products.
+        inveta : np.ndarray
+            Inverse of the matrix with the Hartree kernel integrals.
+
+        Other Parameters
+        ----------------
+        See Offsite2cTable.calculate().
+
+        Returns
+        -------
         M: dict of np.ndarray
-            Dictionary containing the integrals for each selected
-            orbital pair.
+            Dictionary containing the mapping coefficients
+            for each selected orbital pair.
         """
         self.timer.start('calculate_offsiteM')
 
@@ -155,20 +278,77 @@ class Offsite2cMTable(MultiAtomIntegrator):
         aux = area * x
         self.timer.stop('prelude')
 
+        Naux1 = e1.aux_basis.get_size()
+        Naux2 = e2.aux_basis.get_size()
+        Naux12 = Naux1 + Naux2
+        g = np.zeros(Naux12)
+        vhar = []
+
+        lmax1 = e1.aux_basis.get_lmax()
+        lmax2 = e2.aux_basis.get_lmax()
+        lmax12 = max(lmax1, lmax2)
+        Nmom = (lmax12 + 1)**2
+        d = np.zeros(Nmom)
+
+        moments = []
+        for l in range(lmax12+1):
+            for lm in ORBITALS[l]:
+                moments.append((l, lm))
+
         M = {}
         for key in selected:
-            nl1, nl2, integrals = key
-            M[key] = np.zeros(NUMSK_2CM)
+            (nl1, lm1), (nl2, lm2) = key
+            l1 = ANGULAR_MOMENTUM[lm1[0]]
+            l2 = ANGULAR_MOMENTUM[lm2[0]]
+            product = e1.Rnl(r1, nl1) * e2.Rnl(r2, nl2)
 
-            Rnl1 = e1.Rnl(r1, nl1)
-            Rnl2 = e2.Rnl(r2, nl2)
+            # g vector
+            for iaux in range(Naux1):
+                vhar = e1.aux_basis.vhar(r1, iaux)
+                ilm = e1.aux_basis.get_orbital_label(iaux)
 
-            for integral in integrals:
-                lm1, lm2 = get_integral_pair(integral)
-                gphi = get_twocenter_phi_integral(lm1, lm2, c1, c2, s1, s2)
+                gphi = np.zeros_like(vhar)
+                for ll in range(2*max(l1, lmax1)+1):
+                    for llm in ORBITALS[ll]:
+                        gaunt = get_gaunt_coefficient(llm, lm1, ilm)
+                        if abs(gaunt) > 0:
+                            gphi += gaunt * get_twocenter_phi_integral(
+                                                llm, lm2, c1, c2, s1, s2)
+                g[iaux] = np.sum(product * vhar * aux * gphi)
 
-                index = INTEGRALS_2CM.index(integral)
-                M[key][index] = np.sum(Rnl1 * Rnl2 * aux * gphi)
+            for iaux in range(Naux2):
+                vhar = e2.aux_basis.vhar(r2, iaux)
+                ilm = e2.aux_basis.get_orbital_label(iaux)
+
+                gphi = np.zeros_like(vhar)
+                for ll in range(2*max(l2, lmax2)+1):
+                    for llm in ORBITALS[ll]:
+                        gaunt = get_gaunt_coefficient(llm, lm2, ilm)
+                        if abs(gaunt) > 0:
+                            gphi += gaunt * get_twocenter_phi_integral(
+                                                lm1, llm, c1, c2, s1, s2)
+                g[Naux1 + iaux] = np.sum(product * vhar * aux * gphi)
+
+            # d vector
+            for imom, (l, lm) in enumerate(moments):
+                Clm = sph_solid_radial(r1, l)
+
+                gphi = np.zeros_like(Clm)
+                for ll in range(2*lmax12+1):
+                    for llm in ORBITALS[ll]:
+                        gaunt = get_gaunt_coefficient(llm, lm1, lm)
+                        if abs(gaunt) > 0:
+                            gphi += gaunt * get_twocenter_phi_integral(
+                                                llm, lm2, c1, c2, s1, s2)
+                d[imom] = np.sum(product * Clm * aux * gphi)
+
+            # u vector
+            u1 = np.linalg.inv(np.matmul(D.T, np.matmul(inveta, D)))
+            u2 = np.matmul(D.T, np.matmul(inveta, g)) - d
+            u = np.matmul(u1, u2)
+
+            # M vector
+            M[key] = np.matmul(inveta, (g - np.matmul(D, u)))
 
         self.timer.stop('calculate_offsiteM')
         return M
@@ -177,24 +357,23 @@ class Offsite2cMTable(MultiAtomIntegrator):
         """
         Writes all integral tables to file.
 
-        The filename template corresponds to '<el1>-<el2>_offsiteM.2cm'.
+        The filename template corresponds to
+        '<el1>-<el2>_offsiteM_<label1>-<label2>.2cm'.
         """
         for p, (e1, e2) in enumerate(self.pairs):
             sym1, sym2 = e1.get_symbol(), e2.get_symbol()
+            label1 = e1.aux_basis.get_basis_set_label()
+            label2 = e2.aux_basis.get_basis_set_label()
 
             for bas1, valence1 in enumerate(e1.basis_sets):
                 for bas2, valence2 in enumerate(e2.basis_sets):
-                    template = '%s-%s_offsiteM.2cm'
-                    filename = template % (sym1 + '+'*bas1, sym2  + '+'*bas2)
+                    template = '%s-%s_offsiteM_%s-%s.2cm'
+                    filename = template % (sym1 + '+'*bas1, sym2  + '+'*bas2,
+                                           label1, label2)
                     print('Writing to %s' % filename, file=self.txt, flush=True)
 
-                    with open(filename, 'a') as f:
-                        # ensure that we start from empty file
-                        f.truncate(0)
-
-                        for l1 in range(NUML_2CM):
-                            table = self.tables[(p, bas1, bas2)][l1, :, :]
-                            write_2cm(f, self.Rgrid, table, l1)
+                    with open(filename, 'w') as f:
+                        write_2cm(f, self.Rgrid, self.tables[(p, bas1, bas2)])
         return
 
 
@@ -460,9 +639,8 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
     def __init__(self, *args, **kwargs):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
 
-    def run(self, subshells=None, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50,
-            wflimit=1e-7, xc='LDA', smoothen_tails=True, shift=False,
-            subtract_delta=True):
+    def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
+            xc='LDA', smoothen_tails=True, shift=False, subtract_delta=True):
         """
         Calculates off-site, orbital- and distance-dependent "U" values
         as matrix elements of the two-center-expanded Hartree-XC kernel
@@ -470,15 +648,6 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
 
         Parameters
         ----------
-        subshells : dict, optional
-            Dictionary with the list of subshells to use as radial functions
-            (one for every 'basis subset') for every element. By default,
-            the subshell with lowest angular momentum is chosen from each
-            subset.
-        nl : tuple of str, optional
-            Two-tuple with the subshells defining the radial functions
-            for each element. If None, the subshells with the lowest angular
-            momentum will be chosen from the minimal valence sets.
         subtract_delta : bool, optional
             Whether to subtract the point multipole contributions from
             the kernel integrals (default: True). Setting it to False
@@ -507,17 +676,7 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
         selected = {}
         for el in [self.ela, self.elb]:
             sym = el.get_symbol()
-
-            if subshells is None or sym not in subshells:
-                selected[sym] = None
-            else:
-                selected[sym] = subshells[sym]
-
-            if selected[sym] is None:
-                selected[sym] = select_radial_functions(el)
-
-            assert len(selected[sym]) == len(el.basis_sets), \
-                    'Need one subshell per basis subset for {0}'.format(sym)
+            selected[sym] = el.aux_basis.select_radial_functions()
         print('Selected subshells:', selected, file=self.txt)
 
         self.build_ohp(selected)
@@ -526,8 +685,8 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
 
         self.tables = {}
         for p, (e1, e2) in enumerate(self.pairs):
-            for bas1 in range(len(e1.basis_sets)):
-                for bas2 in range(len(e2.basis_sets)):
+            for bas1 in range(e1.aux_basis.get_nzeta()):
+                for bas2 in range(e2.aux_basis.get_nzeta()):
                     self.tables[(p, bas1, bas2)] = np.zeros((N, NUMSK_2CK))
 
         for i, R in enumerate(self.Rgrid):
@@ -554,8 +713,8 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
 
                         for key in U:
                             nl1, nl2 = key
-                            bas1 = e1.get_basis_set_index(nl1)
-                            bas2 = e2.get_basis_set_index(nl2)
+                            bas1 = e1.aux_basis.get_zeta_index(nl1)
+                            bas2 = e2.aux_basis.get_zeta_index(nl2)
                             self.tables[(p, bas1, bas2)][i, :] += U[key][:]
 
         for key in self.tables:
@@ -671,10 +830,10 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
             sym1 = e1.get_symbol()
             sym2 = e2.get_symbol()
 
-            for bas1 in range(len(e1.basis_sets)):
+            for bas1 in range(e1.aux_basis.get_nzeta()):
                 nl1 = selected[sym1][bas1]
 
-                for bas2 in range(len(e2.basis_sets)):
+                for bas2 in range(e2.aux_basis.get_nzeta()):
                     nl2 = selected[sym2][bas2]
                     self.point_kernels[(p, bas1, bas2)] = np.zeros(NUMSK_2CK)
 
@@ -691,8 +850,7 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
         Parameters
         ----------
         selected : dict
-            Dictionary with the list of subshells to use as radial functions
-            (one for every 'basis subset') for every element.
+            List of subshells to use as radial functions for every element.
 
         Other parameters
         ----------------
@@ -904,8 +1062,7 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
         Parameters
         ----------
         selected : dict
-            Dictionary with the list of subshells to use as radial functions
-            (one for every 'basis subset') for every element.
+            List of subshells to use as radial functions for every element.
         subtract_delta : bool
             Whether to subtract the point multipole contributions from
             the kernel integrals.
@@ -971,8 +1128,8 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
         for p, (e1, e2) in enumerate(self.pairs):
             sym1, sym2 = e1.get_symbol(), e2.get_symbol()
 
-            for bas1, valence1 in enumerate(e1.basis_sets):
-                for bas2, valence2 in enumerate(e2.basis_sets):
+            for bas1 in range(e1.aux_basis.get_nzeta()):
+                for bas2 in range(e2.aux_basis.get_nzeta()):
                     template = '%s-%s_offsiteU.2ck'
                     filename = template % (sym1 + '+'*bas1, sym2  + '+'*bas2)
                     print('Writing to %s' % filename, file=self.txt, flush=True)

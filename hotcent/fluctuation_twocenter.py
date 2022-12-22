@@ -5,14 +5,14 @@
 #   SPDX-License-Identifier: GPL-3.0-or-later                                 #
 #-----------------------------------------------------------------------------#
 import numpy as np
-from hotcent.orbitals import ANGULAR_MOMENTUM, ORBITALS
+from hotcent.orbitals import ANGULAR_MOMENTUM, ORBITAL_LABELS, ORBITALS
 
 
 NUMINT_2CL = 4*4  # number of subshell-resolved integrals in .2cl files
 
 NUML_2CK = 3  # number of subshells included in .2ck files (3 = up to d)
 
-NUML_2CM = 3  # number of subshells included in .2cm files (3 = up to d)
+NUMLM_2CM = 9  # number of orbitals considered for .2cm files (9 = up to d)
 
 INTEGRALS_2CK = [
     'sss', 'sps', 'sds', 'pss', 'pps', 'ppp', 'pds', 'pdp',
@@ -20,17 +20,6 @@ INTEGRALS_2CK = [
 ]
 
 NUMSK_2CK = len(INTEGRALS_2CK)
-
-INTEGRALS_2CM = [
-    'sss', 'sps', 'sds', 'sfs', 'sgs', 'pss', 'pps', 'ppp', 'pds', 'pdp',
-    'pfs', 'pfp', 'pgs', 'pgp', 'dss', 'dps', 'dpp', 'dds', 'ddp', 'ddd',
-    'dfs', 'dfp', 'dfd', 'dgs', 'dgp', 'dgd', 'fss', 'fps', 'fpp', 'fds',
-    'fdp', 'fdd', 'ffs', 'ffp', 'ffd', 'fff', 'fgs', 'fgp', 'fgd', 'fgf',
-    'gss', 'gps', 'gpp', 'gds', 'gdp', 'gdd', 'gfs', 'gfp', 'gfd', 'gff',
-    'ggs', 'ggp', 'ggd', 'ggf', 'ggg',
-]
-
-NUMSK_2CM = len(INTEGRALS_2CM)
 
 
 def select_subshells(e1, e2):
@@ -142,38 +131,34 @@ def write_2ck(handle, Rgrid, table, point_kernels=None):
     return
 
 
-def write_2cm(handle, Rgrid, table, l1, l2=None):
+def write_2cm(handle, Rgrid, table):
     """
-    Writes (part of) a parameter file in '2cm' format.
+    Writes a parameter file in '2cm' format.
 
     Parameters
     ----------
-    l1 : int or None
-        Agular momentum associated with the first element.
-    l2 : int or None, optional
-        Agular momentum associated with the second element.
-
-    Other parameters
-    ----------------
-    See slako.write_skf()
+    handle : file handle
+        Handle of an open file.
+    Rgrid : np.ndarray
+        Array of interatomic distances.
+    table : nd.ndarray
+        Three-dimensional table.
     """
     grid_dist = Rgrid[1] - Rgrid[0]
-    grid_npts, numint = np.shape(table)
-    assert numint == NUMSK_2CM
-
-    if l1 is not None:
-        header = '# {0}'.format('spdf'[l1])
-        if l2 is not None:
-            header += '_{0}'.format('spdf'[l2])
-        print(header, file=handle)
-
+    grid_npts = len(Rgrid)
     nzeros = int(np.round(Rgrid[0] / grid_dist)) - 1
     assert nzeros >= 0
+    assert table.ndim == 4
 
     print("%.12f, %d" % (grid_dist, grid_npts + nzeros), file=handle)
 
-    for i in range(nzeros):
-        print(' '.join(['0.0'] * numint), file=handle)
+    for i in range(table.shape[0]):
+        for j in range(table.shape[1]):
+            header = '# {0}_{1}'.format(ORBITAL_LABELS[i], ORBITAL_LABELS[j])
+            print(header, file=handle)
 
-    np.savetxt(handle, table, fmt='%1.12e')
+            for k in range(nzeros):
+                print(' '.join(['0.0'] * table.shape[3]), file=handle)
+
+            np.savetxt(handle, table[i, j, :, :], fmt='%1.12e')
     return

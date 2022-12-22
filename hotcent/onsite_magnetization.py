@@ -6,8 +6,7 @@
 #-----------------------------------------------------------------------------#
 import numpy as np
 from ase.units import Ha
-from hotcent.fluctuation_onecenter import (
-                NUML_1CK, select_radial_functions, write_1ck)
+from hotcent.fluctuation_onecenter import NUML_1CK, write_1ck
 from hotcent.fluctuation_twocenter import (
                 INTEGRALS_2CK, NUMINT_2CL, NUML_2CK, NUMSK_2CK,
                 select_subshells, write_2cl, write_2ck)
@@ -152,16 +151,12 @@ class Onsite1cWMultipoleTable:
         self.el = el
         self.txt = txt
 
-    def run(self, subshells=None, xc='LDA'):
+    def run(self, xc='LDA'):
         """
         Calculates the onsite, one-center "W" integrals.
 
         Parameters
         ----------
-        subshells : list, optional
-            Specific subshells to use as radial functions (one for
-            every 'basis subset'). By default, the subshell with lowest
-            angular momentum is chosen from each subset.
         xc : str, optional
             Name of the exchange-correlation functional (default: LDA).
         """
@@ -172,23 +167,18 @@ class Onsite1cWMultipoleTable:
         print('***********************************************', file=self.txt)
 
         self.tables = {}
-        for bas1 in range(len(self.el.basis_sets)):
-            for bas2 in range(len(self.el.basis_sets)):
+        for bas1 in range(self.el.aux_basis.get_nzeta()):
+            for bas2 in range(self.el.aux_basis.get_nzeta()):
                 self.tables[(bas1, bas2)] = np.zeros((2, NUML_1CK))
 
-        if subshells is None:
-            selected = select_radial_functions(self.el)
-        else:
-            assert len(subshells) == len(self.el.basis_sets), \
-                   'Expecting one subshell per basis subset'
-            selected = subshells
+        selected = self.el.aux_basis.select_radial_functions()
         print('Selected subshells:', selected, file=self.txt)
 
         for nl1 in selected:
             for nl2 in selected:
                 W, radmom = self.calculate(nl1, nl2, xc=xc)
-                bas1 = self.el.get_basis_set_index(nl1)
-                bas2 = self.el.get_basis_set_index(nl2)
+                bas1 = self.el.aux_basis.get_zeta_index(nl1)
+                bas2 = self.el.aux_basis.get_zeta_index(nl2)
                 self.tables[(bas1, bas2)][0, :] = W
                 self.tables[(bas1, bas2)][1, :] = radmom
         return
@@ -286,8 +276,8 @@ class Onsite1cWMultipoleTable:
         """
         sym = self.el.get_symbol()
 
-        for bas1, valence1 in enumerate(self.el.basis_sets):
-            for bas2, valence2 in enumerate(self.el.basis_sets):
+        for bas1 in range(self.el.aux_basis.get_nzeta()):
+            for bas2 in range(self.el.aux_basis.get_nzeta()):
                 template = '%s-%s_onsiteW.1ck'
                 filename = template % (sym + '+'*bas1, sym + '+'*bas2)
                 print('Writing to %s' % filename, file=self.txt, flush=True)
@@ -622,8 +612,8 @@ class Onsite2cWMultipoleTable(MultiAtomIntegrator):
         MultiAtomIntegrator.__init__(self, *args, grid_type='monopolar',
                                      **kwargs)
 
-    def run(self, subshells=None, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50,
-            wflimit=1e-7, xc='LDA', smoothen_tails=True):
+    def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
+            xc='LDA', smoothen_tails=True):
         """
         Calculates onsite, orbital- and distance-dependent "W" values
         as matrix elements of the two-center-expanded spin-polarized XC
@@ -631,13 +621,6 @@ class Onsite2cWMultipoleTable(MultiAtomIntegrator):
 
         Parameters
         ----------
-        subshells : list, optional
-            Specific subshells to use as radial functions (one for
-            every 'basis subset'). By default, the subshell with lowest
-            angular momentum is chosen from each subset.
-
-        Other parameters
-        ----------------
         See Onsite2cTable.run().
         """
         print('\n\n', file=self.txt)
@@ -659,17 +642,12 @@ class Onsite2cWMultipoleTable(MultiAtomIntegrator):
 
         e1, e2 = self.ela, self.elb
 
-        if subshells is None:
-            selected = select_radial_functions(e1)
-        else:
-            assert len(subshells) == len(e1.basis_sets), \
-                   'Need one subshell per basis subset'
-            selected = subshells
+        selected = e1.aux_basis.select_radial_functions()
         print('Selected subshells:', selected, file=self.txt)
 
         self.tables = {}
-        for bas1a in range(len(e1.basis_sets)):
-            for bas1b in range(len(e1.basis_sets)):
+        for bas1a in range(e1.aux_basis.get_nzeta()):
+            for bas1b in range(e1.aux_basis.get_nzeta()):
                 self.tables[(bas1a, bas1b)] = np.zeros((N, NUMSK_2CK))
 
         for i, R in enumerate(self.Rgrid):
@@ -684,8 +662,8 @@ class Onsite2cWMultipoleTable(MultiAtomIntegrator):
 
             for key in W:
                 nl1a, nl1b = key
-                bas1a = e1.get_basis_set_index(nl1a)
-                bas1b = e1.get_basis_set_index(nl1b)
+                bas1a = e1.aux_basis.get_zeta_index(nl1a)
+                bas1b = e1.aux_basis.get_zeta_index(nl1b)
                 self.tables[(bas1a, bas1b)][i, :] = W[key][:]
 
         if smoothen_tails:
@@ -705,9 +683,8 @@ class Onsite2cWMultipoleTable(MultiAtomIntegrator):
 
         Parameters
         ----------
-        selected : dict
-            List of subshells to use as radial functions
-            (one for every 'basis subset') for every element.
+        selected : list
+            List of subshells to use as radial functions.
 
         Other parameters
         ----------------
@@ -885,8 +862,8 @@ class Onsite2cWMultipoleTable(MultiAtomIntegrator):
         """
         sym1, sym2 = self.ela.get_symbol(), self.elb.get_symbol()
 
-        for bas1a in range(len(self.ela.basis_sets)):
-            for bas1b in range(len(self.ela.basis_sets)):
+        for bas1a in range(self.ela.aux_basis.get_nzeta()):
+            for bas1b in range(self.ela.aux_basis.get_nzeta()):
                 template = '%s-%s_onsiteW_%s.2ck'
                 filename = template % (sym1+'+'*bas1a, sym1+'+'*bas1b, sym2)
                 print('Writing to %s' % filename, file=self.txt, flush=True)

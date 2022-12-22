@@ -7,7 +7,7 @@ import numpy as np
 from hotcent.confinement import SoftConfinement
 from hotcent.kleinman_bylander import KleinmanBylanderPP
 from hotcent.pseudo_atomic_dft import PseudoAtomicDFT
-from hotcent.offsite_chargetransfer import INTEGRALS_2CK, NUMSK_2CM
+from hotcent.offsite_chargetransfer import INTEGRALS_2CK
 
 
 R1 = 2.4
@@ -85,7 +85,7 @@ def atoms(request):
         atom.run()
         atom.generate_nonminimal_basis(size=size, tail_norm=0.15,
                                        r_pol=r_pol[element])
-        atom.generate_auxiliary_basis()
+        atom.generate_auxiliary_basis(nzeta=2, tail_norm=0.2, lmax=2)
         atoms.append(atom)
 
     return atoms
@@ -101,7 +101,7 @@ def test_on1cU(atoms):
     xc = atom_O.xcname
 
     chgon1c = Onsite1cUTable(atom_O, use_multipoles=True)
-    chgon1c.run(subshells=None, xc=xc)
+    chgon1c.run(xc=xc)
     U = chgon1c.tables
 
     U_ref = {
@@ -145,7 +145,7 @@ def test_on1cW(atoms):
     xc = atom_O.xcname
 
     magon1c = Onsite1cWTable(atom_O, use_multipoles=True)
-    magon1c.run(subshells=None, xc=xc)
+    magon1c.run(xc=xc)
     W = magon1c.tables
 
     W_ref = {
@@ -276,7 +276,7 @@ def test_on2cU(R, atoms):
     rmin, dr, N = R, R, 2
 
     chgon2c = Onsite2cUTable(atom_O, atom_Li, use_multipoles=True)
-    chgon2c.run(subshells=None, rmin=rmin, dr=dr, N=N, xc=xc, ntheta=300,
+    chgon2c.run(rmin=rmin, dr=dr, N=N, xc=xc, ntheta=300,
                 nr=100, smoothen_tails=False)
     U = chgon2c.tables
 
@@ -441,7 +441,7 @@ def test_on2cW(R, atoms):
     rmin, dr, N = R, R, 2
 
     magon2c = Onsite2cWTable(atom_O, atom_Li, use_multipoles=True)
-    magon2c.run(subshells=None, rmin=rmin, dr=dr, N=N, xc=xc, ntheta=300,
+    magon2c.run(rmin=rmin, dr=dr, N=N, xc=xc, ntheta=300,
                 nr=100, smoothen_tails=False)
     W = magon2c.tables
 
@@ -608,7 +608,7 @@ def test_off2cU(R, atoms):
     rmin, dr, N = R, R, 2
 
     chgoff2c = Offsite2cUTable(atom_O, atom_Li, use_multipoles=True)
-    chgoff2c.run(subshells=None, rmin=rmin, dr=dr, N=N, xc=xc, ntheta=300,
+    chgoff2c.run(rmin=rmin, dr=dr, N=N, xc=xc, ntheta=300,
                  nr=100, smoothen_tails=False)
     U = chgoff2c.tables
 
@@ -918,7 +918,7 @@ def test_off2cW(R, atoms):
     rmin, dr, N = R, R, 2
 
     magoff2c = Offsite2cWTable(atom_O, atom_Li, use_multipoles=True)
-    magoff2c.run(subshells=None, rmin=rmin, dr=dr, N=N, xc=xc, ntheta=300,
+    magoff2c.run(rmin=rmin, dr=dr, N=N, xc=xc, ntheta=300,
                  nr=100, smoothen_tails=False)
     W = magoff2c.tables
 
@@ -1352,7 +1352,7 @@ def test_off2cM(R, atoms):
                     0.000000e+00, 0.000000e+00, 0.000000e+00, 0.000000e+00,
                     0.000000e+00, 0.000000e+00, 0.000000e+00,
                 ]),
-                np.zeros(NUMSK_2CM),
+                np.zeros(55),
             ),
             (0, 1, 1): (
                 np.array([
@@ -1387,7 +1387,7 @@ def test_off2cM(R, atoms):
                     0.000000e+00, 0.000000e+00, 0.000000e+00, 0.000000e+00,
                     0.000000e+00, 0.000000e+00, 0.000000e+00,
                 ]),
-                np.zeros(NUMSK_2CM),
+                np.zeros(55),
             ),
             (1, 0, 0): (
                 np.array([
@@ -1422,7 +1422,7 @@ def test_off2cM(R, atoms):
                     0.000000e+00, 0.000000e+00, 0.000000e+00, 0.000000e+00,
                     0.000000e+00, 0.000000e+00, 0.000000e+00,
                 ]),
-                np.zeros(NUMSK_2CM),
+                np.zeros(55),
             ),
             (1, 0, 1): (
                 np.array([
@@ -1457,7 +1457,7 @@ def test_off2cM(R, atoms):
                     0.000000e+00, 0.000000e+00, 0.000000e+00, 0.000000e+00,
                     0.000000e+00, 0.000000e+00, 0.000000e+00,
                 ]),
-                np.zeros(NUMSK_2CM),
+                np.zeros(55),
             ),
             (1, 1, 0): (
                 np.array([
@@ -1476,8 +1476,8 @@ def test_off2cM(R, atoms):
                     0.000000e+00, 0.000000e+00, 0.000000e+00, 0.000000e+00,
                     0.000000e+00, 0.000000e+00, 0.000000e+00,
                 ]),
-                np.zeros(NUMSK_2CM),
-                np.zeros(NUMSK_2CM),
+                np.zeros(55),
+                np.zeros(55),
             ),
             (1, 1, 1): (
                 np.array([
@@ -1496,8 +1496,8 @@ def test_off2cM(R, atoms):
                     0.000000e+00, 0.000000e+00, 0.000000e+00, 0.000000e+00,
                     0.000000e+00, 0.000000e+00, 0.000000e+00,
                 ]),
-                np.zeros(NUMSK_2CM),
-                np.zeros(NUMSK_2CM),
+                np.zeros(55),
+                np.zeros(55),
             ),
         },
     }

@@ -5,7 +5,6 @@
 #   SPDX-License-Identifier: GPL-3.0-or-later                                 #
 #-----------------------------------------------------------------------------#
 import numpy as np
-from hotcent.fluctuation_onecenter import select_radial_functions
 from hotcent.fluctuation_twocenter import (
                 INTEGRALS_2CK, NUMINT_2CL, NUML_2CK, NUMSK_2CK,
                 select_subshells, write_2cl, write_2ck)
@@ -262,8 +261,8 @@ class Offsite2cWMultipoleTable(MultiAtomIntegrator):
     def __init__(self, *args, **kwargs):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
 
-    def run(self, subshells=None, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50,
-            wflimit=1e-7, xc='LDA', smoothen_tails=True):
+    def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
+            xc='LDA', smoothen_tails=True):
         """
         Calculates offsite, orbital- and distance-dependent "W" values
         as matrix elements of the two-center-expanded spin-polarized
@@ -271,14 +270,6 @@ class Offsite2cWMultipoleTable(MultiAtomIntegrator):
 
         Parameters
         ----------
-        subshells : dict, optional
-            Dictionary with the list of subshells to use as radial functions
-            (one for every 'basis subset') for every element. By default,
-            the subshell with lowest angular momentum is chosen from each
-            subset.
-
-        Other parameters
-        ----------------
         See Offsite2cTable.run() and Onsite2cTable.run().
         """
         print('\n\n', file=self.txt)
@@ -300,23 +291,13 @@ class Offsite2cWMultipoleTable(MultiAtomIntegrator):
         selected = {}
         for el in [self.ela, self.elb]:
             sym = el.get_symbol()
-
-            if subshells is None or sym not in subshells:
-                selected[sym] = None
-            else:
-                selected[sym] = subshells[sym]
-
-            if selected[sym] is None:
-                selected[sym] = select_radial_functions(el)
-
-            assert len(selected[sym]) == len(el.basis_sets), \
-                    'Need one subshell per basis subset for {0}'.format(sym)
+            selected[sym] = el.aux_basis.select_radial_functions()
         print('Selected subshells:', selected, file=self.txt)
 
         self.tables = {}
         for p, (e1, e2) in enumerate(self.pairs):
-            for bas1 in range(len(e1.basis_sets)):
-                for bas2 in range(len(e2.basis_sets)):
+            for bas1 in range(e1.aux_basis.get_nzeta()):
+                for bas2 in range(e2.aux_basis.get_nzeta()):
                     self.tables[(p, bas1, bas2)] = np.zeros((N, NUMSK_2CK))
 
         for i, R in enumerate(self.Rgrid):
@@ -332,8 +313,8 @@ class Offsite2cWMultipoleTable(MultiAtomIntegrator):
 
                     for key in W:
                         nl1, nl2 = key
-                        bas1 = e1.get_basis_set_index(nl1)
-                        bas2 = e2.get_basis_set_index(nl2)
+                        bas1 = e1.aux_basis.get_zeta_index(nl1)
+                        bas2 = e2.aux_basis.get_zeta_index(nl2)
                         self.tables[(p, bas1, bas2)][i, :] = W[key][:]
 
         if smoothen_tails:
@@ -353,8 +334,7 @@ class Offsite2cWMultipoleTable(MultiAtomIntegrator):
         Parameters
         ----------
         selected : dict
-            Dictionary with the list of subshells to use as radial functions
-            (one for every 'basis subset') for every element.
+            List of subshells to use as radial functions for every element.
 
         Other parameters
         ----------------
@@ -513,8 +493,8 @@ class Offsite2cWMultipoleTable(MultiAtomIntegrator):
         for p, (e1, e2) in enumerate(self.pairs):
             sym1, sym2 = e1.get_symbol(), e2.get_symbol()
 
-            for bas1, valence1 in enumerate(e1.basis_sets):
-                for bas2, valence2 in enumerate(e2.basis_sets):
+            for bas1 in range(e1.aux_basis.get_nzeta()):
+                for bas2 in range(e2.aux_basis.get_nzeta()):
                     template = '%s-%s_offsiteW.2ck'
                     filename = template % (sym1 + '+'*bas1, sym2  + '+'*bas2)
                     print('Writing to %s' % filename, file=self.txt, flush=True)

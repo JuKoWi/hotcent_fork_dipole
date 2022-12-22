@@ -39,6 +39,13 @@ def parse_arguments():
     Note: existing output files will be overwritten.
     """
     parser = ArgumentParser(description=description)
+    parser.add_argument('--auxiliary-basis', help='Auxiliary basis set sizes '
+                        'to use for fluctuation-type tasks (chg*, mag*) with '
+                        'multipoles. To e.g. select a double-zeta auxiliary '
+                        'basis for H with angular momenta up to d (which is '
+                        'also the default for all elements), specify '
+                        '--auxiliary-basis=H_2D. Entries for multiple '
+                        'elements need to be separated by commas.')
     parser.add_argument('include', nargs='*', help='Element combinations '
                         'to consider. To e.g. include all combinations that '
                         'involve H and/or Si, as well as all combinations '
@@ -52,13 +59,14 @@ def parse_arguments():
     parser.add_argument('--label', help='Label to use when searching for the '
                         'input YAML files. The expected file names correspond '
                         'to "<Symbol>[.<label>].yaml".')
-    parser.add_argument('--multipole-subshells', help='Subshells to use for '
-                        'fluctuation-type tasks (chg*, mag*) with multipoles, '
-                        'instead of the default choice (subshells with lowest '
-                        'angular momentum in every basis subset). To e.g. '
-                        'select p-type subshells for Si in a DZ or DZP basis, '
-                        'specify --multipole-subshells=Si_3p-3p+. Entries for '
-                        'multiple elements need to be separated by commas.')
+    parser.add_argument('--multipole-subshells', help='Main basis subshells '
+                        'from which the auxiliary basis functions are to be '
+                        'derived in fluctuation-type tasks (chg*, mag*) with '
+                        'multipoles. To e.g. select the Si 3p subshell '
+                        'instead of the default choice (the subshell with the '
+                        'lowest angular momentum, i.e. Si 3s), specify '
+                        '--multipole-subshells=Si_3p. Entries for multiple '
+                        'elements need to be separated by commas.')
     parser.add_argument('--opts-2c', help='Option for controlling the two-'
                         'center integration grids. The default settings are '
                         'rather tight and correspond to --opts-2c=nr_200,'
@@ -280,21 +288,33 @@ def main():
 
     parse_err = 'Cannot parse {0} entry: {1}'
 
-    if args.multipole_subshells is None:
-        multipole_subshells = None
-    else:
-        multipole_subshells = {}
+    auxiliary_basis_kwargs = {}
+    for elements in included:
+        for element in elements:
+            auxiliary_basis_kwargs[element] = dict(subshell=None, lmax=2,
+                                                   nzeta=2)
 
+    if args.auxiliary_basis is not None:
+        for entry in args.auxiliary_basis.split(','):
+            msg = parse_err.format('auxiliary-basis', entry)
+            assert '_' in entry, msg
+            symbol, value = entry.split('_', maxsplit=1)
+            assert len(value) == 2, msg
+            verify_chemical_symbols(symbol)
+            assert value[0].isdigit(), msg
+            nzeta = int(value[0])
+            assert value[1] in 'SPDF', msg
+            lmax = 'SPDF'.index(value[1])
+            if symbol in auxiliary_basis_kwargs:
+                auxiliary_basis_kwargs[symbol].update(lmax=lmax, nzeta=nzeta)
+
+    if args.multipole_subshells is not None:
         for entry in args.multipole_subshells.split(','):
             assert '_' in entry, parse_err.format('multipole-subshells', entry)
             symbol, value = entry.split('_', maxsplit=1)
             verify_chemical_symbols(symbol)
-            multipole_subshells[symbol] = tuple(value.split('-'))
-
-        for elements in included:
-            for element in elements:
-                if element not in multipole_subshells:
-                    multipole_subshells[element] = None
+            if symbol in auxiliary_basis_kwargs:
+                auxiliary_basis_kwargs[symbol].update(subshell=value)
 
     opts_2c = dict(nr=200, ntheta=600, smoothen_tails=True)
     if args.opts_2c is not None:
@@ -319,8 +339,8 @@ def main():
         use_multipoles.append(True)
 
     task_kwargs = dict(
+        auxiliary_basis_kwargs=auxiliary_basis_kwargs,
         label=args.label,
-        multipole_subshells=multipole_subshells,
         opts_2c=opts_2c,
         opts_3c=opts_3c,
         pseudo_path=args.pseudo_path,
@@ -404,7 +424,7 @@ def read_yaml(filename):
 
 
 def get_atoms(*elements, label=None, only_1c=False, pseudo_path='.', txt='-',
-              yaml_path='.'):
+              yaml_path='.', auxiliary_basis_kwargs=None):
     atoms = {}
     eigenvalues, hubbardvalues, occupations = {}, {}, {}
     offdiagonal_H, offdiagonal_S = {}, {}
@@ -477,7 +497,8 @@ def get_atoms(*elements, label=None, only_1c=False, pseudo_path='.', txt='-',
 
     for el1 in set(elements):
         atoms[el1].pp.build_projectors(atoms[el1])
-        atoms[el1].generate_auxiliary_basis()
+        if auxiliary_basis_kwargs is not None:
+            atoms[el1].generate_auxiliary_basis(**auxiliary_basis_kwargs[el1])
 
     if not only_1c:
         dr = 0.02
@@ -532,7 +553,8 @@ def get_3c_grids(el1, el2, rmin_halves, wf_ranges, verbose=True):
 def chgoff2c(el1, el2, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
             get_atoms(el1, el2, label=kwargs['label'], only_1c=False,
-                      pseudo_path=kwargs['pseudo_path'], yaml_path='..')
+                      pseudo_path=kwargs['pseudo_path'], yaml_path='..',
+                      auxiliary_basis_kwargs=kwargs['auxiliary_basis_kwargs'])
 
     rmin = rmin_halves[el1] + rmin_halves[el2]
     N = numr[el1] + numr[el2] - int(np.round(rmin/dr))
@@ -549,15 +571,6 @@ def chgoff2c(el1, el2, **kwargs):
                                use_multipoles=use_multipoles, timing=False)
 
         run_kwargs.update(shift=kwargs['shift'], xc=xc)
-
-        if use_multipoles:
-            if kwargs['multipole_subshells'] is None:
-                subshells = None
-            else:
-                subshells = {el: kwargs['multipole_subshells'][el]
-                             for el in [el1, el2]}
-            run_kwargs.update(subshells=subshells)
-
         calc.run(**run_kwargs)
         calc.write()
     return
@@ -566,7 +579,8 @@ def chgoff2c(el1, el2, **kwargs):
 def chgon1c(el1, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
             get_atoms(el1, label=kwargs['label'], only_1c=True,
-                      pseudo_path=kwargs['pseudo_path'], yaml_path='..')
+                      pseudo_path=kwargs['pseudo_path'], yaml_path='..',
+                      auxiliary_basis_kwargs=kwargs['auxiliary_basis_kwargs'])
 
     for use_multipoles in kwargs['use_multipoles']:
         if use_multipoles:
@@ -579,11 +593,7 @@ def chgon1c(el1, **kwargs):
         run_kwargs = dict()
 
         if use_multipoles:
-            if kwargs['multipole_subshells'] is None:
-                subshells = None
-            else:
-                subshells = kwargs['multipole_subshells'][el1]
-            run_kwargs.update(subshells=subshells, xc=xc)
+            run_kwargs.update(xc=xc)
         else:
             maxstep = 0.125 if el1 == 'H' else 0.25
             run_kwargs.update(maxstep=maxstep)
@@ -596,7 +606,8 @@ def chgon1c(el1, **kwargs):
 def chgon2c(el1, el2, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
             get_atoms(el1, el2, label=kwargs['label'], only_1c=False,
-                      pseudo_path=kwargs['pseudo_path'], yaml_path='..')
+                      pseudo_path=kwargs['pseudo_path'], yaml_path='..',
+                      auxiliary_basis_kwargs=kwargs['auxiliary_basis_kwargs'])
 
     rmin = rmin_halves[el1] + rmin_halves[el2]
     N = numr[el1] + numr[el1] - int(np.round(rmin/dr))
@@ -606,14 +617,6 @@ def chgon2c(el1, el2, **kwargs):
                               use_multipoles=use_multipoles, timing=False)
 
         run_kwargs = dict(rmin=rmin, dr=dr, N=N, xc=xc, **kwargs['opts_2c'])
-
-        if use_multipoles:
-            if kwargs['multipole_subshells'] is None:
-                subshells = None
-            else:
-                subshells = kwargs['multipole_subshells'][el1]
-            run_kwargs.update(subshells=subshells)
-
         calc.run(**run_kwargs)
         calc.write()
     return
@@ -622,7 +625,8 @@ def chgon2c(el1, el2, **kwargs):
 def magoff2c(el1, el2, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
             get_atoms(el1, el2, label=kwargs['label'], only_1c=False,
-                      pseudo_path=kwargs['pseudo_path'], yaml_path='..')
+                      pseudo_path=kwargs['pseudo_path'], yaml_path='..',
+                      auxiliary_basis_kwargs=kwargs['auxiliary_basis_kwargs'])
 
     rmin = rmin_halves[el1] + rmin_halves[el2]
     N = numr[el1] + numr[el2] - int(np.round(rmin/dr))
@@ -632,15 +636,6 @@ def magoff2c(el1, el2, **kwargs):
                                use_multipoles=use_multipoles, timing=False)
 
         run_kwargs = dict(rmin=rmin, dr=dr, N=N, xc=xc, **kwargs['opts_2c'])
-
-        if use_multipoles:
-            if kwargs['multipole_subshells'] is None:
-                subshells = None
-            else:
-                subshells = {el: kwargs['multipole_subshells'][el]
-                             for el in [el1, el2]}
-            run_kwargs.update(subshells=subshells)
-
         calc.run(**run_kwargs)
         calc.write()
     return
@@ -649,7 +644,8 @@ def magoff2c(el1, el2, **kwargs):
 def magon1c(el1, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
             get_atoms(el1, label=kwargs['label'], only_1c=True,
-                      pseudo_path=kwargs['pseudo_path'], yaml_path='..')
+                      pseudo_path=kwargs['pseudo_path'], yaml_path='..',
+                      auxiliary_basis_kwargs=kwargs['auxiliary_basis_kwargs'])
 
     for use_multipoles in kwargs['use_multipoles']:
         if use_multipoles:
@@ -662,11 +658,7 @@ def magon1c(el1, **kwargs):
         run_kwargs = dict()
 
         if use_multipoles:
-            if kwargs['multipole_subshells'] is None:
-                subshells = None
-            else:
-                subshells = kwargs['multipole_subshells'][el1]
-            run_kwargs.update(subshells=subshells, xc=xc)
+            run_kwargs.update(xc=xc)
         else:
             maxstep = 0.125 if el1 == 'H' else 0.25
             run_kwargs.update(maxstep=maxstep)
@@ -679,7 +671,8 @@ def magon1c(el1, **kwargs):
 def magon2c(el1, el2, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
             get_atoms(el1, el2, label=kwargs['label'], only_1c=False,
-                      pseudo_path=kwargs['pseudo_path'], yaml_path='..')
+                      pseudo_path=kwargs['pseudo_path'], yaml_path='..',
+                      auxiliary_basis_kwargs=kwargs['auxiliary_basis_kwargs'])
 
     rmin = rmin_halves[el1] + rmin_halves[el2]
     N = numr[el1] + numr[el1] - int(np.round(rmin/dr))
@@ -689,14 +682,6 @@ def magon2c(el1, el2, **kwargs):
                               use_multipoles=use_multipoles, timing=False)
 
         run_kwargs = dict(rmin=rmin, dr=dr, N=N, xc=xc, **kwargs['opts_2c'])
-
-        if use_multipoles:
-            if kwargs['multipole_subshells'] is None:
-                subshells = None
-            else:
-                subshells = kwargs['multipole_subshells'][el1]
-            run_kwargs.update(subshells=subshells)
-
         calc.run(**run_kwargs)
         calc.write()
     return
