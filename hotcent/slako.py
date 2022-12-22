@@ -976,6 +976,7 @@ def tail_smoothening(x, y_in, eps_inner=1e-8, eps_outer=1e-16, window_size=5):
         return y_out
 
     Nzero = 0
+    izero = -1
     for izero in range(N-1, 1, -1):
         if abs(y_out[izero]) < eps_outer:
             Nzero += 1
