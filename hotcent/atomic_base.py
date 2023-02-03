@@ -952,7 +952,7 @@ class AtomicBase:
         return W
 
     def generate_nonminimal_basis(self, size, tail_norm=None, l_pol=None,
-                                  r_pol=None):
+                                  r_pol=None, **split_kwargs):
         """
         Adds more basis functions to the default minimal basis.
 
@@ -972,7 +972,7 @@ class AtomicBase:
             ('double-zeta with polarization'). The default is 'dz'.
         tail_norm : None or float, optional
             Parameter determining the radius at which a double-zeta
-            function is 'split off' from the parent single-zeta in
+            function is 'split off' from the parent radial function in
             the split-valence scheme. This radius is chosen such that
             the norm of the corresponding tail equals the given target.
             By default, tail norms of 0.5 are chosen for hydrogen
@@ -983,6 +983,11 @@ class AtomicBase:
             used which does not appear in the minimal basis.
         r_pol : None or float, optional
             Characteristic radius for the polarizing quasi-Gaussian.
+
+        Other Parameters
+        ----------------
+        split_kwargs : optional
+            Additional keyword arguments to get_split_valence_unl().
         """
         assert self.solved, NOT_SOLVED_MESSAGE
         assert size in ['dz', 'szp', 'dzp'], 'Unknown basis size: %s' % size
@@ -1027,8 +1032,9 @@ class AtomicBase:
             for nl in self.valence:
                 nldz = nl + '+'
 
-                self.unlg[nldz], r_split = self.get_split_valence_unl(nl,
-                                                                      tail_norm)
+                self.unlg[nldz], r_split = \
+                    self.get_split_valence_unl(nl, tail_norm, **split_kwargs)
+
                 print('Split radius ({0}): {1:.3f}'.format(nldz, r_split),
                       file=self.txt)
 
@@ -1062,8 +1068,39 @@ class AtomicBase:
             assert nl[:2] in self.valence, nl
             return nl.count('+')
 
-    def get_split_valence_unl(self, nl, tail_norm):
-        """Generates a split-valence radial function."""
+    def get_split_valence_unl(self, nl, tail_norm, degree=None, intercept=None):
+        """
+        Generates a new radial function based on the split-valence approach
+        as used in Siesta (see Artacho et al., Phys. stat. sol. (b) 215,
+        809 (1999)).
+
+        Parameters
+        ----------
+        nl : str
+            Subshell label (e.g. '2p') of the parent radial function.
+        tail_norm : float
+            Norm of the tail for determining the split radius.
+        degree : int or None, optional
+            Degree of the splitting polynomial. A degree of 2 selects
+            the original Siesta form (a - b*r^2). A degree of 3 adds a
+            cubic term (a - b*r^2 - c*r^3). The default (None) is to
+            choose the second-degree form, except for s-type functions
+            for which the parent radial function maximum does not lie
+            at the origin (then the third-degree form is used).
+        intercept : float or None, optional
+            Function value that the splitting polynomial should adopt
+            at the origin when a third-degree polynomial is used.
+            The default (None) is to set it to 3/4 of the value
+            of the parent reduced radial function at the origin.
+
+        Returns
+        -------
+        u : np.ndarray
+            The reduced radial function split off from the parent
+            radial function.
+        r_split : float
+            The split radius.
+        """
         # Find split radius based on the tail norm
         u = np.copy(self.unlg[nl])
         norm2 = 1.
@@ -1074,19 +1111,43 @@ class AtomicBase:
             norm2 = self.grid.integrate(u**2)
         r_split = self.rgrid[index]
 
-        # Fit the polynomial coefficients
+        # Fit the polynomial
         l = ANGULAR_MOMENTUM[nl[1]]
         f0 = self.Rnl(r_split, nl, der=0)
         f1 = self.Rnl(r_split, nl, der=1)
-        b = (f1 - l*f0/r_split) / (-2. * r_split**(l+1))
-        a = f0/r_split**l + b*r_split**2
+
+        if degree is None:
+            has_peak = self.rgrid[np.argmax(self.Rnlg[nl])] > 0.25
+            degree = 3 if (l == 0 and has_peak) else 2
+        else:
+            assert degree in [2, 3], 'Degree must be 2, 3 or None'
+
+        if degree == 2:
+            b = (f1 - l*f0/r_split) / (-2. * r_split**(l+1))
+            a = f0/r_split**l + b*r_split**2
+            fpoly = self.rgrid**(l+1) * (a - b*self.rgrid**2)
+
+        elif degree == 3:
+            if intercept is None:
+                a = 0.75 * self.Rnl(self.rgrid[0], nl, der=0)
+            else:
+                a = intercept
+
+            c = 2*f0/r_split - 2*a*r_split**(l-1) - f1 + l*f0/r_split
+            c /= r_split**(l+2)
+            b = (f0 - a*r_split**l + c*r_split**(l+3)) / -r_split**(l+2)
+            fpoly = self.rgrid**(l+1) * (a - b*self.rgrid**2 - c*self.rgrid**3)
 
         # Build the new radial function
-        u = self.unlg[nl] - self.rgrid**(l+1) * (a - b*self.rgrid**2)
+        u = self.unlg[nl] - fpoly
         u[index:] = 0.
         norm2 = self.grid.integrate(u**2)
         u /= np.sqrt(norm2)
         self.smoothen_tail(u, index)
+
+        assert np.all(u > -1e-3), \
+              'The reduced radial function acquires significantly ' + \
+              'negative values (nl: {0}, min(u): {1})'.format(nl, np.min(u))
         return u, r_split
 
     def get_quasi_gaussian_unl(self, nl, l_pol, r_pol, r_cut):

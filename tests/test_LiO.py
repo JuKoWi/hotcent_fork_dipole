@@ -65,6 +65,11 @@ def atoms(request):
         'O': 1.125,
     }
 
+    degree = {
+        'Li': 3,
+        'O': 2,
+    }
+
     atoms = []
     for element in ['Li', 'O']:
         valence = list(wf_confinements[element].keys())
@@ -84,7 +89,8 @@ def atoms(request):
                                )
         atom.run()
         atom.generate_nonminimal_basis(size=size, tail_norm=0.15,
-                                       r_pol=r_pol[element])
+                                       r_pol=r_pol[element],
+                                       degree=degree[element])
         atom.generate_auxiliary_basis(nzeta=2, tail_norm=0.2, lmax=2)
         atoms.append(atom)
 
