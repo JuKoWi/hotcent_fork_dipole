@@ -951,7 +951,7 @@ class AtomicBase:
                                       dens_nl2)
         return W
 
-    def generate_nonminimal_basis(self, size, tail_norm=None, l_pol=None,
+    def generate_nonminimal_basis(self, size, tail_norms=[0.16,0.3], l_pol=None,
                                   r_pol=None, **split_kwargs):
         """
         Adds more basis functions to the default minimal basis.
@@ -967,16 +967,18 @@ class AtomicBase:
         ----------
         size : str
             Size of the non-minimal basis set to be generated.
-            The currently allowed choices are 'dz' ('double-zeta'),
-            'szp' ('single-zeta with polarization') and 'dzp'
-            ('double-zeta with polarization'). The default is 'dz'.
-        tail_norm : None or float, optional
-            Parameter determining the radius at which a double-zeta
-            function is 'split off' from the parent radial function in
-            the split-valence scheme. This radius is chosen such that
+            The currently allowed choices are:
+            * 'sz' (single-zeta; this corresponds to a quick return),
+            * 'szp' (single-zeta with polarization),
+            * 'dz' (double-zeta),
+            * 'dzp' (double-zeta with polarization),
+            * 'tz' (triple-zeta),
+            * 'tzp' (triple-zeta with polarization),
+        tail_norms : list of float, optional
+            Parameters determining the radii at which higher-zeta
+            functions are 'split off' from the parent radial function in
+            the split-valence scheme. Each radius is chosen such that
             the norm of the corresponding tail equals the given target.
-            By default, tail norms of 0.5 are chosen for hydrogen
-            and 0.15 for all other elements.
         l_pol : None or float, optional
             Angular momentum of the polarizing quasi-Gaussian.
             If None (the default), the first angular momentum is
@@ -990,25 +992,46 @@ class AtomicBase:
             Additional keyword arguments to get_split_valence_unl().
         """
         assert self.solved, NOT_SOLVED_MESSAGE
-        assert size in ['dz', 'szp', 'dzp'], 'Unknown basis size: %s' % size
+        assert size in ['sz', 'szp', 'dz', 'dzp', 'tz', 'tzp'], \
+               'Unknown basis size: {0}'.format(size)
 
         print('Generating {0} basis for {1}'.format(size, self.symbol),
               file=self.txt)
+        self.basis_size = size
 
         l_val = [ANGULAR_MOMENTUM[nl[1]] for nl in self.valence]
         assert len(set(l_val)) == len(l_val), \
                'Minimal basis should not contain multiple basis functions ' + \
                'with the same angular momentum'
 
-        needs_dz = size in ['dz', 'dzp']
-        if needs_dz:
-            if tail_norm is None:
-                tail_norm = 0.5 if self.symbol == 'H' else 0.15
-            assert tail_norm > 0
-            print('Tail norm: {0:.3f}'.format(tail_norm), file=self.txt)
+        self.basis_sets = [[nl for nl in self.valence]]
 
-        needs_pol = size in ['szp', 'dzp']
-        if needs_pol:
+        if not size.startswith('sz'):
+            nzeta = {'d': 2, 't': 3}[size[0]]
+
+            for izeta in range(1, nzeta):
+                tail_norm = tail_norms[izeta-1]
+                print('Tail norm: {0:.3f}'.format(tail_norm), file=self.txt)
+
+                self.basis_sets.append([])
+
+                for nl in self.valence:
+                    nlz = nl + '+'*izeta
+
+                    self.unlg[nlz], r_split = \
+                        self.get_split_valence_unl(nl, tail_norm,
+                                                   **split_kwargs)
+
+                    print('Split radius ({0}): {1:.3f}'.format(nlz, r_split),
+                          file=self.txt)
+
+                    self.unl_fct[nlz] = None
+                    self.Rnlg[nlz] = self.unlg[nlz] / self.rgrid
+                    self.Rnl_fct[nlz] = None
+                    self.rcutnl[nlz] = r_split
+                    self.basis_sets[izeta].append(nlz)
+
+        if size.endswith('p'):
             assert r_pol is not None, 'r_pol value is needed for polarization'
             assert r_pol > 0
             print('Characteristic radius: {0:.3f}'.format(r_pol), file=self.txt)
@@ -1023,30 +1046,6 @@ class AtomicBase:
                 assert 0 <= l_pol <= 3 and l_pol not in l_val
             print('Polarization l: {0}'.format(l_pol), file=self.txt)
 
-        self.basis_size = size
-        self.basis_sets = [[nl for nl in self.valence]]
-
-        if needs_dz:
-            self.basis_sets.append([])
-
-            for nl in self.valence:
-                nldz = nl + '+'
-
-                self.unlg[nldz], r_split = \
-                    self.get_split_valence_unl(nl, tail_norm, **split_kwargs)
-
-                print('Split radius ({0}): {1:.3f}'.format(nldz, r_split),
-                      file=self.txt)
-
-                self.unl_fct[nldz] = None
-                self.Rnlg[nldz] = self.unlg[nldz] / self.rgrid
-                self.Rnl_fct[nldz] = None
-                self.rcutnl[nldz] = r_split
-                self.basis_sets[1].append(nldz)
-
-            print(file=self.txt)
-
-        if needs_pol:
             nlp = '0' + 'spdf'[l_pol]
             r_cut = max([self.rcutnl[nl] for nl in self.valence])
             self.unlg[nlp] = self.get_quasi_gaussian_unl(nlp, l_pol, r_pol,
@@ -1056,8 +1055,8 @@ class AtomicBase:
             self.Rnl_fct[nlp] = None
             self.rcutnl[nlp] = r_cut
             self.basis_sets[0].append(nlp)
-            print(file=self.txt)
 
+        print(file=self.txt)
         return
 
     def get_basis_set_index(self, nl):

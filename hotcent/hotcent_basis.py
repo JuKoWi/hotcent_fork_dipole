@@ -62,11 +62,11 @@ def parse_arguments():
     parser.add_argument('--rmin', help='Smallest radius in the radial grid, '
                         'to be used in case the default setting does not '
                         'yield well-behaved results.')
-    parser.add_argument('--tail-norm', '-T', type=float, default=0.16,
-                        help='Tail norm to use for the second-zeta functions.'
-                             ' (default: 0.16).')
+    parser.add_argument('--tail-norms', '-T', type=str, default='0.16,0.3',
+                        help='Comma-separated tail norms to use for the '
+                             'higher-zeta functions (default: 0.16,0.3).')
     parser.add_argument('--type', '-t', type=str, default='dzp',
-                        choices=['sz', 'szp', 'dz', 'dzp'],
+                        choices=['sz', 'szp', 'dz', 'dzp', 'tz', 'tzp'],
                         help='Basis set type (default: dzp).')
     parser.add_argument('--valence', '-v', type=str, required=True,
                         help='Comma-separated subshells to include in the '
@@ -260,10 +260,12 @@ def main():
         r_pol = find_polarization_radius(symbol, pp, amp, x_ri, atom_kwargs,
                                          verbose=verbose)
 
+    tail_norms = list(map(float, args.tail_norms.split(',')))
+
     basis_kwargs = dict(
         size=args.type,
         r_pol=r_pol,
-        tail_norm=args.tail_norm,
+        tail_norms=tail_norms,
     )
 
     if rcuts is None:

@@ -82,7 +82,7 @@ def atoms(request):
                                txt=None,
                                )
         atom.run()
-        atom.generate_nonminimal_basis(size=size, tail_norm=0.15,
+        atom.generate_nonminimal_basis(size=size, tail_norms=[0.15],
                                        r_pol=r_pol[element],
                                        degree=degree[element])
         atom.generate_auxiliary_basis(nzeta=2, tail_norms=[0.2], lmax=2,
