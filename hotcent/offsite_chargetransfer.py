@@ -296,6 +296,12 @@ class Offsite2cMTable(MultiAtomIntegrator):
             for lm in ORBITALS[l]:
                 moments.append((l, lm))
 
+        # Precalculate the Hartree potentials on the grid
+        self.timer.start('calculate_vhar')
+        vhar1 = [e1.aux_basis.vhar(r1, iaux) for iaux in range(Naux1)]
+        vhar2 = [e2.aux_basis.vhar(r2, iaux) for iaux in range(Naux2)]
+        self.timer.stop('calculate_vhar')
+
         M = {}
         for key in selected:
             (nl1, lm1), (nl2, lm2) = key
@@ -307,30 +313,28 @@ class Offsite2cMTable(MultiAtomIntegrator):
             self.timer.start('calculate_g')
 
             for iaux in range(Naux1):
-                vhar = e1.aux_basis.vhar(r1, iaux)
                 ilm = e1.aux_basis.get_orbital_label(iaux)
 
-                gphi = np.zeros_like(vhar)
+                gphi = np.zeros_like(r1)
                 for ll in range(2*max(l1, lmax1)+1):
                     for llm in ORBITALS[ll]:
                         gaunt = get_gaunt_coefficient(llm, lm1, ilm)
                         if abs(gaunt) > 0:
                             gphi += gaunt * get_twocenter_phi_integral(
                                                 llm, lm2, c1, c2, s1, s2)
-                g[iaux] = np.sum(product * vhar * aux * gphi)
+                g[iaux] = np.sum(product * vhar1[iaux] * aux * gphi)
 
             for iaux in range(Naux2):
-                vhar = e2.aux_basis.vhar(r2, iaux)
                 ilm = e2.aux_basis.get_orbital_label(iaux)
 
-                gphi = np.zeros_like(vhar)
+                gphi = np.zeros_like(r2)
                 for ll in range(2*max(l2, lmax2)+1):
                     for llm in ORBITALS[ll]:
                         gaunt = get_gaunt_coefficient(llm, lm2, ilm)
                         if abs(gaunt) > 0:
                             gphi += gaunt * get_twocenter_phi_integral(
                                                 lm1, llm, c1, c2, s1, s2)
-                g[Naux1 + iaux] = np.sum(product * vhar * aux * gphi)
+                g[Naux1 + iaux] = np.sum(product * vhar2[iaux] * aux * gphi)
 
             self.timer.stop('calculate_g')
 
