@@ -36,7 +36,11 @@ def parse_arguments():
     parser.add_argument('-f', '--xcfunctional', type=str, default='LDA',
                         help='Exchange-correlation functional. Default: LDA.')
     parser.add_argument('--label', help='Label to use in the output file '
-                        'names, which will be "<Symbol>[.<label>].ion/json".')
+                        'names, which will be "<Symbol>[.<label>].ion/json'
+                        '/png".')
+    parser.add_argument('--plot', action='store_true', help='Make a plot '
+                        'of the generated radial basis functions (requires '
+                        'matplotlib).')
     parser.add_argument('--pseudo-label', help='Label to use when searching '
                         'for pseudopotential files. The expected file name '
                         'corresponds to "<Symbol>[.<pseudo-label>].psf".')
@@ -280,6 +284,9 @@ def main():
     stem = symbol
     if args.label is not None:
         stem += '.' + args.label
+
+    if args.plot:
+        atom.plot_Rnl(filename='{0}.png'.format(stem))
 
     write_ion(atom, label=stem)
 
