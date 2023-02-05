@@ -88,6 +88,7 @@ for element in elements:
                     xc='LDA',
                     scalarrel=False,
                     confinement=PowerConfinement(r0=40., s=4),
+                    perturbative_confinement=False,
                     txt='atomic.out')
     atom.run()
     atom.info = {}

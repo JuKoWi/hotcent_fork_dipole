@@ -23,6 +23,7 @@ def test_on1c():
 
     atom = AtomicDFT('Si',
                      wf_confinement=None,
+                     perturbative_confinement=False,
                      **kwargs)
     atom.run()
     eps_free = {nl: atom.get_eigenvalue(nl) for nl in atom.valence}

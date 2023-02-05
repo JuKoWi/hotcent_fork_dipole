@@ -5,6 +5,7 @@ from hotcent.confinement import PowerConfinement
 atom = AtomicDFT('C',
                  xc='LDA',
                  confinement=PowerConfinement(r0=40., s=4),
+                 perturbative_confinement=False,
                  configuration='[He] 2s2 2p2',
                  valence=['2s', '2p'],
                  scalarrel=False,

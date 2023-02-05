@@ -33,7 +33,7 @@ class AtomicDFT(AtomicBase):
                  symbol,
                  xc='LDA',
                  convergence={'density':1e-7, 'energies':1e-7},
-                 perturbative_confinement=False,
+                 perturbative_confinement=True,
                  rmin=None,
                  **kwargs):
         """ Run Kohn-Sham all-electron calculations for a given atom.
@@ -68,14 +68,14 @@ class AtomicDFT(AtomicBase):
             consistent calculation is performed when applying each
             of the subshell- or density-confinement potentials:
 
-            False: apply the confinement potential in a conventional
-                  calculation with self-consistency between
-                  the density and the effective potential,
-
             True: add the confinement potential to the effective
                   potential of the free (nonconfined) atom and
                   solve for the subshell(s)* while keeping this
                   potential fixed.
+
+            False: apply the confinement potential in a conventional
+                   calculation with self-consistency between
+                   the density and the effective potential.
 
             * i.e. all valence subshells when confining the density and
             only the subshell in question in wave function confinement

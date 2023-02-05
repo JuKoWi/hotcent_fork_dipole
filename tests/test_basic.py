@@ -28,6 +28,7 @@ def atoms():
                          configuration=configurations[element],
                          valence=valences[element],
                          confinement=confinements[element],
+                         perturbative_confinement=False,
                          txt=None,
                          )
         atom.run()
