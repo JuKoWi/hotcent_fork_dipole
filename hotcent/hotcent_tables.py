@@ -75,6 +75,11 @@ def parse_arguments():
                         'center integration grids. The default settings are '
                         'rather tight and correspond to --opts-3c=nr_50,'
                         'ntheta_150,nphi_13.')
+    parser.add_argument('--opts-map2c', help='Option for controlling the two-'
+                        'center integration grids for the map2c task only '
+                        '(overriding any --opts-2c settings for this task). '
+                        'The default settings are rather tight and correspond '
+                        'to --opts-map2c=nr_100,ntheta_300.')
     parser.add_argument('--processes', type=int, default=1, help='Number of '
                         'processes to use for multiprocessing (default: 1).')
     parser.add_argument('--pseudo-path', default='.', help='Path to the '
@@ -327,21 +332,25 @@ def main():
             if symbol in auxiliary_basis_kwargs:
                 auxiliary_basis_kwargs[symbol].update(subshell=value)
 
+    def update_opts(optsdict, arg, argname):
+        if arg is not None:
+            for entry in arg.split(','):
+                assert '_' in entry, parse_err.format(argname, entry)
+                key, val = entry.split('_', maxsplit=1)
+                assert key in optsdict, \
+                       'Unknown {0} key: {1}'.format(argname, key)
+                optsdict[key] = int(val)
+        return
+
     opts_2c = dict(nr=200, ntheta=600, smoothen_tails=True)
-    if args.opts_2c is not None:
-        for entry in args.opts_2c.split(','):
-            assert '_' in entry, parse_err.format('opts-2c', entry)
-            key, val = entry.split('_', maxsplit=1)
-            assert key in opts_2c, 'Unknown opts-2c key: {0}'.format(key)
-            opts_2c[key] = int(val)
+    update_opts(opts_2c, args.opts_2c, 'opts-2c')
 
     opts_3c = dict(nr=50, ntheta=150, nphi=13)
-    if args.opts_3c is not None:
-        for entry in args.opts_3c.split(','):
-            assert '_' in entry, parse_err.format('opts-3c', entry)
-            key, val = entry.split('_', maxsplit=1)
-            assert key in opts_3c, 'Unknown opts-3c key: {0}'.format(key)
-            opts_3c[key] = int(val)
+    update_opts(opts_3c, args.opts_3c, 'opts-3c')
+
+    opts_map2c = dict(nr=100, ntheta=300, smoothen_tails=True)
+    update_opts(opts_map2c, args.opts_2c, 'opts-2c')
+    update_opts(opts_map2c, args.opts_map2c, 'opts-map2c')
 
     use_multipoles = []
     if not args.without_monopoles:
@@ -354,6 +363,7 @@ def main():
         label=args.label,
         opts_2c=opts_2c,
         opts_3c=opts_3c,
+        opts_map2c=opts_map2c,
         pseudo_path=args.pseudo_path,
         shift=True,
         use_multipoles=use_multipoles,
@@ -707,7 +717,7 @@ def map2c(el1, el2, **kwargs):
     rmin = rmin_halves[el1] + rmin_halves[el2]
     N = numr[el1] + numr[el2] - int(np.round(rmin/dr))
 
-    run_kwargs = dict(rmin=rmin, dr=dr, N=N, **kwargs['opts_2c'])
+    run_kwargs = dict(rmin=rmin, dr=dr, N=N, **kwargs['opts_map2c'])
     calc = Offsite2cMTable(atoms[el1], atoms[el2], timing=False)
     calc.run(**run_kwargs)
     calc.write()
