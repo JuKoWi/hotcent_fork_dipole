@@ -11,6 +11,9 @@ Development version
   the SKF files are now written in the 'extended' format instead
   of the 'simple' format.
 
+* The 'perturbative' confinement scheme is now the default for
+  AtomicDFT calculations (the 'perturbative_confinement' keyword).
+
 * Maintenance related to changes in ASE, Matplotlib and LibXC.
 
 * Bugfix: there was an off-by-one error in the number of zero-valued
@@ -33,8 +36,8 @@ Development version
   (only the SKF format remains).
 
 * Added functionality for non-minimal basis sets (see
-  AtomicBase.generate_nonminimal_basis()). Currently just a
-  split-valence scheme for double-zeta basis sets is implemented.
+  AtomicBase.generate_nonminimal_basis()). Currently basis sets up to
+  triple-zeta with polarization (TZP) can be generated.
 
 * Hubbard parameters (U values) are now calculated as derivatives of
   the corresponding Hamiltonian matrix elements in the isolated atom
@@ -50,22 +53,23 @@ Development version
   differentiation of atomic eigenvalues).
 
 * Added the possibility to calculate higher-order corrections to
-  Hamiltonian and (Hartree-) XC kernel matrix elements:
+  Hamiltonian and (Hartree-)XC kernel matrix elements:
 
   - three-center expansion for off-site H integrals
   - two- and three-center expansions for on-site H integrals
-  - two-center expansion for on- and off-site "gamma" and "W"
-    integrals associated with the SCC and spin polarization energies,
+  - two-center expansion for on- and off-site "U" and "W"
+    integrals associated with difference and magnetization densities,
     respectively.
 
 * Added the possibility to calculate the needed (Hartree-)XC kernel
-  and moment integrals when the difference density is expanded in
-  spherical-harmonic multipoles (up to and including quadrupole moments
-  and with as many radial functions as the 'zeta' count of the main
-  basis set).
+  and (Giese-York) mapping integrals when the difference and magnetization
+  densities are expanded in a (possibly multipolar) auxiliary basis set.
 
 * Changed the tail smoothening procedure to a moving average for
   simplicity and robustness.
+
+* Added the 'hotcent-basis', 'hotcent-concat' and 'hotcent-tables'
+  command-line tools.
 
 
 Version 1.0
