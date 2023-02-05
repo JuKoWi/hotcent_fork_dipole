@@ -180,23 +180,23 @@ class Onsite1cMTable:
 
 class Onsite1cUTable:
     """
-    Convenience wrapper around the Onsite1cUMonopoleTable
-    and Onsite1cUMultipoleTable classes.
+    Convenience wrapper around the Onsite1cUMainTable
+    and Onsite1cUAuxiliaryTable classes.
 
     Parameters
     ----------
-    use_multipoles : bool
-        Whether to consider a multipole expansion of the difference
-        density (rather than a monopole approximation).
+    basis : str
+        Whether to derive parameters from the main basis set in
+        the monopole approximation (basis='main') or from the
+        (possibly multipolar) auxiliary basis set (basis='auxiliary').
     """
-    def __init__(self, *args, use_multipoles=None, **kwargs):
-        msg = '"use_multipoles" is required and must be either True or False'
-        assert use_multipoles is not None, msg
-
-        if use_multipoles:
-            self.calc = Onsite1cUMultipoleTable(*args, **kwargs)
+    def __init__(self, *args, basis=None, **kwargs):
+        if basis == 'main':
+            self.calc = Onsite1cUMainTable(*args, **kwargs)
+        elif basis == 'auxiliary':
+            self.calc = Onsite1cUAuxiliaryTable(*args, **kwargs)
         else:
-            self.calc = Onsite1cUMonopoleTable(*args, **kwargs)
+            raise ValueError('Unknown basis: {0}'.format(basis))
 
     def __getattr__(self, attr):
         return getattr(self.calc, attr)
@@ -210,11 +210,11 @@ class Onsite1cUTable:
         return
 
 
-class Onsite1cUMonopoleTable:
+class Onsite1cUMainTable:
     """
     Calculator for the "U" integrals as matrix elements of the
-    one-center-expanded Hartree-XC kernel in a monopole
-    approximation.
+    one-center-expanded Hartree-XC kernel and the main basis set,
+    in a monopole approximation.
 
     Parameters
     ----------
@@ -295,10 +295,11 @@ class Onsite1cUMonopoleTable:
         return
 
 
-class Onsite1cUMultipoleTable:
+class Onsite1cUAuxiliaryTable:
     """
     Calculator for (parts of) the "U" integrals as matrix elements of the
-    one-center-expanded Hartree-XC kernel in a multipole expansion.
+    one-center-expanded Hartree-XC kernel and the auxiliary basis set,
+    in a multipole expansion.
 
     Parameters
     ----------
@@ -441,23 +442,23 @@ class Onsite1cUMultipoleTable:
 
 class Onsite2cUTable:
     """
-    Convenience wrapper around the Onsite2cUMonopoleTable
-    and Onsite2cUMultipoleTable classes.
+    Convenience wrapper around the Onsite2cUMainTable
+    and Onsite2cUAuxiliaryTable classes.
 
     Parameters
     ----------
-    use_multipoles : bool
-        Whether to consider a multipole expansion of the difference
-        density (rather than a monopole approximation).
+    basis : str
+        Whether to derive parameters from the main basis set in
+        the monopole approximation (basis='main') or from the
+        (possibly multipolar) auxiliary basis set (basis='auxiliary').
     """
-    def __init__(self, *args, use_multipoles=None, **kwargs):
-        msg = '"use_multipoles" is required and must be either True or False'
-        assert use_multipoles is not None, msg
-
-        if use_multipoles:
-            self.calc = Onsite2cUMultipoleTable(*args, **kwargs)
+    def __init__(self, *args, basis=None, **kwargs):
+        if basis == 'main':
+            self.calc = Onsite2cUMainTable(*args, **kwargs)
+        elif basis == 'auxiliary':
+            self.calc = Onsite2cUAuxiliaryTable(*args, **kwargs)
         else:
-            self.calc = Onsite2cUMonopoleTable(*args, **kwargs)
+            raise ValueError('Unknown basis: {0}'.format(basis))
 
     def __getattr__(self, attr):
         return getattr(self.calc, attr)
@@ -471,7 +472,7 @@ class Onsite2cUTable:
         return
 
 
-class Onsite2cUMonopoleTable(MultiAtomIntegrator):
+class Onsite2cUMainTable(MultiAtomIntegrator):
     def __init__(self, *args, **kwargs):
         MultiAtomIntegrator.__init__(self, *args, grid_type='monopolar',
                                      **kwargs)
@@ -481,7 +482,7 @@ class Onsite2cUMonopoleTable(MultiAtomIntegrator):
         """
         Calculates on-site, distance dependent U (or "Gamma") values
         as matrix elements of the two-center-expanded XC kernel
-        in the monopole approximation.
+        and the main basis set, in the monopole approximation.
 
         Parameters
         ----------
@@ -663,7 +664,7 @@ class Onsite2cUMonopoleTable(MultiAtomIntegrator):
         return
 
 
-class Onsite2cUMultipoleTable(MultiAtomIntegrator):
+class Onsite2cUAuxiliaryTable(MultiAtomIntegrator):
     def __init__(self, *args, **kwargs):
         MultiAtomIntegrator.__init__(self, *args, grid_type='monopolar',
                                      **kwargs)
@@ -675,7 +676,7 @@ class Onsite2cUMultipoleTable(MultiAtomIntegrator):
         """
         Calculates on-site, orbital- and distance-dependent "U" values
         as matrix elements of the two-center-expanded XC kernel
-        in a multipole expansion.
+        and the auxiliary basis set, in a multipole expansion.
 
         Parameters
         ----------

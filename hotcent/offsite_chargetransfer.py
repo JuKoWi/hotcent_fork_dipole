@@ -283,7 +283,6 @@ class Offsite2cMTable(MultiAtomIntegrator):
         Naux2 = e2.aux_basis.get_size()
         Naux12 = Naux1 + Naux2
         g = np.zeros(Naux12)
-        vhar = []
 
         lmax1 = e1.aux_basis.get_lmax()
         lmax2 = e2.aux_basis.get_lmax()
@@ -399,23 +398,23 @@ class Offsite2cMTable(MultiAtomIntegrator):
 
 class Offsite2cUTable:
     """
-    Convenience wrapper around the Offsite2cUMonopoleTable
-    and Offsite2cUMultipoleTable classes.
+    Convenience wrapper around the Offsite2cUMainTable
+    and Offsite2cUAuxiliaryTable classes.
 
     Parameters
     ----------
-    use_multipoles : bool
-        Whether to consider a multipole expansion of the difference
-        density (rather than a monopole approximation).
+    basis : str
+        Whether to derive parameters from the main basis set in
+        the monopole approximation (basis='main') or from the
+        (possibly multipolar) auxiliary basis set (basis='auxiliary').
     """
-    def __init__(self, *args, use_multipoles=None, **kwargs):
-        msg = '"use_multipoles" is required and must be either True or False'
-        assert use_multipoles is not None, msg
-
-        if use_multipoles:
-            self.calc = Offsite2cUMultipoleTable(*args, **kwargs)
+    def __init__(self, *args, basis=None, **kwargs):
+        if basis == 'main':
+            self.calc = Offsite2cUMainTable(*args, **kwargs)
+        elif basis == 'auxiliary':
+            self.calc = Offsite2cUAuxiliaryTable(*args, **kwargs)
         else:
-            self.calc = Offsite2cUMonopoleTable(*args, **kwargs)
+            raise ValueError('Unknown basis: {0}'.format(basis))
 
     def __getattr__(self, attr):
         return getattr(self.calc, attr)
@@ -429,7 +428,7 @@ class Offsite2cUTable:
         return
 
 
-class Offsite2cUMonopoleTable(MultiAtomIntegrator):
+class Offsite2cUMainTable(MultiAtomIntegrator):
     def __init__(self, *args, **kwargs):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
 
@@ -438,7 +437,7 @@ class Offsite2cUMonopoleTable(MultiAtomIntegrator):
         """
         Calculates off-site, distance dependent U (or "Gamma") values
         as matrix elements of the two-center-expanded Hartree-XC kernel
-        in the monopole approximation.
+        and the main basis set, in the monopole approximation.
 
         Parameters
         ----------
@@ -655,7 +654,7 @@ class Offsite2cUMonopoleTable(MultiAtomIntegrator):
         return
 
 
-class Offsite2cUMultipoleTable(MultiAtomIntegrator):
+class Offsite2cUAuxiliaryTable(MultiAtomIntegrator):
     def __init__(self, *args, **kwargs):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
         assert self.ela.aux_basis.get_lmax() < NUML_2CK
@@ -664,9 +663,9 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
     def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
             xc='LDA', smoothen_tails=True, shift=False, subtract_delta=True):
         """
-        Calculates off-site, orbital- and distance-dependent "U" values
+        Calculates off-site and distance-dependent "U" values
         as matrix elements of the two-center-expanded Hartree-XC kernel
-        in a multipole expansion.
+        and the auxiliary basis set, in a multipole expansion.
 
         Parameters
         ----------

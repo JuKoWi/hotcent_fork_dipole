@@ -99,7 +99,7 @@ def test_on1cU(atoms):
     atom_Li, atom_O = atoms
     xc = atom_O.xcname
 
-    chgon1c = Onsite1cUTable(atom_O, use_multipoles=True)
+    chgon1c = Onsite1cUTable(atom_O, basis='auxiliary')
     chgon1c.run(xc=xc)
     U = chgon1c.tables
 
@@ -127,7 +127,7 @@ def test_on1cU(atoms):
             assert U_diff < tol, msg.format(key, i, val)
 
     # Simple test of monopole variant
-    chgon1c = Onsite1cUTable(atom_Li, use_multipoles=False)
+    chgon1c = Onsite1cUTable(atom_Li, basis='main')
     chgon1c.run()
     return
 
@@ -139,7 +139,7 @@ def test_on1cW(atoms):
     atom_Li, atom_O = atoms
     xc = atom_O.xcname
 
-    magon1c = Onsite1cWTable(atom_O, use_multipoles=True)
+    magon1c = Onsite1cWTable(atom_O, basis='auxiliary')
     magon1c.run(xc=xc)
     W = magon1c.tables
 
@@ -167,7 +167,7 @@ def test_on1cW(atoms):
             assert W_diff < tol, msg.format(key, i, val)
 
     # Simple test of monopole variant
-    chgon1c = Onsite1cWTable(atom_Li, use_multipoles=False)
+    chgon1c = Onsite1cWTable(atom_Li, basis='main')
     chgon1c.run()
     return
 
@@ -569,7 +569,7 @@ def test_on2cU(R, atoms):
     xc = atom_O.xcname
     rmin, dr, N = R, R, 2
 
-    chgon2c = Onsite2cUTable(atom_O, atom_Li, use_multipoles=True)
+    chgon2c = Onsite2cUTable(atom_O, atom_Li, basis='auxiliary')
     chgon2c.run(rmin=rmin, dr=dr, N=N, xc=xc, ntheta=300,
                 nr=100, smoothen_tails=False)
     U = chgon2c.tables
@@ -730,7 +730,7 @@ def test_on2cW(R, atoms):
     xc = atom_O.xcname
     rmin, dr, N = R, R, 2
 
-    magon2c = Onsite2cWTable(atom_O, atom_Li, use_multipoles=True)
+    magon2c = Onsite2cWTable(atom_O, atom_Li, basis='auxiliary')
     magon2c.run(rmin=rmin, dr=dr, N=N, xc=xc, ntheta=300,
                 nr=100, smoothen_tails=False)
     W = magon2c.tables
@@ -892,7 +892,7 @@ def test_off2cU(R, atoms):
     xc = atom_O.xcname
     rmin, dr, N = R, R, 2
 
-    chgoff2c = Offsite2cUTable(atom_O, atom_Li, use_multipoles=True)
+    chgoff2c = Offsite2cUTable(atom_O, atom_Li, basis='auxiliary')
     chgoff2c.run(rmin=rmin, dr=dr, N=N, xc=xc, ntheta=300,
                  nr=100, smoothen_tails=False)
     U = chgoff2c.tables
@@ -1196,7 +1196,7 @@ def test_off2cW(R, atoms):
     xc = atom_O.xcname
     rmin, dr, N = R, R, 2
 
-    magoff2c = Offsite2cWTable(atom_O, atom_Li, use_multipoles=True)
+    magoff2c = Offsite2cWTable(atom_O, atom_Li, basis='auxiliary')
     magoff2c.run(rmin=rmin, dr=dr, N=N, xc=xc, ntheta=300,
                  nr=100, smoothen_tails=False)
     W = magoff2c.tables

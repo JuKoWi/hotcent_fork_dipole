@@ -157,7 +157,7 @@ def test_chg1c(atom):
 
     xc = atom.xcname
 
-    chgon1c = Onsite1cUTable(atom, use_multipoles=True)
+    chgon1c = Onsite1cUTable(atom, basis='auxiliary')
     chgon1c.run(xc=xc)
     U = chgon1c.tables[(0, 0)][0, :]
 
@@ -403,7 +403,7 @@ def test_chg2c(R, atom):
     tol = 1e-9
     msg = 'Too large error for {0}_{1}-{2} [{3}] (value={4})'
 
-    chg2c = Offsite2cUTable(atom, atom, use_multipoles=False)
+    chg2c = Offsite2cUTable(atom, atom, basis='main')
     chg2c.run(rmin=rmin, dr=dr, N=N, xc=xc, smoothen_tails=False,
               shift=False, ntheta=300, nr=100)
     G = chg2c.tables
@@ -455,7 +455,7 @@ def test_chg2c(R, atom):
             diff = abs(item - item_ref)
             assert diff < tol, msg.format('Goff2c', key, val[0, i], i, item)
 
-    chg2c = Onsite2cUTable(atom, atom, use_multipoles=False)
+    chg2c = Onsite2cUTable(atom, atom, basis='main')
     chg2c.run(rmin=rmin, dr=dr, N=N, xc=xc, smoothen_tails=False,
               ntheta=300, nr=100)
     G = chg2c.tables
@@ -522,7 +522,7 @@ def test_mag2c(R, atom):
     tol = 1e-9
     msg = 'Too large error for {0}_{1}-{2} [{3}] (value={4})'
 
-    mag2c = Offsite2cWTable(atom, atom, use_multipoles=False)
+    mag2c = Offsite2cWTable(atom, atom, basis='main')
     mag2c.run(rmin=rmin, dr=dr, N=N, xc=xc, smoothen_tails=False,
               ntheta=300, nr=100)
     W = mag2c.tables
@@ -574,7 +574,7 @@ def test_mag2c(R, atom):
             diff = abs(item - item_ref)
             assert diff < tol, msg.format('Woff2c', key, val[0, i], i, item)
 
-    mag2c = Onsite2cWTable(atom, atom, use_multipoles=False)
+    mag2c = Onsite2cWTable(atom, atom, basis='main')
     mag2c.run(rmin=rmin, dr=dr, N=N, xc=xc, smoothen_tails=False,
               ntheta=300, nr=100)
     W = mag2c.tables

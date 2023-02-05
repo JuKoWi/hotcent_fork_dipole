@@ -20,23 +20,23 @@ from hotcent.xc import LibXC
 
 class Onsite1cWTable:
     """
-    Convenience wrapper around the Onsite1cWMonopoleTable
-    and Onsite1cWMultipoleTable classes.
+    Convenience wrapper around the Onsite1cWMainTable
+    and Onsite1cWAuxiliaryTable classes.
 
     Parameters
     ----------
-    use_multipoles : bool
-        Whether to consider a multipole expansion of the magnetization
-        density (rather than a monopole approximation).
+    basis : str
+        Whether to derive parameters from the main basis set in
+        the monopole approximation (basis='main') or from the
+        (possibly multipolar) auxiliary basis set (basis='auxiliary').
     """
-    def __init__(self, *args, use_multipoles=None, **kwargs):
-        msg = '"use_multipoles" is required and must be either True or False'
-        assert use_multipoles is not None, msg
-
-        if use_multipoles:
-            self.calc = Onsite1cWMultipoleTable(*args, **kwargs)
+    def __init__(self, *args, basis=None, **kwargs):
+        if basis == 'main':
+            self.calc = Onsite1cWMainTable(*args, **kwargs)
+        elif basis == 'auxiliary':
+            self.calc = Onsite1cWAuxiliaryTable(*args, **kwargs)
         else:
-            self.calc = Onsite1cWMonopoleTable(*args, **kwargs)
+            raise ValueError('Unknown basis: {0}'.format(basis))
 
     def __getattr__(self, attr):
         return getattr(self.calc, attr)
@@ -50,11 +50,11 @@ class Onsite1cWTable:
         return
 
 
-class Onsite1cWMonopoleTable:
+class Onsite1cWMainTable:
     """
     Calculator for the "W" integrals as matrix elements of the
-    one-center-expanded spin-polarized XC kernel in a monopole
-    approximation.
+    one-center-expanded spin-polarized XC kernel and the main basis set,
+    in a monopole approximation.
 
     Parameters
     ----------
@@ -135,10 +135,11 @@ class Onsite1cWMonopoleTable:
         return
 
 
-class Onsite1cWMultipoleTable:
+class Onsite1cWAuxiliaryTable:
     """
     Calculator for (parts of) the "W" integrals as matrix elements of the
-    one-center-expanded spin-polarized XC kernel in a multipole expansion.
+    one-center-expanded spin-polarized XC kernel and the auxiliary basis set,
+    in a multipole expansion.
 
     Parameters
     ----------
@@ -294,23 +295,23 @@ class Onsite1cWMultipoleTable:
 
 class Onsite2cWTable:
     """
-    Convenience wrapper around the Onsite2cWMonopoleTable
-    and Onsite2cWMultipoleTable classes.
+    Convenience wrapper around the Onsite2cWMainTable
+    and Onsite2cWAuxiliaryTable classes.
 
     Parameters
     ----------
-    use_multipoles : bool
-        Whether to consider a multipole expansion of the magnetization
-        density (rather than a monopole approximation).
+    basis : str
+        Whether to derive parameters from the main basis set in
+        the monopole approximation (basis='main') or from the
+        (possibly multipolar) auxiliary basis set (basis='auxiliary').
     """
-    def __init__(self, *args, use_multipoles=None, **kwargs):
-        msg = '"use_multipoles" is required and must be either True or False'
-        assert use_multipoles is not None, msg
-
-        if use_multipoles:
-            self.calc = Onsite2cWMultipoleTable(*args, **kwargs)
+    def __init__(self, *args, basis=None, **kwargs):
+        if basis == 'main':
+            self.calc = Onsite2cWMainTable(*args, **kwargs)
+        elif basis == 'auxiliary':
+            self.calc = Onsite2cWAuxiliaryTable(*args, **kwargs)
         else:
-            self.calc = Onsite2cWMonopoleTable(*args, **kwargs)
+            raise ValueError('Unknown basis: {0}'.format(basis))
 
     def __getattr__(self, attr):
         return getattr(self.calc, attr)
@@ -324,7 +325,7 @@ class Onsite2cWTable:
         return
 
 
-class Onsite2cWMonopoleTable(MultiAtomIntegrator):
+class Onsite2cWMainTable(MultiAtomIntegrator):
     def __init__(self, *args, **kwargs):
         MultiAtomIntegrator.__init__(self, *args, grid_type='monopolar',
                                      **kwargs)
@@ -334,7 +335,7 @@ class Onsite2cWMonopoleTable(MultiAtomIntegrator):
         """
         Calculates onsite, distance dependent "W" values as matrix
         elements of the two-center-expanded spin-polarized XC kernel
-        in the monopole approximation.
+        and the main basis set, in the monopole approximation.
 
         Parameters
         ----------
@@ -611,7 +612,7 @@ class Onsite2cWMonopoleTable(MultiAtomIntegrator):
         return
 
 
-class Onsite2cWMultipoleTable(MultiAtomIntegrator):
+class Onsite2cWAuxiliaryTable(MultiAtomIntegrator):
     def __init__(self, *args, **kwargs):
         MultiAtomIntegrator.__init__(self, *args, grid_type='monopolar',
                                      **kwargs)
@@ -623,7 +624,7 @@ class Onsite2cWMultipoleTable(MultiAtomIntegrator):
         """
         Calculates onsite, orbital- and distance-dependent "W" values
         as matrix elements of the two-center-expanded spin-polarized XC
-        kernel in a multipole expansion.
+        kernel and the auxiliary basis set, in a multipole expansion.
 
         Parameters
         ----------

@@ -18,23 +18,23 @@ from hotcent.xc import LibXC
 
 class Offsite2cWTable:
     """
-    Convenience wrapper around the Offsite2cWMonopoleTable
-    and Offsite2cWMultipoleTable classes.
+    Convenience wrapper around the Offsite2cWMainTable
+    and Offsite2cWAuxiliaryTable classes.
 
     Parameters
     ----------
-    use_multipoles : bool
-        Whether to consider a multipole expansion of the magnetization
-        density (rather than a monopole approximation).
+    basis : str
+        Whether to derive parameters from the main basis set in
+        the monopole approximation (basis='main') or from the
+        (possibly multipolar) auxiliary basis set (basis='auxiliary').
     """
-    def __init__(self, *args, use_multipoles=None, **kwargs):
-        msg = '"use_multipoles" is required and must be either True or False'
-        assert use_multipoles is not None, msg
-
-        if use_multipoles:
-            self.calc = Offsite2cWMultipoleTable(*args, **kwargs)
+    def __init__(self, *args, basis=None, **kwargs):
+        if basis == 'main':
+            self.calc = Offsite2cWMainTable(*args, **kwargs)
+        elif basis == 'auxiliary':
+            self.calc = Offsite2cWAuxiliaryTable(*args, **kwargs)
         else:
-            self.calc = Offsite2cWMonopoleTable(*args, **kwargs)
+            raise ValueError('Unknown basis: {0}'.format(basis))
 
     def __getattr__(self, attr):
         return getattr(self.calc, attr)
@@ -48,7 +48,7 @@ class Offsite2cWTable:
         return
 
 
-class Offsite2cWMonopoleTable(MultiAtomIntegrator):
+class Offsite2cWMainTable(MultiAtomIntegrator):
     def __init__(self, *args, **kwargs):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
 
@@ -57,7 +57,7 @@ class Offsite2cWMonopoleTable(MultiAtomIntegrator):
         """
         Calculates offsite, distance dependent "W" values as matrix
         elements of the two-center-expanded spin-polarized XC kernel
-        in the monopole approximation.
+        and the main basis set, in the monopole approximation.
 
         Parameters
         ----------
@@ -257,7 +257,7 @@ class Offsite2cWMonopoleTable(MultiAtomIntegrator):
         return
 
 
-class Offsite2cWMultipoleTable(MultiAtomIntegrator):
+class Offsite2cWAuxiliaryTable(MultiAtomIntegrator):
     def __init__(self, *args, **kwargs):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
         assert self.ela.aux_basis.get_lmax() < NUML_2CK
@@ -266,9 +266,9 @@ class Offsite2cWMultipoleTable(MultiAtomIntegrator):
     def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
             xc='LDA', smoothen_tails=True):
         """
-        Calculates offsite, orbital- and distance-dependent "W" values
+        Calculates off-site and distance-dependent "W" values
         as matrix elements of the two-center-expanded spin-polarized
-        XC kernel in a multipole expansion.
+        XC kernel and the auxiliary basis set.
 
         Parameters
         ----------

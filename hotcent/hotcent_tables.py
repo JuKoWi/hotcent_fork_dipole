@@ -39,13 +39,31 @@ def parse_arguments():
     Note: existing output files will be overwritten.
     """
     parser = ArgumentParser(description=description)
-    parser.add_argument('--auxiliary-basis', help='Auxiliary basis set sizes '
+    parser.add_argument('--aux-basis', help='Auxiliary basis set sizes '
                         'to use for fluctuation-related tasks (chg*, mag*, '
-                        'map*) with multipoles. To e.g. select a double-zeta '
-                        'auxiliary basis for H with angular momenta up to d, '
-                        'specify --auxiliary-basis=H_2D. The default is 2P '
-                        'for H and He and 3D for all other elements. Entries '
-                        'for multiple elements need to be separated by commas.')
+                        'map*). This only affects mappings other than '
+                        'Mulliken mapping (see --aux-mappings). To e.g. select '
+                        'a double-zeta auxiliary basis for H with angular '
+                        'momenta up to d, specify --aux-basis=H_2D. The '
+                        'default is 2P for H and He and 3D for all other '
+                        'elements. Entries for multiple elements need to be '
+                        'separated by commas.')
+    parser.add_argument('--aux-mappings', default='mulliken,giese_york',
+                        help='Comma-separated procedures to consider for '
+                        'mapping the atomic orbital products to the auxiliary '
+                        'basis. This determines the kind of kernel integral '
+                        'and mapping integral tables that will be produced '
+                        'by the chg*, mag* and map* tasks. Default: "mulliken,'
+                        'giese_york".)')
+    parser.add_argument('--aux-subshells', help='Main basis subshells '
+                        'from which the auxiliary basis functions are to be '
+                        'derived for fluctuation-related tasks (chg*, mag*, '
+                        'map*). This only affects mappings other than '
+                        'Mulliken mapping (see --aux-mappings). To e.g. select '
+                        'the Si 3p subshell instead of the default choice '
+                        '(the subshell with the lowest angular momentum, i.e. '
+                        'Si 3s), specify --aux-subshells=Si_3p. Entries for '
+                        'multiple elements need to be separated by commas.')
     parser.add_argument('include', nargs='*', help='Element combinations '
                         'to consider. To e.g. include all combinations that '
                         'involve H and/or Si, as well as all combinations '
@@ -59,14 +77,6 @@ def parse_arguments():
     parser.add_argument('--label', help='Label to use when searching for the '
                         'input YAML files. The expected file names correspond '
                         'to "<Symbol>[.<label>].yaml".')
-    parser.add_argument('--multipole-subshells', help='Main basis subshells '
-                        'from which the auxiliary basis functions are to be '
-                        'derived in fluctuation-related tasks (chg*, mag*, '
-                        'map*) with multipoles. To e.g. select the Si 3p '
-                        'subshell instead of the default choice (the subshell '
-                        'with the lowest angular momentum, i.e. Si 3s), '
-                        'specify --multipole-subshells=Si_3p. Entries for '
-                        'multiple elements need to be separated by commas.')
     parser.add_argument('--opts-2c', help='Option for controlling the two-'
                         'center integration grids. The default settings are '
                         'rather tight and correspond to --opts-2c=nr_200,'
@@ -93,15 +103,6 @@ def parse_arguments():
                         '--tasks=all,^rep3c selects all available task types '
                         'except 3-center repulsion.')
     parser.add_argument('--version', action='version', version='%(prog)s 0.1')
-
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument('--without-monopoles', action='store_true',
-                       help='For fluctuation kernel tasks (chg*, mag*), do not '
-                       'generate tables for monopole-only self-consistency.')
-    group.add_argument('--without-multipoles', action='store_true',
-                       help='For fluctuation kernel tasks (chg*, mag*), do not '
-                       'generate tables for multipolar self-consistency.')
-
     args = parser.parse_args()
     return args
 
@@ -292,11 +293,10 @@ def main():
             verify_chemical_symbols(*elements)
             excluded.append(elements)
 
-    task_types = list(sorted(set(args.tasks.split(','))))
-
     parse_err = 'Cannot parse {0} entry: {1}'
 
-    auxiliary_basis_kwargs = {}
+    aux_basis_kwargs = {}
+
     for elements in included:
         for element in elements:
             if element in ['H', 'He']:
@@ -306,13 +306,13 @@ def main():
                 lmax = 2
                 nzeta = 3
 
-            auxiliary_basis_kwargs[element] = \
+            aux_basis_kwargs[element] = \
                 dict(subshell=None, lmax=lmax, nzeta=nzeta,
                      tail_norms=[0.2, 0.4])
 
-    if args.auxiliary_basis is not None:
-        for entry in args.auxiliary_basis.split(','):
-            msg = parse_err.format('auxiliary-basis', entry)
+    if args.aux_basis is not None:
+        for entry in args.aux_basis.split(','):
+            msg = parse_err.format('aux-basis', entry)
             assert '_' in entry, msg
             symbol, value = entry.split('_', maxsplit=1)
             assert len(value) == 2, msg
@@ -321,16 +321,16 @@ def main():
             nzeta = int(value[0])
             assert value[1] in 'SPDF', msg
             lmax = 'SPDF'.index(value[1])
-            if symbol in auxiliary_basis_kwargs:
-                auxiliary_basis_kwargs[symbol].update(lmax=lmax, nzeta=nzeta)
+            if symbol in aux_basis_kwargs:
+                aux_basis_kwargs[symbol].update(lmax=lmax, nzeta=nzeta)
 
-    if args.multipole_subshells is not None:
-        for entry in args.multipole_subshells.split(','):
-            assert '_' in entry, parse_err.format('multipole-subshells', entry)
+    if args.aux_subshells is not None:
+        for entry in args.aux_subshells.split(','):
+            assert '_' in entry, parse_err.format('aux-subshells', entry)
             symbol, value = entry.split('_', maxsplit=1)
             verify_chemical_symbols(symbol)
-            if symbol in auxiliary_basis_kwargs:
-                auxiliary_basis_kwargs[symbol].update(subshell=value)
+            if symbol in aux_basis_kwargs:
+                aux_basis_kwargs[symbol].update(subshell=value)
 
     def update_opts(optsdict, arg, argname):
         if arg is not None:
@@ -352,21 +352,37 @@ def main():
     update_opts(opts_map2c, args.opts_2c, 'opts-2c')
     update_opts(opts_map2c, args.opts_map2c, 'opts-map2c')
 
-    use_multipoles = []
-    if not args.without_monopoles:
-        use_multipoles.append(False)
-    if not args.without_multipoles:
-        use_multipoles.append(True)
+    aux_mappings = args.aux_mappings.split(',')
+
+    need_aux_basis = False
+    for mapping in aux_mappings:
+        msg = parse_err.format('aux-mappings', mapping)
+        assert mapping in ['mulliken', 'giese_york'], msg
+        if mapping != 'mulliken':
+            need_aux_basis = True
+
+    task_types = list(sorted(set(args.tasks.split(','))))
+
+    if not need_aux_basis:
+        aux_basis_kwargs = None
+
+        for task_type in ['map1c', 'map2c']:
+            if task_type in task_types:
+                msg = 'Warning: the "{0}" task will be skipped because no ' + \
+                      'non-Mulliken mapping procedure got selected (see ' + \
+                      'the --aux-mappings option)'
+                print(msg.format(task_type))
+                task_types.remove(task_type)
 
     task_kwargs = dict(
-        auxiliary_basis_kwargs=auxiliary_basis_kwargs,
+        aux_basis_kwargs=aux_basis_kwargs,
+        aux_mappings=aux_mappings,
         label=args.label,
         opts_2c=opts_2c,
         opts_3c=opts_3c,
         opts_map2c=opts_map2c,
         pseudo_path=args.pseudo_path,
         shift=True,
-        use_multipoles=use_multipoles,
     )
 
     generator = TaskGenerator(included, excluded, task_types, task_kwargs)
@@ -445,7 +461,7 @@ def read_yaml(filename):
 
 
 def get_atoms(*elements, label=None, only_1c=False, pseudo_path='.', txt='-',
-              yaml_path='.', auxiliary_basis_kwargs=None):
+              yaml_path='.', aux_basis_kwargs=None):
     atoms = {}
     eigenvalues, hubbardvalues, occupations = {}, {}, {}
     offdiagonal_H, offdiagonal_S = {}, {}
@@ -518,8 +534,8 @@ def get_atoms(*elements, label=None, only_1c=False, pseudo_path='.', txt='-',
 
     for el1 in set(elements):
         atoms[el1].pp.build_projectors(atoms[el1])
-        if auxiliary_basis_kwargs is not None:
-            atoms[el1].generate_auxiliary_basis(**auxiliary_basis_kwargs[el1])
+        if aux_basis_kwargs is not None:
+            atoms[el1].generate_auxiliary_basis(**aux_basis_kwargs[el1])
 
     if not only_1c:
         dr = 0.02
@@ -575,17 +591,18 @@ def chgoff2c(el1, el2, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
             get_atoms(el1, el2, label=kwargs['label'], only_1c=False,
                       pseudo_path=kwargs['pseudo_path'], yaml_path='..',
-                      auxiliary_basis_kwargs=kwargs['auxiliary_basis_kwargs'])
+                      aux_basis_kwargs=kwargs['aux_basis_kwargs'])
 
     rmin = rmin_halves[el1] + rmin_halves[el2]
     N = numr[el1] + numr[el2] - int(np.round(rmin/dr))
 
-    for use_multipoles in kwargs['use_multipoles']:
-        run_kwargs = dict(rmin=rmin, dr=dr, N=N, **kwargs['opts_2c'])
-        calc = Offsite2cUTable(atoms[el1], atoms[el2],
-                               use_multipoles=use_multipoles, timing=False)
+    for mapping in kwargs['aux_mappings']:
+        basis = 'main' if mapping == 'mulliken' else 'auxiliary'
+        calc = Offsite2cUTable(atoms[el1], atoms[el2], basis=basis,
+                               timing=False)
 
-        run_kwargs.update(shift=kwargs['shift'], xc=xc)
+        run_kwargs = dict(rmin=rmin, dr=dr, N=N, shift=kwargs['shift'], xc=xc,
+                          **kwargs['opts_2c'])
         calc.run(**run_kwargs)
         calc.write()
     return
@@ -595,13 +612,14 @@ def chgon1c(el1, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
             get_atoms(el1, label=kwargs['label'], only_1c=True,
                       pseudo_path=kwargs['pseudo_path'], yaml_path='..',
-                      auxiliary_basis_kwargs=kwargs['auxiliary_basis_kwargs'])
+                      aux_basis_kwargs=kwargs['aux_basis_kwargs'])
 
-    for use_multipoles in kwargs['use_multipoles']:
-        calc = Onsite1cUTable(atoms[el1], use_multipoles=use_multipoles)
+    for mapping in kwargs['aux_mappings']:
+        basis = 'main' if mapping == 'mulliken' else 'auxiliary'
+        calc = Onsite1cUTable(atoms[el1], basis=basis)
 
         run_kwargs = dict()
-        if use_multipoles:
+        if basis == 'auxiliary':
             run_kwargs.update(xc=xc)
         else:
             maxstep = 0.125 if el1 == 'H' else 0.25
@@ -616,14 +634,14 @@ def chgon2c(el1, el2, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
             get_atoms(el1, el2, label=kwargs['label'], only_1c=False,
                       pseudo_path=kwargs['pseudo_path'], yaml_path='..',
-                      auxiliary_basis_kwargs=kwargs['auxiliary_basis_kwargs'])
+                      aux_basis_kwargs=kwargs['aux_basis_kwargs'])
 
     rmin = rmin_halves[el1] + rmin_halves[el2]
     N = numr[el1] + numr[el1] - int(np.round(rmin/dr))
 
-    for use_multipoles in kwargs['use_multipoles']:
-        calc = Onsite2cUTable(atoms[el1], atoms[el2],
-                              use_multipoles=use_multipoles, timing=False)
+    for mapping in kwargs['aux_mappings']:
+        basis = 'main' if mapping == 'mulliken' else 'auxiliary'
+        calc = Onsite2cUTable(atoms[el1], atoms[el2], basis=basis, timing=False)
 
         run_kwargs = dict(rmin=rmin, dr=dr, N=N, xc=xc, **kwargs['opts_2c'])
         calc.run(**run_kwargs)
@@ -635,14 +653,15 @@ def magoff2c(el1, el2, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
             get_atoms(el1, el2, label=kwargs['label'], only_1c=False,
                       pseudo_path=kwargs['pseudo_path'], yaml_path='..',
-                      auxiliary_basis_kwargs=kwargs['auxiliary_basis_kwargs'])
+                      aux_basis_kwargs=kwargs['aux_basis_kwargs'])
 
     rmin = rmin_halves[el1] + rmin_halves[el2]
     N = numr[el1] + numr[el2] - int(np.round(rmin/dr))
 
-    for use_multipoles in kwargs['use_multipoles']:
-        calc = Offsite2cWTable(atoms[el1], atoms[el2],
-                               use_multipoles=use_multipoles, timing=False)
+    for mapping in kwargs['aux_mappings']:
+        basis = 'main' if mapping == 'mulliken' else 'auxiliary'
+        calc = Offsite2cWTable(atoms[el1], atoms[el2], basis=basis,
+                               timing=False)
 
         run_kwargs = dict(rmin=rmin, dr=dr, N=N, xc=xc, **kwargs['opts_2c'])
         calc.run(**run_kwargs)
@@ -654,19 +673,14 @@ def magon1c(el1, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
             get_atoms(el1, label=kwargs['label'], only_1c=True,
                       pseudo_path=kwargs['pseudo_path'], yaml_path='..',
-                      auxiliary_basis_kwargs=kwargs['auxiliary_basis_kwargs'])
+                      aux_basis_kwargs=kwargs['aux_basis_kwargs'])
 
-    for use_multipoles in kwargs['use_multipoles']:
-        if use_multipoles:
-            calc = Onsite1cMTable(atoms[el1])
-            calc.run()
-            calc.write()
-
-        calc = Onsite1cWTable(atoms[el1], use_multipoles=use_multipoles)
+    for mapping in kwargs['aux_mappings']:
+        basis = 'main' if mapping == 'mulliken' else 'auxiliary'
+        calc = Onsite1cWTable(atoms[el1], basis=basis)
 
         run_kwargs = dict()
-
-        if use_multipoles:
+        if basis == 'auxiliary':
             run_kwargs.update(xc=xc)
         else:
             maxstep = 0.125 if el1 == 'H' else 0.25
@@ -681,14 +695,14 @@ def magon2c(el1, el2, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
             get_atoms(el1, el2, label=kwargs['label'], only_1c=False,
                       pseudo_path=kwargs['pseudo_path'], yaml_path='..',
-                      auxiliary_basis_kwargs=kwargs['auxiliary_basis_kwargs'])
+                      aux_basis_kwargs=kwargs['aux_basis_kwargs'])
 
     rmin = rmin_halves[el1] + rmin_halves[el2]
     N = numr[el1] + numr[el1] - int(np.round(rmin/dr))
 
-    for use_multipoles in kwargs['use_multipoles']:
-        calc = Onsite2cWTable(atoms[el1], atoms[el2],
-                              use_multipoles=use_multipoles, timing=False)
+    for mapping in kwargs['aux_mappings']:
+        basis = 'main' if mapping == 'mulliken' else 'auxiliary'
+        calc = Onsite2cWTable(atoms[el1], atoms[el2], basis=basis, timing=False)
 
         run_kwargs = dict(rmin=rmin, dr=dr, N=N, xc=xc, **kwargs['opts_2c'])
         calc.run(**run_kwargs)
@@ -700,11 +714,13 @@ def map1c(el1, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
             get_atoms(el1, label=kwargs['label'], only_1c=True,
                       pseudo_path=kwargs['pseudo_path'], yaml_path='..',
-                      auxiliary_basis_kwargs=kwargs['auxiliary_basis_kwargs'])
+                      aux_basis_kwargs=kwargs['aux_basis_kwargs'])
 
-    calc = Onsite1cMTable(atoms[el1])
-    calc.run()
-    calc.write()
+    for mapping in kwargs['aux_mappings']:
+        if mapping == 'giese_york':
+            calc = Onsite1cMTable(atoms[el1])
+            calc.run()
+            calc.write()
     return
 
 
@@ -712,15 +728,17 @@ def map2c(el1, el2, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
             get_atoms(el1, el2, label=kwargs['label'], only_1c=False,
                       pseudo_path=kwargs['pseudo_path'], yaml_path='..',
-                      auxiliary_basis_kwargs=kwargs['auxiliary_basis_kwargs'])
+                      aux_basis_kwargs=kwargs['aux_basis_kwargs'])
 
     rmin = rmin_halves[el1] + rmin_halves[el2]
     N = numr[el1] + numr[el2] - int(np.round(rmin/dr))
-
     run_kwargs = dict(rmin=rmin, dr=dr, N=N, **kwargs['opts_map2c'])
-    calc = Offsite2cMTable(atoms[el1], atoms[el2], timing=False)
-    calc.run(**run_kwargs)
-    calc.write()
+
+    for mapping in kwargs['aux_mappings']:
+        if mapping == 'giese_york':
+            calc = Offsite2cMTable(atoms[el1], atoms[el2], timing=False)
+            calc.run(**run_kwargs)
+            calc.write()
     return
 
 
