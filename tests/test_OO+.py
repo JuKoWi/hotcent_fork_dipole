@@ -59,7 +59,8 @@ def atom(request):
     atom.run()
     atom.generate_nonminimal_basis(size=size, tail_norm=0.15, r_pol=1.125,
                                    degree=2)
-    atom.generate_auxiliary_basis(nzeta=nzeta, tail_norm=0.2, lmax=2)
+    atom.generate_auxiliary_basis(nzeta=nzeta, tail_norms=[0.2, 0.4], lmax=2,
+                                  degree=2)
     atom.pp.build_projectors(atom)
     atom.pp.build_overlaps(atom, atom, rmin=1., rmax=4., N=200)
     return atom
@@ -161,7 +162,7 @@ def test_chg1c(atom):
     U = chgon1c.tables[(0, 0)][0, :]
 
     U_ref = {
-        LDA: np.array([9.813091, 1.739321, 0.4714054, 0.03553798]),
+        LDA: np.array([9.81309054, 1.52281255, 0.35847368]),
     }
 
     msg = 'Too large error for U_{0} (value={1})'
