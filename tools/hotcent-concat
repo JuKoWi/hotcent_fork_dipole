@@ -14,7 +14,7 @@ options:
   -d                    Dry run (only print info and exit).
   -h                    Show this help message and exit.
   -q                    Do not print info to standard output.
-  -t                    Basis set type (default: dzp).
+  -t                    Basis set type (default: sz).
 EOF
 }
 

@@ -48,7 +48,8 @@ def parse_arguments():
     parser.add_argument('--rchar-pol', help='Characteristic radius '
                         'in Bohr radii to use for polarization functions.')
     parser.add_argument('--rcut', type=str, help='Comma-separated cutoff radii'
-                        ' in Bohr radii for every valence subshell. Only used '
+                        ' in Bohr radii for every valence subshell (in the '
+                        'same order as the -v/--valence keyword). Only used '
                         '(and required) for --rcut-approach=user.')
     parser.add_argument('--rcut-approach', choices=['energy_shift_hubbard',
                         'energy_shift_user', 'user'],
