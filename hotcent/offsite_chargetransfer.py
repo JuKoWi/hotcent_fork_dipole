@@ -122,7 +122,8 @@ class Offsite2cMTable(MultiAtomIntegrator):
         D : np.ndarray
             D matrix.
         """
-        self.timer.start('prelude')
+        self.timer.start('calculate_D')
+
         x = grid[:, 0]
         y = grid[:, 1]
         r1 = np.sqrt(x**2 + y**2)
@@ -132,7 +133,6 @@ class Offsite2cMTable(MultiAtomIntegrator):
         s1 = x / r1  # sine of theta_1
         s2 = x / r2  # sine of theta_2
         aux = area * x
-        self.timer.stop('prelude')
 
         Naux1 = e1.aux_basis.get_size()
         Naux2 = e2.aux_basis.get_size()
@@ -167,6 +167,7 @@ class Offsite2cMTable(MultiAtomIntegrator):
                 gphi = get_twocenter_phi_integral(ilm, lm, c1, c2, s1, s2)
                 D[Naux1+iaux, imom] = np.sum(Clm * Anl * aux * gphi)
 
+        self.timer.stop('calculate_D')
         return D
 
     def calculate_inveta_matrix(self, e1, e2, R, grid, area):
@@ -185,7 +186,6 @@ class Offsite2cMTable(MultiAtomIntegrator):
         """
         self.timer.start('calculate_inveta')
 
-        self.timer.start('prelude')
         x = grid[:, 0]
         y = grid[:, 1]
         r1 = np.sqrt(x**2 + y**2)
@@ -195,7 +195,6 @@ class Offsite2cMTable(MultiAtomIntegrator):
         s1 = x / r1  # sine of theta_1
         s2 = x / r2  # sine of theta_2
         aux = area * x
-        self.timer.stop('prelude')
 
         Naux1 = e1.aux_basis.get_size()
         Naux2 = e2.aux_basis.get_size()
@@ -305,6 +304,8 @@ class Offsite2cMTable(MultiAtomIntegrator):
             product = e1.Rnl(r1, nl1) * e2.Rnl(r2, nl2)
 
             # g vector
+            self.timer.start('calculate_g')
+
             for iaux in range(Naux1):
                 vhar = e1.aux_basis.vhar(r1, iaux)
                 ilm = e1.aux_basis.get_orbital_label(iaux)
@@ -331,7 +332,11 @@ class Offsite2cMTable(MultiAtomIntegrator):
                                                 lm1, llm, c1, c2, s1, s2)
                 g[Naux1 + iaux] = np.sum(product * vhar * aux * gphi)
 
+            self.timer.stop('calculate_g')
+
             # d vector
+            self.timer.start('calculate_d')
+
             for imom, (l, lm) in enumerate(moments):
                 Clm = sph_solid_radial(r1, l)
 
@@ -344,10 +349,14 @@ class Offsite2cMTable(MultiAtomIntegrator):
                                                 llm, lm2, c1, c2, s1, s2)
                 d[imom] = np.sum(product * Clm * aux * gphi)
 
+            self.timer.stop('calculate_d')
+
             # u vector
+            self.timer.start('calculate_u')
             u1 = np.linalg.inv(np.matmul(D.T, np.matmul(inveta, D)))
             u2 = np.matmul(D.T, np.matmul(inveta, g)) - d
             u = np.matmul(u1, u2)
+            self.timer.stop('calculate_u')
 
             # M vector
             M[key] = np.matmul(inveta, (g - np.matmul(D, u)))
