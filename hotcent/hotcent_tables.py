@@ -42,10 +42,10 @@ def parse_arguments():
     parser.add_argument('--auxiliary-basis', help='Auxiliary basis set sizes '
                         'to use for fluctuation-type tasks (chg*, mag*) with '
                         'multipoles. To e.g. select a double-zeta auxiliary '
-                        'basis for H with angular momenta up to d (which is '
-                        'also the default for all elements), specify '
-                        '--auxiliary-basis=H_2D. Entries for multiple '
-                        'elements need to be separated by commas.')
+                        'basis for H with angular momenta up to d, specify '
+                        '--auxiliary-basis=H_2D. The default is 2P for H and '
+                        'He and 3D for all other elements. Entries for '
+                        'multiple elements need to be separated by commas.')
     parser.add_argument('include', nargs='*', help='Element combinations '
                         'to consider. To e.g. include all combinations that '
                         'involve H and/or Si, as well as all combinations '
@@ -273,26 +273,34 @@ def main():
 
     included = []
     for item in args.include:
-        elements = tuple(set(item.split(',')))
+        elements = tuple(sorted(set(item.split(','))))
         verify_chemical_symbols(*elements)
         included.append(elements)
 
     excluded = []
     if args.exclude is not None:
         for item in args.exclude.split(','):
-            elements = tuple(set(item.split('-')))
+            elements = tuple(sorted(set(item.split('-'))))
             verify_chemical_symbols(*elements)
             excluded.append(elements)
 
-    task_types = list(set(args.tasks.split(',')))
+    task_types = list(sorted(set(args.tasks.split(','))))
 
     parse_err = 'Cannot parse {0} entry: {1}'
 
     auxiliary_basis_kwargs = {}
     for elements in included:
         for element in elements:
-            auxiliary_basis_kwargs[element] = dict(subshell=None, lmax=2,
-                                                   nzeta=2)
+            if element in ['H', 'He']:
+                lmax = 1
+                nzeta = 2
+            else:
+                lmax = 2
+                nzeta = 3
+
+            auxiliary_basis_kwargs[element] = \
+                dict(subshell=None, lmax=lmax, nzeta=nzeta,
+                     tail_norms=[0.2, 0.4])
 
     if args.auxiliary_basis is not None:
         for entry in args.auxiliary_basis.split(','):
