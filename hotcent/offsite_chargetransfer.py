@@ -6,7 +6,7 @@
 #-----------------------------------------------------------------------------#
 import numpy as np
 from hotcent.fluctuation_twocenter import (
-                INTEGRALS_2CK, NUMINT_2CL, NUML_2CK, NUMLM_2CM,
+                INTEGRALS_2CK, NUMINT_2CL, NUML_2CK, NUML_2CM, NUMLM_2CM,
                 NUMSK_2CK, select_orbitals, select_subshells,
                 write_2cl, write_2ck, write_2cm)
 from hotcent.gaunt import get_gaunt_coefficient
@@ -28,6 +28,8 @@ class Offsite2cMTable(MultiAtomIntegrator):
     """
     def __init__(self, *args, **kwargs):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
+        assert self.ela.aux_basis.get_lmax() < NUML_2CM
+        assert self.elb.aux_basis.get_lmax() < NUML_2CM
 
     def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
             smoothen_tails=True):
@@ -78,7 +80,7 @@ class Offsite2cMTable(MultiAtomIntegrator):
                 self.grid_type = 'bipolar'
                 grid, area = self.make_grid(R, wf_range, nt=ntheta, nr=nr)
 
-                if i == N - 1 or N // 10 == 0 or i % (N // 10) == 0:
+                if (p == 0) and (i == N-1 or N//10 == 0 or i % (N//10) == 0):
                     print('R=%8.2f, %i grid points ...' % \
                         (R, len(grid)), file=self.txt, flush=True)
 
@@ -334,7 +336,7 @@ class Offsite2cMTable(MultiAtomIntegrator):
                 Clm = sph_solid_radial(r1, l)
 
                 gphi = np.zeros_like(Clm)
-                for ll in range(2*lmax12+1):
+                for ll in range(2*max(l1, lmax1)+1):
                     for llm in ORBITALS[ll]:
                         gaunt = get_gaunt_coefficient(llm, lm1, lm)
                         if abs(gaunt) > 0:
@@ -365,6 +367,10 @@ class Offsite2cMTable(MultiAtomIntegrator):
             label1 = e1.aux_basis.get_basis_set_label()
             label2 = e2.aux_basis.get_basis_set_label()
 
+            aux_orbitals = [el.aux_basis.get_orbital_label(iaux)
+                            for el in [e1, e2]
+                            for iaux in range(el.aux_basis.get_size())]
+
             for bas1, valence1 in enumerate(e1.basis_sets):
                 for bas2, valence2 in enumerate(e2.basis_sets):
                     template = '%s-%s_offsiteM_%s-%s.2cm'
@@ -373,7 +379,8 @@ class Offsite2cMTable(MultiAtomIntegrator):
                     print('Writing to %s' % filename, file=self.txt, flush=True)
 
                     with open(filename, 'w') as f:
-                        write_2cm(f, self.Rgrid, self.tables[(p, bas1, bas2)])
+                        write_2cm(f, self.Rgrid, self.tables[(p, bas1, bas2)],
+                                  aux_orbitals)
         return
 
 
@@ -638,6 +645,8 @@ class Offsite2cUMonopoleTable(MultiAtomIntegrator):
 class Offsite2cUMultipoleTable(MultiAtomIntegrator):
     def __init__(self, *args, **kwargs):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
+        assert self.ela.aux_basis.get_lmax() < NUML_2CK
+        assert self.elb.aux_basis.get_lmax() < NUML_2CK
 
     def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
             xc='LDA', smoothen_tails=True, shift=False, subtract_delta=True):
@@ -748,7 +757,7 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
             sym2 = e2.get_symbol()
 
             for nl1 in selected[sym1]:
-                for l in range(NUML_2CK):
+                for l in e1.aux_basis.get_angular_momenta():
                     if (sym1, nl1, l) not in self.ohp_dict:
                         lmax = NUML_2CK
                         Anl = np.copy(e1.aux_basis.Anlg[(nl1, l)])
@@ -756,7 +765,7 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
                             OrbitalHartreePotential(e1.rgrid, Anl, lmax)
 
             for nl2 in selected[sym2]:
-                for l in range(NUML_2CK):
+                for l in e2.aux_basis.get_angular_momenta():
                     if (sym2, nl2, l) not in self.ohp_dict:
                         lmax = NUML_2CK
                         Anl = np.copy(e2.aux_basis.Anlg[(nl2, l)])
@@ -802,7 +811,7 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
         for nl1 in selected[sym1]:
             self.int1c_dict[(sym1, nl1)] = []
 
-            for l in range(NUML_2CK):
+            for l in self.ela.aux_basis.get_angular_momenta():
                 Anl = np.copy(self.ela.aux_basis.Anlg[(nl1, l)])
                 int1c = self.ela.grid.integrate(
                                 Anl * self.ela.rgrid**(l+2), use_dV=False)
@@ -812,7 +821,7 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
             for nl2 in selected[sym2]:
                 self.int1c_dict[(sym2, nl2)] = []
 
-                for l in range(NUML_2CK):
+                for l in self.elb.aux_basis.get_angular_momenta():
                     Anl = np.copy(self.elb.aux_basis.Anlg[(nl2, l)])
                     int1c = self.elb.grid.integrate(
                                     Anl * self.elb.rgrid**(l+2), use_dV=False)
@@ -838,6 +847,13 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
                     self.point_kernels[(p, bas1, bas2)] = np.zeros(NUMSK_2CK)
 
                     for i, integral in enumerate(INTEGRALS_2CK):
+                        lm1, lm2 = get_integral_pair(integral)
+                        l1 = ANGULAR_MOMENTUM[lm1[0]]
+                        l2 = ANGULAR_MOMENTUM[lm2[0]]
+                        if l1 > e1.aux_basis.get_lmax() or \
+                           l2 > e2.aux_basis.get_lmax():
+                            continue
+
                         self.point_kernels[(p, bas1, bas2)][i] = \
                             self.evaluate_point_multipole_hartree(
                                     sym1, sym2, nl1, nl2, integral, 1)
@@ -883,9 +899,9 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
         rho2 = e2.electron_density(r2)
         rho12 = rho1 + rho2
         Anl1 = {(nl1, l): e1.aux_basis(r1, nl1, l) for nl1 in selected[sym1]
-                for l in range(NUML_2CK)}
+                for l in e1.aux_basis.get_angular_momenta()}
         Anl2 = {(nl2, l): e2.aux_basis(r2, nl2, l) for nl2 in selected[sym2]
-                for l in range(NUML_2CK)}
+                for l in e2.aux_basis.get_angular_momenta()}
 
         if xc.add_gradient_corrections:
             drho1 = e1.electron_density(r1, der=1)
@@ -907,7 +923,8 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
             grad_r1_grad_rho12 = dr1dx * drho12dx + dr1dy * drho12dy
             grad_theta1_grad_rho12 = dtheta1dx * drho12dx + dtheta1dy * drho12dy
             dAnl1dr1 = {(nl1, l): e1.aux_basis(r1, nl1, l, der=1)
-                        for nl1 in selected[sym1] for l in range(NUML_2CK)}
+                        for nl1 in selected[sym1]
+                        for l in e1.aux_basis.get_angular_momenta()}
 
             dr2dx = x/r2
             ds2dx = (r2 - x*dr2dx) / r2**2
@@ -919,7 +936,8 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
             grad_r2_grad_rho12 = dr2dx * drho12dx + dr2dy * drho12dy
             grad_theta2_grad_rho12 = dtheta2dx * drho12dx + dtheta2dy * drho12dy
             dAnl2dr2 = {(nl2, l): e2.aux_basis(r2, nl2, l, der=1)
-                        for nl2 in selected[sym2] for l in range(NUML_2CK)}
+                        for nl2 in selected[sym2]
+                        for l in e2.aux_basis.get_angular_momenta()}
 
             grad_r1_grad_r2 = dr1dx*dr2dx + dr1dy*dr2dy
             grad_r1_grad_theta2 = dr1dx * dtheta2dx + dr1dy * dtheta2dy
@@ -946,6 +964,8 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
 
             l1 = ANGULAR_MOMENTUM[lm1[0]]
             l2 = ANGULAR_MOMENTUM[lm2[0]]
+            if l1 > e1.aux_basis.get_lmax() or l2 > e2.aux_basis.get_lmax():
+                continue
 
             for key in keys:
                 nl1, nl2 = key
@@ -1094,7 +1114,7 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
         sym1 = e1.get_symbol()
         sym2 = e2.get_symbol()
         Anl1 = {(nl1, l): e1.aux_basis(r1, nl1, l) for nl1 in selected[sym1]
-                for l in range(NUML_2CK)}
+                for l in e1.aux_basis.get_angular_momenta()}
 
         keys = [(nl1, nl2) for nl1 in selected[sym1] for nl2 in selected[sym2]]
         U = {key: np.zeros(NUMSK_2CK) for key in keys}
@@ -1105,6 +1125,8 @@ class Offsite2cUMultipoleTable(MultiAtomIntegrator):
 
             l1 = ANGULAR_MOMENTUM[lm1[0]]
             l2 = ANGULAR_MOMENTUM[lm2[0]]
+            if l1 > e1.aux_basis.get_lmax() or l2 > e2.aux_basis.get_lmax():
+                continue
 
             for key in keys:
                 nl1, nl2 = key

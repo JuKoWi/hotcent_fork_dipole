@@ -22,6 +22,11 @@ class AuxiliaryBasis:
         self.nzeta = None
         self.ohp_dict = {}
 
+    def get_angular_momenta(self):
+        """Returns the angular momenta used in the auxiliary basis set."""
+        ls = list(range(self.lmax+1))
+        return ls
+
     def get_angular_momentum(self, iaux):
         """Returns the angular momentum for the given basis function index."""
         l = self.function_labels[iaux][1]
@@ -72,7 +77,8 @@ class AuxiliaryBasis:
         selected = [self.get_radial_label(izeta) for izeta in range(self.nzeta)]
         return selected
 
-    def build(self, el, subshell=None, nzeta=2, lmax=2, tail_norm=0.2):
+    def build(self, el, subshell=None, nzeta=2, lmax=2, tail_norms=[0.2, 0.4],
+              **split_kwargs):
         """
         Builds a set of auxiliary radial functions and associated
         Hartree potentials.
@@ -92,11 +98,16 @@ class AuxiliaryBasis:
         lmax : int, optional
             Maximum angular momentum of the auxiliary basis functions
             (default: 2, i.e. up to d).
-        tail_norm : float, optional
-            Parameter determining the radius at which a double-zeta
-            function is 'split off' from the parent single-zeta in
-            the split-valence scheme. This radius is chosen such that
+        tail_norms : list of float, optional
+            Parameters determining the radii at which higher-zeta
+            functions are 'split off' from the parent radial function in
+            the split-valence scheme. Each radius is chosen such that
             the norm of the corresponding tail equals the given target.
+
+        Other Parameters
+        ----------------
+        split_kwargs : optional
+            Additional keyword arguments to AtomicBase.get_split_valence_unl().
         """
         if subshell is None:
             key_fct = lambda nl: ANGULAR_MOMENTUM[nl[1]]
@@ -108,7 +119,8 @@ class AuxiliaryBasis:
         assert 0 <= lmax <= 2, 'lmax must lie between 0 and 2'
         self.lmax = lmax
 
-        assert 1 <= nzeta <= 2, 'nzeta must lie between 1 and 2'
+        assert nzeta >= 1, 'nzeta must be at least 1'
+        assert len(tail_norms) >= nzeta-1, 'additional tail norms are needed'
         self.nzeta = nzeta
 
         for izeta in range(self.nzeta):
@@ -122,7 +134,9 @@ class AuxiliaryBasis:
                 Rnl = np.copy(el.Rnlg[self.subshell])
                 rc = el.rcutnl[self.subshell]
             else:
-                u, r_split = el.get_split_valence_unl(self.subshell, tail_norm)
+                tail_norm = tail_norms[izeta-1]
+                u, r_split = el.get_split_valence_unl(self.subshell, tail_norm,
+                                                      **split_kwargs)
                 Rnl = u / el.rgrid
                 rc = r_split
 

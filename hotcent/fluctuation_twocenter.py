@@ -12,7 +12,11 @@ NUMINT_2CL = 4*4  # number of subshell-resolved integrals in .2cl files
 
 NUML_2CK = 3  # number of subshells included in .2ck files (3 = up to d)
 
-NUMLM_2CM = 9  # number of orbitals considered for .2cm files (9 = up to d)
+NUMLM_2CK = NUML_2CK**2  # number of orbitals considered for .2ck files
+
+NUML_2CM = 3  # number of subshells included in .2cm files (3 = up to d)
+
+NUMLM_2CM = NUML_2CM**2  # number of orbitals considered for .2cm files
 
 INTEGRALS_2CK = [
     'sss', 'sps', 'sds', 'pss', 'pps', 'ppp', 'pds', 'pdp',
@@ -20,6 +24,90 @@ INTEGRALS_2CK = [
 ]
 
 NUMSK_2CK = len(INTEGRALS_2CK)
+
+NONZERO_2CM = np.array([
+       [[ True, False, False,  True, False, False, False, False,  True],
+        [False,  True, False, False, False, False,  True, False, False],
+        [False, False,  True, False, False,  True, False, False, False],
+        [ True, False, False,  True, False, False, False, False,  True],
+        [False, False, False, False,  True, False, False, False, False],
+        [False, False,  True, False, False,  True, False, False, False],
+        [False,  True, False, False, False, False,  True, False, False],
+        [False, False, False, False, False, False, False,  True, False],
+        [ True, False, False,  True, False, False, False, False,  True]],
+       [[False,  True, False, False, False, False,  True, False, False],
+        [ True, False, False,  True, False, False, False,  True,  True],
+        [False, False, False, False,  True, False, False, False, False],
+        [False,  True, False, False, False, False,  True, False, False],
+        [False, False,  True, False, False,  True, False, False, False],
+        [False, False, False, False,  True, False, False, False, False],
+        [ True, False, False,  True, False, False, False,  True,  True],
+        [False,  True, False, False, False, False,  True, False, False],
+        [False,  True, False, False, False, False,  True, False, False]],
+       [[False, False,  True, False, False,  True, False, False, False],
+        [False, False, False, False,  True, False, False, False, False],
+        [ True, False, False,  True, False, False, False,  True,  True],
+        [False, False,  True, False, False,  True, False, False, False],
+        [False,  True, False, False, False, False,  True, False, False],
+        [ True, False, False,  True, False, False, False,  True,  True],
+        [False, False, False, False,  True, False, False, False, False],
+        [False, False,  True, False, False,  True, False, False, False],
+        [False, False,  True, False, False,  True, False, False, False]],
+       [[ True, False, False,  True, False, False, False, False,  True],
+        [False,  True, False, False, False, False,  True, False, False],
+        [False, False,  True, False, False,  True, False, False, False],
+        [ True, False, False,  True, False, False, False, False,  True],
+        [False, False, False, False,  True, False, False, False, False],
+        [False, False,  True, False, False,  True, False, False, False],
+        [False,  True, False, False, False, False,  True, False, False],
+        [False, False, False, False, False, False, False,  True, False],
+        [ True, False, False,  True, False, False, False, False,  True]],
+       [[False, False, False, False,  True, False, False, False, False],
+        [False, False,  True, False, False,  True, False, False, False],
+        [False,  True, False, False, False, False,  True, False, False],
+        [False, False, False, False,  True, False, False, False, False],
+        [ True, False, False,  True, False, False, False, False,  True],
+        [False,  True, False, False, False, False,  True, False, False],
+        [False, False,  True, False, False,  True, False, False, False],
+        [False, False, False, False, False, False, False, False, False],
+        [False, False, False, False,  True, False, False, False, False]],
+       [[False, False,  True, False, False,  True, False, False, False],
+        [False, False, False, False,  True, False, False, False, False],
+        [ True, False, False,  True, False, False, False,  True,  True],
+        [False, False,  True, False, False,  True, False, False, False],
+        [False,  True, False, False, False, False,  True, False, False],
+        [ True, False, False,  True, False, False, False,  True,  True],
+        [False, False, False, False,  True, False, False, False, False],
+        [False, False,  True, False, False,  True, False, False, False],
+        [False, False,  True, False, False,  True, False, False, False]],
+       [[False,  True, False, False, False, False,  True, False, False],
+        [ True, False, False,  True, False, False, False,  True,  True],
+        [False, False, False, False,  True, False, False, False, False],
+        [False,  True, False, False, False, False,  True, False, False],
+        [False, False,  True, False, False,  True, False, False, False],
+        [False, False, False, False,  True, False, False, False, False],
+        [ True, False, False,  True, False, False, False,  True,  True],
+        [False,  True, False, False, False, False,  True, False, False],
+        [False,  True, False, False, False, False,  True, False, False]],
+       [[False, False, False, False, False, False, False,  True, False],
+        [False,  True, False, False, False, False,  True, False, False],
+        [False, False,  True, False, False,  True, False, False, False],
+        [False, False, False, False, False, False, False,  True, False],
+        [False, False, False, False, False, False, False, False, False],
+        [False, False,  True, False, False,  True, False, False, False],
+        [False,  True, False, False, False, False,  True, False, False],
+        [ True, False, False,  True, False, False, False, False,  True],
+        [False, False, False, False, False, False, False,  True, False]],
+       [[ True, False, False,  True, False, False, False, False,  True],
+        [False,  True, False, False, False, False,  True, False, False],
+        [False, False,  True, False, False,  True, False, False, False],
+        [ True, False, False,  True, False, False, False, False,  True],
+        [False, False, False, False,  True, False, False, False, False],
+        [False, False,  True, False, False,  True, False, False, False],
+        [False,  True, False, False, False, False,  True, False, False],
+        [False, False, False, False, False, False, False,  True, False],
+        [ True, False, False,  True, False, False, False, False,  True]],
+     ])  # (NUMLM_2CM, NUMLM_2CM, NUMLM_2CK) array of non-zero .2cm integrals
 
 
 def select_subshells(e1, e2):
@@ -131,7 +219,7 @@ def write_2ck(handle, Rgrid, table, point_kernels=None):
     return
 
 
-def write_2cm(handle, Rgrid, table):
+def write_2cm(handle, Rgrid, table, aux_orbitals):
     """
     Writes a parameter file in '2cm' format.
 
@@ -143,22 +231,43 @@ def write_2cm(handle, Rgrid, table):
         Array of interatomic distances.
     table : nd.ndarray
         Three-dimensional table.
+    aux_orbitals : list of str
+        Orbital labels for every auxiliary basis function.
     """
     grid_dist = Rgrid[1] - Rgrid[0]
     grid_npts = len(Rgrid)
     nzeros = int(np.round(Rgrid[0] / grid_dist)) - 1
     assert nzeros >= 0
+    Naux = len(aux_orbitals)
     assert table.ndim == 4
+    assert table.shape[0] == NUMLM_2CM, table.shape[0]
+    assert table.shape[1] == NUMLM_2CM, table.shape[1]
+    assert table.shape[2] == grid_npts, table.shape[2]
+    assert table.shape[3] == Naux, table.shape[3]
 
     print("%.12f, %d" % (grid_dist, grid_npts + nzeros), file=handle)
 
-    for i in range(table.shape[0]):
-        for j in range(table.shape[1]):
-            header = '# {0}_{1}'.format(ORBITAL_LABELS[i], ORBITAL_LABELS[j])
+    for ilm in range(NUMLM_2CM):
+        for jlm in range(NUMLM_2CM):
+            header = '# {0}_{1}'.format(ORBITAL_LABELS[ilm],
+                                        ORBITAL_LABELS[jlm])
             print(header, file=handle)
 
-            for k in range(nzeros):
+            for _ in range(nzeros):
                 print(' '.join(['0.0'] * table.shape[3]), file=handle)
 
-            np.savetxt(handle, table[i, j, :, :], fmt='%1.12e')
+            formats = ['%1.12e'] * Naux
+
+            for iaux in range(Naux):
+                label = aux_orbitals[iaux]
+                klm = ORBITAL_LABELS.index(label)
+                allzero = np.allclose(table[ilm, jlm, :, iaux], 0.)
+
+                if not NONZERO_2CM[ilm, jlm, klm]:
+                    assert allzero, (ilm, jlm, klm, iaux)
+
+                if allzero:
+                    formats[iaux] = '%.1f'
+
+            np.savetxt(handle, table[ilm, jlm, :, :], fmt=formats)
     return

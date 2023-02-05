@@ -260,6 +260,8 @@ class Offsite2cWMonopoleTable(MultiAtomIntegrator):
 class Offsite2cWMultipoleTable(MultiAtomIntegrator):
     def __init__(self, *args, **kwargs):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
+        assert self.ela.aux_basis.get_lmax() < NUML_2CK
+        assert self.elb.aux_basis.get_lmax() < NUML_2CK
 
     def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
             xc='LDA', smoothen_tails=True):
@@ -368,9 +370,9 @@ class Offsite2cWMultipoleTable(MultiAtomIntegrator):
         rho2 = e2.electron_density(r2) / 2
         rho12 = rho1 + rho2
         Anl1 = {(nl1, l): e1.aux_basis(r1, nl1, l) for nl1 in selected[sym1]
-                for l in range(NUML_2CK)}
+                for l in e1.aux_basis.get_angular_momenta()}
         Anl2 = {(nl2, l): e2.aux_basis(r2, nl2, l) for nl2 in selected[sym2]
-                for l in range(NUML_2CK)}
+                for l in e2.aux_basis.get_angular_momenta()}
 
         if xc.add_gradient_corrections:
             drho1 = e1.electron_density(r1, der=1) / 2
@@ -392,7 +394,8 @@ class Offsite2cWMultipoleTable(MultiAtomIntegrator):
             grad_r1_grad_rho12 = dr1dx * drho12dx + dr1dy * drho12dy
             grad_theta1_grad_rho12 = dtheta1dx * drho12dx + dtheta1dy * drho12dy
             dAnl1dr1 = {(nl1, l): e1.aux_basis(r1, nl1, l, der=1)
-                        for nl1 in selected[sym1] for l in range(NUML_2CK)}
+                        for nl1 in selected[sym1]
+                        for l in e1.aux_basis.get_angular_momenta()}
 
             dr2dx = x/r2
             ds2dx = (r2 - x*dr2dx) / r2**2
@@ -404,7 +407,8 @@ class Offsite2cWMultipoleTable(MultiAtomIntegrator):
             grad_r2_grad_rho12 = dr2dx * drho12dx + dr2dy * drho12dy
             grad_theta2_grad_rho12 = dtheta2dx * drho12dx + dtheta2dy * drho12dy
             dAnl2dr2 = {(nl2, l): e2.aux_basis(r2, nl2, l, der=1)
-                        for nl2 in selected[sym2] for l in range(NUML_2CK)}
+                        for nl2 in selected[sym2]
+                        for l in e2.aux_basis.get_angular_momenta()}
 
             grad_r1_grad_r2 = dr1dx*dr2dx + dr1dy*dr2dy
             grad_r1_grad_theta2 = dr1dx * dtheta2dx + dr1dy * dtheta2dy
@@ -433,6 +437,8 @@ class Offsite2cWMultipoleTable(MultiAtomIntegrator):
 
             l1 = ANGULAR_MOMENTUM[lm1[0]]
             l2 = ANGULAR_MOMENTUM[lm2[0]]
+            if l1 > e1.aux_basis.get_lmax() or l2 > e2.aux_basis.get_lmax():
+                continue
 
             for key in keys:
                 nl1, nl2 = key

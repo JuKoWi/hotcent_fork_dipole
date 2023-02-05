@@ -10,7 +10,9 @@ from hotcent.orbitals import ANGULAR_MOMENTUM, ORBITALS
 
 NUML_1CK = 3  # total number of multipoles considered for .1ck files (up to d)
 
-NUMLM_1CM = 9  # number of orbitals considered for .1cm files (up to d)
+NUML_1CM = 3  # number of subshells included in .1cm files (3 = up to d)
+
+NUMLM_1CM = NUML_1CM**2  # number of orbitals considered for .1cm files
 
 
 def select_radial_functions(el):

@@ -150,6 +150,7 @@ class Onsite1cWMultipoleTable:
     def __init__(self, el, txt=None):
         self.el = el
         self.txt = txt
+        assert self.el.aux_basis.get_lmax() < NUML_1CK
 
     def run(self, xc='LDA'):
         """
@@ -223,6 +224,9 @@ class Onsite1cWMultipoleTable:
         radmom = np.zeros(NUML_1CK)
 
         for l in range(NUML_1CK):
+            if l > self.el.aux_basis.get_lmax():
+                continue
+
             Anl1 = self.el.aux_basis(self.el.rgrid, nl1, l)
             Anl2 = self.el.aux_basis(self.el.rgrid, nl2, l)
 
@@ -611,6 +615,8 @@ class Onsite2cWMultipoleTable(MultiAtomIntegrator):
     def __init__(self, *args, **kwargs):
         MultiAtomIntegrator.__init__(self, *args, grid_type='monopolar',
                                      **kwargs)
+        assert self.ela.aux_basis.get_lmax() < NUML_2CK
+        assert self.elb.aux_basis.get_lmax() < NUML_2CK
 
     def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
             xc='LDA', smoothen_tails=True):
@@ -714,7 +720,7 @@ class Onsite2cWMultipoleTable(MultiAtomIntegrator):
         rho2 = e2.electron_density(r2) / 2
         rho12 = rho1 + rho2
         Anl1 = {(nl, l): e1.aux_basis(r1, nl, l) for nl in selected
-                for l in range(NUML_2CK)}
+                for l in e1.aux_basis.get_angular_momenta()}
 
         if xc.add_gradient_corrections:
             drho1 = e1.electron_density(r1, der=1) / 2
@@ -745,7 +751,8 @@ class Onsite2cWMultipoleTable(MultiAtomIntegrator):
             grad_theta1_grad_rho1 = dtheta1dx * drho1dx + dtheta1dy * drho1dy
 
             dAnl1dr1 = {(nl, l): e1.aux_basis(r1, nl, l, der=1)
-                        for nl in selected for l in range(NUML_2CK)}
+                        for nl in selected
+                        for l in e1.aux_basis.get_angular_momenta()}
         else:
             sigma1 = None
             sigma12 = None
@@ -773,6 +780,8 @@ class Onsite2cWMultipoleTable(MultiAtomIntegrator):
 
             l1a = ANGULAR_MOMENTUM[lm1a[0]]
             l1b = ANGULAR_MOMENTUM[lm1b[0]]
+            if l1a > e1.aux_basis.get_lmax() or l1b > e1.aux_basis.get_lmax():
+                continue
 
             for key in keys:
                 nl1a, nl1b = key
