@@ -64,6 +64,10 @@ def parse_arguments():
                         '(the subshell with the lowest angular momentum, i.e. '
                         'Si 3s), specify --aux-subshells=Si_3p. Entries for '
                         'multiple elements need to be separated by commas.')
+    parser.add_argument('--aux-tail-norms', type=str, default='0.2,0.4',
+                        help='Comma-separated tail norms to use for the '
+                             'higher-zeta auxiliary basis functions (default: '
+                             '0.2,0.4).')
     parser.add_argument('include', nargs='*', help='Element combinations '
                         'to consider. To e.g. include all combinations that '
                         'involve H and/or Si, as well as all combinations '
@@ -331,6 +335,11 @@ def main():
             verify_chemical_symbols(symbol)
             if symbol in aux_basis_kwargs:
                 aux_basis_kwargs[symbol].update(subshell=value)
+
+    if args.aux_tail_norms is not None:
+        tail_norms = list(map(float, args.aux_tail_norms.split(',')))
+        for key in aux_basis_kwargs:
+            aux_basis_kwargs[key].update(tail_norms=tail_norms)
 
     def update_opts(optsdict, arg, argname):
         if arg is not None:
