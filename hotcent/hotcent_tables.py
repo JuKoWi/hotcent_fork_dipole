@@ -40,12 +40,12 @@ def parse_arguments():
     """
     parser = ArgumentParser(description=description)
     parser.add_argument('--auxiliary-basis', help='Auxiliary basis set sizes '
-                        'to use for fluctuation-type tasks (chg*, mag*) with '
-                        'multipoles. To e.g. select a double-zeta auxiliary '
-                        'basis for H with angular momenta up to d, specify '
-                        '--auxiliary-basis=H_2D. The default is 2P for H and '
-                        'He and 3D for all other elements. Entries for '
-                        'multiple elements need to be separated by commas.')
+                        'to use for fluctuation-related tasks (chg*, mag*, '
+                        'map*) with multipoles. To e.g. select a double-zeta '
+                        'auxiliary basis for H with angular momenta up to d, '
+                        'specify --auxiliary-basis=H_2D. The default is 2P '
+                        'for H and He and 3D for all other elements. Entries '
+                        'for multiple elements need to be separated by commas.')
     parser.add_argument('include', nargs='*', help='Element combinations '
                         'to consider. To e.g. include all combinations that '
                         'involve H and/or Si, as well as all combinations '
@@ -61,12 +61,12 @@ def parse_arguments():
                         'to "<Symbol>[.<label>].yaml".')
     parser.add_argument('--multipole-subshells', help='Main basis subshells '
                         'from which the auxiliary basis functions are to be '
-                        'derived in fluctuation-type tasks (chg*, mag*) with '
-                        'multipoles. To e.g. select the Si 3p subshell '
-                        'instead of the default choice (the subshell with the '
-                        'lowest angular momentum, i.e. Si 3s), specify '
-                        '--multipole-subshells=Si_3p. Entries for multiple '
-                        'elements need to be separated by commas.')
+                        'derived in fluctuation-related tasks (chg*, mag*, '
+                        'map*) with multipoles. To e.g. select the Si 3p '
+                        'subshell instead of the default choice (the subshell '
+                        'with the lowest angular momentum, i.e. Si 3s), '
+                        'specify --multipole-subshells=Si_3p. Entries for '
+                        'multiple elements need to be separated by commas.')
     parser.add_argument('--opts-2c', help='Option for controlling the two-'
                         'center integration grids. The default settings are '
                         'rather tight and correspond to --opts-2c=nr_200,'
@@ -91,10 +91,10 @@ def parse_arguments():
 
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--without-monopoles', action='store_true',
-                       help='For fluctuation-type tasks (chg*, mag*), do not '
+                       help='For fluctuation kernel tasks (chg*, mag*), do not '
                        'generate tables for monopole-only self-consistency.')
     group.add_argument('--without-multipoles', action='store_true',
-                       help='For fluctuation-type tasks (chg*, mag*), do not '
+                       help='For fluctuation kernel tasks (chg*, mag*), do not '
                        'generate tables for multipolar self-consistency.')
 
     args = parser.parse_args()
@@ -116,6 +116,7 @@ class TaskGenerator:
     all_task_types = [
         'chgoff2c', 'chgon1c', 'chgon2c',
         'magoff2c', 'magon1c', 'magon2c',
+        'map2c', 'map1c',
         'off2c', 'off3c',
         'on1c', 'on2c', 'on3c',
         'rep2c', 'rep3c',
@@ -205,8 +206,9 @@ class TaskGenerator:
 
     def get_tasks(self):
         priority = [
-            'off3c', 'rep3c', 'on3c', 'chgoff2c', 'chgon2c', 'magoff2c',
-            'magon2c', 'off2c', 'rep2c', 'on2c', 'chgon1c', 'magon1c',
+            'off3c', 'rep3c', 'on3c', 'map2c', 'chgoff2c', 'chgon2c',
+            'magoff2c', 'magon2c', 'off2c', 'rep2c', 'on2c', 'map1c',
+            'chgon1c', 'magon1c',
         ]
         tasks = sorted([task for task in self.tasks],
                        key=lambda x: priority.index(x.task_type))
@@ -216,12 +218,13 @@ class TaskGenerator:
         for elements in self.included:
             for el1 in elements:
                 workdir = self.get_workdir(el1)
-                for task_type in ['chgon1c', 'magon1c']:
+                for task_type in ['chgon1c', 'magon1c', 'map1c']:
                     yield Task(task_type, [el1], workdir, self.task_kwargs)
 
             for el1, el2 in combinations_with_replacement(elements, r=2):
                 workdir = self.get_workdir(el1, el2)
-                for task_type in ['chgoff2c', 'magoff2c', 'off2c', 'rep2c']:
+                for task_type in ['chgoff2c', 'magoff2c', 'map2c', 'off2c',
+                                  'rep2c']:
                     yield Task(task_type, [el1, el2], workdir,
                                self.task_kwargs)
 
@@ -569,12 +572,6 @@ def chgoff2c(el1, el2, **kwargs):
 
     for use_multipoles in kwargs['use_multipoles']:
         run_kwargs = dict(rmin=rmin, dr=dr, N=N, **kwargs['opts_2c'])
-
-        if use_multipoles:
-            calc = Offsite2cMTable(atoms[el1], atoms[el2], timing=False)
-            calc.run(**run_kwargs)
-            calc.write()
-
         calc = Offsite2cUTable(atoms[el1], atoms[el2],
                                use_multipoles=use_multipoles, timing=False)
 
@@ -591,15 +588,9 @@ def chgon1c(el1, **kwargs):
                       auxiliary_basis_kwargs=kwargs['auxiliary_basis_kwargs'])
 
     for use_multipoles in kwargs['use_multipoles']:
-        if use_multipoles:
-            calc = Onsite1cMTable(atoms[el1])
-            calc.run()
-            calc.write()
-
         calc = Onsite1cUTable(atoms[el1], use_multipoles=use_multipoles)
 
         run_kwargs = dict()
-
         if use_multipoles:
             run_kwargs.update(xc=xc)
         else:
@@ -692,6 +683,34 @@ def magon2c(el1, el2, **kwargs):
         run_kwargs = dict(rmin=rmin, dr=dr, N=N, xc=xc, **kwargs['opts_2c'])
         calc.run(**run_kwargs)
         calc.write()
+    return
+
+
+def map1c(el1, **kwargs):
+    atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
+            get_atoms(el1, label=kwargs['label'], only_1c=True,
+                      pseudo_path=kwargs['pseudo_path'], yaml_path='..',
+                      auxiliary_basis_kwargs=kwargs['auxiliary_basis_kwargs'])
+
+    calc = Onsite1cMTable(atoms[el1])
+    calc.run()
+    calc.write()
+    return
+
+
+def map2c(el1, el2, **kwargs):
+    atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
+            get_atoms(el1, el2, label=kwargs['label'], only_1c=False,
+                      pseudo_path=kwargs['pseudo_path'], yaml_path='..',
+                      auxiliary_basis_kwargs=kwargs['auxiliary_basis_kwargs'])
+
+    rmin = rmin_halves[el1] + rmin_halves[el2]
+    N = numr[el1] + numr[el2] - int(np.round(rmin/dr))
+
+    run_kwargs = dict(rmin=rmin, dr=dr, N=N, **kwargs['opts_2c'])
+    calc = Offsite2cMTable(atoms[el1], atoms[el2], timing=False)
+    calc.run(**run_kwargs)
+    calc.write()
     return
 
 
