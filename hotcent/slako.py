@@ -991,6 +991,8 @@ def tail_smoothening(x, y_in, eps_inner=1e-8, eps_outer=1e-16, window_size=5):
             Nsmall += 1
         else:
             break
+    else:
+        ismall -= 1
 
     if Nsmall > 0:
         tail = np.empty(Nsmall-1)
