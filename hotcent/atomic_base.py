@@ -351,72 +351,142 @@ class AtomicBase:
             return self.vhar_fct(r)
 
     def plot_Rnl(self, filename=None, only_valence=True):
-        """ Plot radial wave functions with matplotlib.
+        """
+        Plot the radial parts of the main basis functions with matplotlib.
 
-        filename:  output file name + extension (extension used in matplotlib)
-                   default = <Element>_Rnl.pdf
-        only_valence: whether to only plot the valence states or all of them
+        Parameters
+        ----------
+        only_valence : bool, optional
+            Whether to only plot the valence subshells or also the core ones.
+
+        Other parameters
+        ----------------
+        See plot_radial_functions().
+        """
+        basis = 'valence' if only_valence else 'core+valence'
+        self.plot_radial_functions(basis, filename=filename)
+        return
+
+    def plot_Anl(self, filename=None):
+        """
+        Plot the radial parts of the auxiliary basis functions with matplotlib.
+
+        Parameters
+        ----------
+        See plot_radial_functions().
+        """
+        self.plot_radial_functions('auxiliary', filename=filename)
+        return
+
+    def plot_radial_functions(self, basis, filename=None):
+        """
+        Plot the radial parts of the chosen basis functions with matplotlib.
+
+        Parameters
+        ----------
+        basis : str
+            The basis from which to gather the radial functions
+            ('valence', 'core+valence' or 'auxiliary').
+        filename : str, optional
+            Output file name. Default: <symbol>_Anl.pdf for the
+            auxiliary basis and <symbol>_Rnl.pdf otherwise.
         """
         assert plt is not None, 'Matplotlib could not be imported!'
         assert self.solved, NOT_SOLVED_MESSAGE
 
-        rmax = 3 * covalent_radii[self.Z] / Bohr
+        if len(self.rcutnl) > 0:
+            rmax = max(self.rcutnl.values())
+        else:
+            rmax = 3 * covalent_radii[self.Z] / Bohr
+
         ri = np.where(self.rgrid < rmax)[0][-1]
 
-        if only_valence:
-            states = self.valence
-        else:
-            states = [x[2] for x in self.list_states()]
+        labels_core, labels_val, labels_aux = [], [], []
 
-        p = int(np.ceil(np.sqrt(len(states))))
-        q = 2 * p
+        if basis == 'core+valence':
+            prefix = 'R'
+            labels_val += self.valence
 
-        fig = plt.figure(dpi=400)
+            for x in self.list_states():
+                nl = x[2]
+                if nl not in self.valence:
+                    labels_core.append(nl)
+
+        elif basis == 'valence':
+            prefix = 'R'
+            labels_val += self.valence
+
+        elif basis == 'auxiliary':
+            prefix = 'A'
+            assert self.aux_basis.lmax is not None, \
+                   'The auxiliary basis has not been generated yet'
+            labels_aux += self.aux_basis.get_angular_momenta()
+
+        labels = labels_core + labels_val + labels_aux
+
+        ncol = 2
+        nrow = len(labels)
+        fig = plt.figure(figsize=(8, 2*nrow), dpi=400)
+        fig.subplots_adjust(hspace=0, wspace=0)
+
         i = 1
-        # as a function of grid points
-        for nl in states:
-            ax = plt.subplot(q, p, i)
-            plt.plot(self.Rnlg[nl])
+        for label in labels:
+            if label in labels_val:
+                colors = ['tab:blue', 'tab:orange', 'tab:green']
+                keys = [nl for valence in self.basis_sets
+                        for nl in valence if nl[:2] == label]
+                yvals = [self.Rnlg[key] for key in keys]
+                subscripts = keys
+            elif label in labels_aux:
+                colors = ['tab:red', 'tab:purple', 'tab:brown']
+                keys = [(nl, label)
+                        for nl in self.aux_basis.select_radial_functions()]
+                yvals = [self.aux_basis.Anlg[key] for key in keys]
+                subscripts = ['{0},\\ell={1}'.format(*key) for key in keys]
+            elif label in labels_core:
+                colors = ['tab:gray']
+                keys = [label]
+                yvals = [self.Rnlg[key] for key in keys]
+                subscripts = keys
+
+            # As a function of grid points
+            ax = plt.subplot(nrow, ncol, i)
+            for j in range(len(keys)):
+                ax.plot(yvals[j], colors[j])
+                plt.text(0.95, 0.8-0.2*j,
+                         r'$%s_\mathrm{%s}$' % (prefix, subscripts[j]),
+                         horizontalalignment='right',
+                         transform=ax.transAxes, size=15, color=colors[j])
+
             plt.xticks(size=5)
-            plt.grid(ls='--')
-
-            # annotate
-            c = 'k'
-            if nl in self.valence:
-                c = 'r'
-            plt.text(0.5, 0.4, r'$R_{%s}(i)$' % nl, transform=ax.transAxes,
-                     size=15, color=c)
-            if ax.get_subplotspec().is_first_col():
-                plt.ylabel(r'$R_{nl}(i)$', size=8)
-            i += 1
-
-        # as a function of radius
-        i = p ** 2 + 1
-        for nl in states:
-            ax = plt.subplot(q, p, i)
-            plt.plot(self.rgrid[:ri], self.Rnlg[nl][:ri])
-            plt.xticks(size=5)
-            plt.grid(ls='--')
-
-            # annotate
-            c = 'k'
-            if nl in self.valence:
-                c = 'r'
-            plt.text(0.5, 0.4, r'$R_{%s}(r)$' % nl, transform=ax.transAxes,
-                     size=15, color=c)
-            if ax.get_subplotspec().is_first_col():
-                plt.ylabel(r'$R_{nl}(r)$', size=8)
+            ax.grid(ls='--')
             if ax.get_subplotspec().is_last_row():
-                plt.xlabel('r (Bohr)', size=8)
+                ax.set_xlabel('grid point index [-]', size=8)
             i += 1
 
-        fig.subplots_adjust(hspace=0.3, wspace=0.3)
-        plt.figtext(0.4, 0.95, r'$R_{nl}(r)$ for %s' % self.symbol)
+            # As a function of radius
+            ax = plt.subplot(nrow, ncol, i)
+            for j in range(len(keys)):
+                ax.plot(self.rgrid[:ri], yvals[j][:ri], colors[j])
+                plt.text(0.95, 0.8-0.2*j,
+                         r'$%s_\mathrm{%s}$' % (prefix, subscripts[j]),
+                         horizontalalignment='right',
+                         transform=ax.transAxes, size=15, color=colors[j])
 
+            plt.xticks(size=5)
+            ax.grid(ls='--')
+            ax.yaxis.tick_right()
+            ax.yaxis.set_ticks_position('both')
+            if ax.get_subplotspec().is_last_row():
+                ax.set_xlabel('r [Bohr]', size=8)
+            i += 1
+
+        plt.tight_layout()
         if filename is None:
-            filename = '%s_Rnl.pdf' % self.symbol
-        plt.savefig(filename, bbox_inches='tight')
+            filename = '{0}_{1}nl.pdf'.format(self.symbol, prefix)
+        plt.savefig(filename)
         plt.clf()
+        return
 
     def plot_density(self, filename=None):
         """ Plot the electron density and valence subshell densities.
