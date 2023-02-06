@@ -405,16 +405,16 @@ class AtomicBase:
 
         if basis == 'core+valence':
             prefix = 'R'
-            labels_val += self.valence
+            labels_val += self.basis_sets[0]
 
             for x in self.list_states():
                 nl = x[2]
-                if nl not in self.valence:
+                if nl not in labels_val:
                     labels_core.append(nl)
 
         elif basis == 'valence':
             prefix = 'R'
-            labels_val += self.valence
+            labels_val += self.basis_sets[0]
 
         elif basis == 'auxiliary':
             prefix = 'A'
@@ -432,19 +432,24 @@ class AtomicBase:
         i = 1
         for label in labels:
             if label in labels_val:
-                colors = ['tab:blue', 'tab:orange', 'tab:green']
+                if label in self.valence:
+                    # minimal basis function or higher-zeta variant
+                    colors = ['tab:blue', 'tab:orange', 'tab:green']
+                else:
+                    # polarization function
+                    colors = ['tab:purple', 'tab:pink']
                 keys = [nl for valence in self.basis_sets
                         for nl in valence if nl[:2] == label]
                 yvals = [self.Rnlg[key] for key in keys]
                 subscripts = keys
             elif label in labels_aux:
-                colors = ['tab:red', 'tab:purple', 'tab:brown']
+                colors = ['tab:red', 'tab:gray', 'tab:brown']
                 keys = [(nl, label)
                         for nl in self.aux_basis.select_radial_functions()]
                 yvals = [self.aux_basis.Anlg[key] for key in keys]
                 subscripts = ['{0},\\ell={1}'.format(*key) for key in keys]
             elif label in labels_core:
-                colors = ['tab:gray']
+                colors = ['darkslategray']
                 keys = [label]
                 yvals = [self.Rnlg[key] for key in keys]
                 subscripts = keys
