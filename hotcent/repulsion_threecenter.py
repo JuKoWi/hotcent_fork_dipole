@@ -55,12 +55,7 @@ class Repulsion3cTable(MultiAtomIntegrator):
             and integral type (only 's_s' in this case).
             Only returned if write=False.
         """
-        print('\n\n', file=self.txt)
-        print('***********************************************', file=self.txt)
-        print('Three-center repulsion with %s' % e3.get_symbol(), file=self.txt)
-        print('***********************************************', file=self.txt)
-        self.txt.flush()
-        self.timer.start('run_repulsion3c')
+        self.print_header(suffix='-'+e3.get_symbol())
 
         assert nphi == 'adaptive' or (isinstance(nphi, int) and nphi > 0), nphi
 

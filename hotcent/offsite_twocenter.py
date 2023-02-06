@@ -75,12 +75,7 @@ class Offsite2cTable(MultiAtomIntegrator):
             Whether to modify the 'tails' of the Slater-Koster integrals
             so that they smoothly decay to zero (default: True).
         """
-        print('\n\n', file=self.txt)
-        print('***********************************************', file=self.txt)
-        print('Slater-Koster table construction for %s and %s' % \
-              (self.ela.get_symbol(), self.elb.get_symbol()), file=self.txt)
-        print('***********************************************', file=self.txt)
-        self.txt.flush()
+        self.print_header()
 
         assert N is not None, 'Need to set number of grid points N!'
         assert rmin >= 1e-3, 'For stability, please set rmin >= 1e-3'

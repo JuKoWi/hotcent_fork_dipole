@@ -54,12 +54,7 @@ class Onsite3cTable(MultiAtomIntegrator):
             Dictionary of the onsite threecenter integrals for each
             basis set pair (of the first element) and integral type.
         """
-        print('\n\n', file=self.txt)
-        print('***********************************************', file=self.txt)
-        print('On-site three-center calculations with %s' % e3.get_symbol(),
-              file=self.txt)
-        print('***********************************************', file=self.txt)
-        self.txt.flush()
+        self.print_header(suffix='-'+e3.get_symbol())
         self.timer.start('run_onsite3c')
 
         assert nphi == 'adaptive' or (isinstance(nphi, int) and nphi > 0), nphi

@@ -69,6 +69,18 @@ class MultiAtomIntegrator:
     def __del__(self):
         self.timer.summary()
 
+    def print_header(self, suffix=''):
+        print('\n\n', file=self.txt)
+        title = '{0} run for {1}-{2}{3}'.format(self.__class__.__name__,
+                                                self.ela.get_symbol(),
+                                                self.elb.get_symbol(),
+                                                suffix)
+        print('*'*len(title), file=self.txt)
+        print(title, file=self.txt)
+        print('*'*len(title), file=self.txt)
+        self.txt.flush()
+        return
+
     def get_range(self, wf_limit):
         """
         Get the maximal radius beyond which all involved valence

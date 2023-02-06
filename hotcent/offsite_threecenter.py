@@ -53,12 +53,7 @@ class Offsite3cTable(MultiAtomIntegrator):
             Dictionary with the values for each el1-el2 pair
             and integral type.
         """
-        print('\n\n', file=self.txt)
-        print('***********************************************', file=self.txt)
-        print('Off-site three-center calculations with %s' % e3.get_symbol(),
-              file=self.txt)
-        print('***********************************************', file=self.txt)
-        self.txt.flush()
+        self.print_header(suffix='-'+e3.get_symbol())
         self.timer.start('run_offsite3c')
 
         assert nphi == 'adaptive' or (isinstance(nphi, int) and nphi > 0), nphi

@@ -34,12 +34,7 @@ class Onsite2cTable(MultiAtomIntegrator):
         ----------------
         See Offsite2cTable.run().
         """
-        print('\n\n', file=self.txt)
-        print('***********************************************', file=self.txt)
-        print('On-site two-center calculations with %s and %s' % \
-              (self.ela.get_symbol(), self.elb.get_symbol()), file=self.txt)
-        print('***********************************************', file=self.txt)
-        self.txt.flush()
+        self.print_header()
         self.timer.start('run_onsite2c')
 
         assert np.isclose(rmin / dr, np.round(rmin / dr)), \

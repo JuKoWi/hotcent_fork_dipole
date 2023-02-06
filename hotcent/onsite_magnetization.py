@@ -12,6 +12,7 @@ from hotcent.fluctuation_twocenter import (
                 select_subshells, write_2cl, write_2ck)
 from hotcent.multiatom_integrator import MultiAtomIntegrator
 from hotcent.orbitals import ANGULAR_MOMENTUM
+from hotcent.singleatom_integrator import SingleAtomIntegrator
 from hotcent.slako import (get_integral_pair, get_twocenter_phi_integral,
                            get_twocenter_phi_integrals_derivatives,
                            tail_smoothening)
@@ -50,7 +51,7 @@ class Onsite1cWTable:
         return
 
 
-class Onsite1cWMainTable:
+class Onsite1cWMainTable(SingleAtomIntegrator):
     """
     Calculator for the "W" integrals as matrix elements of the
     one-center-expanded spin-polarized XC kernel and the main basis set,
@@ -64,8 +65,7 @@ class Onsite1cWMainTable:
         Where to print output to (None for stdout).
     """
     def __init__(self, el, txt=None):
-        self.el = el
-        self.txt = txt
+        SingleAtomIntegrator.__init__(self, el, txt=txt)
         self.methods = ['Numerical', 'Analytical']
 
     def run(self, maxstep=0.25):
@@ -78,11 +78,7 @@ class Onsite1cWMainTable:
             Step size to use for integrals evaluated via
             numerical differentiation.
         """
-        print('\n\n', file=self.txt)
-        print('***********************************************', file=self.txt)
-        print('Monopole onsite-W table construction for %s' % \
-              self.el.get_symbol(), file=self.txt)
-        print('***********************************************', file=self.txt)
+        self.print_header()
 
         self.tables = {method: {} for method in self.methods}
         self.keys = []
@@ -135,7 +131,7 @@ class Onsite1cWMainTable:
         return
 
 
-class Onsite1cWAuxiliaryTable:
+class Onsite1cWAuxiliaryTable(SingleAtomIntegrator):
     """
     Calculator for (parts of) the "W" integrals as matrix elements of the
     one-center-expanded spin-polarized XC kernel and the auxiliary basis set,
@@ -149,8 +145,7 @@ class Onsite1cWAuxiliaryTable:
         Where to print output to (None for stdout).
     """
     def __init__(self, el, txt=None):
-        self.el = el
-        self.txt = txt
+        SingleAtomIntegrator.__init__(self, el, txt=txt)
         assert self.el.aux_basis.get_lmax() < NUML_1CK
 
     def run(self, xc='LDA'):
@@ -162,11 +157,7 @@ class Onsite1cWAuxiliaryTable:
         xc : str, optional
             Name of the exchange-correlation functional (default: LDA).
         """
-        print('\n\n', file=self.txt)
-        print('***********************************************', file=self.txt)
-        print('Multipole onsite-W table construction for %s' % \
-              self.el.get_symbol(), file=self.txt)
-        print('***********************************************', file=self.txt)
+        self.print_header()
 
         self.tables = {}
         for bas1 in range(self.el.aux_basis.get_nzeta()):
@@ -341,12 +332,7 @@ class Onsite2cWMainTable(MultiAtomIntegrator):
         ----------
         See Onsite2cTable.run().
         """
-        print('\n\n', file=self.txt)
-        print('***********************************************', file=self.txt)
-        print('Monopole onsite-W table construction for %s and %s' % \
-              (self.ela.get_symbol(), self.elb.get_symbol()), file=self.txt)
-        print('***********************************************', file=self.txt)
-        self.txt.flush()
+        self.print_header()
 
         assert N is not None, 'Need to set number of grid points N!'
         assert rmin >= 1e-3, 'For stability, please set rmin >= 1e-3'
@@ -630,12 +616,7 @@ class Onsite2cWAuxiliaryTable(MultiAtomIntegrator):
         ----------
         See Onsite2cTable.run().
         """
-        print('\n\n', file=self.txt)
-        print('***********************************************', file=self.txt)
-        print('Multipole onsite-W table construction for %s and %s' % \
-              (self.ela.get_symbol(), self.elb.get_symbol()), file=self.txt)
-        print('***********************************************', file=self.txt)
-        self.txt.flush()
+        self.print_header()
 
         assert N is not None, 'Need to set number of grid points N!'
         assert rmin >= 1e-3, 'For stability, please set rmin >= 1e-3'

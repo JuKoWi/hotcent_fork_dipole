@@ -32,12 +32,7 @@ class Repulsion2cTable(MultiAtomIntegrator):
         ----------------
         See Offsite2cTable.run().
         """
-        print('\n\n', file=self.txt)
-        print('***********************************************', file=self.txt)
-        print('Repulsion calculation for %s and %s' % \
-              (self.ela.get_symbol(), self.elb.get_symbol()), file=self.txt)
-        print('***********************************************', file=self.txt)
-        self.txt.flush()
+        self.print_header()
 
         assert N is not None, 'Need to set number of grid points N!'
         assert rmin >= 1e-3, 'For stability, please set rmin >= 1e-3'

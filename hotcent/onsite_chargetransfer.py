@@ -15,6 +15,7 @@ from hotcent.gaunt import get_gaunt_coefficient
 from hotcent.multiatom_integrator import MultiAtomIntegrator
 from hotcent.orbital_hartree import OrbitalHartreePotential
 from hotcent.orbitals import ANGULAR_MOMENTUM, ORBITAL_LABELS, ORBITALS
+from hotcent.singleatom_integrator import SingleAtomIntegrator
 from hotcent.slako import (get_integral_pair, get_twocenter_phi_integral,
                            get_twocenter_phi_integrals_derivatives,
                            tail_smoothening)
@@ -22,7 +23,7 @@ from hotcent.solid_harmonics import sph_solid_radial
 from hotcent.xc import LibXC
 
 
-class Onsite1cMTable:
+class Onsite1cMTable(SingleAtomIntegrator):
     """
     Class for calculations involving on-site mapping coefficients
     (see Giese and York (2011), doi:10.1063/1.3587052).
@@ -35,17 +36,12 @@ class Onsite1cMTable:
         Where to print output to (None for stdout).
     """
     def __init__(self, el, txt=None):
-        self.el = el
-        self.txt = txt
+        SingleAtomIntegrator.__init__(self, el, txt=txt)
         assert self.el.aux_basis.get_lmax() < NUML_1CM
 
     def run(self):
         """Calculates the required mapping coefficients."""
-        print('\n\n', file=self.txt)
-        print('***********************************************', file=self.txt)
-        print('Multipole onsite-M table construction for %s' % \
-              self.el.get_symbol(), file=self.txt)
-        print('***********************************************', file=self.txt)
+        self.print_header()
 
         selected = select_orbitals(self.el, self.el)
 
@@ -210,7 +206,7 @@ class Onsite1cUTable:
         return
 
 
-class Onsite1cUMainTable:
+class Onsite1cUMainTable(SingleAtomIntegrator):
     """
     Calculator for the "U" integrals as matrix elements of the
     one-center-expanded Hartree-XC kernel and the main basis set,
@@ -224,8 +220,7 @@ class Onsite1cUMainTable:
         Where to print output to (None for stdout).
     """
     def __init__(self, el, txt=None):
-        self.el = el
-        self.txt = txt
+        SingleAtomIntegrator.__init__(self, el, txt=txt)
         self.methods = ['Numerical', 'Analytical']
 
     def run(self, maxstep=0.25):
@@ -238,11 +233,7 @@ class Onsite1cUMainTable:
             Step size to use for integrals evaluated via
             numerical differentiation.
         """
-        print('\n\n', file=self.txt)
-        print('***********************************************', file=self.txt)
-        print('Monopole onsite-U table construction for %s' % \
-              self.el.get_symbol(), file=self.txt)
-        print('***********************************************', file=self.txt)
+        self.print_header()
 
         self.tables = {method: {} for method in self.methods}
         self.keys = []
@@ -295,7 +286,7 @@ class Onsite1cUMainTable:
         return
 
 
-class Onsite1cUAuxiliaryTable:
+class Onsite1cUAuxiliaryTable(SingleAtomIntegrator):
     """
     Calculator for (parts of) the "U" integrals as matrix elements of the
     one-center-expanded Hartree-XC kernel and the auxiliary basis set,
@@ -309,8 +300,7 @@ class Onsite1cUAuxiliaryTable:
         Where to print output to (None for stdout).
     """
     def __init__(self, el, txt=None):
-        self.el = el
-        self.txt = txt
+        SingleAtomIntegrator.__init__(self, el, txt=txt)
         assert self.el.aux_basis.get_lmax() < NUML_1CK
 
     def run(self, xc='LDA'):
@@ -322,11 +312,7 @@ class Onsite1cUAuxiliaryTable:
         xc : str, optional
             Name of the exchange-correlation functional (default: LDA).
         """
-        print('\n\n', file=self.txt)
-        print('***********************************************', file=self.txt)
-        print('Multipole onsite-U table construction for %s' % \
-              self.el.get_symbol(), file=self.txt)
-        print('***********************************************', file=self.txt)
+        self.print_header()
 
         self.tables = {}
         for bas1 in range(self.el.aux_basis.get_nzeta()):
@@ -488,12 +474,7 @@ class Onsite2cUMainTable(MultiAtomIntegrator):
         ----------
         See Onsite2cTable.run().
         """
-        print('\n\n', file=self.txt)
-        print('***********************************************', file=self.txt)
-        print('Monopole onsite-U table construction for %s and %s' % \
-              (self.ela.get_symbol(), self.elb.get_symbol()), file=self.txt)
-        print('***********************************************', file=self.txt)
-        self.txt.flush()
+        self.print_header()
 
         assert N is not None, 'Need to set number of grid points N!'
         assert rmin >= 1e-3, 'For stability, please set rmin >= 1e-3'
@@ -682,12 +663,7 @@ class Onsite2cUAuxiliaryTable(MultiAtomIntegrator):
         ----------
         See Onsite2cTable.run().
         """
-        print('\n\n', file=self.txt)
-        print('***********************************************', file=self.txt)
-        print('Multipole onsite-U table construction for %s and %s' % \
-              (self.ela.get_symbol(), self.elb.get_symbol()), file=self.txt)
-        print('***********************************************', file=self.txt)
-        self.txt.flush()
+        self.print_header()
 
         assert N is not None, 'Need to set number of grid points N!'
         assert rmin >= 1e-3, 'For stability, please set rmin >= 1e-3'
