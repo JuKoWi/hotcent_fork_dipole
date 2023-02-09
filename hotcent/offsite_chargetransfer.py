@@ -339,7 +339,7 @@ class Offsite2cMTable(MultiAtomIntegrator):
                 Clm = sph_solid_radial(r1, l)
 
                 gphi = np.zeros_like(Clm)
-                for ll in range(2*max(l1, lmax1)+1):
+                for ll in range(2*max(l1, lmax12)+1):
                     for llm in ORBITALS[ll]:
                         gaunt = get_gaunt_coefficient(llm, lm1, lm)
                         if abs(gaunt) > 0:
