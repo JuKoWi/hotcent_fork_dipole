@@ -39,15 +39,6 @@ def parse_arguments():
     Note: existing output files will be overwritten.
     """
     parser = ArgumentParser(description=description)
-    parser.add_argument('--aux-basis', help='Auxiliary basis set sizes '
-                        'to use for fluctuation-related tasks (chg*, mag*, '
-                        'map*). This only affects mappings other than '
-                        'Mulliken mapping (see --aux-mappings). To e.g. select '
-                        'a double-zeta auxiliary basis for H with angular '
-                        'momenta up to d, specify --aux-basis=H_2D. The '
-                        'default is 2P for H and He and 3D for all other '
-                        'elements. Entries for multiple elements need to be '
-                        'separated by commas.')
     parser.add_argument('--aux-mappings', default='mulliken,giese_york',
                         help='Comma-separated procedures to consider for '
                         'mapping the atomic orbital products to the auxiliary '
@@ -55,19 +46,6 @@ def parse_arguments():
                         'and mapping integral tables that will be produced '
                         'by the chg*, mag* and map* tasks. Default: "mulliken,'
                         'giese_york".)')
-    parser.add_argument('--aux-subshells', help='Main basis subshells '
-                        'from which the auxiliary basis functions are to be '
-                        'derived for fluctuation-related tasks (chg*, mag*, '
-                        'map*). This only affects mappings other than '
-                        'Mulliken mapping (see --aux-mappings). To e.g. select '
-                        'the Si 3p subshell instead of the default choice '
-                        '(the subshell with the lowest angular momentum, i.e. '
-                        'Si 3s), specify --aux-subshells=Si_3p. Entries for '
-                        'multiple elements need to be separated by commas.')
-    parser.add_argument('--aux-tail-norms', type=str, default='0.2,0.4',
-                        help='Comma-separated tail norms to use for the '
-                             'higher-zeta auxiliary basis functions (default: '
-                             '0.2,0.4).')
     parser.add_argument('include', nargs='*', help='Element combinations '
                         'to consider. To e.g. include all combinations that '
                         'involve H and/or Si, as well as all combinations '
@@ -299,48 +277,6 @@ def main():
 
     parse_err = 'Cannot parse {0} entry: {1}'
 
-    aux_basis_kwargs = {}
-
-    for elements in included:
-        for element in elements:
-            if element in ['H', 'He']:
-                lmax = 1
-                nzeta = 2
-            else:
-                lmax = 2
-                nzeta = 3
-
-            aux_basis_kwargs[element] = \
-                dict(subshell=None, lmax=lmax, nzeta=nzeta,
-                     tail_norms=[0.2, 0.4])
-
-    if args.aux_basis is not None:
-        for entry in args.aux_basis.split(','):
-            msg = parse_err.format('aux-basis', entry)
-            assert '_' in entry, msg
-            symbol, value = entry.split('_', maxsplit=1)
-            assert len(value) == 2, msg
-            verify_chemical_symbols(symbol)
-            assert value[0].isdigit(), msg
-            nzeta = int(value[0])
-            assert value[1] in 'SPDF', msg
-            lmax = 'SPDF'.index(value[1])
-            if symbol in aux_basis_kwargs:
-                aux_basis_kwargs[symbol].update(lmax=lmax, nzeta=nzeta)
-
-    if args.aux_subshells is not None:
-        for entry in args.aux_subshells.split(','):
-            assert '_' in entry, parse_err.format('aux-subshells', entry)
-            symbol, value = entry.split('_', maxsplit=1)
-            verify_chemical_symbols(symbol)
-            if symbol in aux_basis_kwargs:
-                aux_basis_kwargs[symbol].update(subshell=value)
-
-    if args.aux_tail_norms is not None:
-        tail_norms = list(map(float, args.aux_tail_norms.split(',')))
-        for key in aux_basis_kwargs:
-            aux_basis_kwargs[key].update(tail_norms=tail_norms)
-
     def update_opts(optsdict, arg, argname):
         if arg is not None:
             for entry in arg.split(','):
@@ -373,8 +309,6 @@ def main():
     task_types = list(sorted(set(args.tasks.split(','))))
 
     if not need_aux_basis:
-        aux_basis_kwargs = None
-
         for task_type in ['map1c', 'map2c']:
             if task_type in task_types:
                 msg = 'Warning: the "{0}" task will be skipped because no ' + \
@@ -384,7 +318,6 @@ def main():
                 task_types.remove(task_type)
 
     task_kwargs = dict(
-        aux_basis_kwargs=aux_basis_kwargs,
         aux_mappings=aux_mappings,
         label=args.label,
         opts_2c=opts_2c,
@@ -459,7 +392,10 @@ def read_yaml(filename):
         setup = yaml.safe_load(f)
 
     dicts = []
-    for key in ['meta', 'atom', 'basis', 'confinement', 'pseudopotential']:
+    keys = ['meta', 'atom', 'basis', 'confinement', 'pseudopotential',
+            'auxiliary_basis']
+
+    for key in keys:
         for section in setup:
             if key in section:
                 dicts.append(section[key])
@@ -470,7 +406,7 @@ def read_yaml(filename):
 
 
 def get_atoms(*elements, label=None, only_1c=False, pseudo_path='.', txt='-',
-              yaml_path='.', aux_basis_kwargs=None):
+              yaml_path='.'):
     atoms = {}
     eigenvalues, hubbardvalues, occupations = {}, {}, {}
     offdiagonal_H, offdiagonal_S = {}, {}
@@ -484,8 +420,8 @@ def get_atoms(*elements, label=None, only_1c=False, pseudo_path='.', txt='-',
             filename = '{0}.{1}.yaml'.format(el, label)
         filename = os.path.join(yaml_path, filename)
 
-        meta_kwargs, atom_kwargs, basis_kwargs, conf_kwargs, pp_kwargs = \
-            read_yaml(filename)
+        meta_kwargs, atom_kwargs, basis_kwargs, conf_kwargs, pp_kwargs, \
+            aux_basis_kwargs = read_yaml(filename)
 
         if xc is None:
             xc = atom_kwargs['xc']
@@ -506,6 +442,8 @@ def get_atoms(*elements, label=None, only_1c=False, pseudo_path='.', txt='-',
                                **atom_kwargs)
         atom.run()
         atom.generate_nonminimal_basis(**basis_kwargs)
+        atom.pp.build_projectors(atom)
+        atom.generate_auxiliary_basis(**aux_basis_kwargs)
 
         eigenvalues[el], hubbardvalues[el], occupations[el] = {}, {}, {}
         offdiagonal_H[el], offdiagonal_S[el] = {}, {}
@@ -540,11 +478,6 @@ def get_atoms(*elements, label=None, only_1c=False, pseudo_path='.', txt='-',
         offdiagonal_H=offdiagonal_H,
         offdiagonal_S=offdiagonal_S,
     )
-
-    for el1 in set(elements):
-        atoms[el1].pp.build_projectors(atoms[el1])
-        if aux_basis_kwargs is not None:
-            atoms[el1].generate_auxiliary_basis(**aux_basis_kwargs[el1])
 
     if not only_1c:
         dr = 0.02
@@ -599,8 +532,7 @@ def get_3c_grids(el1, el2, rmin_halves, wf_ranges, verbose=True):
 def chgoff2c(el1, el2, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
             get_atoms(el1, el2, label=kwargs['label'], only_1c=False,
-                      pseudo_path=kwargs['pseudo_path'], yaml_path='..',
-                      aux_basis_kwargs=kwargs['aux_basis_kwargs'])
+                      pseudo_path=kwargs['pseudo_path'], yaml_path='..')
 
     rmin = rmin_halves[el1] + rmin_halves[el2]
     N = numr[el1] + numr[el2] - int(np.round(rmin/dr))
@@ -620,8 +552,7 @@ def chgoff2c(el1, el2, **kwargs):
 def chgon1c(el1, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
             get_atoms(el1, label=kwargs['label'], only_1c=True,
-                      pseudo_path=kwargs['pseudo_path'], yaml_path='..',
-                      aux_basis_kwargs=kwargs['aux_basis_kwargs'])
+                      pseudo_path=kwargs['pseudo_path'], yaml_path='..')
 
     for mapping in kwargs['aux_mappings']:
         basis = 'main' if mapping == 'mulliken' else 'auxiliary'
@@ -642,8 +573,7 @@ def chgon1c(el1, **kwargs):
 def chgon2c(el1, el2, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
             get_atoms(el1, el2, label=kwargs['label'], only_1c=False,
-                      pseudo_path=kwargs['pseudo_path'], yaml_path='..',
-                      aux_basis_kwargs=kwargs['aux_basis_kwargs'])
+                      pseudo_path=kwargs['pseudo_path'], yaml_path='..')
 
     rmin = rmin_halves[el1] + rmin_halves[el2]
     N = numr[el1] + numr[el1] - int(np.round(rmin/dr))
@@ -661,8 +591,7 @@ def chgon2c(el1, el2, **kwargs):
 def magoff2c(el1, el2, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
             get_atoms(el1, el2, label=kwargs['label'], only_1c=False,
-                      pseudo_path=kwargs['pseudo_path'], yaml_path='..',
-                      aux_basis_kwargs=kwargs['aux_basis_kwargs'])
+                      pseudo_path=kwargs['pseudo_path'], yaml_path='..')
 
     rmin = rmin_halves[el1] + rmin_halves[el2]
     N = numr[el1] + numr[el2] - int(np.round(rmin/dr))
@@ -681,8 +610,7 @@ def magoff2c(el1, el2, **kwargs):
 def magon1c(el1, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
             get_atoms(el1, label=kwargs['label'], only_1c=True,
-                      pseudo_path=kwargs['pseudo_path'], yaml_path='..',
-                      aux_basis_kwargs=kwargs['aux_basis_kwargs'])
+                      pseudo_path=kwargs['pseudo_path'], yaml_path='..')
 
     for mapping in kwargs['aux_mappings']:
         basis = 'main' if mapping == 'mulliken' else 'auxiliary'
@@ -703,8 +631,7 @@ def magon1c(el1, **kwargs):
 def magon2c(el1, el2, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
             get_atoms(el1, el2, label=kwargs['label'], only_1c=False,
-                      pseudo_path=kwargs['pseudo_path'], yaml_path='..',
-                      aux_basis_kwargs=kwargs['aux_basis_kwargs'])
+                      pseudo_path=kwargs['pseudo_path'], yaml_path='..')
 
     rmin = rmin_halves[el1] + rmin_halves[el2]
     N = numr[el1] + numr[el1] - int(np.round(rmin/dr))
@@ -722,8 +649,7 @@ def magon2c(el1, el2, **kwargs):
 def map1c(el1, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
             get_atoms(el1, label=kwargs['label'], only_1c=True,
-                      pseudo_path=kwargs['pseudo_path'], yaml_path='..',
-                      aux_basis_kwargs=kwargs['aux_basis_kwargs'])
+                      pseudo_path=kwargs['pseudo_path'], yaml_path='..')
 
     for mapping in kwargs['aux_mappings']:
         if mapping == 'giese_york':
@@ -736,8 +662,7 @@ def map1c(el1, **kwargs):
 def map2c(el1, el2, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
             get_atoms(el1, el2, label=kwargs['label'], only_1c=False,
-                      pseudo_path=kwargs['pseudo_path'], yaml_path='..',
-                      aux_basis_kwargs=kwargs['aux_basis_kwargs'])
+                      pseudo_path=kwargs['pseudo_path'], yaml_path='..')
 
     rmin = rmin_halves[el1] + rmin_halves[el2]
     N = numr[el1] + numr[el2] - int(np.round(rmin/dr))

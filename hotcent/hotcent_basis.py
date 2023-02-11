@@ -19,12 +19,27 @@ from hotcent.utils import verify_chemical_symbols
 
 def parse_arguments():
     description = """
-    Generate a numerical basis set for the given element.
+    Generate a main and auxiliary basis for the given element.
 
     Note: existing output files will be overwritten.
     """
     parser = ArgumentParser(description=description)
     parser.add_argument('symbol', type=str, help='Element symbol (e.g. "Si").')
+    parser.add_argument('--aux-basis', type=str, help='Size of the auxiliary '
+                        'basis set. For e.g. a double-zeta auxiliary basis '
+                        'with angular momenta up to d, specify --aux-basis=2D.'
+                        ' The default is 2P for H and He and 3D for all other '
+                        'elements.')
+    parser.add_argument('--aux-subshell', type=str, help='Main basis subshell '
+                        'from which the auxiliary radial functions will be '
+                        'derived. To e.g. select the 3p subshell for Si '
+                        'instead of the default choice (the valence subshell '
+                        'with the lowest angular momentum, i.e. 3s for Si), '
+                        'specify --aux-subshell=3p.')
+    parser.add_argument('--aux-tail-norms', type=str, default='0.2,0.4',
+                        help='Comma-separated tail norms to use for building '
+                             'the higher-zeta auxiliary basis functions '
+                             '(default: 0.2,0.4).')
     parser.add_argument('--configuration', '-c', type=str, required=True,
                         help='Electronic configuration, e.g. "[Ne],3s2,3p2".')
     parser.add_argument('--energy-shift', '-E', type=str, default='0.2',
@@ -36,8 +51,8 @@ def parse_arguments():
     parser.add_argument('-f', '--xcfunctional', type=str, default='LDA',
                         help='Exchange-correlation functional. Default: LDA.')
     parser.add_argument('--label', help='Label to use in the output file '
-                        'names, which will be "<Symbol>[.<label>].ion/json'
-                        '/png".')
+                        'names, which will be "<Symbol>[.<label>].ion/json" '
+                        'and "<Symbol>_Rnl/Anl[.<label>].png".')
     parser.add_argument('--plot', action='store_true', help='Make a plot '
                         'of the generated radial basis functions (requires '
                         'matplotlib).')
@@ -135,12 +150,13 @@ def find_polarization_radius(symbol, pp, amp, x_ri, atom_kwargs, verbose=True):
     return r_pol
 
 
-def generate_basis(symbol, pp, atom_kwargs, basis_kwargs, conf_kwargs,
-                   verbose=True):
+def generate_bases(symbol, pp, atom_kwargs, basis_kwargs, conf_kwargs,
+                   aux_basis_kwargs, verbose=True):
     atom = get_atom(symbol, pp, atom_kwargs, verbose=verbose, **conf_kwargs)
     atom.run()
     atom.generate_nonminimal_basis(**basis_kwargs)
     atom.pp.build_projectors(atom)
+    atom.generate_auxiliary_basis(**aux_basis_kwargs)
     return atom
 
 
@@ -169,7 +185,7 @@ def sanity_check_atom(symbol, pp, amp, x_ri, atom_kwargs, verbose=True):
 
 
 def write_yaml(symbol, atom_kwargs, basis_kwargs, conf_kwargs, pp_kwargs,
-               stem):
+               aux_basis_kwargs, stem):
     timestamp = datetime.now().replace(microsecond=0).isoformat()
     meta_kwargs = dict(
         symbol=symbol,
@@ -183,6 +199,7 @@ def write_yaml(symbol, atom_kwargs, basis_kwargs, conf_kwargs, pp_kwargs,
         dict(basis=basis_kwargs),
         dict(confinement=conf_kwargs),
         dict(pseudopotential=pp_kwargs),
+        dict(auxiliary_basis=aux_basis_kwargs),
     ]
 
     filename = '{0}.yaml'.format(stem)
@@ -197,6 +214,8 @@ def main():
 
     symbol = args.symbol
     verify_chemical_symbols(symbol)
+
+    # Main basis settings
 
     configuration = args.configuration.replace(',', ' ')
     pseudo_label = '' if args.pseudo_label is None else '.' + args.pseudo_label
@@ -278,20 +297,51 @@ def main():
 
     conf_kwargs = dict(amp=amp, x_ri=x_ri, rcuts=rcuts)
 
-    atom = generate_basis(symbol, pp, atom_kwargs, basis_kwargs, conf_kwargs,
-                          verbose=verbose)
+    # Auxiliary basis settings
 
-    stem = symbol
-    if args.label is not None:
-        stem += '.' + args.label
+    aux_lmax = 1 if symbol in ['H', 'He'] else 2
+    aux_nzeta = 2 if symbol in ['H', 'He'] else 3
+    aux_basis_kwargs = dict(subshell=None, lmax=aux_lmax, nzeta=aux_nzeta,
+                            tail_norms=[0.2, 0.4])
+
+    parse_err = 'Cannot parse {0} entry: {1}'
+
+    if args.aux_basis is not None:
+        val = args.aux_basis[0]
+        assert val.isdigit(), parse_err.format('aux-basis', args.aux_basis)
+        aux_basis_kwargs.update(nzeta=int(val))
+
+        val = args.aux_basis[1]
+        assert val in 'SPDF', parse_err.format('aux-basis', args.aux_basis)
+        aux_basis_kwargs.update(lmax='SPDF'.index(val))
+
+    if args.aux_subshell is not None:
+        assert args.aux_subshell in valence, \
+               'Auxiliary basis subshell must be chosen from the minimal basis'
+        aux_basis_kwargs.update(subshell=args.aux_subshell)
+
+    if args.aux_tail_norms is not None:
+        tail_norms = list(map(float, args.aux_tail_norms.split(',')))
+        aux_basis_kwargs.update(tail_norms=tail_norms)
+
+    # Basis generation and plotting
+
+    atom = generate_bases(symbol, pp, atom_kwargs, basis_kwargs, conf_kwargs,
+                          aux_basis_kwargs=aux_basis_kwargs, verbose=verbose)
+
+    label = '' if args.label is None else '.'+args.label
+    stem = symbol + label
 
     if args.plot:
-        atom.plot_Rnl(filename='{0}.png'.format(stem))
+        fmt = '{0}_{1}{2}.png'
+        atom.plot_Rnl(filename=fmt.format(symbol, 'Rnl', label))
+        atom.plot_Anl(filename=fmt.format(symbol, 'Anl', label))
 
     write_ion(atom, label=stem)
 
     pp_kwargs.update(filename=pp_filename)
-    write_yaml(symbol, atom_kwargs, basis_kwargs, conf_kwargs, pp_kwargs, stem)
+    write_yaml(symbol, atom_kwargs, basis_kwargs, conf_kwargs, pp_kwargs,
+               aux_basis_kwargs, stem)
     return
 
 
