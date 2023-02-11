@@ -289,6 +289,7 @@ def main():
         size=args.basis,
         r_pol=r_pol,
         tail_norms=tail_norms,
+        degree=None,
     )
 
     if rcuts is None:
@@ -302,7 +303,7 @@ def main():
     aux_lmax = 1 if symbol in ['H', 'He'] else 2
     aux_nzeta = 2 if symbol in ['H', 'He'] else 3
     aux_basis_kwargs = dict(subshell=None, lmax=aux_lmax, nzeta=aux_nzeta,
-                            tail_norms=[0.2, 0.4])
+                            tail_norms=[0.2, 0.4], degree=None)
 
     parse_err = 'Cannot parse {0} entry: {1}'
 
