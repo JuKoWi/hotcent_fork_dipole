@@ -322,6 +322,7 @@ class Offsite2cMTable(MultiAtomIntegrator):
         lmax2 = e2.aux_basis.get_lmax()
         lmax12 = max(lmax1, lmax2)
         moments = self.get_multipole_moments(lmax1, lmax2)
+        lmax_mom = max([moment[0] for moment in moments])
         Nmom = len(moments)
         d = np.zeros(Nmom)
 
@@ -345,7 +346,8 @@ class Offsite2cMTable(MultiAtomIntegrator):
                 ilm = e1.aux_basis.get_orbital_label(iaux)
 
                 gphi = np.zeros_like(r1)
-                for ll in range(2*max(l1, lmax1)+1):
+                lmax_gaunt = l1 + lmax1
+                for ll in range(lmax_gaunt+1):
                     for llm in ORBITALS[ll]:
                         gaunt = get_gaunt_coefficient(llm, lm1, ilm)
                         if abs(gaunt) > 0:
@@ -357,7 +359,8 @@ class Offsite2cMTable(MultiAtomIntegrator):
                 ilm = e2.aux_basis.get_orbital_label(iaux)
 
                 gphi = np.zeros_like(r2)
-                for ll in range(2*max(l2, lmax2)+1):
+                lmax_gaunt = l2 + lmax2
+                for ll in range(lmax_gaunt+1):
                     for llm in ORBITALS[ll]:
                         gaunt = get_gaunt_coefficient(llm, lm2, ilm)
                         if abs(gaunt) > 0:
@@ -374,7 +377,8 @@ class Offsite2cMTable(MultiAtomIntegrator):
                 Clm = sph_solid_radial(r1, l)
 
                 gphi = np.zeros_like(Clm)
-                for ll in range(2*max(l1, lmax12)+1):
+                lmax_gaunt = l1 + lmax_mom
+                for ll in range(lmax_gaunt+1):
                     for llm in ORBITALS[ll]:
                         gaunt = get_gaunt_coefficient(llm, lm1, lm)
                         if abs(gaunt) > 0:
