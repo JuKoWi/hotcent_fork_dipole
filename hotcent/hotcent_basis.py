@@ -40,6 +40,9 @@ def parse_arguments():
                         help='Comma-separated tail norms to use for building '
                              'the higher-zeta auxiliary basis functions '
                              '(default: 0.2,0.4).')
+    parser.add_argument('--basis', '-b', type=str, default='dzp',
+                        choices=['sz', 'szp', 'dz', 'dzp', 'tz', 'tzp'],
+                        help='Size of the main basis set (default: dzp).')
     parser.add_argument('--configuration', '-c', type=str, required=True,
                         help='Electronic configuration, e.g. "[Ne],3s2,3p2".')
     parser.add_argument('--energy-shift', '-E', type=str, default='0.2',
@@ -84,9 +87,6 @@ def parse_arguments():
     parser.add_argument('--tail-norms', '-T', type=str, default='0.16,0.3',
                         help='Comma-separated tail norms to use for the '
                              'higher-zeta functions (default: 0.16,0.3).')
-    parser.add_argument('--type', '-t', type=str, default='dzp',
-                        choices=['sz', 'szp', 'dz', 'dzp', 'tz', 'tzp'],
-                        help='Basis set type (default: dzp).')
     parser.add_argument('--valence', '-v', type=str, required=True,
                         help='Comma-separated subshells to include in the '
                              '(minimal) basis (e.g. "3s,3p").')
@@ -226,7 +226,7 @@ def main():
     amp = args.vconf_amplitude
     x_ri = args.vconf_rstart_rel
 
-    with_polarization = args.type.endswith('p')
+    with_polarization = args.basis.endswith('p')
 
     if args.rcut_approach == 'user':
         assert args.rcut is not None, 'For --rcut-approach=user, ' + \
@@ -286,7 +286,7 @@ def main():
     tail_norms = list(map(float, args.tail_norms.split(',')))
 
     basis_kwargs = dict(
-        size=args.type,
+        size=args.basis,
         r_pol=r_pol,
         tail_norms=tail_norms,
     )
