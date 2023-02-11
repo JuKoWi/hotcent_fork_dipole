@@ -30,6 +30,7 @@ class Offsite2cMTable(MultiAtomIntegrator):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
         assert self.ela.aux_basis.get_lmax() < NUML_2CM
         assert self.elb.aux_basis.get_lmax() < NUML_2CM
+        self.include_lmaxplus1 = False
 
     def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
             smoothen_tails=True):
@@ -103,6 +104,49 @@ class Offsite2cMTable(MultiAtomIntegrator):
         self.timer.stop('run_offsiteM')
         return
 
+    def get_multipole_moments(self, lmax1, lmax2):
+        """
+        Returns the multipole moments to consider in the fitting procedure.
+
+        Parameters
+        ----------
+        lmax1 : int
+            Maximum angular momentum in the auxiliary basis
+            of the first element.
+        lmax2 : int
+            Maximum angular momentum in the auxiliary basis
+            of the second element.
+
+        Returns
+        -------
+        moments : list of (int, str) tuples
+            The (angular momentum, lm_label) multipole moments to include.
+        """
+        lmax12 = max(lmax1, lmax2)
+        moments = []
+
+        for lM in range(lmax12+1):
+            for lmM in ORBITALS[lM]:
+                moments.append((lM, lmM))
+        assert len(moments) == (lmax12 + 1)**2
+
+        if self.include_lmaxplus1:
+            lmin12 = min(lmax1, lmax2)
+            lM = lmax12 + 1
+            lm_dict = {
+                's': 0, 'px': -1, 'pz': 0, 'py': 1, 'dxy': -2, 'dyz': -1,
+                'dz2': 0, 'dxz': 1, 'dx2-y2': 2, 'fx(x2-3y2)': 3,
+                'fy(3x2-y2)': -3, 'fz(x2-y2)': 2, 'fxyz': -2, 'fyz2': -1,
+                'fxz2': 1, 'fz3': 0,
+            }
+
+            for lmM in ORBITALS[lM]:
+                if abs(lm_dict[lmM]) <= lmin12:
+                    moments.append((lM, lmM))
+            assert len(moments) == (lmax12 + 1)**2 + 2*lmin12 + 1
+
+        return moments
+
     def calculate_D_matrix(self, e1, e2, R, grid, area):
         """
         Calculates the 'D' matrix with the multipole moments of the
@@ -135,13 +179,8 @@ class Offsite2cMTable(MultiAtomIntegrator):
 
         lmax1 = e1.aux_basis.get_lmax()
         lmax2 = e2.aux_basis.get_lmax()
-        lmax12 = max(lmax1, lmax2)
-        Nmom = (lmax12 + 1)**2
-
-        moments = []
-        for l in range(lmax12+1):
-            for lm in ORBITALS[l]:
-                moments.append((l, lm))
+        moments = self.get_multipole_moments(lmax1, lmax2)
+        Nmom = len(moments)
 
         D = np.zeros((Naux12, Nmom))
 
@@ -282,13 +321,9 @@ class Offsite2cMTable(MultiAtomIntegrator):
         lmax1 = e1.aux_basis.get_lmax()
         lmax2 = e2.aux_basis.get_lmax()
         lmax12 = max(lmax1, lmax2)
-        Nmom = (lmax12 + 1)**2
+        moments = self.get_multipole_moments(lmax1, lmax2)
+        Nmom = len(moments)
         d = np.zeros(Nmom)
-
-        moments = []
-        for l in range(lmax12+1):
-            for lm in ORBITALS[l]:
-                moments.append((l, lm))
 
         # Precalculate the Hartree potentials on the grid
         self.timer.start('calculate_vhar')
