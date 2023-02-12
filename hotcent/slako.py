@@ -280,7 +280,7 @@ def dg(c1, c2, s1, s2, integral):
 
 def get_twocenter_phi_integral(lm1, lm2, c1, c2, s1, s2):
     """ Similar to the g() function above, but for every
-    (lm1, lm2) combination including s/p/d/f/g angular momenta.
+    (lm1, lm2) combination including s/p/d/f/g/h angular momenta.
 
     Parameters
     ----------
@@ -306,6 +306,8 @@ def get_twocenter_phi_integral(lm1, lm2, c1, c2, s1, s2):
         gphi = np.sqrt(7)*(5*c2**2 - 3)*c2/4.
     elif lm1 == 's' and lm2 == 'g5':
         gphi = 105*c2**4/16. - 45*c2**2/8 + 9/16.
+    elif lm1 == 's' and lm2 == 'h6':
+        gphi = np.sqrt(11)*(63*c2**4 - 70*c2**2 + 15)*c2/16.
     elif lm1 == 'px' and lm2 == 'px':
         gphi = 3*s2*s1/4.
     elif lm1 == 'px' and lm2 == 'dxz':
@@ -314,6 +316,8 @@ def get_twocenter_phi_integral(lm1, lm2, c1, c2, s1, s2):
         gphi = 3*np.sqrt(14)*(5*c2**2 - 1)*s2*s1/16.
     elif lm1 == 'px' and lm2 == 'g6':
         gphi = 3*np.sqrt(30)*(7*c2**2 - 3)*s2*s1*c2/16.
+    elif lm1 == 'px' and lm2 == 'h7':
+        gphi = 3*np.sqrt(55)*(21*c2**4 - 14*c2**2 + 1)*s2*s1/32.
     elif lm1 == 'py' and lm2 == 'py':
         gphi = 3*s2*s1/4.
     elif lm1 == 'py' and lm2 == 'dyz':
@@ -322,6 +326,8 @@ def get_twocenter_phi_integral(lm1, lm2, c1, c2, s1, s2):
         gphi = 3*np.sqrt(14)*(5*c2**2 - 1)*s2*s1/16.
     elif lm1 == 'py' and lm2 == 'g4':
         gphi = 3*np.sqrt(30)*(7*c2**2 - 3)*s2*s1*c2/16.
+    elif lm1 == 'py' and lm2 == 'h5':
+        gphi = 3*np.sqrt(55)*(21*c2**4 - 14*c2**2 + 1)*s2*s1/32.
     elif lm1 == 'pz' and lm2 == 's':
         gphi = np.sqrt(3)*c1/2.
     elif lm1 == 'pz' and lm2 == 'pz':
@@ -332,12 +338,16 @@ def get_twocenter_phi_integral(lm1, lm2, c1, c2, s1, s2):
         gphi = np.sqrt(21)*(5*c2**2 - 3)*c2*c1/4.
     elif lm1 == 'pz' and lm2 == 'g5':
         gphi = 3*np.sqrt(3)*(35*c2**4 - 30*c2**2 + 3)*c1/16.
+    elif lm1 == 'pz' and lm2 == 'h6':
+        gphi = np.sqrt(33)*(63*c2**4 - 70*c2**2 + 15)*c2*c1/16.
     elif lm1 == 'dxy' and lm2 == 'dxy':
         gphi = 15*s2**2*s1**2/16.
     elif lm1 == 'dxy' and lm2 == 'fxyz':
         gphi = 15*np.sqrt(7)*s2**2*s1**2*c2/16.
     elif lm1 == 'dxy' and lm2 == 'g3':
-        gphi = 15*np.sqrt(3)*(7*c2**2 - 1)*s2**2*s1**2/32.
+        gphi = 15*np.sqrt(3)*(6 - 7*s2**2)*s2**2*s1**2/32.
+    elif lm1 == 'dxy' and lm2 == 'h4':
+        gphi = 15*np.sqrt(77)*(2 - 3*s2**2)*s2**2*s1**2*c2/32.
     elif lm1 == 'dyz' and lm2 == 'py':
         gphi = 3*np.sqrt(5)*s2*s1*c1/4.
     elif lm1 == 'dyz' and lm2 == 'dyz':
@@ -345,8 +355,9 @@ def get_twocenter_phi_integral(lm1, lm2, c1, c2, s1, s2):
     elif lm1 == 'dyz' and lm2 == 'fyz2':
         gphi = 3*np.sqrt(70)*(5*c2**2 - 1)*s2*s1*c1/16.
     elif lm1 == 'dyz' and lm2 == 'g4':
-        gphi = 15*np.sqrt(6)*(28*(-8*s2**3*c2 + 4*s2*c2)*s1*c1 \
-                              + 16*s2*s1*c2*c1)/512.
+        gphi = 15*np.sqrt(6)*(7*c2**2 - 3)*s2*s1*c2*c1/16.
+    elif lm1 == 'dyz' and lm2 == 'h5':
+        gphi = 15*np.sqrt(11)*(21*c2**4 - 14*c2**2 + 1)*s2*s1*c1/32.
     elif lm1 == 'dxz' and lm2 == 'px':
         gphi = 3*np.sqrt(5)*s2*s1*c1/4.
     elif lm1 == 'dxz' and lm2 == 'dxz':
@@ -354,14 +365,17 @@ def get_twocenter_phi_integral(lm1, lm2, c1, c2, s1, s2):
     elif lm1 == 'dxz' and lm2 == 'fxz2':
         gphi = 3*np.sqrt(70)*(5*c2**2 - 1)*s2*s1*c1/16.
     elif lm1 == 'dxz' and lm2 == 'g6':
-        gphi = 15*np.sqrt(6)*(28*(-8*s2**3*c2 + 4*s2*c2)*s1*c1 \
-                              + 16*s2*s1*c2*c1)/512.
+        gphi = 15*np.sqrt(6)*(7*c2**2 - 3)*s2*s1*c2*c1/16.
+    elif lm1 == 'dxz' and lm2 == 'h7':
+        gphi = 15*np.sqrt(11)*(21*c2**4 - 14*c2**2 + 1)*s2*s1*c1/32.
     elif lm1 == 'dx2-y2' and lm2 == 'dx2-y2':
         gphi = 15*s2**2*s1**2/16.
     elif lm1 == 'dx2-y2' and lm2 == 'fz(x2-y2)':
         gphi = 15*np.sqrt(7)*s2**2*s1**2*c2/16.
     elif lm1 == 'dx2-y2' and lm2 == 'g7':
-        gphi = 15*np.sqrt(3)*(7*c2**2 - 1)*s2**2*s1**2/32.
+        gphi = 15*np.sqrt(3)*(6 - 7*s2**2)*s2**2*s1**2/32.
+    elif lm1 == 'dx2-y2' and lm2 == 'h8':
+        gphi = 15*np.sqrt(77)*(2 - 3*s2**2)*s2**2*s1**2*c2/32.
     elif lm1 == 'dz2' and lm2 == 's':
         gphi = np.sqrt(5)*(3*c1**2 - 1)/4.
     elif lm1 == 'dz2' and lm2 == 'pz':
@@ -372,26 +386,36 @@ def get_twocenter_phi_integral(lm1, lm2, c1, c2, s1, s2):
         gphi = np.sqrt(35)*(5*c2**2 - 3)*(3*c1**2 - 1)*c2/8.
     elif lm1 == 'dz2' and lm2 == 'g5':
         gphi = 3*np.sqrt(5)*(3*c1**2 - 1)*(35*c2**4 - 30*c2**2 + 3)/32.
+    elif lm1 == 'dz2' and lm2 == 'h6':
+        gphi = np.sqrt(55)*(3*c1**2 - 1)*(63*c2**4 - 70*c2**2 + 15)*c2/32.
     elif lm1 == 'fx(x2-3y2)' and lm2 == 'fx(x2-3y2)':
         gphi = 35*s2**3*s1**3/32.
     elif lm1 == 'fx(x2-3y2)' and lm2 == 'g8':
         gphi = 105*s2**3*s1**3*c2/32.
+    elif lm1 == 'fx(x2-3y2)' and lm2 == 'h9':
+        gphi = 35*np.sqrt(11)*(9*c2**2 - 1)*s2**3*s1**3/128.
     elif lm1 == 'fy(3x2-y2)' and lm2 == 'fy(3x2-y2)':
         gphi = 35*s2**3*s1**3/32.
     elif lm1 == 'fy(3x2-y2)' and lm2 == 'g2':
         gphi = 105*s2**3*s1**3*c2/32.
+    elif lm1 == 'fy(3x2-y2)' and lm2 == 'h3':
+        gphi = 35*np.sqrt(11)*(9*c2**2 - 1)*s2**3*s1**3/128.
     elif lm1 == 'fz(x2-y2)' and lm2 == 'dx2-y2':
         gphi = 15*np.sqrt(7)*s2**2*s1**2*c1/16.
     elif lm1 == 'fz(x2-y2)' and lm2 == 'fz(x2-y2)':
         gphi = 105*s2**2*s1**2*c2*c1/16.
     elif lm1 == 'fz(x2-y2)' and lm2 == 'g7':
-        gphi = 15*np.sqrt(21)*(7*c2**2 - 1)*s2**2*s1**2*c1/32.
+        gphi = 15*np.sqrt(21)*(6 - 7*s2**2)*s2**2*s1**2*c1/32.
+    elif lm1 == 'fz(x2-y2)' and lm2 == 'h8':
+        gphi = 105*np.sqrt(11)*(2 - 3*s2**2)*s2**2*s1**2*c2*c1/32.
     elif lm1 == 'fxyz' and lm2 == 'dxy':
         gphi = 15*np.sqrt(7)*s2**2*s1**2*c1/16.
     elif lm1 == 'fxyz' and lm2 == 'fxyz':
         gphi = 105*s2**2*s1**2*c2*c1/16.
     elif lm1 == 'fxyz' and lm2 == 'g3':
-        gphi = 15*np.sqrt(21)*(7*c2**2 - 1)*s2**2*s1**2*c1/32.
+        gphi = 15*np.sqrt(21)*(6 - 7*s2**2)*s2**2*s1**2*c1/32.
+    elif lm1 == 'fxyz' and lm2 == 'h4':
+        gphi = 105*np.sqrt(11)*(2 - 3*s2**2)*s2**2*s1**2*c2*c1/32.
     elif lm1 == 'fyz2' and lm2 == 'py':
         gphi = 3*np.sqrt(14)*(5*c1**2 - 1)*s2*s1/16.
     elif lm1 == 'fyz2' and lm2 == 'dyz':
@@ -400,6 +424,8 @@ def get_twocenter_phi_integral(lm1, lm2, c1, c2, s1, s2):
         gphi = 21*(5*c2**2 - 1)*(5*c1**2 - 1)*s2*s1/32.
     elif lm1 == 'fyz2' and lm2 == 'g4':
         gphi = 3*np.sqrt(105)*(7*c2**2 - 3)*(5*c1**2 - 1)*s2*s1*c2/32.
+    elif lm1 == 'fyz2' and lm2 == 'h5':
+        gphi = 3*np.sqrt(770)*(5*c1**2 - 1)*(21*c2**4 - 14*c2**2 + 1)*s2*s1/128.
     elif lm1 == 'fxz2' and lm2 == 'px':
         gphi = 3*np.sqrt(14)*(5*c1**2 - 1)*s2*s1/16.
     elif lm1 == 'fxz2' and lm2 == 'dxz':
@@ -408,6 +434,8 @@ def get_twocenter_phi_integral(lm1, lm2, c1, c2, s1, s2):
         gphi = 21*(5*c2**2 - 1)*(5*c1**2 - 1)*s2*s1/32.
     elif lm1 == 'fxz2' and lm2 == 'g6':
         gphi = 3*np.sqrt(105)*(7*c2**2 - 3)*(5*c1**2 - 1)*s2*s1*c2/32.
+    elif lm1 == 'fxz2' and lm2 == 'h7':
+        gphi = 3*np.sqrt(770)*(5*c1**2 - 1)*(21*c2**4 - 14*c2**2 + 1)*s2*s1/128.
     elif lm1 == 'fz3' and lm2 == 's':
         gphi = np.sqrt(7)*(5*c1**2 - 3)*c1/4.
     elif lm1 == 'fz3' and lm2 == 'pz':
@@ -418,28 +446,36 @@ def get_twocenter_phi_integral(lm1, lm2, c1, c2, s1, s2):
         gphi = 7*(5*c2**2 - 3)*(5*c1**2 - 3)*c2*c1/8.
     elif lm1 == 'fz3' and lm2 == 'g5':
         gphi = 3*np.sqrt(7)*(5*c1**2 - 3)*(35*c2**4 - 30*c2**2 + 3)*c1/32.
+    elif lm1 == 'fz3' and lm2 == 'h6':
+        gphi = np.sqrt(77)*(5*c1**2 - 3)*(63*c2**4 - 70*c2**2 + 15)*c2*c1/32.
     elif lm1 == 'g1' and lm2 == 'g1':
         gphi = 315*s2**4*s1**4/256.
+    elif lm1 == 'g1' and lm2 == 'h2':
+        gphi = 315*np.sqrt(11)*s2**4*s1**4*c2/256.
     elif lm1 == 'g2' and lm2 == 'fy(3x2-y2)':
         gphi = 105*s2**3*s1**3*c1/32.
     elif lm1 == 'g2' and lm2 == 'g2':
         gphi = 315*s2**3*s1**3*c2*c1/32.
+    elif lm1 == 'g2' and lm2 == 'h3':
+        gphi = 105*np.sqrt(11)*(9*c2**2 - 1)*s2**3*s1**3*c1/128.
     elif lm1 == 'g3' and lm2 == 'dxy':
-        gphi = 15*np.sqrt(3)*(7*c1**2 - 1)*s2**2*s1**2/32.
+        gphi = 15*np.sqrt(3)*(6 - 7*s1**2)*s2**2*s1**2/32.
     elif lm1 == 'g3' and lm2 == 'fxyz':
-        gphi = 15*np.sqrt(21)*(7*c1**2 - 1)*s2**2*s1**2*c2/32.
+        gphi = 15*np.sqrt(21)*(6 - 7*s1**2)*s2**2*s1**2*c2/32.
     elif lm1 == 'g3' and lm2 == 'g3':
-        gphi = 45*(7*c2**2 - 1)*(7*c1**2 - 1)*s2**2*s1**2/64.
+        gphi = 45*(7*s2**2 - 6)*(7*s1**2 - 6)*s2**2*s1**2/64.
+    elif lm1 == 'g3' and lm2 == 'h4':
+        gphi = 15*np.sqrt(231)*(3*s2**2 - 2)*(7*s1**2 - 6)*s2**2*s1**2*c2/64.
     elif lm1 == 'g4' and lm2 == 'py':
         gphi = 3*np.sqrt(30)*(7*c1**2 - 3)*s2*s1*c1/16.
     elif lm1 == 'g4' and lm2 == 'dyz':
-        gphi = 15*np.sqrt(6)*(14*(-8*s1**3*c1 + 4*s1*c1)*s2*c2 \
-                              - 14*(8*s1**3*c1 - 4*s1*c1)*s2*c2 \
-                              + 16*s2*s1*c2*c1)/512.
+        gphi = 15*np.sqrt(6)*(7*c1**2 - 3)*s2*s1*c2*c1/16.
     elif lm1 == 'g4' and lm2 == 'fyz2':
         gphi = 3*np.sqrt(105)*(5*c2**2 - 1)*(7*c1**2 - 3)*s2*s1*c1/32.
     elif lm1 == 'g4' and lm2 == 'g4':
         gphi = 45*(7*c2**2 - 3)*(7*c1**2 - 3)*s2*s1*c2*c1/32.
+    elif lm1 == 'g4' and lm2 == 'h5':
+        gphi = 15*np.sqrt(66)*(7*c1**2 - 3)*(21*c2**4 - 14*c2**2 + 1)*s2*s1*c1/128.
     elif lm1 == 'g5' and lm2 == 's':
         gphi = 105*c1**4/16. - 45*c1**2/8 + 9/16.
     elif lm1 == 'g5' and lm2 == 'pz':
@@ -450,28 +486,108 @@ def get_twocenter_phi_integral(lm1, lm2, c1, c2, s1, s2):
         gphi = 3*np.sqrt(7)*(5*c2**2 - 3)*(35*c1**4 - 30*c1**2 + 3)*c2/32.
     elif lm1 == 'g5' and lm2 == 'g5':
         gphi = 9*(35*c2**4 - 30*c2**2 + 3)*(35*c1**4 - 30*c1**2 + 3)/128.
+    elif lm1 == 'g5' and lm2 == 'h6':
+        gphi = 3*np.sqrt(11)*(63*c2**4 - 70*c2**2 + 15)*(35*c1**4 - 30*c1**2 + 3)*c2/128.
     elif lm1 == 'g6' and lm2 == 'px':
         gphi = 3*np.sqrt(30)*(7*c1**2 - 3)*s2*s1*c1/16.
     elif lm1 == 'g6' and lm2 == 'dxz':
-        gphi = 15*np.sqrt(6)*(14*(-8*s1**3*c1 + 4*s1*c1)*s2*c2 \
-                              - 14*(8*s1**3*c1 - 4*s1*c1)*s2*c2 \
-                              + 16*s2*s1*c2*c1)/512.
+        gphi = 15*np.sqrt(6)*(7*c1**2 - 3)*s2*s1*c2*c1/16.
     elif lm1 == 'g6' and lm2 == 'fxz2':
         gphi = 3*np.sqrt(105)*(5*c2**2 - 1)*(7*c1**2 - 3)*s2*s1*c1/32.
     elif lm1 == 'g6' and lm2 == 'g6':
         gphi = 45*(7*c2**2 - 3)*(7*c1**2 - 3)*s2*s1*c2*c1/32.
+    elif lm1 == 'g6' and lm2 == 'h7':
+        gphi = 15*np.sqrt(66)*(7*c1**2 - 3)*(21*c2**4 - 14*c2**2 + 1)*s2*s1*c1/128.
     elif lm1 == 'g7' and lm2 == 'dx2-y2':
-        gphi = 15*np.sqrt(3)*(7*c1**2 - 1)*s2**2*s1**2/32.
+        gphi = 15*np.sqrt(3)*(6 - 7*s1**2)*s2**2*s1**2/32.
     elif lm1 == 'g7' and lm2 == 'fz(x2-y2)':
-        gphi = 15*np.sqrt(21)*(7*c1**2 - 1)*s2**2*s1**2*c2/32.
+        gphi = 15*np.sqrt(21)*(6 - 7*s1**2)*s2**2*s1**2*c2/32.
     elif lm1 == 'g7' and lm2 == 'g7':
-        gphi = 45*(7*c2**2 - 1)*(7*c1**2 - 1)*s2**2*s1**2/64.
+        gphi = 45*(7*s2**2 - 6)*(7*s1**2 - 6)*s2**2*s1**2/64.
+    elif lm1 == 'g7' and lm2 == 'h8':
+        gphi = 15*np.sqrt(231)*(3*s2**2 - 2)*(7*s1**2 - 6)*s2**2*s1**2*c2/64.
     elif lm1 == 'g8' and lm2 == 'fx(x2-3y2)':
         gphi = 105*s2**3*s1**3*c1/32.
     elif lm1 == 'g8' and lm2 == 'g8':
         gphi = 315*s2**3*s1**3*c2*c1/32.
+    elif lm1 == 'g8' and lm2 == 'h9':
+        gphi = 105*np.sqrt(11)*(9*c2**2 - 1)*s2**3*s1**3*c1/128.
     elif lm1 == 'g9' and lm2 == 'g9':
         gphi = 315*s2**4*s1**4/256.
+    elif lm1 == 'g9' and lm2 == 'h10':
+        gphi = 315*np.sqrt(11)*s2**4*s1**4*c2/256.
+    elif lm1 == 'h1' and lm2 == 'h1':
+        gphi = 693*s2**5*s1**5/512.
+    elif lm1 == 'h2' and lm2 == 'g1':
+        gphi = 315*np.sqrt(11)*s2**4*s1**4*c1/256.
+    elif lm1 == 'h2' and lm2 == 'h2':
+        gphi = 3465*s2**4*s1**4*c2*c1/256.
+    elif lm1 == 'h3' and lm2 == 'fy(3x2-y2)':
+        gphi = 35*np.sqrt(11)*(9*c1**2 - 1)*s2**3*s1**3/128.
+    elif lm1 == 'h3' and lm2 == 'g2':
+        gphi = 105*np.sqrt(11)*(9*c1**2 - 1)*s2**3*s1**3*c2/128.
+    elif lm1 == 'h3' and lm2 == 'h3':
+        gphi = 385*(9*c2**2 - 1)*(9*c1**2 - 1)*s2**3*s1**3/512.
+    elif lm1 == 'h4' and lm2 == 'dxy':
+        gphi = 15*np.sqrt(77)*(2 - 3*s1**2)*s2**2*s1**2*c1/32.
+    elif lm1 == 'h4' and lm2 == 'fxyz':
+        gphi = 105*np.sqrt(11)*(2 - 3*s1**2)*s2**2*s1**2*c2*c1/32.
+    elif lm1 == 'h4' and lm2 == 'g3':
+        gphi = 15*np.sqrt(231)*(7*s2**2 - 6)*(3*s1**2 - 2)*s2**2*s1**2*c1/64.
+    elif lm1 == 'h4' and lm2 == 'h4':
+        gphi = 1155*(3*s2**2 - 2)*(3*s1**2 - 2)*s2**2*s1**2*c2*c1/64.
+    elif lm1 == 'h5' and lm2 == 'py':
+        gphi = 3*np.sqrt(55)*(21*c1**4 - 14*c1**2 + 1)*s2*s1/32.
+    elif lm1 == 'h5' and lm2 == 'dyz':
+        gphi = 15*np.sqrt(11)*(21*c1**4 - 14*c1**2 + 1)*s2*s1*c2/32.
+    elif lm1 == 'h5' and lm2 == 'fyz2':
+        gphi = 3*np.sqrt(770)*(5*c2**2 - 1)*(21*c1**4 - 14*c1**2 + 1)*s2*s1/128.
+    elif lm1 == 'h5' and lm2 == 'g4':
+        gphi = 15*np.sqrt(66)*(7*c2**2 - 3)*(21*c1**4 - 14*c1**2 + 1)*s2*s1*c2/128.
+    elif lm1 == 'h5' and lm2 == 'h5':
+        gphi = 165*(21*c2**4 - 14*c2**2 + 1)*(21*c1**4 - 14*c1**2 + 1)*s2*s1/256.
+    elif lm1 == 'h6' and lm2 == 's':
+        gphi = np.sqrt(11)*(63*c1**4 - 70*c1**2 + 15)*c1/16.
+    elif lm1 == 'h6' and lm2 == 'pz':
+        gphi = np.sqrt(33)*(63*c1**4 - 70*c1**2 + 15)*c2*c1/16.
+    elif lm1 == 'h6' and lm2 == 'dz2':
+        gphi = np.sqrt(55)*(3*c2**2 - 1)*(63*c1**4 - 70*c1**2 + 15)*c1/32.
+    elif lm1 == 'h6' and lm2 == 'fz3':
+        gphi = np.sqrt(77)*(5*c2**2 - 3)*(63*c1**4 - 70*c1**2 + 15)*c2*c1/32.
+    elif lm1 == 'h6' and lm2 == 'g5':
+        gphi = 3*np.sqrt(11)*(35*c2**4 - 30*c2**2 + 3)*(63*c1**4 - 70*c1**2 + 15)*c1/128.
+    elif lm1 == 'h6' and lm2 == 'h6':
+        gphi = 11*(63*c2**4 - 70*c2**2 + 15)*(63*c1**4 - 70*c1**2 + 15)*c2*c1/128.
+    elif lm1 == 'h7' and lm2 == 'px':
+        gphi = 3*np.sqrt(55)*(21*c1**4 - 14*c1**2 + 1)*s2*s1/32.
+    elif lm1 == 'h7' and lm2 == 'dxz':
+        gphi = 15*np.sqrt(11)*(21*c1**4 - 14*c1**2 + 1)*s2*s1*c2/32.
+    elif lm1 == 'h7' and lm2 == 'fxz2':
+        gphi = 3*np.sqrt(770)*(5*c2**2 - 1)*(21*c1**4 - 14*c1**2 + 1)*s2*s1/128.
+    elif lm1 == 'h7' and lm2 == 'g6':
+        gphi = 15*np.sqrt(66)*(7*c2**2 - 3)*(21*c1**4 - 14*c1**2 + 1)*s2*s1*c2/128.
+    elif lm1 == 'h7' and lm2 == 'h7':
+        gphi = 165*(21*c2**4 - 14*c2**2 + 1)*(21*c1**4 - 14*c1**2 + 1)*s2*s1/256.
+    elif lm1 == 'h8' and lm2 == 'dx2-y2':
+        gphi = 15*np.sqrt(77)*(2 - 3*s1**2)*s2**2*s1**2*c1/32.
+    elif lm1 == 'h8' and lm2 == 'fz(x2-y2)':
+        gphi = 105*np.sqrt(11)*(2 - 3*s1**2)*s2**2*s1**2*c2*c1/32.
+    elif lm1 == 'h8' and lm2 == 'g7':
+        gphi = 15*np.sqrt(231)*(7*s2**2 - 6)*(3*s1**2 - 2)*s2**2*s1**2*c1/64.
+    elif lm1 == 'h8' and lm2 == 'h8':
+        gphi = 1155*(3*s2**2 - 2)*(3*s1**2 - 2)*s2**2*s1**2*c2*c1/64.
+    elif lm1 == 'h9' and lm2 == 'fx(x2-3y2)':
+        gphi = 35*np.sqrt(11)*(9*c1**2 - 1)*s2**3*s1**3/128.
+    elif lm1 == 'h9' and lm2 == 'g8':
+        gphi = 105*np.sqrt(11)*(9*c1**2 - 1)*s2**3*s1**3*c2/128.
+    elif lm1 == 'h9' and lm2 == 'h9':
+        gphi = 385*(9*c2**2 - 1)*(9*c1**2 - 1)*s2**3*s1**3/512.
+    elif lm1 == 'h10' and lm2 == 'g9':
+        gphi = 315*np.sqrt(11)*s2**4*s1**4*c1/256.
+    elif lm1 == 'h10' and lm2 == 'h10':
+        gphi = 3465*s2**4*s1**4*c2*c1/256.
+    elif lm1 == 'h11' and lm2 == 'h11':
+        gphi = 693*s2**5*s1**5/512.
     else:
         gphi = 0
     return gphi
@@ -480,7 +596,8 @@ def get_twocenter_phi_integral(lm1, lm2, c1, c2, s1, s2):
 def get_twocenter_phi_integrals_derivatives(lm1, lm2, c1, c2, s1, s2):
     """
     Returns the equivalent of get_twocenter_phi_integrals() with
-    selected derivatives of the involved spherical harmonics.
+    selected derivatives of the involved spherical harmonics
+    for combinations including s/p/d angular momenta.
 
     Parameters
     ----------

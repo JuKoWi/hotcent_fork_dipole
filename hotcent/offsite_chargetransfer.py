@@ -25,12 +25,28 @@ class Offsite2cMTable(MultiAtomIntegrator):
     """
     Class for calculations involving off-site mapping coefficients
     (see Giese and York (2011), doi:10.1063/1.3587052).
+
+    Parameters
+    ----------
+    constraint_method : str, optional
+        Method for selecting the multipole moments entering the electrostatic
+        fitting procedure. In the 'reduced' method, all orbital momenta are
+        included for l <= max(lmax_a, lmax_b) = lmax_ab. In the 'original'
+        method, which is the approach described by Giese and York, these are
+        supplemented by those orbital momenta belonging to l == lmax_ab+1
+        for which |m| <= min(lmax_a, lmax_b).
+
+    Other parameters
+    ----------------
+    See MultiAtomIntegrator.
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, constraint_method='original', **kwargs):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
         assert self.ela.aux_basis.get_lmax() < NUML_2CM
         assert self.elb.aux_basis.get_lmax() < NUML_2CM
-        self.include_lmaxplus1 = False
+        assert constraint_method in ['original', 'reduced'], \
+               'The constraint method must be either "original" or "reduced"'
+        self.constraint_method = constraint_method
 
     def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
             smoothen_tails=True):
@@ -106,7 +122,8 @@ class Offsite2cMTable(MultiAtomIntegrator):
 
     def get_multipole_moments(self, lmax1, lmax2):
         """
-        Returns the multipole moments to consider in the fitting procedure.
+        Returns the multipole moments to consider in the fitting procedure
+        (depends on self.constraint_method).
 
         Parameters
         ----------
@@ -122,28 +139,33 @@ class Offsite2cMTable(MultiAtomIntegrator):
         moments : list of (int, str) tuples
             The (angular momentum, lm_label) multipole moments to include.
         """
-        lmax12 = max(lmax1, lmax2)
-        moments = []
+        if self.constraint_method in ['original', 'reduced']:
+            lmax12 = max(lmax1, lmax2)
+            moments = []
 
-        for lM in range(lmax12+1):
-            for lmM in ORBITALS[lM]:
-                moments.append((lM, lmM))
-        assert len(moments) == (lmax12 + 1)**2
-
-        if self.include_lmaxplus1:
-            lmin12 = min(lmax1, lmax2)
-            lM = lmax12 + 1
-            lm_dict = {
-                's': 0, 'px': -1, 'pz': 0, 'py': 1, 'dxy': -2, 'dyz': -1,
-                'dz2': 0, 'dxz': 1, 'dx2-y2': 2, 'fx(x2-3y2)': 3,
-                'fy(3x2-y2)': -3, 'fz(x2-y2)': 2, 'fxyz': -2, 'fyz2': -1,
-                'fxz2': 1, 'fz3': 0,
-            }
-
-            for lmM in ORBITALS[lM]:
-                if abs(lm_dict[lmM]) <= lmin12:
+            for lM in range(lmax12+1):
+                for lmM in ORBITALS[lM]:
                     moments.append((lM, lmM))
-            assert len(moments) == (lmax12 + 1)**2 + 2*lmin12 + 1
+            assert len(moments) == (lmax12 + 1)**2
+
+            if self.constraint_method == 'original':
+                lmin12 = min(lmax1, lmax2)
+                lM = lmax12 + 1
+
+                m_dict = {
+                    's': 0, 'px': 1, 'pz': 0, 'py': -1, 'dxy': -2, 'dyz': -1,
+                    'dz2': 0, 'dxz': 1, 'dx2-y2': 2, 'fx(x2-3y2)': 3,
+                    'fy(3x2-y2)': -3, 'fz(x2-y2)': 2, 'fxyz': -2, 'fyz2': -1,
+                    'fxz2': 1, 'fz3': 0,
+                }
+
+                for lmM in ORBITALS[lM]:
+                    if abs(m_dict[lmM]) <= lmin12:
+                        moments.append((lM, lmM))
+
+                assert len(moments) == (lmax12 + 1)**2 + 2*lmin12 + 1
+        else:
+            raise NotImplementedError(self.constraint_method)
 
         return moments
 
@@ -320,7 +342,6 @@ class Offsite2cMTable(MultiAtomIntegrator):
 
         lmax1 = e1.aux_basis.get_lmax()
         lmax2 = e2.aux_basis.get_lmax()
-        lmax12 = max(lmax1, lmax2)
         moments = self.get_multipole_moments(lmax1, lmax2)
         lmax_mom = max([moment[0] for moment in moments])
         Nmom = len(moments)

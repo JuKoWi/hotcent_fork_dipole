@@ -7,7 +7,7 @@
 import numpy as np
 
 
-ANGULAR_MOMENTUM = {'s': 0, 'p': 1, 'd': 2, 'f': 3, 'g': 4}
+ANGULAR_MOMENTUM = {'s': 0, 'p': 1, 'd': 2, 'f': 3, 'g': 4, 'h': 5}
 
 ORBITALS = {
     0: ('s', ),
@@ -15,9 +15,10 @@ ORBITALS = {
     2: ('dxy', 'dyz', 'dxz', 'dx2-y2', 'dz2'),
     3: ('fx(x2-3y2)', 'fy(3x2-y2)', 'fz(x2-y2)', 'fxyz', 'fyz2', 'fxz2', 'fz3'),
     4: tuple(['g{0}'.format(i) for i in range(1, 10)]),
+    5: tuple(['h{0}'.format(i) for i in range(1, 12)]),
 }
 
-ORBITAL_LABELS = [lm for l in range(5) for lm in ORBITALS[l]]
+ORBITAL_LABELS = [lm for l in range(6) for lm in ORBITALS[l]]
 
 
 def calculate_slako_coeff(x, y, z, ilm, jlm, tau):
