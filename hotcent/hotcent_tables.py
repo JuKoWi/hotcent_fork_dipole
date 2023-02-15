@@ -39,6 +39,10 @@ def parse_arguments():
     Note: existing output files will be overwritten.
     """
     parser = ArgumentParser(description=description)
+    parser.add_argument('include', nargs='*', help='Element combinations '
+                        'to consider. To e.g. include all combinations that '
+                        'involve H and/or Si, as well as all combinations '
+                        'involving only O, write "H,Si O".')
     parser.add_argument('--aux-mappings', default='mulliken,giese_york',
                         help='Comma-separated procedures to consider for '
                         'mapping the atomic orbital products to the auxiliary '
@@ -46,16 +50,23 @@ def parse_arguments():
                         'and mapping integral tables that will be produced '
                         'by the chg*, mag* and map* tasks. Default: "mulliken,'
                         'giese_york".)')
-    parser.add_argument('include', nargs='*', help='Element combinations '
-                        'to consider. To e.g. include all combinations that '
-                        'involve H and/or Si, as well as all combinations '
-                        'involving only O, write "H,Si O".')
     parser.add_argument('--dry-run', action='store_true', help='Exit after '
                         'printing the task overview, without executing them.')
     parser.add_argument('--exclude', help='Element combinations to exclude. '
                         'To e.g. skip those involving only H or just H and '
                         'Si, write "H,H-Si". By default no combinations get '
                         'excluded.')
+    parser.add_argument('--giese-york-constraint-method', default='original',
+                        choices=['original', 'reduced'], help='Method for '
+                        'selecting the multipole moments entering the '
+                        'electrostatic fitting procedure used by the "map2c" '
+                        'task for "giese_york" mappings. In the "reduced" '
+                        'method, all orbital momenta are included for l <= '
+                        'max(lmax_a, lmax_b) = lmax_ab. In the "original" '
+                        'method, which is the approach described by Giese and '
+                        'York (2011, doi:10.1063/1.3587052), these are '
+                        'supplemented by those orbital momenta belonging to l '
+                        '== lmax_ab+1 for which |m| <= min(lmax_a, lmax_b).')
     parser.add_argument('--label', help='Label to use when searching for the '
                         'input YAML files. The expected file names correspond '
                         'to "<Symbol>[.<label>].yaml".')
@@ -319,6 +330,7 @@ def main():
 
     task_kwargs = dict(
         aux_mappings=aux_mappings,
+        giese_york_constraint_method=args.giese_york_constraint_method,
         label=args.label,
         opts_2c=opts_2c,
         opts_3c=opts_3c,
@@ -670,7 +682,10 @@ def map2c(el1, el2, **kwargs):
 
     for mapping in kwargs['aux_mappings']:
         if mapping == 'giese_york':
-            calc = Offsite2cMTable(atoms[el1], atoms[el2], timing=False)
+            constraint_method = kwargs['giese_york_constraint_method']
+            calc = Offsite2cMTable(atoms[el1], atoms[el2],
+                                   constraint_method=constraint_method,
+                                   timing=False)
             calc.run(**run_kwargs)
             calc.write()
     return
