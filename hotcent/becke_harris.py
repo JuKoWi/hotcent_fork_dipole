@@ -7,10 +7,11 @@
 import numpy as np
 from scipy import linalg
 import becke
+from ase.io.cube import write_cube
 from ase.units import Bohr
-from hotcent.fluctuation_onecenter import select_radial_functions
 from hotcent.fluctuation_twocenter import INTEGRALS_2CK
 from hotcent.kleinman_bylander import KleinmanBylanderPP
+from hotcent.orbital_hartree import OrbitalHartreePotential
 from hotcent.orbitals import ANGULAR_MOMENTUM, ORBITAL_LABELS, ORBITALS
 from hotcent.phillips_kleinman import PhillipsKleinmanPP
 from hotcent.slako import get_integral_pair, INTEGRAL_PAIRS as INTEGRAL_PAIRS_2c
@@ -30,6 +31,12 @@ def ase2becke(atoms_ase):
 
 def set_becke_settings(settings):
     becke.settings.radial_grid_factor, becke.settings.lebedev_order = settings
+
+
+def h2gpts(h, cell, idiv=1):
+    # Based on gpaw.utilities.h2gpts
+    L_c = (np.linalg.inv(cell)**2).sum(0)**-0.5
+    return np.maximum(idiv, (L_c / h / idiv + 0.5).astype(int) * idiv)
 
 
 class BeckeHarris:
@@ -1123,10 +1130,10 @@ class BeckeHarrisKernels(BeckeHarris):
         return fxc
 
 
-class BeckeHarrisSubshellKernels(BeckeHarrisKernels):
+class BeckeHarrisMainKernels(BeckeHarrisKernels):
     """
-    Calculator for "kernel" matrix elements involving subshell-dependent
-    second derivatives of the Hartree and XC energies.
+    Calculator for "kernel" matrix elements involving the main basis set
+    and second derivatives of the Hartree and XC energies.
 
     Parameters
     ----------
@@ -1318,10 +1325,10 @@ class BeckeHarrisSubshellKernels(BeckeHarrisKernels):
         return KharAB
 
 
-class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
+class BeckeHarrisAuxiliaryKernels(BeckeHarrisKernels):
     """
-    Calculator for "kernel" matrix elements involving multipole-specific
-    second derivatives of the Hartree and XC energies.
+    Calculator for kernel integrals and (Giese-York) mapping coefficients
+    for auxiliary basis sets.
 
     Parameters
     ----------
@@ -1331,28 +1338,34 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
         BeckeHarrisKernels.__init__(self, *args, **kwargs)
 
     def run_selected_kernels(self, atoms_ase, mode, spin=False, check_mc=True,
-                             lmax=2, subtract_delta=False,
-                             subshell_dependence='none'):
+                             lmax=2, nzeta=1, subtract_delta=False):
         self.atoms_ase = atoms_ase
         self.atoms_becke = ase2becke(atoms_ase)
         assert mode in ['onsite', 'offsite']
         tol = 1e-3 if check_mc else None
-        assert subshell_dependence in ['none', 'zeta']
 
         N = len(atoms_ase)
         assert N in [1, 2]
 
-        self.iA = 0
+        self.iK = 0
         is_onsite = mode == 'onsite'
-        self.iB = 0 if is_onsite else 1
+        self.iL = 0 if is_onsite else 1
 
-        symA = self.get_symbol(self.iA)
-        self.elA = self.elements[symA]
-        self.xA, self.yA, self.zA = self.get_position(self.iA)
+        symK = self.get_symbol(self.iK)
+        self.elK = self.elements[symK]
+        self.xK, self.yK, self.zK = self.get_position(self.iK)
 
-        symB = self.get_symbol(self.iB)
-        self.elB = self.elements[symB]
-        self.xB, self.yB, self.zB = self.get_position(self.iB)
+        symL = self.get_symbol(self.iL)
+        self.elL = self.elements[symL]
+        self.xL, self.yL, self.zL = self.get_position(self.iL)
+
+        self.iA = self.iK
+        self.elA = self.elK
+        self.xA, self.yA, self.zA = self.xK, self.yK, self.zK
+
+        self.iB = self.iL
+        self.elB = self.elL
+        self.xB, self.yB, self.zB = self.xL, self.yL, self.zL
 
         # Find out which integrals need to be calculated
         pairs = []
@@ -1374,31 +1387,32 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
             labels = 'on2c' if is_onsite else 'off2c'
 
         # Evaluate the integrals
-        for ibasisA, valenceA in enumerate(self.elA.basis_sets):
-            for ibasisB, valenceB in enumerate(self.elB.basis_sets):
-                if subshell_dependence == 'none':
-                    if ibasisA > 1 or ibasisB > 1:
-                        continue
+        for self.nlK in self.elK.aux_basis.select_radial_functions():
+            izeta = self.elK.aux_basis.get_zeta_index(self.nlK)
+            if izeta+1 > nzeta:
+                continue
 
-                self.nlA = self.elA.basis_sets[ibasisA][0]
-                self.nlB = self.elB.basis_sets[ibasisB][0]
+            for self.nlL in self.elL.aux_basis.select_radial_functions():
+                jzeta = self.elL.aux_basis.get_zeta_index(self.nlL)
+                if jzeta+1 > nzeta:
+                    continue
 
                 results = {}
-                for integral, (lmA, lmB) in pairs:
-                    self.lmA = lmA
-                    self.lmB = lmB
-                    print('\nRunning iA %d iB %d lmA %s lmB %s %s' % \
-                          (self.iA, self.iB, lmA, lmB, spin), flush=True)
+                for integral, (lmK, lmL) in pairs:
+                    self.lmK = lmK
+                    self.lmL = lmL
+                    print('\nRunning iK %d iL %d lmK %s lmL %s %s' % \
+                          (self.iK, self.iL, lmK, lmL, spin), flush=True)
 
                     # Hartree contribution
-                    if spin:
-                        KharAB = 0.
+                    if spin or (is_onsite and N == 2):
+                        KharKL = 0.
                     else:
-                        vharA = self.get_orbital_vharA()
-                        KharAB = self.evaluate_KharAB(vharA)
+                        vharK = self.get_orbital_vharK()
+                        KharKL = self.evaluate_KharKL(vharK)
                         if subtract_delta and not is_onsite:
-                            KharAB -= self.calculate_point_multipole_kernel()
-                    print("<a|fhartree|b> =", KharAB)
+                            KharKL -= self.calculate_point_multipole_kernel()
+                    print("<a|fhartree|b> =", KharKL)
 
                     # XC contribution
                     if is_onsite:
@@ -1413,17 +1427,17 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
                     if N == 1:
                         if check_mc:
                             assert abs(out['K_mc'] - out['K_1c']) < tol
-                        results[integral] = out['K_1c'] + KharAB
+                        results[integral] = out['K_1c'] + KharKL
                     elif N == 2:
                         if check_mc:
                             assert abs(out['K_mc'] - out['K_2c']) < tol
                         if is_onsite:
                             results[integral] = out['K_2c'] - out['K_1c']
                         else:
-                            results[integral] = out['K_2c'] + KharAB
+                            results[integral] = out['K_2c'] + KharKL
 
                 # Print summary
-                print('=== {0} [{1}, {2}] ==='.format(labels, ibasisA, ibasisB))
+                print('=== {0} [{1}, {2}] ==='.format(labels, izeta, jzeta))
                 for integral, values in results.items():
                     print("'%s': " % integral, end='')
                     fmt = lambda x: '%.8f' % x
@@ -1436,14 +1450,14 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
         return
 
     def calculate_point_multipole_kernel(self):
-        vec = self.get_position(self.iA) - self.get_position(self.iB)
+        vec = self.get_position(self.iK) - self.get_position(self.iL)
         R = np.linalg.norm(vec)
 
-        if self.lmA == self.lmB == 's':
-            KharAB = 4 * np.pi / R
+        if self.lmK == self.lmL == 's':
+            KharKL = 4 * np.pi / R
         else:
-            KharAB = 0  # not (yet) implemented
-        return KharAB
+            KharKL = 0  # not (yet) implemented
+        return KharKL
 
     def get_multipoles(self, lmax):
         lms = []
@@ -1452,107 +1466,118 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
                 lms.append(lm)
         return lms
 
-    def get_subshells(self, index, lmax):
-        # From each basis 'subset' the subshell with lowest angular
-        # momentum is selected as radial function.
-        sym = self.get_symbol(index)
-        nls = [nl for nl in select_radial_functions(self.elements[sym])
-               for imp in self.get_multipoles(lmax)]
-        return nls
-
-    def run_all_kernels(self, atoms_ase, indices_A=None, indices_B=None,
-                        print_matrices=True, spin=False, lmax=2,
-                        subtract_delta=False, subshell_dependence='none'):
+    def run_all_kernels(self, atoms_ase, print_matrices=True, spin=False,
+                        lmax={}, nzeta={}, subtract_delta=False, check_mc=True):
         self.atoms_ase = atoms_ase
         self.atoms_becke = ase2becke(atoms_ase)
+        indices = list(range(len(self.atoms_ase)))
 
-        assert subshell_dependence in ['none', 'zeta']
+        # Auxiliary basis indices/orbitals/...
+        iXs, nlXs, lmXs = [], [], []
+        Nchi_dict = {}  # number of aux basis func for each element
 
-        # Collect atom indices and multipole labels
-        if indices_A is None:
-            indices_A = list(range(len(self.atoms_becke)))
-        else:
-            assert len(indices_A) == len(set(indices_A)), indices_A
+        for iA in indices:
+            symA = self.get_symbol(iA)
+            elA = self.elements[symA]
 
-        if indices_B is None:
-            indices_B = list(range(len(self.atoms_becke)))
-        else:
-            assert len(indices_B) == len(set(indices_B)), indices_B
+            if symA not in Nchi_dict:
+                Nchi_dict[symA] = len(self.get_multipoles(lmax[symA])) \
+                                  * nzeta[symA]
 
-        nmulti = len(self.get_multipoles(lmax))
+            for izeta in range(nzeta[symA]):
+                lms = self.get_multipoles(lmax[symA])
+                lmXs.extend(lms)
+                iXs.extend([iA] * len(lms))
+                nl = elA.aux_basis.get_radial_label(izeta)
+                nlXs.extend([nl] * len(lms))
 
-        iAs, nlAs, lmAs = [], [], []
-        for index in indices_A:
-            nls = self.get_subshells(index, lmax)
-            if subshell_dependence == 'none':
-                nls = nls[:nmulti]
-            lms = self.get_multipoles(lmax) * (len(nls) // nmulti)
-            iAs.extend([index] * len(lms))
-            nlAs.extend(nls)
-            lmAs.extend(lms)
-
-        iBs, nlBs, lmBs = [], [], []
-        for index in indices_B:
-            nls = self.get_subshells(index, lmax)
-            if subshell_dependence == 'none':
-                nls = nls[:nmulti]
-            lms = self.get_multipoles(lmax) * (len(nls) // nmulti)
-            iBs.extend([index] * len(lms))
-            nlBs.extend(nls)
-            lmBs.extend(lms)
-
-        # Calculate kernels
-        shape = (len(nlAs), len(nlBs))
+        shape = (len(lmXs), len(lmXs))
         K_10 = np.zeros(shape)
         K_20 = np.zeros(shape)
         K_12 = np.zeros(shape)
         K_22 = np.zeros(shape)
         K_mc = np.zeros(shape)
 
-        for indexA, (iA, nlA, lmA) in enumerate(zip(iAs, nlAs, lmAs)):
-            self.iA, self.nlA, self.lmA = iA, nlA, lmA
-            self.xA, self.yA, self.zA = self.get_position(self.iA)
-            symA = self.get_symbol(self.iA)
-            self.elA = self.elements[symA]
+        for indexK, (iK, nlK, lmK) in enumerate(zip(iXs, nlXs, lmXs)):
+            self.iK = iK
+            self.nlK = nlK
+            self.lmK = lmK
+            self.symK = self.get_symbol(self.iK)
+            self.xK, self.yK, self.zK = self.get_position(self.iK)
+            self.elK = self.elements[self.symK]
+            lK = ANGULAR_MOMENTUM[lmK[0]]
+
+            self.iA = self.iK
+            self.xA = self.xK
+            self.yA = self.yK
+            self.zA = self.zK
+            self.elA = self.elements[self.symK]
 
             if not spin:
-                vharA = self.get_orbital_vharA()
+                vharK = OrbitalHartreePotential(
+                                        self.elK.rgrid,
+                                        self.elK.aux_basis.Anlg[(nlK, lK)],
+                                        lmax=lmax[self.symK]+1)
 
-            for indexB, (iB, nlB, lmB) in enumerate(zip(iBs, nlBs, lmBs)):
-                self.iB, self.nlB, self.lmB = iB, nlB, lmB
-                self.xB, self.yB, self.zB = self.get_position(self.iB)
-                symB = self.get_symbol(self.iB)
-                self.elB = self.elements[symB]
+            for indexL, (iL, nlL, lmL) in enumerate(zip(iXs, nlXs, lmXs)):
+                self.iL = iL
+                self.nlL = nlL
+                self.lmL = lmL
+                self.symL = self.get_symbol(self.iL)
+                self.xL, self.yL, self.zL = self.get_position(self.iL)
+                self.elL = self.elements[self.symL]
 
-                print('\nRunning iA %d iB %d nlA %s nlB %s lmA %s lmB %s %s' % \
-                      (iA, iB, nlA, nlB, lmA, lmB, spin), flush=True)
-                is_onsite = self.iA == self.iB
+                self.iB = self.iL
+                self.xB = self.xL
+                self.yB = self.yL
+                self.zB = self.zL
+                self.elB = self.elements[self.symL]
+
+                print('\nRunning iK %d iL %d nlmK %s %s nlmL %s %s' % \
+                      (iK, iL, nlK, lmK, nlL, lmL), flush=True)
+                is_onsite = iK == iL
 
                 # Hartree contribution
                 if spin:
-                    KharAB = 0.
+                    KharKL = 0.
                 else:
-                    KharAB = self.evaluate_KharAB(vharA)
+                    def Khar(x, y, z):
+                        dx = x - self.xK
+                        dy = y - self.yK
+                        dz = z - self.zK
+                        r = np.sqrt(dx**2 + dy**2 + dz**2)
+                        return vharK.vhar_fct[lK](r) \
+                               * sph_cartesian(dx, dy, dz, r, self.lmK) \
+                               * self.chiL(x, y, z)
+
+                    atoms_har = [self.atoms_becke[self.iK]]
+                    if not is_onsite:
+                        atoms_har += [self.atoms_becke[self.iL]]
+                    KharKL = becke.integral(atoms_har, Khar)
+
                     if subtract_delta and not is_onsite:
-                        KharAB -= self.calculate_point_multipole_kernel()
-                print("<a|fhartree|b> =", KharAB, flush=True)
+                        KharKL -= self.calculate_point_multipole_kernel()
+                print("<a|fhartree|b> =", KharKL, flush=True)
 
                 # XC contribution
                 if is_onsite:
                     out = self.calculate_onsite_kernel_approximations(spin)
                 else:
                     out = self.calculate_offsite_kernel_approximations(spin)
-                out.update(self.calculate_multicenter_kernel(spin))
+
+                if check_mc:
+                    out.update(self.calculate_multicenter_kernel(spin))
+                    K_mc[indexK, indexL] = out['K_mc'] + KharKL
+
                 print(out, flush=True)
 
-                K_mc[indexA, indexB] = out['K_mc'] + KharAB
                 if is_onsite:
-                    K_10[indexA, indexB] = out['K_1c'] + KharAB
-                    K_20[indexA, indexB] = out['K_2c'] + KharAB
-                    K_12[indexA, indexB] = out['K_1c'] + KharAB
+                    K_10[indexK, indexL] = out['K_1c'] + KharKL
+                    K_20[indexK, indexL] = out['K_2c'] + KharKL
+                    K_12[indexK, indexL] = out['K_1c'] + KharKL
                 else:
-                    K_12[indexA, indexB] = out['K_2c'] + KharAB
-                K_22[indexA, indexB] = out['K_2c'] + KharAB
+                    K_12[indexK, indexL] = out['K_2c'] + KharKL
+                K_22[indexK, indexL] = out['K_2c'] + KharKL
 
         if print_matrices:
             def print_matrix(M, nperline=4):
@@ -1582,43 +1607,43 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
         return results
 
     def calculate_onsite_kernel_approximations(self, spin):
-        assert self.iA == self.iB
-        assert self.elA.get_symbol() == self.elB.get_symbol()
+        assert self.iL == self.iK
+        assert self.elK.get_symbol() == self.elL.get_symbol()
 
         results = {}
 
         if self.xc.add_gradient_corrections:
-            Kxcab1c, Kxcab2c = self.calculate_onsite_xc_kernel_gga(spin)
+            KxcKL1c, KxcKL2c = self.calculate_onsite_xc_kernel_gga(spin)
         else:
-            Kxcab1c, Kxcab2c = self.calculate_onsite_xc_kernel_lda(spin)
+            KxcKL1c, KxcKL2c = self.calculate_onsite_xc_kernel_lda(spin)
 
-        print("<a|fxc1c|b> =", Kxcab1c)
-        results['K_1c'] = Kxcab1c
+        print("<a|fxc1c|b> =", KxcKL1c)
+        results['K_1c'] = KxcKL1c
 
-        print("<a|fxc2c|b> =", Kxcab2c)
-        results['K_2c'] = Kxcab1c + Kxcab2c
+        print("<a|fxc2c|b> =", KxcKL2c)
+        results['K_2c'] = KxcKL1c + KxcKL2c
         return results
 
     def calculate_onsite_xc_kernel_lda(self, spin):
-        atoms_1c = [self.atoms_becke[self.iA]]
-        Kxc1c = lambda x, y, z: self.multipoleA(x, y, z) \
+        atoms_1c = [self.atoms_becke[self.iK]]
+        Kxc1c = lambda x, y, z: self.chiK(x, y, z) \
                                 * self.fxc_on1c(x, y, z, spin) \
-                                * self.multipoleB(x, y, z)
-        Kxcab1c = becke.integral(atoms_1c, Kxc1c)
+                                * self.chiL(x, y, z)
+        KxcKL1c = becke.integral(atoms_1c, Kxc1c)
 
-        Kxc2c = lambda x, y, z: self.multipoleA(x, y, z) \
+        Kxc2c = lambda x, y, z: self.chiK(x, y, z) \
                                 * self.fxc_on2c(x, y, z, spin) \
-                                * self.multipoleB(x, y, z)
-        Kxcab2c = becke.integral(self.atoms_becke, Kxc2c)
-        return (Kxcab1c, Kxcab2c)
+                                * self.chiL(x, y, z)
+        KxcKL2c = becke.integral(self.atoms_becke, Kxc2c)
+        return (KxcKL1c, KxcKL2c)
 
     def calculate_onsite_xc_kernel_gga(self, spin):
         def kxc_on1c(x, y, z):
-            dx, dy, dz = x - self.xA, y - self.yA, z - self.zA
-            rA = np.sqrt(dx**2 + dy**2 + dz**2)
-            rho = self.elA.electron_density(rA)
-            drhodr = self.elA.electron_density(rA, der=1)
-            drho = self.get_rho_deriv1(x, y, z, [self.iA])
+            dx, dy, dz = x - self.xK, y - self.yK, z - self.zK
+            rK = np.sqrt(dx**2 + dy**2 + dz**2)
+            rho = self.elK.electron_density(rK)
+            drhodr = self.elK.electron_density(rK, der=1)
+            drho = self.get_rho_deriv1(x, y, z, [self.iK])
 
             if spin:
                 rho /= 2
@@ -1631,173 +1656,169 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
             else:
                 out = self.xc.compute_vxc(rho, fxc=True, **drho)
 
-            mA = self.multipoleA(x, y, z)
-            mB = self.multipoleB(x, y, z)
-            dmAdr = 2 * self.elA.Rnl(rA, self.nlA) \
-                    * self.elA.Rnl(rA, self.nlA, der=1) \
-                    * sph_cartesian(dx, dy, dz, rA, self.lmA)
-            dmBdr = 2 * self.elB.Rnl(rA, self.nlB) \
-                    * self.elB.Rnl(rA, self.nlB, der=1) \
-                    * sph_cartesian(dx, dy, dz, rA, self.lmB)
-            grad_mA_grad_rho = dmAdr * drhodr
-            grad_mB_grad_rho = dmBdr * drhodr
+            mK = self.chiK(x, y, z)
+            mL = self.chiL(x, y, z)
+            dmKdr = self.AnlK(rK, der=1) \
+                    * sph_cartesian(dx, dy, dz, rK, self.lmK)
+            dmLdr = self.AnlL(rK, der=1) \
+                    * sph_cartesian(dx, dy, dz, rK, self.lmL)
+            grad_mK_grad_rho = dmKdr * drhodr
+            grad_mL_grad_rho = dmLdr * drhodr
 
-            grad_mA_grad_mB = 0.
-            Rnl2A = self.elA.Rnl(rA, self.nlA)**2
-            Rnl2B = self.elA.Rnl(rA, self.nlB)**2
-            drdx = [dx/rA, dy/rA, dz/rA]
+            grad_mK_grad_mL = 0.
+            AnlK = self.AnlK(rK, der=0)
+            AnlL = self.AnlL(rK, der=0)
+            drdx = [dx/rK, dy/rK, dz/rK]
             for i in range(3):
                 der = 'xyz'[i]
-                dYlmA = sph_cartesian_der(dx, dy, dz, rA, self.lmA, der=der)
-                dmAdx = dmAdr * drdx[i] + Rnl2A * dYlmA
-                dYlmB = sph_cartesian_der(dx, dy, dz, rA, self.lmB, der=der)
-                dmBdx = dmBdr * drdx[i] + Rnl2B * dYlmB
-                grad_mA_grad_mB += dmAdx * dmBdx
+                dYlmK = sph_cartesian_der(dx, dy, dz, rK, self.lmK, der=der)
+                dmKdx = dmKdr * drdx[i] + AnlK * dYlmK
+                dYlmL = sph_cartesian_der(dx, dy, dz, rK, self.lmL, der=der)
+                dmLdx = dmLdr * drdx[i] + AnlL * dYlmL
+                grad_mK_grad_mL += dmKdx * dmLdx
 
             if spin:
-                k = (out['v2rho2_up'] - out['v2rho2_updown']) * mA * mB
+                k = (out['v2rho2_up'] - out['v2rho2_updown']) * mK * mL
                 k += 2 * (out['v2rhosigma_up_up'] - out['v2rhosigma_up_down']) \
-                     * grad_mA_grad_rho * mB
+                     * grad_mK_grad_rho * mL
                 k += 2 * (out['v2rhosigma_up_up'] - out['v2rhosigma_up_down']) \
-                     * mA * grad_mB_grad_rho
+                     * mK * grad_mL_grad_rho
                 k += 4 * (out['v2sigma2_up_up'] - out['v2sigma2_up_down']) \
-                     * grad_mA_grad_rho * grad_mB_grad_rho
+                     * grad_mK_grad_rho * grad_mL_grad_rho
                 k += 2 * (out['v2sigma2_up_updown'] - out['v2sigma2_updown_down']) \
-                     * grad_mA_grad_rho * grad_mB_grad_rho
+                     * grad_mK_grad_rho * grad_mL_grad_rho
                 k += (2 * out['vsigma_up'] - out['vsigma_updown']) \
-                     * grad_mA_grad_mB
+                     * grad_mK_grad_mL
                 k /= 2
             else:
-                k = out['v2rho2'] * mA * mB
-                k += 2 * out['v2rhosigma'] * grad_mA_grad_rho * mB
-                k += 2 * out['v2rhosigma'] * mA * grad_mB_grad_rho
-                k += 4 * out['v2sigma2'] * grad_mA_grad_rho * grad_mB_grad_rho
-                k += 2 * out['vsigma'] * grad_mA_grad_mB
+                k = out['v2rho2'] * mK * mL
+                k += 2 * out['v2rhosigma'] * grad_mK_grad_rho * mL
+                k += 2 * out['v2rhosigma'] * mK * grad_mL_grad_rho
+                k += 4 * out['v2sigma2'] * grad_mK_grad_rho * grad_mL_grad_rho
+                k += 2 * out['vsigma'] * grad_mK_grad_mL
             return k
 
         def kxc_on2c(x, y, z):
-            dxA, dyA, dzA = x - self.xA, y - self.yA, z - self.zA
-            rA = np.sqrt(dxA**2 + dyA**2 + dzA**2)
-            drAdx = [dxA/rA, dyA/rA, dzA/rA]
+            dxK, dyK, dzK = x - self.xK, y - self.yK, z - self.zK
+            rK = np.sqrt(dxK**2 + dyK**2 + dzK**2)
+            drKdx = [dxK/rK, dyK/rK, dzK/rK]
 
-            rhoA = self.elA.electron_density(rA)
-            drhoAdrA = self.elA.electron_density(rA, der=1)
-            drho = self.get_rho_deriv1(x, y, z, [self.iA])
+            rhoK = self.elK.electron_density(rK)
+            drhoKdrK = self.elK.electron_density(rK, der=1)
+            drho = self.get_rho_deriv1(x, y, z, [self.iK])
 
             if spin:
-                rhoA /= 2
-                drhoAdrA /= 2
+                rhoK /= 2
+                drhoKdrK /= 2
                 drho = dict(sigma_up=drho['sigma'] / 4,
                             sigma_updown=drho['sigma'] / 4,
                             sigma_down=drho['sigma'] / 4)
-                outA = self.xc_polarized.compute_vxc_polarized(rhoA, rhoA,
+                outK = self.xc_polarized.compute_vxc_polarized(rhoK, rhoK,
                                                                fxc=True, **drho)
             else:
-                outA = self.xc.compute_vxc(rhoA, fxc=True, **drho)
+                outK = self.xc.compute_vxc(rhoK, fxc=True, **drho)
 
-            mA = self.multipoleA(x, y, z)
-            mB = self.multipoleB(x, y, z)
-            dmAdr = 2 * self.elA.Rnl(rA, self.nlA) \
-                    * self.elA.Rnl(rA, self.nlA, der=1) \
-                    * sph_cartesian(dxA, dyA, dzA, rA, self.lmA)
-            dmBdr = 2 * self.elA.Rnl(rA, self.nlB) \
-                    * self.elA.Rnl(rA, self.nlB, der=1) \
-                    * sph_cartesian(dxA, dyA, dzA, rA, self.lmB)
+            mK = self.chiK(x, y, z)
+            mL = self.chiL(x, y, z)
+            dmKdr = self.AnlK(rK, der=1) \
+                    * sph_cartesian(dxK, dyK, dzK, rK, self.lmK)
+            dmLdr = self.AnlL(rK, der=1) \
+                    * sph_cartesian(dxK, dyK, dzK, rK, self.lmL)
 
-            dYlmAs, dYlmBs = [], []
-            grad_mA_grad_mB = 0.
-            grad_mA_grad_rho = 0.
-            grad_mB_grad_rho = 0.
-            Rnl2A = self.elA.Rnl(rA, self.nlA)**2
-            Rnl2B = self.elA.Rnl(rA, self.nlB)**2
+            dYlmKs, dYlmLs = [], []
+            grad_mK_grad_mL = 0.
+            grad_mK_grad_rho = 0.
+            grad_mL_grad_rho = 0.
+            AnlK = self.AnlK(rK, der=0)
+            AnlL = self.AnlL(rK, der=0)
             for i in range(3):
                 der = 'xyz'[i]
-                dYlmA = sph_cartesian_der(dxA, dyA, dzA, rA, self.lmA, der=der)
-                dYlmAs.append(dYlmA)
-                dYlmB = sph_cartesian_der(dxA, dyA, dzA, rA, self.lmB, der=der)
-                dYlmBs.append(dYlmB)
-                dmAdx = dmAdr * drAdx[i] + Rnl2A * dYlmA
-                dmBdx = dmBdr * drAdx[i] + Rnl2B * dYlmB
-                grad_mA_grad_mB += dmAdx * dmBdx
-                drhodx = drhoAdrA * drAdx[i]
-                grad_mA_grad_rho += dmAdx * drhodx
-                grad_mB_grad_rho += dmBdx * drhodx
+                dYlmK = sph_cartesian_der(dxK, dyK, dzK, rK, self.lmK, der=der)
+                dYlmKs.append(dYlmK)
+                dYlmL = sph_cartesian_der(dxK, dyK, dzK, rK, self.lmL, der=der)
+                dYlmLs.append(dYlmL)
+                dmKdx = dmKdr * drKdx[i] + AnlK * dYlmK
+                dmLdx = dmLdr * drKdx[i] + AnlL * dYlmL
+                grad_mK_grad_mL += dmKdx * dmLdx
+                drhodx = drhoKdrK * drKdx[i]
+                grad_mK_grad_rho += dmKdx * drhodx
+                grad_mL_grad_rho += dmLdx * drhodx
 
             if spin:
-                kA = (outA['v2rho2_up'] - outA['v2rho2_updown']) * mA * mB
-                kA += 2 * (outA['v2rhosigma_up_up'] - outA['v2rhosigma_up_down']) \
-                      * grad_mA_grad_rho * mB
-                kA += 2 * (outA['v2rhosigma_up_up'] - outA['v2rhosigma_up_down']) \
-                      * mA * grad_mB_grad_rho
-                kA += 4 * (outA['v2sigma2_up_up'] - outA['v2sigma2_up_down']) \
-                      * grad_mA_grad_rho * grad_mB_grad_rho
-                kA += 2 * (outA['v2sigma2_up_updown'] - outA['v2sigma2_updown_down']) \
-                      * grad_mA_grad_rho * grad_mB_grad_rho
-                kA += (2 * outA['vsigma_up'] - outA['vsigma_updown']) \
-                      * grad_mA_grad_mB
-                kA /= 2
+                kK = (outK['v2rho2_up'] - outK['v2rho2_updown']) * mK * mL
+                kK += 2 * (outK['v2rhosigma_up_up'] - outK['v2rhosigma_up_down']) \
+                      * grad_mK_grad_rho * mL
+                kK += 2 * (outK['v2rhosigma_up_up'] - outK['v2rhosigma_up_down']) \
+                      * mK * grad_mL_grad_rho
+                kK += 4 * (outK['v2sigma2_up_up'] - outK['v2sigma2_up_down']) \
+                      * grad_mK_grad_rho * grad_mL_grad_rho
+                kK += 2 * (outK['v2sigma2_up_updown'] - outK['v2sigma2_updown_down']) \
+                      * grad_mK_grad_rho * grad_mL_grad_rho
+                kK += (2 * outK['vsigma_up'] - outK['vsigma_updown']) \
+                      * grad_mK_grad_mL
+                kK /= 2
             else:
-                kA = outA['v2rho2'] * mA * mB
-                kA += 2 * outA['v2rhosigma'] * grad_mA_grad_rho * mB
-                kA += 2 * outA['v2rhosigma'] * mA * grad_mB_grad_rho
-                kA += 4 * outA['v2sigma2'] * grad_mA_grad_rho * grad_mB_grad_rho
-                kA += 2 * outA['vsigma'] * grad_mA_grad_mB
+                kK = outK['v2rho2'] * mK * mL
+                kK += 2 * outK['v2rhosigma'] * grad_mK_grad_rho * mL
+                kK += 2 * outK['v2rhosigma'] * mK * grad_mL_grad_rho
+                kK += 4 * outK['v2sigma2'] * grad_mK_grad_rho * grad_mL_grad_rho
+                kK += 2 * outK['vsigma'] * grad_mK_grad_mL
 
             k = 0.
-            for iC in list(range(len(self.atoms_ase))):
-                if iC in [self.iA, self.iB]: continue
-                symC = self.get_symbol(iC)
-                xC, yC, zC = self.get_position(iC)
-                dxC, dyC, dzC = x - xC, y - yC, z - zC
-                rC = np.sqrt(dxC**2 + dyC**2 + dzC**2)
-                drCdx = [dxC/rC, dyC/rC, dzC/rC]
+            for iM in list(range(len(self.atoms_ase))):
+                if iM in [self.iK, self.iL]: continue
+                symM = self.get_symbol(iM)
+                xM, yM, zM = self.get_position(iM)
+                dxM, dyM, dzM = x - xM, y - yM, z - zM
+                rM = np.sqrt(dxM**2 + dyM**2 + dzM**2)
+                drMdx = [dxM/rM, dyM/rM, dzM/rM]
 
-                rhoC = self.elements[symC].electron_density(rC)
-                drhoCdrC = self.elements[symC].electron_density(rC, der=1)
-                drho = self.get_rho_deriv1(x, y, z, [self.iA, iC])
+                rhoM = self.elements[symM].electron_density(rM)
+                drhoMdrM = self.elements[symM].electron_density(rM, der=1)
+                drho = self.get_rho_deriv1(x, y, z, [self.iK, iM])
 
                 if spin:
-                    rhoC /= 2
-                    drhoCdrC /= 2
+                    rhoM /= 2
+                    drhoMdrM /= 2
                     drho = dict(sigma_up=drho['sigma'] / 4,
                                 sigma_updown=drho['sigma'] / 4,
                                 sigma_down=drho['sigma'] / 4)
-                    outAC = self.xc_polarized.compute_vxc_polarized(rhoA+rhoC,
-                                                rhoA+rhoC, fxc=True, **drho)
+                    outKM = self.xc_polarized.compute_vxc_polarized(rhoK+rhoM,
+                                                rhoK+rhoM, fxc=True, **drho)
                 else:
-                    outAC = self.xc.compute_vxc(rhoA+rhoC, fxc=True, **drho)
+                    outKM = self.xc.compute_vxc(rhoK+rhoM, fxc=True, **drho)
 
-                grad_mA_grad_rho = 0.
-                grad_mB_grad_rho = 0.
+                grad_mK_grad_rho = 0.
+                grad_mL_grad_rho = 0.
                 for i in range(3):
-                    drhodx = drhoAdrA * drAdx[i] + drhoCdrC * drCdx[i]
-                    dmAdx = dmAdr * drAdx[i] + Rnl2A * dYlmAs[i]
-                    dmBdx = dmBdr * drAdx[i] + Rnl2B * dYlmBs[i]
-                    grad_mA_grad_rho += dmAdx * drhodx
-                    grad_mB_grad_rho += dmBdx * drhodx
+                    drhodx = drhoKdrK * drKdx[i] + drhoMdrM * drMdx[i]
+                    dmKdx = dmKdr * drKdx[i] + AnlK * dYlmKs[i]
+                    dmLdx = dmLdr * drKdx[i] + AnlL * dYlmLs[i]
+                    grad_mK_grad_rho += dmKdx * drhodx
+                    grad_mL_grad_rho += dmLdx * drhodx
 
                 if spin:
-                    kAC = (outAC['v2rho2_up'] - outAC['v2rho2_updown']) * mA * mB
-                    kAC += 2 * (outAC['v2rhosigma_up_up'] - outAC['v2rhosigma_up_down']) \
-                            * grad_mA_grad_rho * mB
-                    kAC += 2 * (outAC['v2rhosigma_up_up'] - outAC['v2rhosigma_up_down']) \
-                            * mA * grad_mB_grad_rho
-                    kAC += 4 * (outAC['v2sigma2_up_up'] - outAC['v2sigma2_up_down']) \
-                            * grad_mA_grad_rho * grad_mB_grad_rho
-                    kAC += 2 * (outAC['v2sigma2_up_updown'] - outAC['v2sigma2_updown_down']) \
-                            * grad_mA_grad_rho * grad_mB_grad_rho
-                    kAC += (2 * outAC['vsigma_up'] - outAC['vsigma_updown']) \
-                            * grad_mA_grad_mB
-                    kAC /= 2
+                    kKM = (outKM['v2rho2_up'] - outKM['v2rho2_updown']) * mK * mL
+                    kKM += 2 * (outKM['v2rhosigma_up_up'] - outKM['v2rhosigma_up_down']) \
+                           * grad_mK_grad_rho * mL
+                    kKM += 2 * (outKM['v2rhosigma_up_up'] - outKM['v2rhosigma_up_down']) \
+                           * mK * grad_mL_grad_rho
+                    kKM += 4 * (outKM['v2sigma2_up_up'] - outKM['v2sigma2_up_down']) \
+                           * grad_mK_grad_rho * grad_mL_grad_rho
+                    kKM += 2 * (outKM['v2sigma2_up_updown'] - outKM['v2sigma2_updown_down']) \
+                           * grad_mK_grad_rho * grad_mL_grad_rho
+                    kKM += (2 * outKM['vsigma_up'] - outKM['vsigma_updown']) \
+                           * grad_mK_grad_mL
+                    kKM /= 2
                 else:
-                    kAC = outAC['v2rho2'] * mA * mB
-                    kAC += 2 * outAC['v2rhosigma'] * grad_mA_grad_rho * mB
-                    kAC += 2 * outAC['v2rhosigma'] * mA * grad_mB_grad_rho
-                    kAC += 4 * outAC['v2sigma2'] * grad_mA_grad_rho \
-                         * grad_mB_grad_rho
-                    kAC += 2 * outAC['vsigma'] * grad_mA_grad_mB
+                    kKM = outKM['v2rho2'] * mK * mL
+                    kKM += 2 * outKM['v2rhosigma'] * grad_mK_grad_rho * mL
+                    kKM += 2 * outKM['v2rhosigma'] * mK * grad_mL_grad_rho
+                    kKM += 4 * outKM['v2sigma2'] * grad_mK_grad_rho \
+                           * grad_mL_grad_rho
+                    kKM += 2 * outKM['vsigma'] * grad_mK_grad_mL
 
-                k += kAC - kA
+                k += kKM - kK
             return k
 
         atoms_1c = [self.atoms_becke[self.iA]]
@@ -1806,98 +1827,96 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
         return (Kxcab1c, Kxcab2c)
 
     def calculate_offsite_kernel_approximations(self, spin):
-        assert self.iA != self.iB
+        assert self.iK != self.iL
 
         results = {}
 
         if self.xc.add_gradient_corrections:
-            Kxcab2c = self.calculate_offsite_xc_kernel_gga(spin)
+            KxcKL2c = self.calculate_offsite_xc_kernel_gga(spin)
         else:
-            Kxcab2c = self.calculate_offsite_xc_kernel_lda(spin)
-        print("<a|fxc2c|b> =", Kxcab2c)
+            KxcKL2c = self.calculate_offsite_xc_kernel_lda(spin)
+        print("<a|fxc2c|b> =", KxcKL2c)
 
-        results['K_2c'] = Kxcab2c
+        results['K_2c'] = KxcKL2c
         return results
 
     def calculate_offsite_xc_kernel_lda(self, spin):
-        Kxc2c = lambda x, y, z: self.multipoleA(x, y, z) \
+        Kxc2c = lambda x, y, z: self.chiK(x, y, z) \
                                 * self.fxc_off2c(x, y, z, spin) \
-                                * self.multipoleB(x, y, z)
-        Kxcab2c = becke.integral(self.atoms_becke, Kxc2c)
-        return Kxcab2c
+                                * self.chiL(x, y, z)
+        KxcKL2c = becke.integral(self.atoms_becke, Kxc2c)
+        return KxcKL2c
 
     def calculate_offsite_xc_kernel_gga(self, spin):
         def kxc_off2c(x, y, z):
-            dxA, dyA, dzA = x - self.xA, y - self.yA, z - self.zA
-            dxB, dyB, dzB = x - self.xB, y - self.yB, z - self.zB
-            rA = np.sqrt(dxA**2 + dyA**2 + dzA**2)
-            rB = np.sqrt(dxB**2 + dyB**2 + dzB**2)
-            drAdx = [dxA/rA, dyA/rA, dzA/rA]
-            drBdx = [dxB/rB, dyB/rB, dzB/rB]
+            dxK, dyK, dzK = x - self.xK, y - self.yK, z - self.zK
+            dxL, dyL, dzL = x - self.xL, y - self.yL, z - self.zL
+            rK = np.sqrt(dxK**2 + dyK**2 + dzK**2)
+            rL = np.sqrt(dxL**2 + dyL**2 + dzL**2)
+            drKdx = [dxK/rK, dyK/rK, dzK/rK]
+            drLdx = [dxL/rL, dyL/rL, dzL/rL]
 
-            rhoA = self.elA.electron_density(rA)
-            rhoB = self.elB.electron_density(rB)
-            drhoAdrA = self.elA.electron_density(rA, der=1)
-            drhoBdrB = self.elB.electron_density(rB, der=1)
-            drho = self.get_rho_deriv1(x, y, z, [self.iA, self.iB])
+            rhoK = self.elK.electron_density(rK)
+            rhoL = self.elL.electron_density(rL)
+            drhoKdrK = self.elK.electron_density(rK, der=1)
+            drhoLdrL = self.elL.electron_density(rL, der=1)
+            drho = self.get_rho_deriv1(x, y, z, [self.iK, self.iL])
 
             if spin:
-                rhoA /= 2
-                rhoB /= 2
-                drhoAdrA /= 2
-                drhoBdrB /= 2
+                rhoK /= 2
+                rhoL /= 2
+                drhoKdrK /= 2
+                drhoLdrL /= 2
                 drho = dict(sigma_up=drho['sigma'] / 4,
                             sigma_updown=drho['sigma'] / 4,
                             sigma_down=drho['sigma'] / 4)
-                outAB = self.xc_polarized.compute_vxc_polarized(rhoA+rhoB,
-                                            rhoA+rhoB, fxc=True, **drho)
+                outKL = self.xc_polarized.compute_vxc_polarized(rhoK+rhoL,
+                                            rhoK+rhoL, fxc=True, **drho)
             else:
-                outAB = self.xc.compute_vxc(rhoA+rhoB, fxc=True, **drho)
+                outKL = self.xc.compute_vxc(rhoK+rhoL, fxc=True, **drho)
 
-            RnlA2 = self.elA.Rnl(rA, self.nlA)**2
-            RnlB2 = self.elB.Rnl(rB, self.nlB)**2
-            mA = self.multipoleA(x, y, z)
-            mB = self.multipoleB(x, y, z)
-            dmAdr = 2 * self.elA.Rnl(rA, self.nlA) \
-                    * self.elA.Rnl(rA, self.nlA, der=1) \
-                    * sph_cartesian(dxA, dyA, dzA, rA, self.lmA)
-            dmBdr = 2 * self.elB.Rnl(rB, self.nlB) \
-                    * self.elB.Rnl(rB, self.nlB, der=1) \
-                    * sph_cartesian(dxB, dyB, dzB, rB, self.lmB)
+            AnlK = self.AnlK(rK, der=0)
+            AnlL = self.AnlL(rL, der=0)
+            mK = self.chiK(x, y, z)
+            mL = self.chiL(x, y, z)
+            dmKdr = self.AnlK(rK, der=1) \
+                    * sph_cartesian(dxK, dyK, dzK, rK, self.lmK)
+            dmLdr = self.AnlL(rL, der=1) \
+                    * sph_cartesian(dxL, dyL, dzL, rL, self.lmL)
 
-            grad_mA_grad_mB = 0.
-            grad_mA_grad_rho = 0.
-            grad_mB_grad_rho = 0.
+            grad_mK_grad_mL = 0.
+            grad_mK_grad_rho = 0.
+            grad_mL_grad_rho = 0.
             for i in range(3):
                 der = 'xyz'[i]
-                dYlmA = sph_cartesian_der(dxA, dyA, dzA, rA, self.lmA, der=der)
-                dYlmB = sph_cartesian_der(dxB, dyB, dzB, rB, self.lmB, der=der)
-                dmAdx = dmAdr * drAdx[i] + RnlA2 * dYlmA
-                dmBdx = dmBdr * drBdx[i] + RnlB2 * dYlmB
-                grad_mA_grad_mB += dmAdx * dmBdx
-                drhodx = drhoAdrA * drAdx[i] + drhoBdrB * drBdx[i]
-                grad_mA_grad_rho += dmAdx * drhodx
-                grad_mB_grad_rho += dmBdx * drhodx
+                dYlmK = sph_cartesian_der(dxK, dyK, dzK, rK, self.lmK, der=der)
+                dYlmL = sph_cartesian_der(dxL, dyL, dzL, rL, self.lmL, der=der)
+                dmKdx = dmKdr * drKdx[i] + AnlK * dYlmK
+                dmLdx = dmLdr * drLdx[i] + AnlL * dYlmL
+                grad_mK_grad_mL += dmKdx * dmLdx
+                drhodx = drhoKdrK * drKdx[i] + drhoLdrL * drLdx[i]
+                grad_mK_grad_rho += dmKdx * drhodx
+                grad_mL_grad_rho += dmLdx * drhodx
 
             if spin:
-                k = (outAB['v2rho2_up'] - outAB['v2rho2_updown']) * mA * mB
-                k += 2 * (outAB['v2rhosigma_up_up'] - outAB['v2rhosigma_up_down']) \
-                        * grad_mA_grad_rho * mB
-                k += 2 * (outAB['v2rhosigma_up_up'] - outAB['v2rhosigma_up_down']) \
-                        * mA * grad_mB_grad_rho
-                k += 4 * (outAB['v2sigma2_up_up'] - outAB['v2sigma2_up_down']) \
-                        * grad_mA_grad_rho * grad_mB_grad_rho
-                k += 2 * (outAB['v2sigma2_up_updown'] - outAB['v2sigma2_updown_down']) \
-                        * grad_mA_grad_rho * grad_mB_grad_rho
-                k += (2 * outAB['vsigma_up'] - outAB['vsigma_updown']) \
-                        * grad_mA_grad_mB
+                k = (outKL['v2rho2_up'] - outKL['v2rho2_updown']) * mK * mL
+                k += 2 * (outKL['v2rhosigma_up_up'] - outKL['v2rhosigma_up_down']) \
+                     * grad_mK_grad_rho * mL
+                k += 2 * (outKL['v2rhosigma_up_up'] - outKL['v2rhosigma_up_down']) \
+                     * mK * grad_mL_grad_rho
+                k += 4 * (outKL['v2sigma2_up_up'] - outKL['v2sigma2_up_down']) \
+                     * grad_mK_grad_rho * grad_mL_grad_rho
+                k += 2 * (outKL['v2sigma2_up_updown'] - outKL['v2sigma2_updown_down']) \
+                     * grad_mK_grad_rho * grad_mL_grad_rho
+                k += (2 * outKL['vsigma_up'] - outKL['vsigma_updown']) \
+                     * grad_mK_grad_mL
                 k /= 2
             else:
-                k = outAB['v2rho2'] * mA * mB
-                k += 2 * outAB['v2rhosigma'] * grad_mA_grad_rho * mB
-                k += 2 * outAB['v2rhosigma'] * mA * grad_mB_grad_rho
-                k += 4 * outAB['v2sigma2'] * grad_mA_grad_rho * grad_mB_grad_rho
-                k += 2 * outAB['vsigma'] * grad_mA_grad_mB
+                k = outKL['v2rho2'] * mK * mL
+                k += 2 * outKL['v2rhosigma'] * grad_mK_grad_rho * mL
+                k += 2 * outKL['v2rhosigma'] * mK * grad_mL_grad_rho
+                k += 4 * outKL['v2sigma2'] * grad_mK_grad_rho * grad_mL_grad_rho
+                k += 2 * outKL['vsigma'] * grad_mK_grad_mL
             return k
 
         Kxcab2c = becke.integral(self.atoms_becke, kxc_off2c)
@@ -1906,281 +1925,554 @@ class BeckeHarrisMultipoleKernels(BeckeHarrisKernels):
     def calculate_multicenter_kernel(self, spin):
         results = {}
 
-        Kxcmc = lambda x, y, z: self.multipoleA(x, y, z) \
+        Kxcmc = lambda x, y, z: self.chiK(x, y, z) \
                                 * self.fxc_mc(x, y, z, spin) \
-                                * self.multipoleB(x, y, z)
-        Kxcabmc = becke.integral(self.atoms_becke, Kxcmc)
-        print("<a|fxcmc|b> =", Kxcabmc)
-        results['K_mc'] = Kxcabmc
+                                * self.chiL(x, y, z)
+        KxcKLmc = becke.integral(self.atoms_becke, Kxcmc)
+        print("<a|fxcmc|b> =", KxcKLmc)
+        results['K_mc'] = KxcKLmc
         return results
 
-    def multipoleA(self, x, y, z):
-        dx, dy, dz = x - self.xA, y - self.yA, z - self.zA
-        rA = np.sqrt(dx**2 + dy**2 + dz**2)
-        return self.elA.Rnl(rA, self.nlA)**2 \
-               * sph_cartesian(dx, dy, dz, rA, self.lmA)
+    def solid_harmonic(self, x, y, z, l, lm):
+        # Note: located at the origin
+        r = np.sqrt(x**2 + y**2 + z**2)
+        return np.sqrt(4 * np.pi / (2*l + 1)) * r**l \
+               * sph_cartesian(x, y, z, r, lm)
 
-    def multipoleB(self, x, y, z):
-        dx, dy, dz = x - self.xB, y - self.yB, z - self.zB
-        rB = np.sqrt(dx**2 + dy**2 + dz**2)
-        return self.elB.Rnl(rB, self.nlB)**2 \
-               * sph_cartesian(dx, dy, dz, rB, self.lmB)
+    def chiK(self, x, y, z):
+        dx, dy, dz = x - self.xK, y - self.yK, z - self.zK
+        rK = np.sqrt(dx**2 + dy**2 + dz**2)
+        lK = ANGULAR_MOMENTUM[self.lmK[0]]
+        return self.elK.aux_basis(rK, self.nlK, lK) \
+               * sph_cartesian(dx, dy, dz, rK, self.lmK)
 
-    def get_orbital_vharA(self):
-        vharA = becke.poisson(self.atoms_becke, self.multipoleA)
-        return vharA
+    def chiL(self, x, y, z):
+        dx, dy, dz = x - self.xL, y - self.yL, z - self.zL
+        rL = np.sqrt(dx**2 + dy**2 + dz**2)
+        lL = ANGULAR_MOMENTUM[self.lmL[0]]
+        return self.elL.aux_basis(rL, self.nlL, lL) \
+               * sph_cartesian(dx, dy, dz, rL, self.lmL)
 
-    def evaluate_KharAB(self, vharA):
-        atoms_B = [self.atoms_becke[self.iB]]
+    def AnlK(self, r, der=0):
+        lK = ANGULAR_MOMENTUM[self.lmK[0]]
+        return self.elK.aux_basis(r, self.nlK, lK, der=der)
+
+    def AnlL(self, r, der=0):
+        lL = ANGULAR_MOMENTUM[self.lmL[0]]
+        return self.elL.aux_basis(r, self.nlL, lL, der=der)
+
+    def get_orbital_vharK(self):
+        vharK = becke.poisson(self.atoms_becke, self.chiK)
+        return vharK
+
+    def evaluate_KharKL(self, vharK):
+        atoms_L = [self.atoms_becke[self.iL]]
 
         def integrand(x, y, z):
-            return vharA(x, y, z) * self.multipoleB(x, y, z)
+            return vharK(x, y, z) * self.chiL(x, y, z)
 
-        KharAB = becke.integral(atoms_B, integrand)
-        return KharAB
+        KharKL = becke.integral(atoms_L, integrand)
+        return KharKL
 
-    def run_all_moments(self, atoms_ase, indices_A=None, indices_B=None,
-                        lmax=2, print_matrices=True):
+    def calculate_mapping_coefficients(self, atoms_ase, lmax={}, nzeta={},
+                                       print_matrices=True,
+                                       constraint_method='original'):
         self.atoms_ase = atoms_ase
         self.atoms_becke = ase2becke(atoms_ase)
+        assert constraint_method in ['original', 'reduced'], constraint_method
+        indices = list(range(len(self.atoms_ase)))
 
+        # Main basis indices/orbitals/...
+        iPs, nlPs, lmPs = [], [], []
+        for index in indices:
+            nls, lms = self.get_valence_orbitals(index)
+            iPs.extend([index] * len(lms))
+            nlPs.extend(nls)
+            lmPs.extend(lms)
+
+        def get_moments(lmax1, lmax2=None):
+            lmax12 = lmax1 if lmax2 is None else max(lmax1, lmax2)
+            lMs, lmMs = [], []
+
+            for lM in range(lmax12+1):
+                for lmM in ORBITALS[lM]:
+                    lMs.append(lM)
+                    lmMs.append(lmM)
+            assert len(lMs) == len(lmMs) == (lmax12 + 1)**2
+
+            if (constraint_method == 'original') and (lmax2 is not None):
+                lmin12 = min(lmax1, lmax2)
+                lM = lmax12 + 1
+                m_dict = {
+                    's': 0, 'px': 1, 'pz': 0, 'py': -1, 'dxy': -2, 'dyz': -1,
+                    'dz2': 0, 'dxz': 1, 'dx2-y2': 2, 'fx(x2-3y2)': 3,
+                    'fy(3x2-y2)': -3, 'fz(x2-y2)': 2, 'fxyz': -2, 'fyz2': -1,
+                    'fxz2': 1, 'fz3': 0,
+                }
+                for lmM in ORBITALS[lM]:
+                    if abs(m_dict[lmM]) <= lmin12:
+                        lMs.append(lM)
+                        lmMs.append(lmM)
+                assert len(lMs) == len(lmMs) == (lmax12 + 1)**2 + 2*lmin12 + 1
+
+            return (lMs, lmMs)
+
+        # Auxiliary basis indices/orbitals/...
+        iXs, nlXs, lmXs = [], [], []
+        Nchi_dict = {}  # number of aux basis func for each element
+
+        for iA in indices:
+            symA = self.get_symbol(iA)
+            elA = self.elements[symA]
+
+            if symA not in Nchi_dict:
+                Nchi_dict[symA] = len(self.get_multipoles(lmax[symA])) \
+                                  * nzeta[symA]
+
+            for izeta in range(nzeta[symA]):
+                lms = self.get_multipoles(lmax[symA])
+                lmXs.extend(lms)
+                iXs.extend([iA] * len(lms))
+                nl = elA.aux_basis.get_radial_label(izeta)
+                nlXs.extend([nl] * len(lms))
+
+        Nchi_max = max(Nchi_dict.values())
+
+        # Calculate mapping coefficients
+        # First the 'eta' matrix, which is the same for all AO products;
+        # Also storing the needed Hartree potentials and auxiliary basis
+        # function moments
+        eta_dict = {}
+        vhar_dict = {}
+        D_dict = {}
+
+        for indexK, (iK, nlK, lmK) in enumerate(zip(iXs, nlXs, lmXs)):
+            self.symK = self.get_symbol(iK)
+            self.nlK = nlK
+            self.lmK = lmK
+            self.xK, self.yK, self.zK = self.get_position(iK)
+            lK = ANGULAR_MOMENTUM[lmK[0]]
+            self.elK = self.elements[self.symK]
+
+            keyK = (iK, nlK, lmK)
+            vhar_dict[keyK] = OrbitalHartreePotential(
+                                    self.elK.rgrid,
+                                    self.elK.aux_basis.Anlg[(nlK, lK)],
+                                    lmax=lmax[self.symK]+1)
+
+            lMs, lmMs = get_moments(max(lmax.values()),
+                                    lmax2=max(lmax.values()))
+            for lM, lmM in zip(lMs, lmMs):
+                def moment_chiK(x, y, z):
+                    return self.chiK(x, y, z) \
+                           * self.solid_harmonic(x, y, z, lM, lmM)
+                keyM = (iK, nlK, lmK, lM, lmM)
+                D_dict[keyM] = becke.integral([self.atoms_becke[iK]],
+                                              moment_chiK)
+
+            for indexL, (iL, nlL, lmL) in enumerate(zip(iXs, nlXs, lmXs)):
+                self.symL = self.get_symbol(iL)
+                self.nlL = nlL
+                self.lmL = lmL
+                self.xL, self.yL, self.zL = self.get_position(iL)
+                self.elL = self.elements[self.symL]
+
+                def Khar(x, y, z):
+                    dx = x - self.xK
+                    dy = y - self.yK
+                    dz = z - self.zK
+                    r = np.sqrt(dx**2 + dy**2 + dz**2)
+                    return vhar_dict[keyK].vhar_fct[lK](r) \
+                           * sph_cartesian(dx, dy, dz, r, self.lmK) \
+                           * self.chiL(x, y, z)
+
+                print('\nRunning iK %d iL %d nlmK %s %s nlmL %s %s' % \
+                      (iK, iL, nlK, lmK, nlL, lmL), flush=True)
+
+                atoms_har = [self.atoms_becke[iK]]
+                if iK != iL:
+                    atoms_har += [self.atoms_becke[iL]]
+                keyKL = (iK, nlK, lmK, iL, nlL, lmL)
+                eta_dict[keyKL] = becke.integral(atoms_har, Khar)
+                print('eta:', eta_dict[keyKL])
+
+        # Now looping over the AO products to get the M1 and M2 matrices
+        M1 = np.zeros((len(lmPs), len(lmPs), Nchi_max))
+        M2 = np.zeros_like(M1)
+
+        for indexA, (iA, nlA, lmA) in enumerate(zip(iPs, nlPs, lmPs)):
+            symA = self.get_symbol(iA)
+            self.elA = self.elements[symA]
+            self.nlA = nlA
+            self.lmA = lmA
+            nlmA = nlA[0] + lmA + nlA[2:]
+            self.xA, self.yA, self.zA = self.get_position(iA)
+            Nchi_A = Nchi_dict[symA]
+
+            for indexB, (iB, nlB, lmB) in enumerate(zip(iPs, nlPs, lmPs)):
+                symB = self.get_symbol(iB)
+                self.elB = self.elements[symB]
+                self.nlB = nlB
+                self.lmB = lmB
+                nlmB = nlB[0] + lmB + nlB[2:]
+                self.xB, self.yB, self.zB = self.get_position(iB)
+                Nchi_B = Nchi_dict[symB]
+
+                print('\nRunning iA %d iB %d nlmA %s nlmB %s' % \
+                      (iA, iB, nlmA, nlmB), flush=True)
+
+                is_onsite = iA == iB
+                if is_onsite:
+                    Nchi = Nchi_A
+                    lMs, lmMs = get_moments(lmax[symA], lmax2=None)
+                else:
+                    Nchi = Nchi_A + Nchi_B
+                    lMs, lmMs = get_moments(lmax[symA], lmax2=lmax[symB])
+                Nmp = len(lmMs)
+
+                # d vector
+                d = np.zeros(Nmp)
+                for indexM, (lM, lmM) in enumerate(zip(lMs, lmMs)):
+                    def moment_AOprod(x, y, z):
+                        return self.phiA(x, y, z) * self.phiB(x, y, z) \
+                               * self.solid_harmonic(x, y, z, lM, lmM)
+
+                    atoms_2c = [self.atoms_becke[iA]]
+                    if not is_onsite:
+                        atoms_2c += [self.atoms_becke[iB]]
+                    d[indexM] = becke.integral(atoms_2c, moment_AOprod)
+
+                assert indexM == Nmp-1, (indexM, Nmp-1)
+                print('d:', d, d.shape, flush=True)
+
+                # g vector
+                g = np.zeros(Nchi)
+                ichi_dict = {iA: 0} if is_onsite else {iA: 0, iB: Nchi_A}
+
+                for iK, nlK, lmK in zip(iXs, nlXs, lmXs):
+                    if iK not in [iA, iB]:
+                        continue
+
+                    keyK = (iK, nlK, lmK)
+                    xK, yK, zK = self.get_position(iK)
+                    lK = ANGULAR_MOMENTUM[lmK[0]]
+
+                    def KharAB(x, y, z):
+                        dx = x - xK
+                        dy = y - yK
+                        dz = z - zK
+                        r = np.sqrt(dx**2 + dy**2 + dz**2)
+                        return self.phiA(x, y, z) * self.phiB(x, y, z) \
+                               * vhar_dict[keyK].vhar_fct[lK](r) \
+                               * sph_cartesian(dx, dy, dz, r, lmK)
+
+                    atoms_har = [self.atoms_becke[iA]]
+                    if not is_onsite:
+                        atoms_har += [self.atoms_becke[iB]]
+                    g[ichi_dict[iK]] = becke.integral(atoms_har, KharAB)
+                    ichi_dict[iK] += 1
+
+                assert ichi_dict[iA] == Nchi_A, (ichi_dict, Nchi_A)
+                if not is_onsite:
+                    assert ichi_dict[iB] == Nchi, (ichi_dict, Nchi)
+                print('g:', g, g.shape, flush=True)
+
+                # D matrix
+                D = np.zeros((Nchi, Nmp))
+                for indexM, (lM, lmM) in enumerate(zip(lMs, lmMs)):
+                    ichi_dict = {iA: 0} if is_onsite else {iA: 0, iB: Nchi_A}
+
+                    for iK, nlK, lmK in zip(iXs, nlXs, lmXs):
+                        if iK not in [iA, iB]:
+                            continue
+
+                        keyM = (iK, nlK, lmK, lM, lmM)
+                        D[ichi_dict[iK], indexM] = D_dict[keyM]
+                        ichi_dict[iK] += 1
+
+                    assert ichi_dict[iA] == Nchi_A, (ichi_dict, Nchi_A)
+                    if not is_onsite:
+                        assert ichi_dict[iB] == Nchi, (ichi_dict, Nchi)
+
+                assert indexM == Nmp-1, (indexM, Nmp-1)
+                print('D:', D, D.shape, flush=True)
+
+                # (inv)eta matrices
+                eta = np.zeros((Nchi, Nchi))
+                ichi_dict = {iA: 0} if is_onsite else {iA: 0, iB: Nchi_A}
+
+                for iK, nlK, lmK in zip(iXs, nlXs, lmXs):
+                    if iK not in [iA, iB]:
+                        continue
+
+                    ichi_dict2 = {iA: 0} if is_onsite else {iA: 0, iB: Nchi_A}
+
+                    for iL, nlL, lmL in zip(iXs, nlXs, lmXs):
+                        if iL not in [iA, iB]:
+                            continue
+                        keyKL = (iK, nlK, lmK, iL, nlL, lmL)
+
+                        eta[ichi_dict[iK], ichi_dict2[iL]] = eta_dict[keyKL]
+                        ichi_dict2[iL] += 1
+
+                    assert ichi_dict2[iA] == Nchi_A, (ichi_dict2, Nchi_A)
+                    if not is_onsite:
+                        assert ichi_dict2[iB] == Nchi, (ichi_dict2, Nchi)
+
+                    ichi_dict[iK] += 1
+
+                assert ichi_dict[iA] == Nchi_A, (ichi_dict, Nchi_A)
+                if not is_onsite:
+                    assert ichi_dict[iB] == Nchi, (ichi_dict, Nchi)
+                print('eta:', eta, eta.shape, flush=True)
+                inveta = np.linalg.inv(eta)
+
+                # u vector
+                u1 = np.linalg.inv(np.matmul(D.T, np.matmul(inveta, D)))
+                u2 = np.matmul(D.T, np.matmul(inveta, g)) - d
+                u = np.matmul(u1, u2)
+
+                # M vector
+                # For a given (ij), M should be a vector, containing
+                # first the NauxA elements for Mijk^(1) and then the NauxB
+                # elements for Mijk^(2).
+                M = np.matmul(inveta, (g - np.matmul(D, u)))
+                assert np.shape(M) == (Nchi,), (np.shape(M), Nchi)
+                print('M:', M, flush=True)
+
+                if is_onsite:
+                    M1[indexA, indexB, :Nchi] = M[:]
+                else:
+                    M1[indexA, indexB, :Nchi_A] = M[:Nchi_A]
+                    M2[indexA, indexB, :Nchi_B] = M[Nchi_A:]
+
+        if print_matrices:
+            def print_matrix(M, nperline=4):
+                print('np.array([')
+                for row in M:
+                    print('[', end='')
+                    i = 0
+                    while i < len(row):
+                        part = row[i:min(i+nperline, len(row))]
+                        items = list(map(lambda x: '%.6e' % x, part))
+                        print(', '.join(items), end='')
+                        i += nperline
+                        if i >= len(row):
+                            print('],')
+                        else:
+                            print(',')
+                print('])\n')
+
+            template = '=== Mapping coefficient matrix {0} (ichi={1}) ==='
+            for name, M in zip(['M1', 'M2'], [M1, M2]):
+                np.save('{0}.npy'.format(name), M)
+
+                for ichi in range(Nchi_max):
+                    print(template.format(name, ichi))
+                    print_matrix(M[:, :, ichi], nperline=4)
+
+        return (M1, M2)
+
+    def analyze_density_matrix(self, atoms_ase, density_matrices, M1, M2,
+                               lmax={}, nzeta={}, h=0.1, vacuum=4, name=None):
+        self.atoms_ase = atoms_ase
+        self.atoms_ase.center(vacuum=vacuum)
+        self.atoms_becke = ase2becke(atoms_ase)
+        indices = list(range(len(self.atoms_ase)))
+
+        nspin = len(density_matrices)
+        for ispin in range(nspin):
+            assert np.allclose(density_matrices[ispin],
+                               density_matrices[ispin].T), \
+                   'Density matrices needs to be symmetric'
+
+        assert nspin in [1, 2], nspin
+        spin_polarized = nspin == 2
+
+        # Main basis indices/orbitals/...
         iAs, nlAs, lmAs = [], [], []
-        for index in indices_A:
+        for index in indices:
             nls, lms = self.get_valence_orbitals(index)
             iAs.extend([index] * len(lms))
             nlAs.extend(nls)
             lmAs.extend(lms)
 
-        iBs, nlBs, lmBs = [], [], []
-        for index in indices_B:
-            nls, lms = self.get_valence_orbitals(index)
-            iBs.extend([index] * len(lms))
-            nlBs.extend(nls)
-            lmBs.extend(lms)
+        # Auxiliary basis indices/orbitals/...
+        iXs, nlXs, lmXs = [], [], []
+        Nchi_dict = {}  # number of aux basis func for each element
 
-        # Calculate the moment integrals M1 and M2
-        lms = self.get_multipoles(lmax)
-        nlm = len(lms)
-        shape = (nlm, len(lmAs), len(lmBs))
-        M_1 = np.zeros(shape)
-        M_2 = np.zeros(shape)
+        for iA in indices:
+            symA = self.get_symbol(iA)
+            elA = self.elements[symA]
+
+            if symA not in Nchi_dict:
+                Nchi_dict[symA] = len(self.get_multipoles(lmax[symA])) \
+                                  * nzeta[symA]
+
+            for izeta in range(nzeta[symA]):
+                lms = self.get_multipoles(lmax[symA])
+                lmXs.extend(lms)
+                iXs.extend([iA] * len(lms))
+                nl = elA.aux_basis.get_radial_label(izeta)
+                nlXs.extend([nl] * len(lms))
+
+        # Grid generation
+        # Note: only correct for orthogonal cell vectors
+        print('Generating grid ...', flush=True)
+        cell = self.atoms_ase.get_cell()
+        self.gpts = tuple(h2gpts(h, cell))
+        cell /= Bohr
+        print('gpts:', self.gpts)
+
+        x = np.linspace(0., 1., num=self.gpts[0], endpoint=False)
+        y = np.linspace(0., 1., num=self.gpts[1], endpoint=False)
+        z = np.linspace(0., 1., num=self.gpts[2], endpoint=False)
+        X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
+        XYZ = np.array([X, Y, Z])
+        xyz = np.matmul(XYZ.T, cell)
+        self.x = xyz[:, :, :, 0]
+        self.y = xyz[:, :, :, 1]
+        self.z = xyz[:, :, :, 2]
+        self.Ngpts = np.prod(self.gpts)
+        self.dV = abs(np.linalg.det(cell)) / self.Ngpts
+        print('dV:', self.dV)
+
+        self.dx = (x[1] - x[0]) * cell[0, 0]
+        self.dy = (y[1] - y[0]) * cell[1, 1]
+        self.dz = (z[1] - z[0]) * cell[2, 2]
+        print('dx dy dz:', self.dx, self.dy, self.dz)
+        assert np.isclose(self.dV, self.dx * self.dy * self.dz)
+
+        # Sum of atomic densities
+        rho0 = np.zeros_like(self.x)
+        rho0_separate = [np.zeros_like(self.x) for iA in indices]
+
+        for iA in indices:
+            xA, yA, zA = self.get_position(iA)
+            dxA = self.x - xA
+            dyA = self.y - yA
+            dzA = self.z - zA
+            rA = np.sqrt(dxA**2 + dyA**2 + dzA**2)
+            symA = self.get_symbol(iA)
+            elA = self.elements[symA]
+            rho0_separate[iA] = elA.electron_density(rA, only_valence=True)
+            rho0 += rho0_separate[iA]
+
+        total0 = self.dV * np.sum(rho0)
+        print('Integrated initial density:', total0, flush=True)
+
+        # Building drho from densmat
+        rho = [np.zeros_like(self.x) for i in range(nspin)]
 
         for indexA, (iA, nlA, lmA) in enumerate(zip(iAs, nlAs, lmAs)):
-            self.iA, self.nlA, self.lmA = iA, nlA, lmA
-            nlmA = nlA[0] + lmA + nlA[2:]
-            self.xA, self.yA, self.zA = self.get_position(self.iA)
-            symA = self.get_symbol(self.iA)
-            self.elA = self.elements[symA]
+            xA, yA, zA = self.get_position(iA)
+            dxA = self.x - xA
+            dyA = self.y - yA
+            dzA = self.z - zA
+            rA = np.sqrt(dxA**2 + dyA**2 + dzA**2)
+            symA = self.get_symbol(iA)
+            elA = self.elements[symA]
 
-            for indexB, (iB, nlB, lmB) in enumerate(zip(iBs, nlBs, lmBs)):
-                self.iB, self.nlB, self.lmB = iB, nlB, lmB
-                nlmB = nlB[0] + lmB + nlB[2:]
-                self.xB, self.yB, self.zB = self.get_position(self.iB)
-                symB = self.get_symbol(self.iB)
-                self.elB = self.elements[symB]
+            for indexB, (iB, nlB, lmB) in enumerate(zip(iAs, nlAs, lmAs)):
+                xB, yB, zB = self.get_position(iB)
+                dxB = self.x - xB
+                dyB = self.y - yB
+                dzB = self.z - zB
+                rB = np.sqrt(dxB**2 + dyB**2 + dzB**2)
+                symB = self.get_symbol(iB)
+                elB = self.elements[symB]
 
-                print('\nRunning iA %d iB %d nlmA %s nlmB %s' % \
-                      (self.iA, self.iB, nlmA, nlmB))
-                is_onsite = self.iA == self.iB
+                overlap = elA.Rnl(rA, nl=nlA) \
+                        * sph_cartesian(dxA, dyA, dzA, rA, lmA) \
+                        * elB.Rnl(rB, nl=nlB) \
+                        * sph_cartesian(dxB, dyB, dzB, rB, lmB)
+                assert not np.any(np.isnan(overlap)), \
+                       [(iA, nlA, lmA), (iB, nlB, lmB)]
 
-                ilm = 0
-                for l in range(lmax+1):
-                    for lm in ORBITALS[l]:
-                        self.multipole = lm
-                        if is_onsite:
-                            m_1, m_2 = self.calculate_onsite_moment_integrals()
-                        else:
-                            m_1, m_2 = self.calculate_offsite_moment_integrals()
+                for ispin in range(nspin):
+                    coeff = density_matrices[ispin][indexA, indexB]
+                    rho[ispin] += coeff * overlap
 
-                        print("<a*Ylm|b> =", m_1)
-                        print("<b*Ylm|a> =", m_2)
-                        M_1[ilm, indexA, indexB] = m_1
-                        M_2[ilm, indexB, indexA] = m_2
-                        ilm += 1
+        if spin_polarized:
+            drho = rho[0] - rho[1]
+        else:
+            drho = rho[0] - rho0
 
-        if print_matrices:
-            def print_matrix(M, nperline=4):
-                print('np.array([')
-                for row in M:
-                    print('[', end='')
-                    i = 0
-                    while i < len(row):
-                        part = row[i:min(i+nperline, len(row))]
-                        items = list(map(lambda x: '%.6e' % x, part))
-                        print(', '.join(items), end='')
-                        i += nperline
-                        if i >= len(row):
-                            print('],')
-                        else:
-                            print(',')
-                print('])\n')
+        totals = [self.dV * np.sum(rho[ispin]) for ispin in range(nspin)]
+        print('Integrated densities:', *totals)
 
-            template = '=== Moment integral matrix {0} (lm={1}) ==='
-            for name, M in zip(['M_1', 'M_2'], [M_1, M_2]):
-                ilm = 0
-                for l in range(lmax+1):
-                    for lm in ORBITALS[l]:
-                        print(template.format(name, lm))
-                        print_matrix(M[ilm, :, :], nperline=4)
-                        ilm += 1
+        total = self.dV * np.sum(drho)
+        print('Integrated difference density:', total)
 
-        results = {'M_1': M_1, 'M_2': M_2}
-        return results
+        if name is not None:
+            filename = 'out_{0}_densmat.cube'.format(name)
+            with open(filename, 'w') as f:
+                write_cube(f, self.atoms_ase, data=drho.T, origin=None,
+                           comment=None)
 
-    def phiA_Ylm(self, x, y, z):
-        dx, dy, dz = x - self.xA, y - self.yA, z - self.zA
-        rA = np.sqrt(dx**2 + dy**2 + dz**2)
-        return self.elA.Rnl(rA, self.nlA) \
-               * sph_cartesian(dx, dy, dz, rA, self.lmA) \
-               * sph_cartesian(dx, dy, dz, rA, self.multipole)
+        # Building drho from multipoles
 
-    def phiB_Ylm(self, x, y, z):
-        dx, dy, dz = x - self.xB, y - self.yB, z - self.zB
-        rB = np.sqrt(dx**2 + dy**2 + dz**2)
-        return self.elB.Rnl(rB, self.nlB) \
-               * sph_cartesian(dx, dy, dz, rB, self.lmB) \
-               * sph_cartesian(dx, dy, dz, rB, self.multipole)
+        # Reference density matrix is either the atomic one or
+        # the down-channel one
+        if spin_polarized:
+            densmat_ref = np.copy(density_matrices[1])
+        else:
+            densmat_ref = np.zeros_like(density_matrices[0])
+            for indexA, (iA, nlA, lmA) in enumerate(zip(iAs, nlAs, lmAs)):
+                symA = self.get_symbol(iA)
+                elA = self.elements[symA]
 
-    def calculate_offsite_moment_integrals(self):
-        atoms_2c = [self.atoms_becke[self.iA], self.atoms_becke[self.iB]]
-        m_1 = becke.overlap(atoms_2c, self.phiA_Ylm, self.phiB)
-        m_2 = becke.overlap(atoms_2c, self.phiB_Ylm, self.phiA)
-        return (m_1, m_2)
+                for indexB, (iB, nlB, lmB) in enumerate(zip(iAs, nlAs, lmAs)):
+                    if (indexA == indexB) and (nlA in elA.valence):
+                        occup = elA.configuration[nlA]
+                        l = ANGULAR_MOMENTUM[nlA[1]]
+                        numlm = (l + 1)**2 - l**2
+                        densmat_ref[indexA, indexA] = occup * 1. / numlm
 
-    def calculate_onsite_moment_integrals(self):
-        atoms_1c = [self.atoms_becke[self.iA]]
-        m_1 = becke.overlap(atoms_1c, self.phiA_Ylm, self.phiB)
-        m_2 = becke.overlap(atoms_1c, self.phiB_Ylm, self.phiA)
-        return (m_1, m_2)
+        # Multipole moments m and their drho contributions
+        m = np.zeros(len(lmXs))
+        drho = 0.
 
-    def run_all_dH(self, atoms_ase, density_matrix, Zval, lmax=0,
-                   kernel=None, print_matrices=True,
-                   subshell_dependence='none'):
-        self.atoms_ase = atoms_ase
-        self.atoms_becke = ase2becke(atoms_ase)
-        indices = list(range(len(self.atoms_ase)))
+        for indexA, (iA, nlA, lmA) in enumerate(zip(iAs, nlAs, lmAs)):
+            for indexB, (iB, nlB, lmB) in enumerate(zip(iAs, nlAs, lmAs)):
+                coeff = density_matrices[0][indexA, indexB]
+                coeff -= densmat_ref[indexA, indexB]
+                term1 = coeff * M1[indexA, indexB, :]
+                term2 = coeff * M2[indexA, indexB, :]
 
-        assert np.allclose(density_matrix, density_matrix.T), \
-               'Density matrix needs to be symmetric'
+                is_onsite = iA == iB
+                ichi_dict = {iA: 0} if is_onsite else {iA: 0, iB: 0}
 
-        assert subshell_dependence == 'none'
+                for indexK, (iK, nlK, lmK) in enumerate(zip(iXs, nlXs, lmXs)):
+                    if is_onsite:
+                        if iA == iK:
+                            m[indexK] += term1[ichi_dict[iK]]
+                            ichi_dict[iK] += 1
+                    else:
+                        if iA == iK:
+                            m[indexK] += term1[ichi_dict[iK]]
+                            ichi_dict[iK] += 1
+                        elif iB == iK:
+                            m[indexK] += term2[ichi_dict[iK]]
+                            ichi_dict[iK] += 1
 
-        counter = 0
-        start_indices, end_indices = [], []
-        for iatom in indices:
-            start_indices.append(counter)
-            nls, lms = self.get_valence_orbitals(iatom)
-            assert len(nls) == len(lms), (nls, lms)
-            counter += len(lms)
-            end_indices.append(counter)
+        for indexK, (iK, nlK, lmK) in enumerate(zip(iXs, nlXs, lmXs)):
+            self.xK, self.yK, self.zK = self.get_position(iK)
+            self.symK = self.get_symbol(iK)
+            self.nlK = nlK
+            self.lmK = lmK
+            self.elK = self.elements[self.symK]
+            drho += m[indexK] * self.chiK(self.x, self.y, self.z)
 
-        shape = (end_indices[-1], end_indices[-1])
-        assert np.shape(density_matrix) == shape, shape
+        m_str = np.array2string(m, separator=', ', max_line_width=72)
+        print('m:', m_str)
 
-        moments = self.run_all_moments(atoms_ase, indices_A=indices,
-                                       indices_B=indices, lmax=lmax,
-                                       print_matrices=print_matrices)
+        total = self.dV * np.sum(drho)
+        print('Integrated difference density:', total)
 
-        if kernel is None:
-            kernel = self.run_all_kernels(atoms_ase, indices_A=indices,
-                                          indices_B=indices, lmax=lmax,
-                                          print_matrices=print_matrices,
-                                          subtract_delta=False,
-                                          spin=False)['K_mc']
-
-        # Calculate the multipoles charges Q
-        mps = self.get_multipoles(lmax)
-        Q = np.zeros((len(self.atoms_ase), len(mps)))
-
-        for iatom in indices:
-            istart = start_indices[iatom]
-            iend = end_indices[iatom]
-            sym = self.get_symbol(iatom)
-            Q[iatom, 0] = -Zval[sym] / np.sqrt(4*np.pi)
-
-            for jatom in indices:
-                jstart = start_indices[jatom]
-                jend = end_indices[jatom]
-                R = density_matrix[istart:iend, jstart:jend]
-
-                for imp in range(len(mps)):
-                    M = moments['M_1'][imp, istart:iend, jstart:jend]
-                    Q[iatom, imp] += np.sum(R * M)
-
-        # Calculate the second-order correction to the Hamiltonian dH
-        # and to the energy dE and associated potentials V
-        dH = np.zeros(shape)
-        dE_onsite = 0.
-        dE_offsite = 0.
-        V = np.zeros_like(Q)
-
-        for iatom in indices:
-            istart = start_indices[iatom]
-            iend = end_indices[iatom]
-
-            for jatom in indices:
-                jstart = start_indices[jatom]
-                jend = end_indices[jatom]
-
-                dE = 0.
-                for imp in range(len(mps)):
-                    for jmp in range(len(mps)):
-                        k = kernel[len(mps)*iatom + imp, len(mps)*jatom + jmp]
-                        dE += 0.5 * k * Q[iatom, imp] * Q[jatom, jmp]
-                        V[iatom, imp] += k * Q[jatom, jmp]
-
-                if iatom == jatom:
-                    dE_onsite += dE
-                else:
-                    dE_offsite += dE
-
-                for katom in indices:
-                    for imp1 in range(len(mps)):
-                        q = Q[katom, imp1]
-                        impk = len(mps)*katom + imp1
-
-                        for imp2 in range(len(mps)):
-                            impi = len(mps)*iatom + imp2
-                            impj = len(mps)*jatom + imp2
-
-                            k = kernel[impi, impk] + kernel[impk, impi]
-                            M1 = moments['M_1'][imp2, istart:iend, jstart:jend]
-                            dH[istart:iend, jstart:jend] += q * k * M1 / 4.
-
-                            k = kernel[impj, impk] + kernel[impk, impj]
-                            M2 = moments['M_2'][imp2, jstart:jend, istart:iend]
-                            dH[istart:iend, jstart:jend] += q * k * M2.T / 4.
-
-        if print_matrices:
-            def print_matrix(M, nperline=4):
-                print('np.array([')
-                for row in M:
-                    print('[', end='')
-                    i = 0
-                    while i < len(row):
-                        part = row[i:min(i+nperline, len(row))]
-                        items = list(map(lambda x: '%.6e' % x, part))
-                        print(', '.join(items), end='')
-                        i += nperline
-                        if i >= len(row):
-                            print('],')
-                        else:
-                            print(',')
-                print('])\n')
-
-            print('=== Multipoles ===')
-            print_matrix(Q, nperline=4)
-
-            print('=== Potentials ===')
-            print_matrix(V, nperline=4)
-
-            print('=== Second-order correction to the Hamiltonian ===')
-            print_matrix(dH, nperline=4)
-
-            print('=== Second-order correction to the total energy ===')
-            print('dE_onsite: %.6e' % dE_onsite)
-            print('dE_offsite: %.6e' % dE_offsite)
-            print('dE_total: %.6e' % (dE_onsite + dE_offsite))
-
-        results = {'Q': Q, 'dH': dH, 'dE': dE, 'V': V}
-        return results
+        if name is not None:
+            filename = 'out_{0}_multipole.cube'.format(name)
+            with open(filename, 'w') as f:
+                write_cube(f, self.atoms_ase, data=drho.T, origin=None,
+                           comment=None)
+        return
