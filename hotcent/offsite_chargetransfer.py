@@ -69,53 +69,65 @@ class Offsite2cMTable(MultiAtomIntegrator):
         self.Rgrid = rmin + dr * np.arange(N)
         self.tables = {}
 
-        Naux12 = self.ela.aux_basis.get_size() + self.elb.aux_basis.get_size()
-
         for p, (e1, e2) in enumerate(self.pairs):
+            Naux1 = e1.aux_basis.get_size()
             for bas1 in range(len(e1.basis_sets)):
                 for bas2 in range(len(e2.basis_sets)):
-                    shape = (NUMLM_2CM, NUMLM_2CM, N, Naux12)
+                    shape = (NUMLM_2CM, NUMLM_2CM, N, Naux1)
                     self.tables[(p, bas1, bas2)] = np.zeros(shape)
 
         for i, R in enumerate(self.Rgrid):
             if R > 2 * wf_range:
                 break
 
-            for p, (e1, e2) in enumerate(self.pairs):
-                selected = select_orbitals(e1, e2)
+            selected = select_orbitals(self.ela, self.elb)
 
-                self.grid_type = 'monopolar'
-                grid, area = self.make_grid(wf_range, nt=ntheta, nr=nr)
-                inveta = self.calculate_inveta_matrix(e1, e2, R, grid, area)
-                D = self.calculate_D_matrix(e1, e2, R, grid, area)
+            self.grid_type = 'monopolar'
+            grid, area = self.make_grid(wf_range, nt=ntheta, nr=nr)
+            inveta = self.calculate_inveta_matrix(self.ela, self.elb, R, grid,
+                                                  area)
+            D = self.calculate_D_matrix(self.ela, self.elb, R, grid, area)
 
-                self.grid_type = 'bipolar'
-                grid, area = self.make_grid(R, wf_range, nt=ntheta, nr=nr)
+            self.grid_type = 'bipolar'
+            grid, area = self.make_grid(R, wf_range, nt=ntheta, nr=nr)
 
-                if (p == 0) and (i == N-1 or N//10 == 0 or i % (N//10) == 0):
-                    print('R=%8.2f, %i grid points ...' % \
-                        (R, len(grid)), file=self.txt, flush=True)
+            if (i == N-1 or N//10 == 0 or i % (N//10) == 0):
+                print('R=%8.2f, %i grid points ...' % (R, len(grid)),
+                      file=self.txt, flush=True)
 
-                if len(grid) > 0:
-                    M = self.calculate(selected, e1, e2, R, grid, area, D,
-                                       inveta)
+            if len(grid) > 0:
+                M = self.calculate(selected, self.ela, self.elb, R, grid, area,
+                                   D, inveta)
 
-                    for key in selected:
-                        (nl1, lm1), (nl2, lm2) = key
-                        bas1 = e1.get_basis_set_index(nl1)
-                        bas2 = e2.get_basis_set_index(nl2)
-                        ilm = ORBITAL_LABELS.index(lm1)
-                        jlm = ORBITAL_LABELS.index(lm2)
-                        self.tables[(p, bas1, bas2)][ilm, jlm, i, :] = M[key][:]
+                for key in selected:
+                    (nl1, lm1), (nl2, lm2) = key
+                    bas1 = self.ela.get_basis_set_index(nl1)
+                    bas2 = self.elb.get_basis_set_index(nl2)
+                    ilm = ORBITAL_LABELS.index(lm1)
+                    jlm = ORBITAL_LABELS.index(lm2)
+
+                    Naux1 = self.ela.aux_basis.get_size()
+                    self.tables[(0, bas1, bas2)][ilm, jlm, i, :] = \
+                                M[key][:Naux1]
+
+                    if len(self.pairs) == 2:
+                        l1 = ANGULAR_MOMENTUM[lm1[0]]
+                        l2 = ANGULAR_MOMENTUM[lm2[0]]
+                        signs = self.get_parity_sign_changes(l1, l2)
+                        self.tables[(1, bas2, bas1)][jlm, ilm, i, :] = \
+                                    signs * M[key][Naux1:]
 
         if smoothen_tails:
             for key in self.tables:
+                p = key[0]
+                Naux1 = self.pairs[p][0].aux_basis.get_size()
+
                 for i in range(NUMLM_2CM):
                     for j in range(NUMLM_2CM):
-                        for k in range(Naux12):
+                        for k in range(Naux1):
                             self.tables[key][i, j, :, k] = \
                                 tail_smoothening(self.Rgrid,
-                                            self.tables[key][i, j, :, k])
+                                                 self.tables[key][i, j, :, k])
 
         self.timer.stop('run_offsiteM')
         return
@@ -168,6 +180,33 @@ class Offsite2cMTable(MultiAtomIntegrator):
             raise NotImplementedError(self.constraint_method)
 
         return moments
+
+    def get_parity_sign_changes(self, l1, l2):
+        """
+        Returns the sign changes that are needed to transform
+        a set of mapping coefficients for the second element
+        when swapping the positions of the two elements.
+
+        Parameters
+        ----------
+        l1, l2 : int
+            Angular momenta of the main basis orbitals.
+            Note that only the sum of l1 and l2 is influential.
+
+        Returns
+        -------
+        signs : np.ndarray
+            Values for every auxiliary basis function of the second element
+            (1: no sign change, -1: sign change needed).
+        """
+        Naux2 = self.elb.aux_basis.get_size()
+        signs = []
+
+        for iaux in range(Naux2):
+            l3 = self.elb.aux_basis.get_angular_momentum(iaux)
+            signs.append((-1)**(l1+l2+l3))
+
+        return np.array(signs)
 
     def calculate_D_matrix(self, e1, e2, R, grid, area):
         """
@@ -427,22 +466,20 @@ class Offsite2cMTable(MultiAtomIntegrator):
         Writes all integral tables to file.
 
         The filename template corresponds to
-        '<el1>-<el2>_offsiteM_<label1>-<label2>.2cm'.
+        '<el1>-<el2>_offsiteM_<label1>.2cm'.
         """
         for p, (e1, e2) in enumerate(self.pairs):
             sym1, sym2 = e1.get_symbol(), e2.get_symbol()
             label1 = e1.aux_basis.get_basis_set_label()
-            label2 = e2.aux_basis.get_basis_set_label()
 
-            aux_orbitals = [el.aux_basis.get_orbital_label(iaux)
-                            for el in [e1, e2]
-                            for iaux in range(el.aux_basis.get_size())]
+            aux_orbitals = [e1.aux_basis.get_orbital_label(iaux)
+                            for iaux in range(e1.aux_basis.get_size())]
 
             for bas1, valence1 in enumerate(e1.basis_sets):
                 for bas2, valence2 in enumerate(e2.basis_sets):
-                    template = '%s-%s_offsiteM_%s-%s.2cm'
+                    template = '%s-%s_offsiteM_%s.2cm'
                     filename = template % (sym1 + '+'*bas1, sym2  + '+'*bas2,
-                                           label1, label2)
+                                           label1)
                     print('Writing to %s' % filename, file=self.txt, flush=True)
 
                     with open(filename, 'w') as f:

@@ -2657,6 +2657,9 @@ def test_off2cM(R, atoms):
     M_ref[k][(1, 1, 1)][0, 3, 30, :] = [0.031337764810, 0.030694485369]
     M_ref[k][(1, 1, 1)][0, 3, 35, :] = [-0.001535680340, -0.001898048943]
 
+    Naux1 = atom_O.aux_basis.get_size()
+    Naux2 = atom_Li.aux_basis.get_size()
+
     msg = 'Too large error for M_{0}({1}) (value={2})'
     tol = 1e-4
 
@@ -2668,8 +2671,11 @@ def test_off2cM(R, atoms):
         M = momoff2c.tables
 
         for key, ref in M_ref[(size, xc)].items():
+            p, bas1, bas2 = key
+            Naux = Naux1 if p == 0 else Naux2
             val = M[key][:, :, 0, :]
-            M_diff = np.max(np.abs(val - ref[:, :, :, index]))
+
+            M_diff = np.max(np.abs(val - ref[:, :, :Naux, index]))
             assert M_diff < tol, msg.format(key, constraint_method, str(val))
 
     return
