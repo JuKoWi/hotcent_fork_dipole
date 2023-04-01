@@ -4,4 +4,4 @@
 #   Copyright 2018-2021 Maxime Van den Bossche                                #
 #   SPDX-License-Identifier: GPL-3.0-or-later                                 #
 #-----------------------------------------------------------------------------#
-__version__ = '2.0b3'
+__version__ = '2.0b4'

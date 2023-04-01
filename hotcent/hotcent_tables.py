@@ -88,6 +88,19 @@ def parse_arguments():
     parser.add_argument('--pseudo-path', default='.', help='Path to the '
                         'directory where the pseudopotential files are stored '
                         '(default: ".").')
+    parser.add_argument('--rmin-cov-scaling', help='Parameter controlling the '
+                        'minimal interatomic distances covered by the two- '
+                        'and three-center tables. For a given element pair, '
+                        'this minimal distance is calculated as the sum of '
+                        'each element\'s covalent radius multiplied by a '
+                        'scaling factor. By default, a factor of 2/3 is '
+                        'applied for all elements, which generally yields '
+                        'sufficiently short minimal distances. For materials '
+                        'under strong compression, however, even shorter '
+                        'distances may be needed. The factors can then be '
+                        'modified for all elements by passing e.g. '
+                        '--rmin-cov-scaling=0.5 or only for selected elements '
+                        'via e.g. --rmin-cov-scaling=Si_0.5,O_0.6.')
     parser.add_argument('--tasks', default='all', help='Comma-separated task '
                         'types to perform. The following types can be chosen: '
                         + ', '.join(TaskGenerator.all_task_types) + '. The '
@@ -317,6 +330,24 @@ def main():
         if mapping != 'mulliken':
             need_aux_basis = True
 
+    rmin_cov_scaling = {}
+    for elements in included:
+        for element in elements:
+            rmin_cov_scaling[element] = 2./3
+
+    if args.rmin_cov_scaling is not None:
+        if '_' in args.rmin_cov_scaling:
+            for item in args.rmin_cov_scaling.split(','):
+                element, factor = item.split('_')
+                verify_chemical_symbols(element)
+                if element in rmin_cov_scaling:
+                    rmin_cov_scaling[element] = float(factor)
+        else:
+            factor = float(args.rmin_cov_scaling)
+            for elements in included:
+                for element in elements:
+                    rmin_cov_scaling[element] = factor
+
     task_types = list(sorted(set(args.tasks.split(','))))
 
     if not need_aux_basis:
@@ -328,14 +359,20 @@ def main():
                 print(msg.format(task_type))
                 task_types.remove(task_type)
 
+    atom_kwargs = dict(
+        label=args.label,
+        pseudo_path=args.pseudo_path,
+        rmin_cov_scaling=rmin_cov_scaling,
+        yaml_path='..',
+    )
+
     task_kwargs = dict(
+        atom_kwargs=atom_kwargs,
         aux_mappings=aux_mappings,
         giese_york_constraint_method=args.giese_york_constraint_method,
-        label=args.label,
         opts_2c=opts_2c,
         opts_3c=opts_3c,
         opts_map2c=opts_map2c,
-        pseudo_path=args.pseudo_path,
         shift=True,
     )
 
@@ -417,8 +454,8 @@ def read_yaml(filename):
     return dicts
 
 
-def get_atoms(*elements, label=None, only_1c=False, pseudo_path='.', txt='-',
-              yaml_path='.'):
+def get_atoms(*elements, rmin_cov_scaling=None, label=None, only_1c=False,
+              pseudo_path='.', txt='-', yaml_path='.'):
     atoms = {}
     eigenvalues, hubbardvalues, occupations = {}, {}, {}
     offdiagonal_H, offdiagonal_S = {}, {}
@@ -493,11 +530,12 @@ def get_atoms(*elements, label=None, only_1c=False, pseudo_path='.', txt='-',
 
     if not only_1c:
         dr = 0.02
-        cov_frac = 0.75
+
         rmin_halves = {}
-        for el in set(elements):
-            rcov = cov_frac * covalent_radii[atomic_numbers[el]] / Bohr
-            rmin_halves[el] = dr * np.floor(rcov/dr)
+        for el1 in set(elements):
+            rcov = covalent_radii[atomic_numbers[el1]] / Bohr
+            rmin_halves[el1] = rmin_cov_scaling[el1] * rcov
+            rmin_halves[el1] = dr * np.floor(rmin_halves[el1] / dr)
 
         wf_ranges = {}
         numr = {}
@@ -543,8 +581,7 @@ def get_3c_grids(el1, el2, rmin_halves, wf_ranges, verbose=True):
 
 def chgoff2c(el1, el2, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
-            get_atoms(el1, el2, label=kwargs['label'], only_1c=False,
-                      pseudo_path=kwargs['pseudo_path'], yaml_path='..')
+        get_atoms(el1, el2, only_1c=False, **kwargs['atom_kwargs'])
 
     rmin = rmin_halves[el1] + rmin_halves[el2]
     N = numr[el1] + numr[el2] - int(np.round(rmin/dr))
@@ -563,8 +600,7 @@ def chgoff2c(el1, el2, **kwargs):
 
 def chgon1c(el1, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
-            get_atoms(el1, label=kwargs['label'], only_1c=True,
-                      pseudo_path=kwargs['pseudo_path'], yaml_path='..')
+        get_atoms(el1, only_1c=True, **kwargs['atom_kwargs'])
 
     for mapping in kwargs['aux_mappings']:
         basis = 'main' if mapping == 'mulliken' else 'auxiliary'
@@ -584,8 +620,7 @@ def chgon1c(el1, **kwargs):
 
 def chgon2c(el1, el2, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
-            get_atoms(el1, el2, label=kwargs['label'], only_1c=False,
-                      pseudo_path=kwargs['pseudo_path'], yaml_path='..')
+        get_atoms(el1, el2, only_1c=False, **kwargs['atom_kwargs'])
 
     rmin = rmin_halves[el1] + rmin_halves[el2]
     N = numr[el1] + numr[el1] - int(np.round(rmin/dr))
@@ -602,8 +637,7 @@ def chgon2c(el1, el2, **kwargs):
 
 def magoff2c(el1, el2, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
-            get_atoms(el1, el2, label=kwargs['label'], only_1c=False,
-                      pseudo_path=kwargs['pseudo_path'], yaml_path='..')
+        get_atoms(el1, el2, only_1c=False, **kwargs['atom_kwargs'])
 
     rmin = rmin_halves[el1] + rmin_halves[el2]
     N = numr[el1] + numr[el2] - int(np.round(rmin/dr))
@@ -621,8 +655,7 @@ def magoff2c(el1, el2, **kwargs):
 
 def magon1c(el1, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
-            get_atoms(el1, label=kwargs['label'], only_1c=True,
-                      pseudo_path=kwargs['pseudo_path'], yaml_path='..')
+        get_atoms(el1, only_1c=True, **kwargs['atom_kwargs'])
 
     for mapping in kwargs['aux_mappings']:
         basis = 'main' if mapping == 'mulliken' else 'auxiliary'
@@ -642,8 +675,7 @@ def magon1c(el1, **kwargs):
 
 def magon2c(el1, el2, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
-            get_atoms(el1, el2, label=kwargs['label'], only_1c=False,
-                      pseudo_path=kwargs['pseudo_path'], yaml_path='..')
+        get_atoms(el1, el2, only_1c=False, **kwargs['atom_kwargs'])
 
     rmin = rmin_halves[el1] + rmin_halves[el2]
     N = numr[el1] + numr[el1] - int(np.round(rmin/dr))
@@ -660,8 +692,7 @@ def magon2c(el1, el2, **kwargs):
 
 def map1c(el1, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
-            get_atoms(el1, label=kwargs['label'], only_1c=True,
-                      pseudo_path=kwargs['pseudo_path'], yaml_path='..')
+        get_atoms(el1, only_1c=True, **kwargs['atom_kwargs'])
 
     for mapping in kwargs['aux_mappings']:
         if mapping == 'giese_york':
@@ -673,8 +704,7 @@ def map1c(el1, **kwargs):
 
 def map2c(el1, el2, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
-            get_atoms(el1, el2, label=kwargs['label'], only_1c=False,
-                      pseudo_path=kwargs['pseudo_path'], yaml_path='..')
+        get_atoms(el1, el2, only_1c=False, **kwargs['atom_kwargs'])
 
     rmin = rmin_halves[el1] + rmin_halves[el2]
     N = numr[el1] + numr[el2] - int(np.round(rmin/dr))
@@ -693,8 +723,7 @@ def map2c(el1, el2, **kwargs):
 
 def off2c(el1, el2, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
-            get_atoms(el1, el2, label=kwargs['label'], only_1c=False,
-                      pseudo_path=kwargs['pseudo_path'], yaml_path='..')
+        get_atoms(el1, el2, only_1c=False, **kwargs['atom_kwargs'])
 
     rmin = rmin_halves[el1] + rmin_halves[el2]
     N = numr[el1] + numr[el2] - int(np.round(rmin/dr))
@@ -718,8 +747,7 @@ def off2c(el1, el2, **kwargs):
 
 def off3c(el1, el2, el3, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
-            get_atoms(el1, el2, el3, label=kwargs['label'], only_1c=False,
-                      pseudo_path=kwargs['pseudo_path'], yaml_path='..')
+        get_atoms(el1, el2, el3, only_1c=False, **kwargs['atom_kwargs'])
 
     Rgrid, Sgrid, Tgrid = get_3c_grids(el1, el2, rmin_halves, wf_ranges)
     calc = Offsite3cTable(atoms[el1], atoms[el2], timing=False)
@@ -730,8 +758,7 @@ def off3c(el1, el2, el3, **kwargs):
 
 def on2c(el1, el2, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
-            get_atoms(el1, el2, label=kwargs['label'], only_1c=False,
-                      pseudo_path=kwargs['pseudo_path'], yaml_path='..')
+        get_atoms(el1, el2, only_1c=False, **kwargs['atom_kwargs'])
 
     rmin = rmin_halves[el1] + rmin_halves[el2]
     N = numr[el1] + numr[el1] - int(np.round(rmin/dr))
@@ -745,8 +772,7 @@ def on2c(el1, el2, **kwargs):
 
 def on3c(el1, el2, el3, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
-            get_atoms(el1, el2, el3, label=kwargs['label'], only_1c=False,
-                      pseudo_path=kwargs['pseudo_path'], yaml_path='..')
+        get_atoms(el1, el2, el3, only_1c=False, **kwargs['atom_kwargs'])
 
     Rgrid, Sgrid, Tgrid = get_3c_grids(el1, el2, rmin_halves, wf_ranges)
 
@@ -758,8 +784,7 @@ def on3c(el1, el2, el3, **kwargs):
 
 def rep2c(el1, el2, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
-            get_atoms(el1, el2, label=kwargs['label'], only_1c=False,
-                      pseudo_path=kwargs['pseudo_path'], yaml_path='..')
+        get_atoms(el1, el2, only_1c=False, **kwargs['atom_kwargs'])
 
     rmin = rmin_halves[el1] + rmin_halves[el2]
     N = numr[el1] + numr[el2] - int(np.round(rmin/dr))
@@ -773,8 +798,7 @@ def rep2c(el1, el2, **kwargs):
 
 def rep3c(el1, el2, el3, **kwargs):
     atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
-            get_atoms(el1, el2, el3, label=kwargs['label'], only_1c=False,
-                      pseudo_path=kwargs['pseudo_path'], yaml_path='..')
+        get_atoms(el1, el2, el3, only_1c=False, **kwargs['atom_kwargs'])
 
     Rgrid, Sgrid, Tgrid = get_3c_grids(el1, el2, rmin_halves, wf_ranges)
 
