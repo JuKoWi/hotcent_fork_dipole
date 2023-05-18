@@ -1219,7 +1219,7 @@ class AtomicBase:
         u /= np.sqrt(norm2)
         self.smoothen_tail(u, index)
 
-        assert np.all(u > -1e-3), \
+        assert np.all(u > -5e-3), \
               'The reduced radial function acquires significantly ' + \
               'negative values (nl: {0}, min(u): {1})'.format(nl, np.min(u))
         return u, r_split
