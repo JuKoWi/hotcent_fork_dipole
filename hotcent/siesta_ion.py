@@ -79,8 +79,8 @@ def write_ion(atom, label=None, npts=500, threshold=1e-12):
             line = '{0:3d}{1:3d}{2:3d}{3:3d}{4:10.6f}'.format(*items)
             line += '  # subshell l, n, zeta, is_polarized, occupation'
             lines.append(line)
-            table = get_array_table(atom.Rnl_fct[nl], npts, threshold=threshold,
-                                    exponent=l)
+            table = get_array_table(atom.Rnl_fct[nl], atom.rmin, npts,
+                                    threshold=threshold, exponent=l)
             lines.extend(table)
 
     lines.append('# KBs:' + '_'*20)
@@ -91,26 +91,28 @@ def write_ion(atom, label=None, npts=500, threshold=1e-12):
         line = '{0:3d}{1:3d}{2:20.14f}'.format(l, counter, e_ref)
         line += '  # KB l, n (sequence number), e_KB'
         lines.append(line)
-        table = get_array_table(atom.pp.projectors[nl], npts,
+        table = get_array_table(atom.pp.projectors[nl], atom.rmin, npts,
                                 threshold=threshold, exponent=l)
         lines.extend(table)
         counter += 1
 
     lines.append('# Vna:' + '_'*20)
     _ = atom.neutral_atom_potential(1.)
-    table = get_array_table(atom.vna_fct, npts, factor=2,  # Ha to Ry
+    table = get_array_table(atom.vna_fct, atom.rmin, npts, factor=2,  # Ha to Ry
                             threshold=threshold)
     lines.extend(table)
 
     lines.append('# Chlocal:' + '_'*20)
     _ = atom.pp.get_local_density(1.)
-    table = get_array_table(atom.pp.rho_loc_fct, npts, threshold=threshold)
+    table = get_array_table(atom.pp.rho_loc_fct, atom.rmin, npts,
+                            threshold=threshold)
     lines.extend(table)
 
     if atom.pp.has_nonzero_rho_core:
         lines.append('# Core:' + '_'*20)
         _ = atom.pp.get_local_density(1.)
-        table = get_array_table(atom.pp.rho_core_fct, npts, threshold=threshold)
+        table = get_array_table(atom.pp.rho_core_fct, atom.rmin, npts,
+                                threshold=threshold)
         lines.extend(table)
 
     lines += ['']
@@ -122,7 +124,8 @@ def write_ion(atom, label=None, npts=500, threshold=1e-12):
     return
 
 
-def get_array_table(interpolator, npts, factor=1, exponent=0, threshold=None):
+def get_array_table(interpolator, rmin, npts, factor=1, exponent=0,
+                    threshold=None):
     if threshold is None:
         cutoff = interpolator.x[-1]
     else:
@@ -139,8 +142,10 @@ def get_array_table(interpolator, npts, factor=1, exponent=0, threshold=None):
     ]
 
     array = interpolator(grid) * factor
-    array[1:] /= grid[1:]**exponent
-    array[0] = array[1]
+
+    imin = 1 + int(np.round(rmin / delta))
+    array[imin:] /= grid[imin:]**exponent
+    array[:imin] = array[imin]
 
     table += ['{0:30.20e}{1:30.20e}'.format(x, y) for x, y in zip(grid, array)]
     return table
