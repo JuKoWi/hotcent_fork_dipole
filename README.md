@@ -38,10 +38,10 @@ Clone or download Hotcent and install with e.g.
 pip install .
 ```
 
-If you have Cython installed and want to regenerate the C extensions:
+If you want or need to first regenerate the C extensions,
+you need to have Cython installed and invoke it as e.g.
 ```shell
-rm hotcent/extensions.c
-pip install . --verbose --install-option="--use-cython"
+cython --module-name=_hotcent hotcent/extensions.pyx
 ```
 
 For developing Hotcent it is more convenient to install in editable mode:
@@ -50,8 +50,8 @@ pip install -e .
 ```
 
 Aside from the Python module and the compiled extensions (`_hotcent.so`),
-the installation should also provide the `hotcent-basis` and `hotcent-setup`
-command line tools.
+the installation should also provide the `hotcent-basis`, `hotcent-concat`
+and `hotcent-setup` command line tools.
 
 
 ### PyLibXC

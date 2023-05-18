@@ -7,25 +7,14 @@ from setuptools import Extension, find_packages, setup
 with open('hotcent/__init__.py') as f:
     version = re.search("__version__ = '(.*)'", f.read()).group(1)
 
-USE_CYTHON = False
-if '--use-cython' in sys.argv:
-    USE_CYTHON = True
-    sys.argv.remove('--use-cython')
-
-ext = '.pyx' if USE_CYTHON else '.c'
-
 extensions = [
     Extension('_hotcent',
-              sources=['hotcent/extensions' + ext],
+              sources=['hotcent/extensions.c'],
               language='c',
               extra_compile_args=['-O3', '-ffast-math',
                                   '-march=native'],
               ),
 ]
-
-if USE_CYTHON:
-    from Cython.Build import cythonize
-    extensions = cythonize(extensions, annotate=True)
 
 files = [
     'hotcent-basis',
