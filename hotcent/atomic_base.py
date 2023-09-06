@@ -1250,9 +1250,10 @@ class AtomicBase:
         # Build the new radial function
         u = self.unlg[nl] - fpoly
         u[index:] = 0.
+        self.smoothen_tail(u, index)
+
         norm2 = self.grid.integrate(u**2)
         u /= np.sqrt(norm2)
-        self.smoothen_tail(u, index)
 
         assert np.all(u > -5e-3), \
               'The reduced radial function acquires significantly ' + \
@@ -1319,9 +1320,10 @@ class AtomicBase:
                                         - (a - b*self.rgrid**2))
         index = np.argmax(self.rgrid > r_cut)
         u[index:] = 0.
+        self.smoothen_tail(u, index)
+
         norm2 = self.grid.integrate(u**2)
         u /= np.sqrt(norm2)
-        self.smoothen_tail(u, index)
         return u
 
     def smoothen_tail(self, u, N):
