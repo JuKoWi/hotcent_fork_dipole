@@ -8,7 +8,6 @@ import os
 import yaml
 from argparse import ArgumentParser
 from datetime import datetime
-from ase.units import Ha
 from hotcent import __version__
 from hotcent.confinement import SoftConfinement
 from hotcent.kleinman_bylander import KleinmanBylanderPP
@@ -46,11 +45,12 @@ def parse_arguments():
     parser.add_argument('--configuration', '-c', type=str, required=True,
                         help='Electronic configuration, e.g. "[Ne],3s2,3p2".')
     parser.add_argument('--energy-shift', '-E', type=str, default='0.2',
-                        help='Comma-separated energy shifts in eV for use with'
-                             ' --rcut_model=energy_shift_user (one value for '
-                             'each valence subshell). If only a single value '
-                             'is given (as in the default value of 0.2), it '
-                             'is applied to all subshells.')
+                        help='Comma-separated energy shifts in eV for use '
+                             'with the "energy_shift_user" and '
+                             '"energy_shift_user_sc" rcut approaches (one '
+                             'value for each valence subshell). If only a '
+                             'single value is given (as in the default value '
+                             'of 0.2), it is applied to all subshells.')
     parser.add_argument('-f', '--xcfunctional', type=str, default='LDA',
                         help='Exchange-correlation functional. Default: LDA.')
     parser.add_argument('--label', help='Label to use in the output file '
@@ -73,14 +73,17 @@ def parse_arguments():
                         ' in Bohr radii for every valence subshell (in the '
                         'same order as the -v/--valence keyword). Only used '
                         '(and required) for --rcut-approach=user.')
-    parser.add_argument('--rcut-approach', choices=['energy_shift_hubbard',
-                        'energy_shift_user', 'user'],
-                        default='energy_shift_user', help='Approach for '
-                        'obtaining the cutoff radii for the (minimal) basis. '
-                        'Choices are "energy_shift_hubbard" (shifts calculated'
-                        ' from Hubbard parameters), "energy_shift_user" ('
-                        'shifts supplied by the user) and "user" (cutoff radii'
-                        ' supplied by the user). Default: energy_shift_user.')
+    parser.add_argument('--rcut-approach', choices=['energy_shift_user',
+                        'energy_shift_user_sc', 'user'],
+                        default='energy_shift_user',
+                        help='Approach for obtaining the cutoff radii for the '
+                             '(minimal) basis functions. With the "user" '
+                             'approach the cutoff radii need to be supplied '
+                             'via the --rcut keyword. With the '
+                             '"energy_shift_user" and "energy_shift_user_sc" '
+                             'approaches the radii are determined by the '
+                             'shifts given via the --energy-shift option. '
+                             'Default: "energy_shift_user".')
     parser.add_argument('--rmin', help='Smallest radius in the radial grid, '
                         'to be used in case the default setting does not '
                         'yield well-behaved results.')
@@ -101,52 +104,42 @@ def parse_arguments():
     return args
 
 
-def find_energy_shifts(atom, model='hubbard'):
-    shifts = {}
-    for nl in atom.valence:
-        if model == 'hubbard':
-            U = atom.get_analytical_hubbard_value(nl)
-
-            if nl[1] in ['s', 'p']:
-                shift = (0.003/U**2 + 0.003/U)
-            elif nl[1] in ['d']:
-                shift = 0.006
-            else:
-                raise NotImplementedError(nl)
-        else:
-            raise NotImplementedError(model)
-
-        shifts[nl] = shift * Ha
-
-    return shifts
-
-
-def find_cutoff_radii(symbol, pp, rcut_approach, amp, x_ri, atom_kwargs,
-                      shifts=None, verbose=True):
-    assert rcut_approach in ['energy_shift_hubbard', 'energy_shift_user']
-
+def find_cutoff_radii(symbol, pp, rcut_approach, shifts, amp, x_ri, atom_kwargs,
+                      verbose=True):
     conf_kwargs = dict(amp=amp, x_ri=x_ri, rcuts=50.)
     atom = get_atom(symbol, pp, atom_kwargs, verbose=verbose, **conf_kwargs)
-    atom.run()
+
+    conf_kwargs = dict(amp=amp, x_ri=x_ri)
+    valence = atom.valence.copy()
+    rcuts = {}
 
     if rcut_approach == 'energy_shift_user':
-        assert shifts is not None
-    elif rcut_approach == 'energy_shift_hubbard':
-        shifts = find_energy_shifts(atom, model='hubbard')
+        for nl, shift in zip(valence, shifts):
+            rcuts[nl] = atom.find_cutoff_radius(nl, energy_shift=shift,
+                                                neglect_density_change=True,
+                                                **conf_kwargs)
 
-    rcuts = {}
-    for nl in atom_kwargs['valence']:
-        rcut = atom.find_cutoff_radius(nl, energy_shift=shifts[nl],
-                                       amp=amp, x_ri=x_ri)
-        rcuts[nl] = float(rcut)
-
+    elif rcut_approach == 'energy_shift_user_sc':
+        if len(valence) == 1:
+            nl = valence[0]
+            rcuts[nl] = atom.find_cutoff_radius(nl, energy_shift=shifts[0],
+                                                neglect_density_change=False,
+                                                **conf_kwargs)
+        elif len(valence) == 2:
+            rcuts.update(atom.find_cutoff_radii(*valence,
+                                                energy_shifts=shifts,
+                                                **conf_kwargs))
+        else:
+            msg = 'The "energy_shift_user_sc" rcut approach is not ' + \
+                    'available for more than two valence subshells'
+            raise NotImplementedError(msg)
     return rcuts
 
 
 def find_polarization_radius(symbol, pp, amp, x_ri, atom_kwargs, verbose=True):
     conf_kwargs = dict(amp=amp, x_ri=x_ri, rcuts=50.)
     atom = get_atom(symbol, pp, atom_kwargs, verbose=verbose, **conf_kwargs)
-    r_pol = float(atom.find_polarization_radius())
+    r_pol = atom.find_polarization_radius(amp=amp, x_ri=x_ri)
     return r_pol
 
 
@@ -154,6 +147,33 @@ def generate_bases(symbol, pp, atom_kwargs, basis_kwargs, conf_kwargs,
                    aux_basis_kwargs, verbose=True):
     atom = get_atom(symbol, pp, atom_kwargs, verbose=verbose, **conf_kwargs)
     atom.run()
+
+    cation_charges = {}
+    cation_potentials = {}
+
+    for nl in atom.valence:
+        for i in range(2):
+            if nl[1] == 'd':
+                chg = [3., 6.][i]
+                pot = 'point'
+            else:
+                chg = [2., 4.][i]
+                pot = 'pseudo'
+
+            izeta = i + 1
+            nlz = nl + '+'*izeta
+            cation_charges[nlz] = chg
+            cation_potentials[nlz] = pot
+
+    extra_kwargs = dict(
+        zeta_method='cation',
+        cation_charges=cation_charges,
+        cation_potentials=cation_potentials,
+    )
+
+    basis_kwargs.update(**extra_kwargs)
+    aux_basis_kwargs.update(**extra_kwargs)
+
     atom.generate_nonminimal_basis(**basis_kwargs)
     atom.pp.build_projectors(atom)
     atom.generate_auxiliary_basis(**aux_basis_kwargs)
@@ -242,18 +262,17 @@ def main():
         rcuts = {nl: rcut for nl, rcut in zip(valence, rcuts)}
     else:
         rcuts = None
+        shifts = list(map(float, args.energy_shift.split(',')))
 
-        if args.rcut_approach == 'energy_shift_user':
-            shifts = list(map(float, args.energy_shift.split(',')))
+        if args.rcut_approach in ['energy_shift_user', 'energy_shift_user_sc']:
             if len(shifts) == 1:
                 shifts *= len(valence)
             else:
                 assert len(shifts) == len(valence), 'When supplying more ' + \
                        'than one energy shift, the number of shifts must ' + \
                        'be equal to the number of valence subshells.'
-            shifts = {nl: shift for nl, shift in zip(valence, shifts)}
         else:
-            shifts = None
+            raise NotImplementedError(args.rcut_approach)
 
     pp_kwargs = dict(
         valence=valence,
@@ -293,8 +312,8 @@ def main():
     )
 
     if rcuts is None:
-        rcuts = find_cutoff_radii(symbol, pp, args.rcut_approach, amp, x_ri,
-                                  atom_kwargs, shifts=shifts, verbose=verbose)
+        rcuts = find_cutoff_radii(symbol, pp, args.rcut_approach, shifts,
+                                  amp, x_ri, atom_kwargs, verbose=verbose)
 
     conf_kwargs = dict(amp=amp, x_ri=x_ri, rcuts=rcuts)
 
