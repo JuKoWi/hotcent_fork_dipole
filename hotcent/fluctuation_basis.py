@@ -77,7 +77,9 @@ class AuxiliaryBasis:
         selected = [self.get_radial_label(izeta) for izeta in range(self.nzeta)]
         return selected
 
-    def build(self, el, subshell=None, nzeta=2, lmax=2, tail_norms=[0.2, 0.4],
+    def build(self, el, subshell=None, nzeta=2, lmax=2,
+              zeta_method='split_valence', tail_norms=[0.2, 0.4],
+              cation_charges=[2, 4], cation_potentials=['pseudo', 'pseudo'],
               **split_kwargs):
         """
         Builds a set of auxiliary radial functions and associated
@@ -98,11 +100,23 @@ class AuxiliaryBasis:
         lmax : int, optional
             Maximum angular momentum of the auxiliary basis functions
             (default: 2, i.e. up to d).
-        tail_norms : list of float, optional
+        zeta_method : str, optional
+            Method for constructing higher-zeta basis functions:
+            * 'split_valence' (see self.get_split_valence_unl()
+              as well as the 'tail_norms' option),
+            * 'cation' (see self.get_charge_confined_unl() as well as
+              the 'cation_charges' and 'cation_potentials' options).
+        tail_norms : dict or list of float, optional
             Parameters determining the radii at which higher-zeta
-            functions are 'split off' from the parent radial function in
-            the split-valence scheme. Each radius is chosen such that
-            the norm of the corresponding tail equals the given target.
+            functions are 'split off' in the split-valence scheme.
+            The split radius is chosen such that tail norm
+            equals the given target.
+        cation_charges : dict or list of float, optional
+            Charges for scaling the electrostatic potentials used for
+            generating higher-zeta functions in the 'cation' zeta scheme.
+        cation_potentials : dict or list of str, optional
+            Type of electrostatic potentials to apply in the
+            'cation' zeta scheme.
 
         Other Parameters
         ----------------
@@ -123,6 +137,9 @@ class AuxiliaryBasis:
         assert len(tail_norms) >= nzeta-1, 'additional tail norms are needed'
         self.nzeta = nzeta
 
+        assert zeta_method in ['cation', 'split_valence'], \
+               'Unknown zeta method: {0}'.format(zeta_method)
+
         for izeta in range(self.nzeta):
             nl = self.get_radial_label(izeta)
 
@@ -130,15 +147,35 @@ class AuxiliaryBasis:
                 for lm in ORBITALS[l]:
                     self.function_labels.append((nl, l, lm))
 
+            rc = None
+
             if izeta == 0:
                 Rnl = np.copy(el.Rnlg[self.subshell])
                 rc = el.rcutnl[self.subshell]
             else:
-                tail_norm = tail_norms[izeta-1]
-                u, r_split = el.get_split_valence_unl(self.subshell, tail_norm,
-                                                      **split_kwargs)
+                if zeta_method == 'split_valence':
+                    if isinstance(tail_norms, dict):
+                        tail_norm = tail_norms[nl]
+                    else:
+                        tail_norm = tail_norms[izeta-1]
+                    u, rc = el.get_split_valence_unl(self.subshell, tail_norm,
+                                                     **split_kwargs)
+                elif zeta_method == 'cation':
+                    if isinstance(cation_charges, dict):
+                        chg = cation_charges[nl]
+                    else:
+                        chg = cation_charges[izeta-1]
+
+                    if isinstance(cation_potentials, dict):
+                        pot = cation_potentials[nl]
+                    else:
+                        pot = cation_potentials[izeta-1]
+
+                    u = el.get_charge_confined_unl(self.subshell, chg,
+                                                   potential=pot)
+                    rc = el.rcutnl[self.subshell]
+
                 Rnl = u / el.rgrid
-                rc = r_split
 
             for l in range(self.lmax+1):
                 A = el.rgrid**l * Rnl**2

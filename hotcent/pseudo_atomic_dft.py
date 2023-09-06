@@ -31,6 +31,7 @@ class PseudoAtomicDFT(AtomicDFT):
         AtomicDFT.__init__(self, symbol, *args, **kwargs)
         self.pp = pp
         self.Rnl_free_fct = {nl: None for nl in self.pp.get_subshells()}
+        self.veff_free = None
 
     def print_header(self):
         template = '{0}-relativistic pseudopotential {1} calculator for {2}'
@@ -98,7 +99,7 @@ class PseudoAtomicDFT(AtomicDFT):
         header('Initial run without any confinement',
                'for pre-converging subshells and eigenvalues')
         self.confinement = ZeroConfinement()
-        dens_free, veff_free, self.enl_free, unlg_free, self.Rnlg_free = \
+        dens_free, self.veff_free, self.enl_free, unlg_free, self.Rnlg_free = \
                                                                 self.outer_scf()
         print('\nEigenvalues in the free atom:', file=self.txt)
         for nl in self.valence:
@@ -117,7 +118,8 @@ class PseudoAtomicDFT(AtomicDFT):
                     self.configuration[nl] = 0
 
                 l = ANGULAR_MOMENTUM[nl[1]]
-                veff = veff_free + self.pp.semilocal_potential(self.rgrid, l)
+                veff = self.veff_free \
+                       + self.pp.semilocal_potential(self.rgrid, l)
                 # Add similar weak confinement as Siesta with the
                 # KB.New.Reference.Orbitals=True option.
                 veff += SoftConfinement(rc=60.)(self.rgrid)
@@ -150,7 +152,7 @@ class PseudoAtomicDFT(AtomicDFT):
                    'to get a confined %s subshell' % nl)
 
             l = ANGULAR_MOMENTUM[nl[1]]
-            veff = veff_free + self.confinement(self.rgrid) \
+            veff = self.veff_free + self.confinement(self.rgrid) \
                    + self.pp.semilocal_potential(self.rgrid, l)
 
             enl = {nl: self.enl_free[nl]}

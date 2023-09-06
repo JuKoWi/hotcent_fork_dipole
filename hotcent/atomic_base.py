@@ -1026,14 +1026,12 @@ class AtomicBase:
                                       dens_nl2)
         return W
 
-    def generate_nonminimal_basis(self, size, tail_norms=[0.16,0.3], l_pol=None,
-                                  r_pol=None, **split_kwargs):
+    def generate_nonminimal_basis(self, size, zeta_method='split_valence',
+                                  tail_norms=[0.16, 0.3], cation_charges=[2, 4],
+                                  cation_potentials=['pseudo', 'pseudo'],
+                                  l_pol=None, r_pol=None, **split_kwargs):
         """
         Adds more basis functions to the default minimal basis.
-
-        Multiple-zeta basis functions are generated using
-        a "split-valence" scheme (see Artacho et al.,
-        Phys. stat. sol. (b) 215, 809 (1999)).
 
         Polarization functions correspond to so-called "quasi-Gaussians"
         (see Larsen et al., Phys. Rev. B 80, 105112 (2009)).
@@ -1048,12 +1046,24 @@ class AtomicBase:
             * 'dz' (double-zeta),
             * 'dzp' (double-zeta with polarization),
             * 'tz' (triple-zeta),
-            * 'tzp' (triple-zeta with polarization),
-        tail_norms : list of float, optional
+            * 'tzp' (triple-zeta with polarization).
+        zeta_method : str, optional
+            Method for constructing higher-zeta basis functions:
+            * 'split_valence' (see self.get_split_valence_unl()
+              as well as the 'tail_norms' option),
+            * 'cation' (see self.get_charge_confined_unl() as well as
+              the 'cation_charges' and 'cation_potentials' options).
+        tail_norms : dict or list of float, optional
             Parameters determining the radii at which higher-zeta
-            functions are 'split off' from the parent radial function in
-            the split-valence scheme. Each radius is chosen such that
-            the norm of the corresponding tail equals the given target.
+            functions are 'split off' in the split-valence scheme.
+            The split radius is chosen such that tail norm
+            equals the given target.
+        cation_charges : dict or list of float, optional
+            Charges for scaling the electrostatic potentials used for
+            generating higher-zeta functions in the 'cation' zeta scheme.
+        cation_potentials : dict or list of str, optional
+            Type of electrostatic potentials to apply in the
+            'cation' zeta scheme.
         l_pol : None or float, optional
             Angular momentum of the polarizing quasi-Gaussian.
             If None (the default), the first angular momentum is
@@ -1069,6 +1079,8 @@ class AtomicBase:
         assert self.solved, NOT_SOLVED_MESSAGE
         assert size in ['sz', 'szp', 'dz', 'dzp', 'tz', 'tzp'], \
                'Unknown basis size: {0}'.format(size)
+        assert zeta_method in ['cation', 'split_valence'], \
+               'Unknown zeta method: {0}'.format(zeta_method)
 
         print('Generating {0} basis for {1}'.format(size, self.symbol),
               file=self.txt)
@@ -1085,25 +1097,48 @@ class AtomicBase:
             nzeta = {'d': 2, 't': 3}[size[0]]
 
             for izeta in range(1, nzeta):
-                tail_norm = tail_norms[izeta-1]
-                print('Tail norm: {0:.3f}'.format(tail_norm), file=self.txt)
-
                 self.basis_sets.append([])
 
                 for nl in self.valence:
                     nlz = nl + '+'*izeta
 
-                    self.unlg[nlz], r_split = \
-                        self.get_split_valence_unl(nl, tail_norm,
-                                                   **split_kwargs)
+                    if zeta_method == 'split_valence':
+                        if isinstance(tail_norms, dict):
+                            tail_norm = tail_norms[nlz]
+                        else:
+                            tail_norm = tail_norms[izeta-1]
 
-                    print('Split radius ({0}): {1:.3f}'.format(nlz, r_split),
-                          file=self.txt)
+                        msg = 'Tail norm ({0}): {1:.3f}'
+                        print(msg.format(nlz, tail_norm), file=self.txt)
+
+                        self.unlg[nlz], r_cut = \
+                            self.get_split_valence_unl(nl, tail_norm,
+                                                       **split_kwargs)
+                        msg = 'Split radius ({0}): {1:.3f}'
+                        print(msg.format(nlz, r_cut), file=self.txt)
+
+                    elif zeta_method == 'cation':
+                        if isinstance(cation_charges, dict):
+                            chg = cation_charges[nlz]
+                        else:
+                            chg = cation_charges[izeta-1]
+
+                        if isinstance(cation_potentials, dict):
+                            pot = cation_potentials[nlz]
+                        else:
+                            pot = cation_potentials[izeta-1]
+
+                        msg = 'Cation charge ({0}): {1:.3f}, potential: {2}'
+                        print(msg.format(nlz, chg, pot), file=self.txt)
+
+                        self.unlg[nlz] = self.get_charge_confined_unl(
+                                                        nl, chg, potential=pot)
+                        r_cut = self.rcutnl[nl]
 
                     self.unl_fct[nlz] = None
                     self.Rnlg[nlz] = self.unlg[nlz] / self.rgrid
                     self.Rnl_fct[nlz] = None
-                    self.rcutnl[nlz] = r_split
+                    self.rcutnl[nlz] = r_cut
                     self.basis_sets[izeta].append(nlz)
 
         if size.endswith('p'):
@@ -1145,7 +1180,7 @@ class AtomicBase:
     def get_split_valence_unl(self, nl, tail_norm, degree=None, intercept=None):
         """
         Generates a new radial function based on the split-valence approach
-        as used in Siesta (see Artacho et al., Phys. stat. sol. (b) 215,
+        as used in Siesta (see e.g. Artacho et al., Phys. stat. sol. (b) 215,
         809 (1999)).
 
         Parameters
@@ -1223,6 +1258,55 @@ class AtomicBase:
               'The reduced radial function acquires significantly ' + \
               'negative values (nl: {0}, min(u): {1})'.format(nl, np.min(u))
         return u, r_split
+
+    def get_charge_confined_unl(self, nl, charge, potential='point'):
+        """
+        Generates a new (higher-zeta) radial function by introducing
+        an attractive electrostatic potential (as e.g. mentioned in
+        Delley, J. Chem. Phys. 92, 1 (1990)).
+
+        Parameters
+        ----------
+        nl : str
+            Subshell label (e.g. '2p') of the parent radial function.
+        charge : float
+            The total (positive) charge associated with the added
+            electrostatic potential.
+        potential : str, optional
+            The type of electrostatic potential to apply.
+            With 'point' a point charge potential is used,
+            whereas 'pseudo' selects the local part of the
+            pseudopotential.
+
+        Returns
+        -------
+        u : np.ndarray
+            The reduced radial function.
+        """
+        assert nl in self.valence and nl in self.configuration
+
+        vconf = self.wf_confinement[nl](self.rgrid)
+        l = ANGULAR_MOMENTUM[nl[1]]
+
+        if potential == 'point':
+            vchg = -charge / self.rgrid
+        elif potential == 'pseudo':
+            nel = self.get_number_of_electrons(only_valence=True)
+            vchg = self.pp.local_potential(self.rgrid)
+            vchg *= charge * 1. / nel
+        else:
+            raise NotImplementedError('Unknown potential type: %s' % potential)
+
+        veff = self.veff_free + vconf + vchg
+
+        if not isinstance(self.pp, PhillipsKleinmanPP):
+            veff += self.pp.semilocal_potential(self.rgrid, l)
+
+        enl = {nl: self.enl_free[nl]}
+        itmax, enl, d_enl, unlg, Rnlg = self.inner_scf(1, veff, enl, {},
+                                                       solve=[nl], ae=False)
+        u = unlg[nl]
+        return u
 
     def get_quasi_gaussian_unl(self, nl, l_pol, r_pol, r_cut):
         """Generates a quasi-Gaussian radial function."""
