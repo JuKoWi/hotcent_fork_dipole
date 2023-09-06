@@ -49,7 +49,7 @@ def parse_arguments():
                         'basis. This determines the kind of kernel integral '
                         'and mapping integral tables that will be produced '
                         'by the chg*, mag* and map* tasks. Default: "mulliken,'
-                        'giese_york".)')
+                        'giese_york".')
     parser.add_argument('--dry-run', action='store_true', help='Exit after '
                         'printing the task overview, without executing them.')
     parser.add_argument('--exclude', help='Element combinations to exclude. '
@@ -385,7 +385,8 @@ def main():
     generator.create_working_directories()
     tasks = generator.get_tasks()
 
-    print('\nStarting pool with %d processes' % args.processes, flush=True)
+    procstr = 'process' if args.processes == 1 else 'processes'
+    print('\nStarting pool with %d %s' % (args.processes, procstr), flush=True)
     pool = Pool(processes=args.processes)
     pool.map_async(wrapper, tasks, chunksize=1, callback=callback)
     pool.close()
