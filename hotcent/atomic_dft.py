@@ -677,7 +677,7 @@ class AtomicDFT(AtomicBase):
         return c0, c1, c2
 
     def find_cutoff_radius(self, nl, energy_shift=0.2, tolerance=1e-3,
-                           **kwargs):
+                           rcuts=None, neglect_density_change=True, **kwargs):
         """
         Returns the subshell cutoff radius such that the corresponding
         energy upshift upon soft confinement equals the given value.
@@ -691,11 +691,21 @@ class AtomicDFT(AtomicBase):
         tolerance : float, optional
             Tolerance (in eV) for termination of the search
             (default: 1e-3).
+        rcuts : dict, optional
+            Cutoff radii for the other valence subshells.
+            If not given, these will be left unconfined.
+        neglect_density_change : bool, optional
+            By default (True) the shifted energy is calculated in a
+            non-self-consistent fashion from an effective potential
+            that corresponds to that of the unconfined atom plus the
+            the subshell's confinement potential. By choosing False,
+            also the change in electron density due to the subshell's
+            confinement is taken into account.
 
         Other parameters
         ----------------
         kwargs : additional parameters to the SoftConfinement
-                 potential
+                 potentials
 
         Returns
         -------
@@ -706,18 +716,25 @@ class AtomicDFT(AtomicBase):
         assert nl in self.valence
         assert self.perturbative_confinement
 
-        wf_confinement = self.wf_confinement.copy()
+        rmax = float(self.rgrid[-1])
 
-        # Find the eigenvalue in the free atom
-        rmax = self.rgrid[-1]
-        self.wf_confinement = {nl2: SoftConfinement(rc=rmax, **kwargs)
-                               for nl2 in self.valence}
+        # Set up the initial confinement potentials
+        wf_confinement = self.wf_confinement.copy()
+        self.wf_confinement = {}
+        for nl_ in self.valence:
+            if nl_ != nl and rcuts is not None and nl_ in rcuts:
+                rc_ = rcuts[nl_]
+            else:
+                rc_ = rmax
+            self.wf_confinement[nl_] = SoftConfinement(rc=rc_, **kwargs)
+
+        # Find the eigenvalue for the unconfined subshell
         self.run()
         enl_free = self.get_eigenvalue(nl)
 
-        # Bisection with confined atom
-        rc = 6.  # initial guess
+        # Bisection
         rmin = 3.
+        rc = 6.  # initial guess
         diff = np.inf
 
         while abs(diff) > tolerance:
@@ -732,8 +749,13 @@ class AtomicDFT(AtomicBase):
             self.wf_confinement[nl].rc = rc
             try:
                 self.run()
-                de = self.get_eigenvalue(nl) - enl_free  # in Ha
-                diff = de*Ha - energy_shift  # in eV
+
+                if neglect_density_change:
+                    e = self.get_eigenvalue(nl)
+                else:
+                    e, _ = self.get_onecenter_integrals(nl, nl)
+
+                diff = (e - enl_free) * Ha - energy_shift
             except RuntimeError:
                 # Convergence problems. This is usually due to
                 # too strong confinement (eigenvalues becoming positive)
@@ -743,10 +765,104 @@ class AtomicDFT(AtomicBase):
         self.solved = False
         return rc
 
-    def find_polarization_radius(self):
+    def find_cutoff_radii(self, nl1, nl2, energy_shifts, tolerance=1e-3,
+                          **kwargs):
+        """
+        Returns the valence subshell cutoff radii such that the
+        corresponding (self-consistent) energy upshifts upon soft
+        confinement equal the given values.
+
+        Parameters
+        ----------
+        nl1 : str
+            First subshell label.
+        nl2 : str
+            Second subshell label.
+        energy_shifts : list of float
+            The energy shifts in eV for the two subshells.
+        tolerance : float, optional
+            Tolerance (in eV) for termination of the search
+            (default: 1e-3).
+
+        Other parameters
+        ----------------
+        kwargs : additional parameters to the SoftConfinement
+                 potentials
+
+        Returns
+        -------
+        rcuts : dict
+            Cutoff radii for the given subshells.
+        """
+        assert self.perturbative_confinement
+
+        rmax = float(self.rgrid[-1])
+
+        # Set up the initial confinement potentials
+        wf_confinement = self.wf_confinement.copy()
+        self.wf_confinement = {nl_: SoftConfinement(rc=rmax, **kwargs)
+                               for nl_ in self.valence}
+
+        # Find the eigenvalues in the free atom
+        self.run()
+        enl_free1 = self.get_eigenvalue(nl1)
+        enl_free2 = self.get_eigenvalue(nl2)
+
+        # Bisection
+        rmin = 3.
+        rc1 = 6.  # initial guess
+        diff1 = np.inf
+        diff2 = np.inf
+
+        while max(abs(diff1), abs(diff2)) > tolerance:
+            if np.isfinite(diff1):
+                if diff1 < 0:
+                    rmax = rc1
+                    rc1 = (rc1 + rmin) / 2.
+                else:
+                    rmin = rc1
+                    rc1 = (rc1 + rmax) / 2.
+
+            self.wf_confinement = wf_confinement.copy()
+            rcuts = {nl1: rc1}
+            rc2 = self.find_cutoff_radius(nl2, energy_shift=energy_shifts[1],
+                                          tolerance=tolerance,
+                                          neglect_density_change=False,
+                                          rcuts=rcuts, **kwargs)
+            rcuts[nl2] = rc2
+
+            self.wf_confinement = {
+                nl1: SoftConfinement(rc=rc1, **kwargs),
+                nl2: SoftConfinement(rc=rc2, **kwargs),
+            }
+            try:
+                self.run()
+                e1, _ = self.get_onecenter_integrals(nl1, nl1)
+                e2, _ = self.get_onecenter_integrals(nl2, nl2)
+                diff1 = (e1 - enl_free1) * Ha - energy_shifts[0]
+                diff2 = (e2 - enl_free2) * Ha - energy_shifts[1]
+            except RuntimeError:
+                # Convergence problems. This is usually due to
+                # too strong confinement (eigenvalues becoming positive)
+                diff1 = 1.
+
+        self.wf_confinement = wf_confinement
+        self.solved = False
+        return rcuts
+
+    def find_polarization_radius(self, energy_shift=0.3, **kwargs):
         """
         Returns the characteristic radius used in GPAW's quasi-Gaussian
         method for generating polarization functions.
+
+        Parameters
+        ----------
+        energy_shift : float, optional
+            Energy shift in eV (default: 0.3).
+
+        Other parameters
+        ----------------
+        kwargs : additional parameters to the find_cutoff_radius() method
 
         Returns
         -------
@@ -757,7 +873,8 @@ class AtomicDFT(AtomicBase):
 
         rcmax = -np.inf
         for nl in self.valence:
-            rc = self.find_cutoff_radius(nl, energy_shift=0.3, amp=12, x_ri=0.6)
+            rc = self.find_cutoff_radius(nl, energy_shift=energy_shift,
+                                         **kwargs)
             rcmax = max(rcmax, rc)
 
         r_pol = 0.25 * rcmax
