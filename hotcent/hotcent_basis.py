@@ -29,19 +29,49 @@ def parse_arguments():
                         'with angular momenta up to d, specify --aux-basis=2D.'
                         ' The default is 2P for H and He and 3D for all other '
                         'elements.')
+    parser.add_argument('--aux-cation-charges', type=str,
+                        help='Equivalent of the --cation-charges keyword '
+                             'for the higher-zeta auxiliary basis functions.')
+    parser.add_argument('--aux-cation-potentials', type=str,
+                        help='Equivalent of the --cation-potentials keyword '
+                             'for the higher-zeta auxiliary basis functions.')
     parser.add_argument('--aux-subshell', type=str, help='Main basis subshell '
                         'from which the auxiliary radial functions will be '
                         'derived. To e.g. select the 3p subshell for Si '
                         'instead of the default choice (the valence subshell '
                         'with the lowest angular momentum, i.e. 3s for Si), '
                         'specify --aux-subshell=3p.')
+    parser.add_argument('--aux-tail-degree', type=int, default=None,
+                        help='Equivalent of the --tail-degree keyword for the '
+                             'higher-zeta auxiliary basis functions. '
+                             'The default None means that an appropriate '
+                             'degree will be chosen.')
     parser.add_argument('--aux-tail-norms', type=str, default='0.2,0.4',
-                        help='Comma-separated tail norms to use for building '
-                             'the higher-zeta auxiliary basis functions '
+                        help='Equivalent of the --tail-norms keyword for the '
+                             'higher-zeta auxiliary basis functions '
                              '(default: 0.2,0.4).')
+    parser.add_argument('--aux-zeta-method', type=str, default='cation',
+                        choices=['cation', 'split_valence'],
+                        help='Equivalent of the --zeta-method keyword for the '
+                             'higher-zeta auxiliary basis functions.')
     parser.add_argument('--basis', '-b', type=str, default='dzp',
                         choices=['sz', 'szp', 'dz', 'dzp', 'tz', 'tzp'],
                         help='Size of the main basis set (default: dzp).')
+    parser.add_argument('--cation-charges', type=str,
+                        help='Comma-separated charges to use for the '
+                             'higher-zeta functions in the "cation" zeta '
+                             'scheme (one underscore-separated list for '
+                             'each valence subshell). By default charges '
+                             'of 2 and 4 are used for s- and p-subshells '
+                             'and 3 and 6 for d- and f-subshells.')
+    parser.add_argument('--cation-potentials', type=str,
+                        help='Comma-separated potential types to use for the '
+                             'higher-zeta functions in the "cation" zeta '
+                             'scheme (one underscore-separated list for '
+                             'each valence subshell). By default the local '
+                             'part of the pseudopotential is used for s- and '
+                             'p-subshells and point-charge potentials for '
+                             'd- and f-subshells.')
     parser.add_argument('--configuration', '-c', type=str, required=True,
                         help='Electronic configuration, e.g. "[Ne],3s2,3p2".')
     parser.add_argument('--energy-shift', '-E', type=str, default='0.2',
@@ -87,8 +117,14 @@ def parse_arguments():
     parser.add_argument('--rmin', help='Smallest radius in the radial grid, '
                         'to be used in case the default setting does not '
                         'yield well-behaved results.')
+    parser.add_argument('--tail-degree', type=int, default=None,
+                        help='Degree of the polynomial to use in the '
+                             '"split_valence" scheme for generating the '
+                             'higher-zeta functions. The default None means '
+                             'that an appropriate degree will be chosen.')
     parser.add_argument('--tail-norms', '-T', type=str, default='0.16,0.3',
-                        help='Comma-separated tail norms to use for the '
+                        help='Comma-separated tail norms to use in the '
+                             '"split_valence" scheme for generating the '
                              'higher-zeta functions (default: 0.16,0.3).')
     parser.add_argument('--valence', '-v', type=str, required=True,
                         help='Comma-separated subshells to include in the '
@@ -100,6 +136,10 @@ def parse_arguments():
                         help='Soft confinement start radius, relative to the '
                              'cutoff radius (default: 0.6).')
     parser.add_argument('--version', action='version', version='%(prog)s 0.1')
+    parser.add_argument('--zeta-method', type=str, default='cation',
+                        choices=['cation', 'split_valence'],
+                        help='Method for constructing higher-zeta basis '
+                             'functions (default: "cation").')
     args = parser.parse_args()
     return args
 
@@ -143,37 +183,45 @@ def find_polarization_radius(symbol, pp, amp, x_ri, atom_kwargs, verbose=True):
     return r_pol
 
 
+def get_zeta_kwargs(valence, arg_zeta_method, arg_tail_degree, arg_tail_norms,
+                    arg_cation_chg, arg_cation_pot):
+    cation_charges = dict()
+    cation_potentials = dict()
+
+    for i, nl in enumerate(valence):
+        if arg_cation_chg is None:
+            chg = dict(s=[2., 4.], p=[2., 4.], d=[3., 6.], f=[3., 6.])[nl[1]]
+        else:
+            chg = list(map(float, arg_cation_chg.split(',')[i].split('_')))
+
+        if arg_cation_pot is None:
+            pot = dict(s=['pseudo']*2, p=['pseudo']*2,
+                       d=['point']*2, f=['point']*2)[nl[1]]
+        else:
+            pot = arg_cation_pot.split(',')[i].split('_')
+
+        for j in range(2):
+            nlz = nl + '+'*(j + 1)
+            cation_charges[nlz] = chg[j]
+            cation_potentials[nlz] = pot[j]
+
+    tail_degree = None if arg_tail_degree is None else int(arg_tail_degree)
+    tail_norms = list(map(float, arg_tail_norms.split(',')))
+
+    zeta_kwargs = dict(
+        cation_charges=cation_charges,
+        cation_potentials=cation_potentials,
+        degree=tail_degree,
+        tail_norms=tail_norms,
+        zeta_method=arg_zeta_method,
+    )
+    return zeta_kwargs
+
+
 def generate_bases(symbol, pp, atom_kwargs, basis_kwargs, conf_kwargs,
                    aux_basis_kwargs, verbose=True):
     atom = get_atom(symbol, pp, atom_kwargs, verbose=verbose, **conf_kwargs)
     atom.run()
-
-    cation_charges = {}
-    cation_potentials = {}
-
-    for nl in atom.valence:
-        for i in range(2):
-            if nl[1] == 'd':
-                chg = [3., 6.][i]
-                pot = 'point'
-            else:
-                chg = [2., 4.][i]
-                pot = 'pseudo'
-
-            izeta = i + 1
-            nlz = nl + '+'*izeta
-            cation_charges[nlz] = chg
-            cation_potentials[nlz] = pot
-
-    extra_kwargs = dict(
-        zeta_method='cation',
-        cation_charges=cation_charges,
-        cation_potentials=cation_potentials,
-    )
-
-    basis_kwargs.update(**extra_kwargs)
-    aux_basis_kwargs.update(**extra_kwargs)
-
     atom.generate_nonminimal_basis(**basis_kwargs)
     atom.pp.build_projectors(atom)
     atom.generate_auxiliary_basis(**aux_basis_kwargs)
@@ -302,13 +350,12 @@ def main():
         r_pol = find_polarization_radius(symbol, pp, amp, x_ri, atom_kwargs,
                                          verbose=verbose)
 
-    tail_norms = list(map(float, args.tail_norms.split(',')))
-
-    basis_kwargs = dict(
-        size=args.basis,
+    basis_kwargs = get_zeta_kwargs(valence, args.zeta_method, args.tail_degree,
+                                   args.tail_norms, args.cation_charges,
+                                   args.cation_potentials)
+    basis_kwargs.update(
         r_pol=r_pol,
-        tail_norms=tail_norms,
-        degree=None,
+        size=args.basis,
     )
 
     if rcuts is None:
@@ -318,11 +365,21 @@ def main():
     conf_kwargs = dict(amp=amp, x_ri=x_ri, rcuts=rcuts)
 
     # Auxiliary basis settings
+    aux_basis_kwargs = get_zeta_kwargs(valence, args.aux_zeta_method,
+                                       args.aux_tail_degree,
+                                       args.aux_tail_norms,
+                                       args.aux_cation_charges,
+                                       args.aux_cation_potentials)
 
     aux_lmax = 1 if symbol in ['H', 'He'] else 2
     aux_nzeta = 2 if symbol in ['H', 'He'] else 3
-    aux_basis_kwargs = dict(subshell=None, lmax=aux_lmax, nzeta=aux_nzeta,
-                            tail_norms=[0.2, 0.4], degree=None)
+
+    aux_basis_kwargs.update(
+        degree=None,
+        lmax=aux_lmax,
+        nzeta=aux_nzeta,
+        subshell=None,
+    )
 
     parse_err = 'Cannot parse {0} entry: {1}'
 
@@ -340,12 +397,7 @@ def main():
                'Auxiliary basis subshell must be chosen from the minimal basis'
         aux_basis_kwargs.update(subshell=args.aux_subshell)
 
-    if args.aux_tail_norms is not None:
-        tail_norms = list(map(float, args.aux_tail_norms.split(',')))
-        aux_basis_kwargs.update(tail_norms=tail_norms)
-
     # Basis generation and plotting
-
     atom = generate_bases(symbol, pp, atom_kwargs, basis_kwargs, conf_kwargs,
                           aux_basis_kwargs=aux_basis_kwargs, verbose=verbose)
 
