@@ -482,23 +482,24 @@ class KleinmanBylanderPP(SeparablePP):
 
 if __name__ == '__main__':
     import argparse
+    import os
+
     description = 'Tool for plotting (semi)local potentials and densities.'
     usage = """
     python kleinman_bylander.py --help
 
-    python kleinman_bylander.py C.psf --valence=2s,2p --with-polarization=False
-                                      --local-component=siesta
+    python kleinman_bylander.py C.psf --valence=2s,2p --local-component=siesta
 
-    python kleinman_bylander.py Au.psf --valence=5d,6s --with-polarization=True
+    python kleinman_bylander.py Au.psf --valence=5d,6s --with-polarization
                                        --local-component=f
     """
     parser = argparse.ArgumentParser(description=description, usage=usage)
     parser.add_argument('filename', type=str)
-    parser.add_argument('--valence', type=str, default=None)
-    parser.add_argument('--local_component', type=str, default='siesta')
-    parser.add_argument('--with_polarization', type=bool, default=None)
     parser.add_argument('--lmax', type=int, default=None)
+    parser.add_argument('--local-component', type=str, default='siesta')
     parser.add_argument('--rcore', type=float, default=None)
+    parser.add_argument('--valence', type=str, default=None)
+    parser.add_argument('--with-polarization', action='store_true')
     args = parser.parse_args()
 
     valence = None if args.valence is None else args.valence.split(',')
@@ -506,7 +507,9 @@ if __name__ == '__main__':
                             with_polarization=args.with_polarization,
                             local_component=args.local_component,
                             lmax=args.lmax, rcore=args.rcore, verbose=True)
-    pp.plot_potentials()
-    pp.plot_valence_density()
+
+    prefix, _ = os.path.splitext(os.path.basename(args.filename))
+    pp.plot_potentials(filename='{0}_potentials.png'.format(prefix))
+    pp.plot_valence_density(filename='{0}_rhovalence.png'.format(prefix))
     if pp.has_nonzero_rho_core:
-        pp.plot_core_density()
+        pp.plot_core_density(filename='{0}_rhocore.png'.format(prefix))
