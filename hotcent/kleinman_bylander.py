@@ -145,24 +145,25 @@ class KleinmanBylanderPP(SeparablePP):
             self.Zval = float(self.Zval)
             assert np.isclose(self.Zval, sum(occup.values()))
 
-            # Next lines with various arrays  (l-dependent potentials,
-            # core density, valence density)
-            label_dict = {'radial grid': 'rgrid',
-                          'down pseudopotential': 'Vl',
-                          'core charge': 'rho_core',
-                          'valence charge': 'rho_val'}
+            # Next lines contain 1D arrays
+            label_dict = {
+                'radial grid': 'rgrid',
+                'down pseudopotential': 'Vl',
+                'core charge': 'rho_core',
+                'valence charge': 'rho_val',
+            }
 
             new_section = True
             need_l = False
             counter = 0
+
             for line in f:
                 if new_section:
                     assert 'follows' in line
                     label = ' '.join(line.lower().split()[:2])
                     assert label in label_dict
                     key = label_dict[label]
-                    l_dependent = key == 'Vl'
-                    need_l = l_dependent
+                    need_l = key == 'Vl'
                     new_section = False
                     array = []
                     counter = 0
@@ -173,11 +174,7 @@ class KleinmanBylanderPP(SeparablePP):
 
                 else:
                     items = list(map(float, line.split()))
-                    if l_dependent:
-                        array.extend(items)
-                    else:
-                        array.extend(items)
-
+                    array.extend(items)
                     counter += len(items)
                     assert counter <= self.N
 
@@ -187,7 +184,8 @@ class KleinmanBylanderPP(SeparablePP):
                             # Check values beyond rcore
                             limit = -2. * self.Zval  # in Ry
                             index = np.argmax(self.rgrid > self.rcore[l])
-                            valid = np.allclose(array[index:], limit, atol=5e-2)
+                            valid = np.allclose(array[index:], limit,
+                                                atol=5e-2)
                             if not valid:
                                 msg = 'The (reduced) semilocal potential ' \
                                       'for l={0} is not sufficiently close ' \
@@ -285,11 +283,12 @@ class KleinmanBylanderPP(SeparablePP):
 
     def check_lmax(self):
         ps_lmax = max(self.Vl.keys())
-        assert self.lmax <= ps_lmax, 'Pseudopotential only contains V_l up ' \
-                              'to l=%d and we need l=%d' % (ps_lmax, self.lmax)
+        assert self.lmax <= ps_lmax, \
+               'Pseudopotential only contains V_l up to l=%d ' \
+               'and we need l=%d' % (ps_lmax, self.lmax)
 
-        assert self.lmax <= 4, 'Can only handle projectors with angular ' \
-                               'momenta up to f'
+        assert self.lmax <= 4, \
+               'Can only handle projectors with angular momenta up to f'
         return
 
     def get_core_density(self, r, der=0):
@@ -477,7 +476,7 @@ class KleinmanBylanderPP(SeparablePP):
 
                     integrand = projector * e3.rgrid**2 * e3.Rnl(e3.rgrid, nl2)
                     self.overlap_onsite[(nl, nl2)] = \
-                                    e3.grid.integrate(integrand, use_dV=False)
+                        e3.grid.integrate(integrand, use_dV=False)
 
 
 if __name__ == '__main__':
