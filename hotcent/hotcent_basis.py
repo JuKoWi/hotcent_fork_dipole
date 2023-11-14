@@ -330,9 +330,7 @@ def main():
 
     pp_filename = '{0}{1}.psf'.format(symbol, pseudo_label)
     pp_path = os.path.join(args.pseudo_path, pp_filename)
-    if verbose:
-        print('Using pseudopotential file {0}'.format(pp_path))
-    pp = KleinmanBylanderPP(pp_path, verbose=verbose, **pp_kwargs)
+    pp = KleinmanBylanderPP(pp_path, txt='-' if verbose else None, **pp_kwargs)
 
     atom_kwargs = dict(
         configuration=configuration,

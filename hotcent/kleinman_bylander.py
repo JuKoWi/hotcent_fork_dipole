@@ -48,13 +48,15 @@ class KleinmanBylanderPP(SeparablePP):
         local_component argument is 'siesta'. If None, the largest
         core semilocal potential radius of the included angular momenta
         is used.
-    verbose : bool, optional
-        Verbosity flag (default: False).
+
+    Other Parameters
+    ----------------
+    Additional keyword arguments for SeparablePP initialization.
     """
     def __init__(self, filename, valence=None, with_polarization=None,
                  local_component='siesta', lmax=None, rcore=None,
-                 verbose=False):
-        SeparablePP.__init__(self, verbose=verbose)
+                 **kwargs):
+        SeparablePP.__init__(self, **kwargs)
         self.local_component = local_component
 
         self.subshells = []
@@ -72,6 +74,9 @@ class KleinmanBylanderPP(SeparablePP):
         self.rho_loc = []
         self.rho_loc_fct = None
 
+        print('PP: using pseudopotential file {0}'.format(filename),
+              file=self.txt)
+
         if filename.endswith('.psf'):
             self.initialize_from_psf(filename)
         else:
@@ -81,7 +86,8 @@ class KleinmanBylanderPP(SeparablePP):
 
         self.normalize_valence_density()
         if self.has_nonzero_rho_core:
-            print('PP: non-linear core corrections for %s' % self.symbol)
+            print('PP: applying non-linear core corrections for {0}'.format(
+                  self.symbol), file=self.txt)
             self.normalize_core_density()
 
         for l, Vl in self.Vl.items():
@@ -98,8 +104,8 @@ class KleinmanBylanderPP(SeparablePP):
 
         self.check_lmax()
 
-        if self.verbose:
-            print('PP: lmax for {0} set to {1}'.format(self.symbol, self.lmax))
+        print('PP: lmax for {0} set to {1}'.format(self.symbol, self.lmax),
+              file=self.txt)
 
         self.initialize_local_potential(rcore=rcore)
 
@@ -462,11 +468,12 @@ class KleinmanBylanderPP(SeparablePP):
             integrand = Rnl_free * projector * e3.rgrid**2
             self.cosines[nl] = e3.grid.integrate(integrand, use_dV=False)
 
-            if self.verbose:
-                energy = self.energies[nl]
-                print('PP: E_KB for %s_%s: %.6f' % (self.symbol, nl, energy))
-                cosine = self.cosines[nl]
-                print('PP: KB_cos for %s_%s: %.6f' % (self.symbol, nl, cosine))
+            energy = self.energies[nl]
+            print('PP: E_KB for %s_%s: %.6f' % (self.symbol, nl, energy),
+                  file=self.txt)
+            cosine = self.cosines[nl]
+            print('PP: KB_cos for %s_%s: %.6f' % (self.symbol, nl, cosine),
+                  file=self.txt)
 
             # Calculate onsite overlaps
             for valence in e3.basis_sets:
@@ -505,7 +512,7 @@ if __name__ == '__main__':
     pp = KleinmanBylanderPP(args.filename, valence=valence,
                             with_polarization=args.with_polarization,
                             local_component=args.local_component,
-                            lmax=args.lmax, rcore=args.rcore, verbose=True)
+                            lmax=args.lmax, rcore=args.rcore, txt='-')
 
     prefix, _ = os.path.splitext(os.path.basename(args.filename))
     pp.plot_potentials(filename='{0}_potentials.png'.format(prefix))

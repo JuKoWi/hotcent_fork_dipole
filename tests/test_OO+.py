@@ -43,7 +43,7 @@ def atom(request):
     element = 'O'
     valence = list(wf_confinements.keys())
     pp = KleinmanBylanderPP('./pseudos/{0}.psf'.format(element),
-                            lmax=1, local_component='d', verbose=True)
+                            lmax=1, local_component='d', txt='-')
 
     atom = PseudoAtomicDFT(element, pp,
                            xc=xc,

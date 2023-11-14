@@ -68,7 +68,7 @@ def atoms(request):
     for element in ['Li', 'O']:
         valence = list(wf_confinements[element].keys())
         pp = KleinmanBylanderPP('./pseudos/{0}.psf'.format(element),
-                                verbose=True, **pp_setup[element])
+                                txt='-', **pp_setup[element])
 
         atom = PseudoAtomicDFT(element, pp,
                                xc=xc,

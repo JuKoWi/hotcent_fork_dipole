@@ -41,7 +41,7 @@ def atoms(request):
 
     pp = KleinmanBylanderPP('./pseudos/Li.psf', valence=valence,
                             with_polarization=False, local_component='siesta',
-                            rcore=2.4958, verbose=True)
+                            rcore=2.4958, txt='-')
     atom_pp = PseudoAtomicDFT('Li', pp, **kwargs)
     atom_pp.run()
     atom_pp.pp.build_projectors(atom_pp)

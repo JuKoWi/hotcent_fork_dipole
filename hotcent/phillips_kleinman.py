@@ -18,11 +18,13 @@ class PhillipsKleinmanPP(SeparablePP):
     ----------
     symbol : str
         The chemical symbol.
-    verbose : bool, optional
-        Verbosity flag (default: False).
+
+    Other Parameters
+    ----------------
+    Additional keyword arguments for SeparablePP initialization.
     """
-    def __init__(self, symbol, verbose=False):
-        SeparablePP.__init__(self, verbose=verbose)
+    def __init__(self, symbol, **kwargs):
+        SeparablePP.__init__(self, **kwargs)
         self.symbol = symbol
         self.Z = atomic_numbers[self.symbol]
 

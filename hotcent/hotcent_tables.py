@@ -486,7 +486,7 @@ def get_atoms(*elements, rmin_cov_scaling=None, label=None, only_1c=False,
 
         pp_kwargs['filename'] = os.path.join(pseudo_path,
                                              pp_kwargs['filename'])
-        pp = KleinmanBylanderPP(verbose=True, **pp_kwargs)
+        pp = KleinmanBylanderPP(txt=txt, **pp_kwargs)
 
         atom = PseudoAtomicDFT(el, pp, txt=txt, wf_confinement=wf_conf,
                                **atom_kwargs)

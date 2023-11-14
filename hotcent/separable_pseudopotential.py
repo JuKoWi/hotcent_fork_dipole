@@ -5,6 +5,8 @@
 #   SPDX-License-Identifier: GPL-3.0-or-later                                 #
 #-----------------------------------------------------------------------------#
 import numpy as np
+import os
+import sys
 from hotcent.interpolation import CubicSplineFunction
 from hotcent.offsite_twocenter import Offsite2cTable
 from hotcent.orbitals import (ANGULAR_MOMENTUM, calculate_slako_coeff,
@@ -19,17 +21,28 @@ class SeparablePP:
     ----------
     symbol : str
         The chemical symbol.
-    verbose : bool, optional
-        Verbosity flag (default: False).
+    txt : str or None or file handle, optional
+        Where output should be printed. Use '-' for stdout
+        (default), None for /dev/null, any other string for a
+        text file, or a file handle.
     """
-    def __init__(self, verbose=False):
+    def __init__(self, txt='-'):
         self.symbol = None
         self.projectors = {}
         self.energies = {}
         self.overlap_fct = {}  # dict with core-valence overlap functions
         self.overlap_onsite = {}
         self.initialized_elements = []
-        self.verbose = verbose
+
+        if txt is None:
+            self.txt = open(os.devnull, 'w')
+        elif isinstance(txt, str):
+            if txt == '-':
+                self.txt = sys.stdout
+            else:
+                self.txt = open(txt, 'a')
+        else:
+            self.txt = txt
 
     def all_zero_onsite_overlaps(self):
         """ Returns whether all on-site overlaps of the (valence)
@@ -92,8 +105,8 @@ class SeparablePP:
                         if key in self.overlap_fct:
                             continue
 
-                        if self.verbose:
-                            print('Calculating overlaps for ', key)
+                        print('PP: calculating overlaps for {0}'.format(key),
+                              file=self.txt)
 
                         if l1 < l3:
                             sk_integral = nl1[1] + nl3[-1] + 'spdf'[tau]
@@ -224,12 +237,12 @@ class SeparablePP:
                     for tau in range(minl+1):
                         skint = self.get_overlap(sym1, sym3, nl1, prj, tau, r13)
                         if ilm3 >= ilm:
-                           coef = calculate_slako_coeff(x, y, z, ilm+1,
-                                                        ilm3+1, tau+1)
+                            coef = calculate_slako_coeff(x, y, z, ilm+1,
+                                                         ilm3+1, tau+1)
                         else:
-                           coef = calculate_slako_coeff(x, y, z, ilm3+1,
-                                                        ilm+1, tau+1)
-                           coef *= (-1)**(l1 + l3)
+                            coef = calculate_slako_coeff(x, y, z, ilm3+1,
+                                                         ilm+1, tau+1)
+                            coef *= (-1)**(l1 + l3)
                         S3 += coef * skint
                 term *= S3
 
