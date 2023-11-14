@@ -1255,9 +1255,11 @@ class AtomicBase:
         norm2 = self.grid.integrate(u**2)
         u /= np.sqrt(norm2)
 
-        assert np.all(u > -5e-3), \
-              'The reduced radial function acquires significantly ' + \
-              'negative values (nl: {0}, min(u): {1})'.format(nl, np.min(u))
+        if np.any(u < 0):
+            msg = 'Warning: a split-valence radial function for nl={0} (tail' \
+                  ' norm: {1:.3f}) contains negative values (min(u): {2:.6f})'
+            print(msg.format(nl, tail_norm, np.min(u)), file=self.txt)
+
         return u, r_split
 
     def get_charge_confined_unl(self, nl, charge, potential='point'):
