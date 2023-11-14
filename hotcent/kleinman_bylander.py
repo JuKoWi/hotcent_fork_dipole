@@ -188,7 +188,11 @@ class KleinmanBylanderPP(SeparablePP):
                             limit = -2. * self.Zval  # in Ry
                             index = np.argmax(self.rgrid > self.rcore[l])
                             valid = np.allclose(array[index:], limit, atol=5e-2)
-                            assert valid, array[index:]
+                            if not valid:
+                                msg = 'The (reduced) semilocal potential ' \
+                                      'for l={0} is not sufficiently close ' \
+                                      'to the -2*Zval limit at rcore: {1}'
+                                raise ValueError(msg.format(l, array[index:]))
 
                             array = np.array(array) / self.rgrid / 2.  # in Ha
                             getattr(self, key)[l] = array
