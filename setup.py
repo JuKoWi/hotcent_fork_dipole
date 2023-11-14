@@ -11,8 +11,7 @@ extensions = [
     Extension('_hotcent',
               sources=['hotcent/extensions.c'],
               language='c',
-              extra_compile_args=['-O3', '-ffast-math',
-                                  '-march=native'],
+              extra_compile_args=['-O3', '-march=native'],
               ),
 ]
 
