@@ -13,7 +13,7 @@ from hotcent.confinement import SoftConfinement
 from hotcent.kleinman_bylander import KleinmanBylanderPP
 from hotcent.pseudo_atomic_dft import PseudoAtomicDFT
 from hotcent.siesta_ion import write_ion
-from hotcent.utils import verify_chemical_symbols
+from hotcent.utils import get_file_checksum, verify_chemical_symbols
 
 
 def parse_arguments():
@@ -409,7 +409,10 @@ def main():
 
     write_ion(atom, label=stem)
 
-    pp_kwargs.update(filename=pp_filename)
+    pp_kwargs.update(
+        filename=pp_filename,
+        sha256sum=get_file_checksum(pp_path, algorithm='sha256'),
+    )
     write_yaml(symbol, atom_kwargs, basis_kwargs, conf_kwargs, pp_kwargs,
                aux_basis_kwargs, stem)
     return

@@ -29,7 +29,7 @@ from hotcent.onsite_twocenter import Onsite2cTable
 from hotcent.pseudo_atomic_dft import PseudoAtomicDFT
 from hotcent.repulsion_twocenter import Repulsion2cTable
 from hotcent.repulsion_threecenter import Repulsion3cTable
-from hotcent.utils import verify_chemical_symbols
+from hotcent.utils import get_file_checksum, verify_chemical_symbols
 
 
 def parse_arguments():
@@ -475,9 +475,18 @@ def get_atoms(*elements, rmin_cov_scaling=None, label=None, only_1c=False,
                                           x_ri=setup['confinement']['x_ri'],
                                           rc=rc)
 
-        ppfile = setup['pseudopotential']['filename']
-        ppfile = os.path.join(pseudo_path, ppfile)
-        setup['pseudopotential'].update(filename=ppfile)
+        pp_path = setup['pseudopotential']['filename']
+        pp_path = os.path.join(pseudo_path, pp_path)
+        setup['pseudopotential'].update(filename=pp_path)
+
+        if 'sha256sum' in setup['pseudopotential']:
+            sha256sum = get_file_checksum(pp_path, algorithm='sha256')
+
+            assert sha256sum == setup['pseudopotential']['sha256sum'], \
+                   'The checksum for {0} does not match the one in {1}'.format(
+                   pp_path, filename)
+            del setup['pseudopotential']['sha256sum']
+
         pp = KleinmanBylanderPP(txt=txt, **setup['pseudopotential'])
 
         atom = PseudoAtomicDFT(el, pp, txt=txt, wf_confinement=wf_conf,
