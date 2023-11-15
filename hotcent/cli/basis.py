@@ -261,14 +261,14 @@ def write_yaml(symbol, atom_kwargs, basis_kwargs, conf_kwargs, pp_kwargs,
         hotcent_version=__version__,
     )
 
-    setup = [
-        dict(meta=meta_kwargs),
-        dict(atom=atom_kwargs),
-        dict(basis=basis_kwargs),
-        dict(confinement=conf_kwargs),
-        dict(pseudopotential=pp_kwargs),
-        dict(auxiliary_basis=aux_basis_kwargs),
-    ]
+    setup = dict(
+        atom=atom_kwargs,
+        auxiliary_basis=aux_basis_kwargs,
+        basis=basis_kwargs,
+        confinement=conf_kwargs,
+        meta=meta_kwargs,
+        pseudopotential=pp_kwargs,
+    )
 
     filename = '{0}.yaml'.format(stem)
 

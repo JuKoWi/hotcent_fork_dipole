@@ -441,18 +441,9 @@ def read_yaml(filename):
     with open(filename, 'r') as f:
         setup = yaml.safe_load(f)
 
-    dicts = []
-    keys = ['meta', 'atom', 'basis', 'confinement', 'pseudopotential',
-            'auxiliary_basis']
-
-    for key in keys:
-        for section in setup:
-            if key in section:
-                dicts.append(section[key])
-                break
-        else:
-            raise ValueError('No "{0}" section in {1}'.format(key, filename))
-    return dicts
+    assert isinstance(setup, dict), \
+           'Loading {0} did not return a dictionary'.format(filename)
+    return setup
 
 
 def get_atoms(*elements, rmin_cov_scaling=None, label=None, only_1c=False,
@@ -470,30 +461,31 @@ def get_atoms(*elements, rmin_cov_scaling=None, label=None, only_1c=False,
             filename = '{0}.{1}.yaml'.format(el, label)
         filename = os.path.join(yaml_path, filename)
 
-        meta_kwargs, atom_kwargs, basis_kwargs, conf_kwargs, pp_kwargs, \
-            aux_basis_kwargs = read_yaml(filename)
+        setup = read_yaml(filename)
 
         if xc is None:
-            xc = atom_kwargs['xc']
+            xc = setup['atom']['xc']
         else:
-            assert xc == atom_kwargs['xc'], \
+            assert xc == setup['atom']['xc'], \
                    'The XC functional must be the same in all YAML files.'
 
         wf_conf = {}
-        for nl, rc in conf_kwargs['rcuts'].items():
-            wf_conf[nl] = SoftConfinement(amp=conf_kwargs['amp'],
-                                          x_ri=conf_kwargs['x_ri'], rc=rc)
+        for nl, rc in setup['confinement']['rcuts'].items():
+            wf_conf[nl] = SoftConfinement(amp=setup['confinement']['amp'],
+                                          x_ri=setup['confinement']['x_ri'],
+                                          rc=rc)
 
-        pp_kwargs['filename'] = os.path.join(pseudo_path,
-                                             pp_kwargs['filename'])
-        pp = KleinmanBylanderPP(txt=txt, **pp_kwargs)
+        ppfile = setup['pseudopotential']['filename']
+        ppfile = os.path.join(pseudo_path, ppfile)
+        setup['pseudopotential'].update(filename=ppfile)
+        pp = KleinmanBylanderPP(txt=txt, **setup['pseudopotential'])
 
         atom = PseudoAtomicDFT(el, pp, txt=txt, wf_confinement=wf_conf,
-                               **atom_kwargs)
+                               **setup['atom'])
         atom.run()
-        atom.generate_nonminimal_basis(**basis_kwargs)
+        atom.generate_nonminimal_basis(**setup['basis'])
         atom.pp.build_projectors(atom)
-        atom.generate_auxiliary_basis(**aux_basis_kwargs)
+        atom.generate_auxiliary_basis(**setup['auxiliary_basis'])
 
         eigenvalues[el], hubbardvalues[el], occupations[el] = {}, {}, {}
         offdiagonal_H[el], offdiagonal_S[el] = {}, {}
