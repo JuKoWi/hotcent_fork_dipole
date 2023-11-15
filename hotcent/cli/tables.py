@@ -87,7 +87,7 @@ def parse_arguments():
                         'processes to use for multiprocessing (default: 1).')
     parser.add_argument('--pseudo-path', default='.', help='Path to the '
                         'directory where the pseudopotential files are stored '
-                        '(default: ".").')
+                        '(default: the current working directory).')
     parser.add_argument('--rmin-cov-scaling', help='Parameter controlling the '
                         'minimal interatomic distances covered by the two- '
                         'and three-center tables. For a given element pair, '
@@ -361,7 +361,7 @@ def main():
 
     atom_kwargs = dict(
         label=args.label,
-        pseudo_path=args.pseudo_path,
+        pseudo_path=os.path.abspath(args.pseudo_path),
         rmin_cov_scaling=rmin_cov_scaling,
         yaml_path='..',
     )
@@ -447,7 +447,7 @@ def read_yaml(filename):
 
 
 def get_atoms(*elements, rmin_cov_scaling=None, label=None, only_1c=False,
-              pseudo_path='.', txt='-', yaml_path='.'):
+              pseudo_path=None, txt='-', yaml_path='.'):
     atoms = {}
     eigenvalues, hubbardvalues, occupations = {}, {}, {}
     offdiagonal_H, offdiagonal_S = {}, {}
