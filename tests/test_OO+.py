@@ -30,7 +30,15 @@ DZP_PBE = DZP + '-' + PBE
 
 @pytest.fixture(scope='module')
 def atom(request):
-    size, xc = request.param.split('-')
+    items = request.param.split('-')
+    size, xc = items[:2]
+    if len(items) == 2:
+        zeta_method = 'split_valence'
+    elif len(items) == 3:
+        zeta_method = items[2]
+    else:
+        raise NotImplementedError(request.param)
+
     nzeta = {'sz': 1, 'dz': 2}[size[:2]]
 
     configuration = '[He] 2s2 2p4'
@@ -57,10 +65,27 @@ def atom(request):
                            txt=None,
                            )
     atom.run()
-    atom.generate_nonminimal_basis(size=size, tail_norms=[0.15], r_pol=1.125,
-                                   degree=2)
-    atom.generate_auxiliary_basis(nzeta=nzeta, tail_norms=[0.2, 0.4], lmax=2,
-                                  degree=2)
+
+    atom.generate_nonminimal_basis(
+        size=size,
+        r_pol=1.125,
+        tail_norms=[0.15],
+        degree=2,
+        cation_charges={'2s+': 2, '2p+': 3},
+        cation_potentials={'2s+': 'point', '2p+': 'pseudo'},
+        zeta_method=zeta_method,
+    )
+
+    atom.generate_auxiliary_basis(
+        nzeta=nzeta,
+        lmax=2,
+        tail_norms=[0.2, 0.4],
+        degree=2,
+        cation_charges=[2, 4],
+        cation_potentials=['pseudo', 'point'],
+        zeta_method=zeta_method,
+    )
+
     atom.pp.build_projectors(atom)
     atom.pp.build_overlaps(atom, atom, rmin=1., rmax=4., N=200)
     return atom
@@ -151,27 +176,70 @@ def test_hubbard_analytical(atom):
                     assert U_diff < tol, msg.format(nl1, nl2, U_ana, U_num)
 
 
-@pytest.mark.parametrize('atom', [DZ_LDA], indirect=True)
-def test_chg1c(atom):
+@pytest.mark.parametrize('aux_basis', ['auxiliary', 'main'])
+@pytest.mark.parametrize('atom', [DZ_LDA+'-cation', DZ_LDA+'-split_valence'],
+                         indirect=True)
+def test_chg1c(aux_basis, atom):
     from hotcent.onsite_chargetransfer import Onsite1cUTable
 
     xc = atom.xcname
+    zeta_method = atom.aux_basis.build_info['zeta_method']
 
-    chgon1c = Onsite1cUTable(atom, basis='auxiliary')
-    chgon1c.run(xc=xc)
-    U = chgon1c.tables[(0, 0)][0, :]
+    chgon1c = Onsite1cUTable(atom, basis=aux_basis)
+    run_kwargs = dict(xc=xc) if aux_basis == 'auxiliary' else dict()
+    chgon1c.run(**run_kwargs)
+    U = chgon1c.tables
 
     U_ref = {
-        LDA: np.array([9.81309054, 1.52281255, 0.35847368]),
+        (LDA, 'auxiliary', 'cation'): {
+            (0, 0): np.array([9.81309054, 1.52281255, 0.35847368]),
+            (0, 1): np.array([10.99217542, 1.69107521, 0.44311249]),
+            (1, 0): np.array([10.99217542, 1.69107521, 0.44311249]),
+            (1, 1): np.array([12.60995050, 1.97534918, 0.53419660]),
+        },
+        (LDA, 'auxiliary', 'split_valence'): {
+            (0, 0): np.array([9.81309054, 1.52281255, 0.35847368]),
+            (0, 1): np.array([11.04291341, 1.75837877, 0.48564713]),
+            (1, 0): np.array([11.04291341, 1.75837877, 0.48564713]),
+            (1, 1): np.array([12.68383176, 2.15292832, 0.60966922]),
+        },
+        (LDA, 'main', 'cation'): {
+            '2s': np.array([7.809009e-01, 7.506050e-01,
+                            9.449637e-01, 8.957202e-01]),
+            '2p': np.array([7.506050e-01, 7.216174e-01,
+                            9.032576e-01, 8.554260e-01]),
+            '2s+': np.array([9.449637e-01, 9.032576e-01,
+                             1.237472e+00, 1.148747e+00]),
+            '2p+': np.array([8.957202e-01, 8.554260e-01,
+                             1.148747e+00, 1.059530e+00]),
+        },
+        (LDA, 'main', 'split_valence'): {
+            '2s': np.array([7.809009e-01, 7.506050e-01,
+                            8.640492e-01, 8.351770e-01]),
+            '2p': np.array([7.506050e-01, 7.216174e-01,
+                            8.275901e-01, 8.003571e-01]),
+            '2s+': np.array([8.640492e-01, 8.275901e-01,
+                             9.696268e-01, 9.324859e-01]),
+            '2p+': np.array([8.351770e-01, 8.003571e-01,
+                             9.324859e-01, 8.975532e-01]),
+        },
     }
 
-    msg = 'Too large error for U_{0} (value={1})'
+    msg = 'Too large error for U_{0}-{1} (value={2})'
     tol = 1e-4
 
-    for i, (val, ref) in enumerate(zip(U, U_ref[xc])):
-        U_diff = np.abs(val - ref)
-        assert U_diff < tol, msg.format(i, val)
+    for key, refs in U_ref[(xc, aux_basis, zeta_method)].items():
+        if aux_basis == 'auxiliary':
+            vals = U[key][0, :]
+        elif aux_basis == 'main':
+            vals = []
+            for valence in atom.basis_sets:
+                for nl in valence:
+                    vals.append(U['Analytical'][(key, nl)])
 
+        for i, (val, ref) in enumerate(zip(vals, refs)):
+            U_diff = np.abs(val - ref)
+            assert U_diff < tol, msg.format(key, i, val)
     return
 
 

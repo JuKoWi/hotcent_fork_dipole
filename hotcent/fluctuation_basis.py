@@ -21,6 +21,7 @@ class AuxiliaryBasis:
         self.lmax = None
         self.nzeta = None
         self.ohp_dict = {}
+        self.build_info = {}
 
     def get_angular_momenta(self):
         """Returns the angular momenta used in the auxiliary basis set."""
@@ -139,6 +140,7 @@ class AuxiliaryBasis:
 
         assert zeta_method in ['cation', 'split_valence'], \
                'Unknown zeta method: {0}'.format(zeta_method)
+        self.build_info.update(zeta_method=zeta_method)
 
         for izeta in range(self.nzeta):
             nl = self.get_radial_label(izeta)
