@@ -23,7 +23,7 @@ files = [
 scripts = [str(Path('tools') / f) for f in files]
 
 install_requires = [
-    'ase>=3.21.1',
+    'ase>=3.22.0',
     'matplotlib',
     'numpy',
     'pytest',
@@ -37,6 +37,7 @@ setup(
   license='LICENSE',
   name='hotcent',
   packages=find_packages(),
+  python_requires='>=3.6',
   scripts=scripts,
   url='https://gitlab.com/mvdb/hotcent',
   version=version,

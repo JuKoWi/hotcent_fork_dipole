@@ -20,7 +20,10 @@ Development version
   integrals printed in the Slater-Koster files for distances below
   'rmin'.
 
-* The (optional) PyLibXC dependency now needs to be v5 or above.
+* The Python version is now required to be >= v3.6.
+  The ASE dependency now needs to be >= v22.0 and
+  the (optional) PyLibXC dependency >= v5.0.
+  PyYAML and pytest are two new dependencies.
 
 * Bugfix: gradient corrections to the exchange-correlation potential
   for two-center integrals were wrong.
