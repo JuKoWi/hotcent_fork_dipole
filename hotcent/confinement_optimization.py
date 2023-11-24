@@ -190,13 +190,13 @@ class ConfinementOptimizer:
                 off2c = Offsite2cTable(atom1, atom2, timing=False, txt=None)
                 off2c.run(**sk_kwargs)
 
-                filename = '%s-%s.skf' % (s1, s2)
-                if s1 == s2:
-                    off2c.write(filename=filename, pair=(s1, s2), **atom1.info)
-                else:
-                    off2c.write(filename=filename, pair=(s1, s2))
-                    filename = '%s-%s.skf' % (s2, s1)
-                    off2c.write(filename=filename, pair=(s2, s1))
+                write_kwargs = atom1.info if s1 == s2 else {}
+                off2c.write(**write_kwargs)
+                os.rename('%s-%s_offsite2c.skf' % (s1, s2),
+                          '%s-%s.skf' % (s1, s2))
+                if s1 != s2:
+                    os.rename('%s-%s_offsite2c.skf' % (s2, s1),
+                              '%s-%s.skf' % (s2, s1))
         return
 
 

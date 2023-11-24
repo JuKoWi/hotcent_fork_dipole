@@ -74,6 +74,8 @@ Development version
 * Added the 'hotcent-basis', 'hotcent-concat' and 'hotcent-tables'
   command-line tools.
 
+* Renamed the `hotcent.tools` submodule to `hotcent.confinement_optimization`.
+
 
 Version 1.0
 ===========

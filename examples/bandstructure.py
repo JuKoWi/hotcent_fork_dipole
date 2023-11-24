@@ -12,7 +12,8 @@ from ase.units import Bohr
 from ase.data import atomic_numbers, covalent_radii
 from hotcent.atomic_dft import AtomicDFT
 from hotcent.confinement import PowerConfinement
-from hotcent.tools import ConfinementOptimizer, DftbPlusBandStructure
+from hotcent.confinement_optimization import (ConfinementOptimizer,
+                                              DftbPlusBandStructure)
 
 
 atoms = bulk('NO', 'zincblende', a=3.6)
@@ -76,25 +77,26 @@ dpbs = DftbPlusBandStructure(Hamiltonian_SCC='Yes',
 
 dpbs.add_reference_bandstructure(bs_dft, atoms='NO.traj', kpts_scf=(3, 3, 3),
                                  reference_level='vbm', nsemicore=0, weight=1.,
-                                 distribution={'type': 'Boltzmann', 'kBT': 1.5})
+                                 distribution=dict(type='Boltzmann', kBT=1.5))
 
 elements = ['N', 'O']
 atoms = []
 for element in elements:
     occ_2p = 3 if element == 'N' else 4
     atom = AtomicDFT(element,
-                    configuration='[He] 2s2 2p%d' % occ_2p,
-                    valence=['2s', '2p'],
-                    xc='LDA',
-                    scalarrel=False,
-                    confinement=PowerConfinement(r0=40., s=4),
-                    perturbative_confinement=False,
-                    txt='atomic.out')
+                     configuration='[He] 2s2 2p%d' % occ_2p,
+                     valence=['2s', '2p'],
+                     xc='LDA',
+                     scalarrel=False,
+                     confinement=PowerConfinement(r0=40., s=4),
+                     perturbative_confinement=False,
+                     txt='atomic.out')
     atom.run()
     atom.info = {}
-    atom.info['eigenvalues'] = {nl: atom.get_eigenvalue(nl) for nl in atom.valence}
+    atom.info['eigenvalues'] = {nl: atom.get_eigenvalue(nl)
+                                for nl in atom.valence}
     U_p = atom.get_hubbard_value('2p', scheme='central', maxstep=1.)
-    atom.info['hubbardvalues'] = {'s': U_p}
+    atom.info['hubbardvalues'] = {'2s': U_p, '2p': U_p}
     atom.info['occupations'] = {'2s': 2, '2p': occ_2p}
     atoms.append(atom)
 
@@ -106,12 +108,12 @@ initial_guess = {}
 for element in elements:
     rcov = covalent_radii[atomic_numbers[element]] / Bohr
     initial_guess['%s_2s,%s_2p' % (element, element)] = \
-                  PowerConfinement(r0=2 * rcov, s=2, adjustable=['r0'])
-    initial_guess['%s_n' % element] = PowerConfinement(r0=3 * rcov, s=2,
-                                                       adjustable=['r0'])
+        PowerConfinement(r0=2 * rcov, s=2, adjustable=['r0'])
+    initial_guess['%s_n' % element] = \
+        PowerConfinement(r0=3 * rcov, s=2, adjustable=['r0'])
 
 vconf = confopt.run(dpbs.get_residual, initial_guess=initial_guess, tol=1e-2,
-                    method='COBYLA', options={'maxiter':1, 'rhobeg': 0.2})
+                    method='COBYLA', options={'maxiter': 1, 'rhobeg': 0.2})
 
 bs_dftb = dpbs.calculate_bandstructure(bs_dft)
 bs_dftb.plot(filename='bs_dftb.png', emax=bs_dftb.reference + 10,
