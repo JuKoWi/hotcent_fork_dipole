@@ -67,40 +67,18 @@ def parse_arguments():
                         'York (2011, doi:10.1063/1.3587052), these are '
                         'supplemented by those orbital momenta belonging to l '
                         '== lmax_ab+1 for which |m| <= min(lmax_a, lmax_b).')
+    parser.add_argument('--grid-opt-int', help='Path to a YAML file for '
+                        'overriding the default integration grid options.')
+    parser.add_argument('--grid-opt-tab', help='Path to a YAML file for '
+                        'overriding the default tabulation grid options.')
     parser.add_argument('--label', help='Label to use when searching for the '
                         'input YAML files. The expected file names correspond '
                         'to "<Symbol>[.<label>].yaml".')
-    parser.add_argument('--opts-2c', help='Option for controlling the two-'
-                        'center integration grids. The default settings are '
-                        'rather tight and correspond to --opts-2c=nr_200,'
-                        'ntheta_600.')
-    parser.add_argument('--opts-3c', help='Option for controlling the three-'
-                        'center integration grids. The default settings are '
-                        'rather tight and correspond to --opts-3c=nr_50,'
-                        'ntheta_150,nphi_13.')
-    parser.add_argument('--opts-map2c', help='Option for controlling the two-'
-                        'center integration grids for the map2c task only '
-                        '(overriding any --opts-2c settings for this task). '
-                        'The default settings are rather tight and correspond '
-                        'to --opts-map2c=nr_100,ntheta_300.')
     parser.add_argument('--processes', type=int, default=1, help='Number of '
                         'processes to use for multiprocessing (default: 1).')
     parser.add_argument('--pseudo-path', default='.', help='Path to the '
                         'directory where the pseudopotential files are stored '
                         '(default: the current working directory).')
-    parser.add_argument('--rmin-cov-scaling', help='Parameter controlling the '
-                        'minimal interatomic distances covered by the two- '
-                        'and three-center tables. For a given element pair, '
-                        'this minimal distance is calculated as the sum of '
-                        'each element\'s covalent radius multiplied by a '
-                        'scaling factor. By default, a factor of 2/3 is '
-                        'applied for all elements, which generally yields '
-                        'sufficiently short minimal distances. For materials '
-                        'under strong compression, however, even shorter '
-                        'distances may be needed. The factors can then be '
-                        'modified for all elements by passing e.g. '
-                        '--rmin-cov-scaling=0.5 or only for selected elements '
-                        'via e.g. --rmin-cov-scaling=Si_0.5,O_0.6.')
     parser.add_argument('--tasks', default='all', help='Comma-separated task '
                         'types to perform. The following types can be chosen: '
                         + ', '.join(TaskGenerator.all_task_types) + '. The '
@@ -130,7 +108,7 @@ class TaskGenerator:
         'magoff2c', 'magon1c', 'magon2c',
         'map2c', 'map1c',
         'off2c', 'off3c',
-        'on1c', 'on2c', 'on3c',
+        'on2c', 'on3c',
         'rep2c', 'rep3c',
     ]
 
@@ -299,54 +277,17 @@ def main():
             verify_chemical_symbols(*elements)
             excluded.append(elements)
 
-    parse_err = 'Cannot parse {0} entry: {1}'
-
-    def update_opts(optsdict, arg, argname):
-        if arg is not None:
-            for entry in arg.split(','):
-                assert '_' in entry, parse_err.format(argname, entry)
-                key, val = entry.split('_', maxsplit=1)
-                assert key in optsdict, \
-                       'Unknown {0} key: {1}'.format(argname, key)
-                optsdict[key] = int(val)
-        return
-
-    opts_2c = dict(nr=200, ntheta=600, smoothen_tails=True)
-    update_opts(opts_2c, args.opts_2c, 'opts-2c')
-
-    opts_3c = dict(nr=50, ntheta=150, nphi=13)
-    update_opts(opts_3c, args.opts_3c, 'opts-3c')
-
-    opts_map2c = dict(nr=100, ntheta=300, smoothen_tails=True)
-    update_opts(opts_map2c, args.opts_2c, 'opts-2c')
-    update_opts(opts_map2c, args.opts_map2c, 'opts-map2c')
-
     aux_mappings = args.aux_mappings.split(',')
 
     need_aux_basis = False
     for mapping in aux_mappings:
-        msg = parse_err.format('aux-mappings', mapping)
-        assert mapping in ['mulliken', 'giese_york'], msg
+        assert mapping in ['mulliken', 'giese_york'], \
+               'Unknown mapping: "{0}"'.format(mapping)
         if mapping != 'mulliken':
             need_aux_basis = True
 
-    rmin_cov_scaling = {}
-    for elements in included:
-        for element in elements:
-            rmin_cov_scaling[element] = 2./3
-
-    if args.rmin_cov_scaling is not None:
-        if '_' in args.rmin_cov_scaling:
-            for item in args.rmin_cov_scaling.split(','):
-                element, factor = item.split('_')
-                verify_chemical_symbols(element)
-                if element in rmin_cov_scaling:
-                    rmin_cov_scaling[element] = float(factor)
-        else:
-            factor = float(args.rmin_cov_scaling)
-            for elements in included:
-                for element in elements:
-                    rmin_cov_scaling[element] = factor
+    grid_opt_int = GridOptionsIntegrate.from_yaml(filename=args.grid_opt_int)
+    grid_opt_tab = GridOptionsTabulate.from_yaml(filename=args.grid_opt_tab)
 
     task_types = list(sorted(set(args.tasks.split(','))))
 
@@ -362,17 +303,15 @@ def main():
     atom_kwargs = dict(
         label=args.label,
         pseudo_path=os.path.abspath(args.pseudo_path),
-        rmin_cov_scaling=rmin_cov_scaling,
-        yaml_path='..',
+        yaml_path=os.getcwd(),
     )
 
     task_kwargs = dict(
         atom_kwargs=atom_kwargs,
         aux_mappings=aux_mappings,
         giese_york_constraint_method=args.giese_york_constraint_method,
-        opts_2c=opts_2c,
-        opts_3c=opts_3c,
-        opts_map2c=opts_map2c,
+        grid_opt_int=grid_opt_int,
+        grid_opt_tab=grid_opt_tab,
         shift=True,
     )
 
@@ -446,8 +385,8 @@ def read_yaml(filename):
     return setup
 
 
-def get_atoms(*elements, rmin_cov_scaling=None, label=None, only_1c=False,
-              pseudo_path=None, txt='-', yaml_path='.'):
+def get_atoms(*elements, label=None, only_1c=False, pseudo_path=None, txt='-',
+              yaml_path=None):
     atoms = {}
     eigenvalues, hubbardvalues, occupations = {}, {}, {}
     offdiagonal_H, offdiagonal_S = {}, {}
@@ -530,43 +469,201 @@ def get_atoms(*elements, rmin_cov_scaling=None, label=None, only_1c=False,
         offdiagonal_S=offdiagonal_S,
     )
 
+    wf_ranges = dict()
+
     if not only_1c:
-        dr = 0.02
-
-        rmin_halves = {}
-        for el1 in set(elements):
-            rcov = covalent_radii[atomic_numbers[el1]] / Bohr
-            rmin_halves[el1] = rmin_cov_scaling[el1] * rcov
-            rmin_halves[el1] = dr * np.floor(rmin_halves[el1] / dr)
-
-        wf_ranges = {}
-        numr = {}
         for el1 in set(elements):
             wf_range = max([atoms[el1].wf_confinement[nl].rc
                             for nl in atoms[el1].valence])
             wf_ranges[el1] = wf_range
-            numr[el1] = int(np.floor(wf_range/dr))
 
         for el1 in set(elements):
             for el2 in set(elements):
                 rmax = wf_ranges[el1] + wf_ranges[el2] + 1.
                 atoms[el1].pp.build_overlaps(atoms[el2], atoms[el1], rmin=1e-2,
                                              rmax=rmax, N=300)
-    else:
-        dr, rmin_halves, wf_ranges, numr = None, None, None, None
 
-    return (atoms, xc, properties, dr, rmin_halves, wf_ranges, numr)
+    return (atoms, xc, properties, wf_ranges)
 
 
-def get_3c_grids(el1, el2, rmin_halves, wf_ranges, verbose=True):
-    min_rAB = rmin_halves[el1] + rmin_halves[el2]
-    max_rAB = 0.98 * (wf_ranges[el1] + wf_ranges[el2])
-    num_rAB = 6 + int(np.ceil((max_rAB - min_rAB) / 0.4))
-    min_rCM = 0.2
-    max_rCM = max_rAB
-    num_rCM = 6 + int(np.ceil((max_rCM - min_rCM) / 0.4))
-    num_theta = 24
+class GridOptions:
+    def __init__(self, default_options=None, custom_options=None):
+        def update(dictionary, task, **kwargs):
+            for key, val in kwargs.items():
+                msg = '"{0}" is not a known option for task "{1}"'
+                assert key in dictionary, msg.format(key, task)
+            dictionary.update(**kwargs)
 
+        self.default_options = self.get_default_options()
+
+        if default_options is not None:
+            for task, options in default_options.items():
+                assert task in self.default_options, \
+                       'Unknown task "{0}"'.format(task)
+                update(self.default_options[task], task, **options)
+
+        self.custom_options = dict()
+
+        if custom_options is not None:
+            for elements_str, task_options in custom_options.items():
+                elements = elements_str.split('-', maxsplit=1)
+                elements = elements[:1] + elements[1].split('_', maxsplit=1)
+                elements = tuple(elements)
+                verify_chemical_symbols(*elements)
+
+                self.custom_options[elements] = self.default_options.copy()
+
+                for task, options in task_options.items():
+                    assert task in self.default_options, \
+                           'Unknown task "{0}"'.format(task)
+                    update(self.custom_options[elements][task], task,
+                           **options)
+
+    @classmethod
+    def from_yaml(cls, filename=None):
+        custom_options = {} if filename is None else read_yaml(filename)
+        default_options = custom_options.pop('default', None)
+        return cls(default_options, custom_options)
+
+    def get_parameters(self, el1, el2, task, wf_ranges, el3=None,
+                       verbose=True):
+        elements = tuple([el1, el2] if el3 is None else [el1, el2, el3])
+
+        try:
+            parameters = self.custom_options[elements][task].copy()
+        except KeyError:
+            try:
+                parameters = self.custom_options[(el1, el2)][task].copy()
+            except KeyError:
+                parameters = self.default_options[task].copy()
+
+        for param in parameters:
+            if parameters[param] is None:
+                func_name = 'generate_{0}'.format(param)
+                func = getattr(self, func_name)
+                value = func(*elements, task=task, wf_ranges=wf_ranges,
+                             **parameters)
+                parameters[param] = value
+
+        if verbose:
+            print('{0}: {1}'.format(self.__class__.__name__, parameters))
+
+        return parameters
+
+
+class GridOptionsIntegrate(GridOptions):
+    def get_default_options(self):
+        default_options = dict()
+
+        for task in ['chgoff2c', 'chgon2c', 'magon2c', 'magoff2c',
+                     'off2c', 'on2c', 'rep2c']:
+            default_options[task] = dict(nr=200, ntheta=600)
+
+        for task in ['map2c']:
+            default_options[task] = dict(nr=100, ntheta=300)
+
+        for task in ['off3c', 'on3c', 'rep3c']:
+            default_options[task] = dict(nr=50, ntheta=150, nphi=13)
+
+        return default_options
+
+
+class GridOptionsTabulate(GridOptions):
+    def get_default_options(self):
+        default_options = dict()
+
+        for task in ['chgoff2c', 'chgon2c', 'magon2c', 'magoff2c',
+                     'map2c', 'off2c', 'on2c', 'rep2c']:
+            default_options[task] = dict(dr=0.02, N=None, rmin=None)
+
+        for task in ['off3c', 'on3c', 'rep3c']:
+            default_options[task] = \
+                dict(min_rAB=None, max_rAB=None, num_rAB=None,
+                     min_rCM=None, max_rCM=None, num_rCM=None,
+                     num_theta=24)
+
+        return default_options
+
+    def generate_rmin_half(self, el, **kwargs):
+        rcov = covalent_radii[atomic_numbers[el]] / Bohr
+        rmin_cov_scaling = 2. / 3
+        rmin_half = rmin_cov_scaling * rcov
+        rmin_half = kwargs['dr'] * np.floor(rmin_half / kwargs['dr'])
+        return rmin_half
+
+    def generate_rmin(self, el1, el2, **kwargs):
+        rmin = sum([self.generate_rmin_half(e, **kwargs) for e in [el1, el2]])
+        return rmin
+
+    def generate_N_half(self, el, **kwargs):
+        N_half = int(np.floor(kwargs['wf_ranges'][el] / kwargs['dr']))
+        return N_half
+
+    def generate_N(self, el1, el2, **kwargs):
+        task = kwargs['task']
+        if task.endswith('on2c'):
+            N = 2 * self.generate_N_half(el1, **kwargs)
+        elif task.endswith('off2c') or task in ['map2c', 'rep2c']:
+            N = sum([self.generate_N_half(e, **kwargs) for e in [el1, el2]])
+        else:
+            raise NotImplementedError(task)
+
+        rmin = kwargs['rmin']
+        if rmin is None:
+            rmin = self.generate_rmin(el1, el2, **kwargs)
+
+        N -= int(np.round(rmin / kwargs['dr']))
+        return N
+
+    def generate_min_rAB(self, el1, el2, el3, **kwargs):
+        min_rAB = self.generate_rmin(el1, el2, dr=0.02, **kwargs)
+        return min_rAB
+
+    def generate_max_rAB(self, el1, el2, el3, **kwargs):
+        max_rAB = 0.98 * sum([kwargs['wf_ranges'][e] for e in [el1, el2]])
+        return max_rAB
+
+    def generate_num_rAB(self, el1, el2, el3, **kwargs):
+        max_rAB = kwargs['max_rAB']
+        if max_rAB is None:
+            max_rAB = self.generate_max_rAB(el1, el2, el3, **kwargs)
+
+        min_rAB = kwargs['min_rAB']
+        if min_rAB is None:
+            min_rAB = self.generate_min_rAB(el1, el2, el3, **kwargs)
+
+        num_rAB = 6 + int(np.ceil((max_rAB - min_rAB) / 0.4))
+        return num_rAB
+
+    def generate_min_rCM(self, el1, el2, el3, **kwargs):
+        min_rCM = 0.2
+        return min_rCM
+
+    def generate_max_rCM(self, el1, el2, el3, **kwargs):
+        max_rCM = kwargs['max_rAB']
+        if max_rCM is None:
+            max_rCM = self.generate_max_rAB(el1, el2, el3, **kwargs)
+        return max_rCM
+
+    def generate_num_rCM(self, el1, el2, el3, **kwargs):
+        max_rCM = kwargs['max_rCM']
+        if max_rCM is None:
+            max_rCM = self.generate_max_rCM(el1, el2, el3, **kwargs)
+
+        min_rCM = kwargs['min_rCM']
+        if min_rCM is None:
+            min_rCM = self.generate_min_rCM(el1, el2, el3, **kwargs)
+
+        num_rCM = 6 + int(np.ceil((max_rCM - min_rCM) / 0.4))
+        return num_rCM
+
+    def generate_num_theta(self, el1, el2, el3, **kwargs):
+        num_theta = 24
+        return num_theta
+
+
+def get_3c_grids(min_rAB=None, max_rAB=None, num_rAB=None, min_rCM=None,
+                 max_rCM=None, num_rCM=None, num_theta=None, verbose=True):
     Rgrid = np.exp(np.linspace(np.log(min_rAB), np.log(max_rAB), num=num_rAB,
                    endpoint=True))
     Sgrid = np.exp(np.linspace(np.log(min_rCM), np.log(max_rCM), num=num_rCM,
@@ -582,27 +679,27 @@ def get_3c_grids(el1, el2, rmin_halves, wf_ranges, verbose=True):
 
 
 def chgoff2c(el1, el2, **kwargs):
-    atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
-        get_atoms(el1, el2, only_1c=False, **kwargs['atom_kwargs'])
-
-    rmin = rmin_halves[el1] + rmin_halves[el2]
-    N = numr[el1] + numr[el2] - int(np.round(rmin/dr))
+    atoms, xc, properties, wf_ranges = get_atoms(el1, el2, only_1c=False,
+                                                 **kwargs['atom_kwargs'])
+    grid_args = (el1, el2, 'chgoff2c', wf_ranges)
+    grid_opt_int = kwargs['grid_opt_int'].get_parameters(*grid_args)
+    grid_opt_tab = kwargs['grid_opt_tab'].get_parameters(*grid_args)
 
     for mapping in kwargs['aux_mappings']:
         basis = 'main' if mapping == 'mulliken' else 'auxiliary'
         calc = Offsite2cUTable(atoms[el1], atoms[el2], basis=basis,
                                timing=False)
 
-        run_kwargs = dict(rmin=rmin, dr=dr, N=N, shift=kwargs['shift'], xc=xc,
-                          **kwargs['opts_2c'])
+        run_kwargs = dict(shift=kwargs['shift'], xc=xc, **grid_opt_int,
+                          **grid_opt_tab)
         calc.run(**run_kwargs)
         calc.write()
     return
 
 
 def chgon1c(el1, **kwargs):
-    atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
-        get_atoms(el1, only_1c=True, **kwargs['atom_kwargs'])
+    atoms, xc, properties, wf_ranges = get_atoms(el1, only_1c=True,
+                                                 **kwargs['atom_kwargs'])
 
     for mapping in kwargs['aux_mappings']:
         basis = 'main' if mapping == 'mulliken' else 'auxiliary'
@@ -621,43 +718,44 @@ def chgon1c(el1, **kwargs):
 
 
 def chgon2c(el1, el2, **kwargs):
-    atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
-        get_atoms(el1, el2, only_1c=False, **kwargs['atom_kwargs'])
-
-    rmin = rmin_halves[el1] + rmin_halves[el2]
-    N = numr[el1] + numr[el1] - int(np.round(rmin/dr))
+    atoms, xc, properties, wf_ranges = get_atoms(el1, el2, only_1c=False,
+                                                 **kwargs['atom_kwargs'])
+    grid_args = (el1, el2, 'chgon2c', wf_ranges)
+    grid_opt_int = kwargs['grid_opt_int'].get_parameters(*grid_args)
+    grid_opt_tab = kwargs['grid_opt_tab'].get_parameters(*grid_args)
 
     for mapping in kwargs['aux_mappings']:
         basis = 'main' if mapping == 'mulliken' else 'auxiliary'
-        calc = Onsite2cUTable(atoms[el1], atoms[el2], basis=basis, timing=False)
+        calc = Onsite2cUTable(atoms[el1], atoms[el2], basis=basis,
+                              timing=False)
 
-        run_kwargs = dict(rmin=rmin, dr=dr, N=N, xc=xc, **kwargs['opts_2c'])
+        run_kwargs = dict(xc=xc, **grid_opt_int, **grid_opt_tab)
         calc.run(**run_kwargs)
         calc.write()
     return
 
 
 def magoff2c(el1, el2, **kwargs):
-    atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
-        get_atoms(el1, el2, only_1c=False, **kwargs['atom_kwargs'])
-
-    rmin = rmin_halves[el1] + rmin_halves[el2]
-    N = numr[el1] + numr[el2] - int(np.round(rmin/dr))
+    atoms, xc, properties, wf_ranges = get_atoms(el1, el2, only_1c=False,
+                                                 **kwargs['atom_kwargs'])
+    grid_args = (el1, el2, 'magoff2c', wf_ranges)
+    grid_opt_int = kwargs['grid_opt_int'].get_parameters(*grid_args)
+    grid_opt_tab = kwargs['grid_opt_tab'].get_parameters(*grid_args)
 
     for mapping in kwargs['aux_mappings']:
         basis = 'main' if mapping == 'mulliken' else 'auxiliary'
         calc = Offsite2cWTable(atoms[el1], atoms[el2], basis=basis,
                                timing=False)
 
-        run_kwargs = dict(rmin=rmin, dr=dr, N=N, xc=xc, **kwargs['opts_2c'])
+        run_kwargs = dict(xc=xc, **grid_opt_int, **grid_opt_tab)
         calc.run(**run_kwargs)
         calc.write()
     return
 
 
 def magon1c(el1, **kwargs):
-    atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
-        get_atoms(el1, only_1c=True, **kwargs['atom_kwargs'])
+    atoms, xc, properties, wf_ranges = get_atoms(el1, only_1c=True,
+                                                 **kwargs['atom_kwargs'])
 
     for mapping in kwargs['aux_mappings']:
         basis = 'main' if mapping == 'mulliken' else 'auxiliary'
@@ -676,25 +774,27 @@ def magon1c(el1, **kwargs):
 
 
 def magon2c(el1, el2, **kwargs):
-    atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
-        get_atoms(el1, el2, only_1c=False, **kwargs['atom_kwargs'])
+    atoms, xc, properties, wf_ranges = get_atoms(el1, el2, only_1c=False,
+                                                 **kwargs['atom_kwargs'])
 
-    rmin = rmin_halves[el1] + rmin_halves[el2]
-    N = numr[el1] + numr[el1] - int(np.round(rmin/dr))
+    grid_args = (el1, el2, 'magon2c', wf_ranges)
+    grid_opt_int = kwargs['grid_opt_int'].get_parameters(*grid_args)
+    grid_opt_tab = kwargs['grid_opt_tab'].get_parameters(*grid_args)
 
     for mapping in kwargs['aux_mappings']:
         basis = 'main' if mapping == 'mulliken' else 'auxiliary'
-        calc = Onsite2cWTable(atoms[el1], atoms[el2], basis=basis, timing=False)
+        calc = Onsite2cWTable(atoms[el1], atoms[el2], basis=basis,
+                              timing=False)
 
-        run_kwargs = dict(rmin=rmin, dr=dr, N=N, xc=xc, **kwargs['opts_2c'])
+        run_kwargs = dict(xc=xc, **grid_opt_int, **grid_opt_tab)
         calc.run(**run_kwargs)
         calc.write()
     return
 
 
 def map1c(el1, **kwargs):
-    atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
-        get_atoms(el1, only_1c=True, **kwargs['atom_kwargs'])
+    atoms, xc, properties, wf_ranges = get_atoms(el1, only_1c=True,
+                                                 **kwargs['atom_kwargs'])
 
     for mapping in kwargs['aux_mappings']:
         if mapping == 'giese_york':
@@ -705,12 +805,12 @@ def map1c(el1, **kwargs):
 
 
 def map2c(el1, el2, **kwargs):
-    atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
-        get_atoms(el1, el2, only_1c=False, **kwargs['atom_kwargs'])
+    atoms, xc, properties, wf_ranges = get_atoms(el1, el2, only_1c=False,
+                                                 **kwargs['atom_kwargs'])
 
-    rmin = rmin_halves[el1] + rmin_halves[el2]
-    N = numr[el1] + numr[el2] - int(np.round(rmin/dr))
-    run_kwargs = dict(rmin=rmin, dr=dr, N=N, **kwargs['opts_map2c'])
+    grid_args = (el1, el2, 'map2c', wf_ranges)
+    grid_opt_int = kwargs['grid_opt_int'].get_parameters(*grid_args)
+    grid_opt_tab = kwargs['grid_opt_tab'].get_parameters(*grid_args)
 
     for mapping in kwargs['aux_mappings']:
         if mapping == 'giese_york':
@@ -718,21 +818,23 @@ def map2c(el1, el2, **kwargs):
             calc = Offsite2cMTable(atoms[el1], atoms[el2],
                                    constraint_method=constraint_method,
                                    timing=False)
+
+            run_kwargs = dict(**grid_opt_int, **grid_opt_tab)
             calc.run(**run_kwargs)
             calc.write()
     return
 
 
 def off2c(el1, el2, **kwargs):
-    atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
-        get_atoms(el1, el2, only_1c=False, **kwargs['atom_kwargs'])
+    atoms, xc, properties, wf_ranges = get_atoms(el1, el2, only_1c=False,
+                                                 **kwargs['atom_kwargs'])
 
-    rmin = rmin_halves[el1] + rmin_halves[el2]
-    N = numr[el1] + numr[el2] - int(np.round(rmin/dr))
+    grid_args = (el1, el2, 'off2c', wf_ranges)
+    grid_opt_int = kwargs['grid_opt_int'].get_parameters(*grid_args)
+    grid_opt_tab = kwargs['grid_opt_tab'].get_parameters(*grid_args)
 
     calc = Offsite2cTable(atoms[el1], atoms[el2], timing=False)
-    calc.run(rmin=rmin, dr=dr, N=N, superposition='density', xc=xc,
-             **kwargs['opts_2c'])
+    calc.run(superposition='density', xc=xc, **grid_opt_int, **grid_opt_tab)
 
     write_kwargs = dict()
     if el1 == el2:
@@ -748,65 +850,72 @@ def off2c(el1, el2, **kwargs):
 
 
 def off3c(el1, el2, el3, **kwargs):
-    atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
-        get_atoms(el1, el2, el3, only_1c=False, **kwargs['atom_kwargs'])
+    atoms, xc, properties, wf_ranges = get_atoms(el1, el2, el3, only_1c=False,
+                                                 **kwargs['atom_kwargs'])
 
-    Rgrid, Sgrid, Tgrid = get_3c_grids(el1, el2, rmin_halves, wf_ranges)
+    grid_args = (el1, el2, 'off3c', wf_ranges)
+    grid_opt_int = kwargs['grid_opt_int'].get_parameters(*grid_args, el3=el3)
+    grid_opt_tab = kwargs['grid_opt_tab'].get_parameters(*grid_args, el3=el3)
+    Rgrid, Sgrid, Tgrid = get_3c_grids(**grid_opt_tab)
+
     calc = Offsite3cTable(atoms[el1], atoms[el2], timing=False)
-    calc.run(atoms[el3], Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc,
-             **kwargs['opts_3c'])
+    calc.run(atoms[el3], Rgrid, Sgrid, Tgrid, xc=xc, **grid_opt_int)
     return
 
 
 def on2c(el1, el2, **kwargs):
-    atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
-        get_atoms(el1, el2, only_1c=False, **kwargs['atom_kwargs'])
+    atoms, xc, properties, wf_ranges = get_atoms(el1, el2, only_1c=False,
+                                                 **kwargs['atom_kwargs'])
 
-    rmin = rmin_halves[el1] + rmin_halves[el2]
-    N = numr[el1] + numr[el1] - int(np.round(rmin/dr))
+    grid_args = (el1, el2, 'on2c', wf_ranges)
+    grid_opt_int = kwargs['grid_opt_int'].get_parameters(*grid_args)
+    grid_opt_tab = kwargs['grid_opt_tab'].get_parameters(*grid_args)
 
     calc = Onsite2cTable(atoms[el1], atoms[el2], timing=False)
-    calc.run(rmin=rmin, dr=dr, N=N, xc=xc, shift=kwargs['shift'],
-             **kwargs['opts_2c'])
+    calc.run(xc=xc, shift=kwargs['shift'], **grid_opt_int, **grid_opt_tab)
     calc.write()
     return
 
 
 def on3c(el1, el2, el3, **kwargs):
-    atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
-        get_atoms(el1, el2, el3, only_1c=False, **kwargs['atom_kwargs'])
+    atoms, xc, properties, wf_ranges = get_atoms(el1, el2, el3, only_1c=False,
+                                                 **kwargs['atom_kwargs'])
 
-    Rgrid, Sgrid, Tgrid = get_3c_grids(el1, el2, rmin_halves, wf_ranges)
+    grid_args = (el1, el2, 'on3c', wf_ranges)
+    grid_opt_int = kwargs['grid_opt_int'].get_parameters(*grid_args, el3=el3)
+    grid_opt_tab = kwargs['grid_opt_tab'].get_parameters(*grid_args, el3=el3)
+    Rgrid, Sgrid, Tgrid = get_3c_grids(**grid_opt_tab)
 
     on3c = Onsite3cTable(atoms[el1], atoms[el2], timing=False)
-    on3c.run(atoms[el3], Rgrid=Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc,
-             **kwargs['opts_3c'])
+    on3c.run(atoms[el3], Rgrid, Sgrid, Tgrid, xc=xc, **grid_opt_int)
     return
 
 
 def rep2c(el1, el2, **kwargs):
-    atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
-        get_atoms(el1, el2, only_1c=False, **kwargs['atom_kwargs'])
+    atoms, xc, properties, wf_ranges = get_atoms(el1, el2, only_1c=False,
+                                                 **kwargs['atom_kwargs'])
 
-    rmin = rmin_halves[el1] + rmin_halves[el2]
-    N = numr[el1] + numr[el2] - int(np.round(rmin/dr))
+    grid_args = (el1, el2, 'rep2c', wf_ranges)
+    grid_opt_int = kwargs['grid_opt_int'].get_parameters(*grid_args)
+    grid_opt_tab = kwargs['grid_opt_tab'].get_parameters(*grid_args)
 
     calc = Repulsion2cTable(atoms[el1], atoms[el2], timing=False)
-    calc.run(rmin=rmin, dr=dr, N=N, xc=xc, shift=kwargs['shift'],
-             **kwargs['opts_2c'])
+    calc.run(xc=xc, shift=kwargs['shift'], **grid_opt_int, **grid_opt_tab)
     calc.write()
     return
 
 
 def rep3c(el1, el2, el3, **kwargs):
-    atoms, xc, properties, dr, rmin_halves, wf_ranges, numr = \
-        get_atoms(el1, el2, el3, only_1c=False, **kwargs['atom_kwargs'])
+    atoms, xc, properties, wf_ranges = get_atoms(el1, el2, el3, only_1c=False,
+                                                 **kwargs['atom_kwargs'])
 
-    Rgrid, Sgrid, Tgrid = get_3c_grids(el1, el2, rmin_halves, wf_ranges)
+    grid_args = (el1, el2, 'rep3c', wf_ranges)
+    grid_opt_int = kwargs['grid_opt_int'].get_parameters(*grid_args, el3=el3)
+    grid_opt_tab = kwargs['grid_opt_tab'].get_parameters(*grid_args, el3=el3)
+    Rgrid, Sgrid, Tgrid = get_3c_grids(**grid_opt_tab)
 
     calc = Repulsion3cTable(atoms[el1], atoms[el2], timing=False)
-    calc.run(atoms[el3], Rgrid, Sgrid=Sgrid, Tgrid=Tgrid, xc=xc,
-             **kwargs['opts_3c'])
+    calc.run(atoms[el3], Rgrid, Sgrid, Tgrid, xc=xc, **grid_opt_int)
     return
 
 
