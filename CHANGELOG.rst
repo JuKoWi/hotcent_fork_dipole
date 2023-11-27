@@ -76,6 +76,9 @@ Development version
 
 * Renamed the `hotcent.tools` submodule to `hotcent.confinement_optimization`.
 
+* Updated the existing two tutorials and added `Tutorial 3` about generating
+  3cTB-GY parameter sets.
+
 
 Version 1.0
 ===========

@@ -99,7 +99,6 @@ class KleinmanBylanderPP(SeparablePP):
             self.set_lmax(valence, with_polarization)
         else:
             assert valence is None
-            assert with_polarization is None
             self.lmax = lmax
 
         self.check_lmax()

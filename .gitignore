@@ -15,4 +15,5 @@ tests/.hypothesis
 tutorials/*
 !tutorials/*.ipynb
 !tutorials/*.json
+!tutorials/grid_opt_*.yaml
 .ipynb_checkpoints

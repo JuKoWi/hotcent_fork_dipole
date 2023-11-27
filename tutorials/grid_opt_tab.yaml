@@ -1,0 +1,58 @@
+# Loose tabulation grid settings to speed up tutorial 3
+Si-Si:
+    chgoff2c:
+        dr: 0.1
+        N: null
+        rmin: null
+    chgon2c:
+        dr: 0.1
+        N: null
+        rmin: null
+    magoff2c:
+        dr: 0.1
+        N: null
+        rmin: null
+    magon2c:
+        dr: 0.1
+        N: null
+        rmin: null
+    map2c:
+        dr: 0.1
+        N: null
+        rmin: null
+    off2c:
+        dr: 0.1
+        N: null
+        rmin: null
+    off3c:
+        min_rAB: null
+        max_rAB: null
+        num_rAB: 16
+        min_rCM: null
+        max_rCM: null
+        num_rCM: 16
+        num_theta:  12
+    on2c:
+        dr: 0.1
+        N: null
+        rmin: null
+    on3c:
+        min_rAB: null
+        max_rAB: null
+        num_rAB: 16
+        min_rCM: null
+        max_rCM: null
+        num_rCM: 16
+        num_theta:  12
+    rep2c:
+        dr: 0.1
+        N: null
+        rmin: null
+    rep3c:
+        min_rAB: null
+        max_rAB: null
+        num_rAB: 16
+        min_rCM: null
+        max_rCM: null
+        num_rCM: 16
+        num_theta:  12
