@@ -14,6 +14,7 @@ from multiprocessing import Pool
 from time import time
 from ase.data import atomic_numbers, covalent_radii
 from ase.units import Bohr
+from hotcent import __version__
 from hotcent.confinement import SoftConfinement
 from hotcent.kleinman_bylander import KleinmanBylanderPP
 from hotcent.offsite_chargetransfer import Offsite2cMTable, Offsite2cUTable
@@ -85,7 +86,8 @@ def parse_arguments():
                         'deselected by prepending a caret (^). For example, '
                         '--tasks=all,^rep3c selects all available task types '
                         'except 3-center repulsion.')
-    parser.add_argument('--version', action='version', version='%(prog)s 0.1')
+    parser.add_argument('--version', action='version',
+                        version=f'%(prog)s {__version__}')
     args = parser.parse_args()
     return args
 

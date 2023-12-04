@@ -134,7 +134,8 @@ def parse_arguments():
     parser.add_argument('--vconf-rstart-rel', type=float, default=0.6,
                         help='Soft confinement start radius, relative to the '
                              'cutoff radius (default: 0.6).')
-    parser.add_argument('--version', action='version', version='%(prog)s 0.1')
+    parser.add_argument('--version', action='version',
+                        version=f'%(prog)s {__version__}')
     parser.add_argument('--zeta-method', type=str, default='cation',
                         choices=['cation', 'split_valence'],
                         help='Method for constructing higher-zeta basis '
