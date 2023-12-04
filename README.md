@@ -1,9 +1,12 @@
 # Hotcent
 
-Calculating one- and two-center Slater-Koster integrals,
-based on parts of the [Hotbit](https://github.com/pekkosk/hotbit/)
-code. The development of Hotcent was started as part of the
-following study:
+*Hotcent* is a tool for generating tight-binding parameter files
+starting from atomic DFT calculations with spherical confinement
+Hotcent was originally based on parts of the [Hotbit](
+https://github.com/pekkosk/hotbit/) code but has evolved considerably
+since then.
+
+The development of Hotcent was started as part of the following study:
 
 M. Van den Bossche, J. Chem. Phys. A. **2019**, 123 (13), 3038-3045
 [(doi)](https://dx.doi.org/10.1021/acs.jpca.9b00927).
@@ -11,19 +14,18 @@ M. Van den Bossche, J. Chem. Phys. A. **2019**, 123 (13), 3038-3045
 
 ## Features
 
-* The main use for Hotcent is generating Slater-Koster tables,
-typically in the [".skf"](https://www.dftb.org/fileadmin/DFTB/public/misc/slakoformat.pdf)
-format to be used with DFTB codes such as DFTB+.
+Hotcent can generate parameters representing:
 
-* The code allows to use different confinement potentials for
-the different valence wave functions and for the electron density
-(which determines the effective potential used in the Hamiltonian
-integrals).
+- [x] up-to-three-center contributions to the zeroth-order Hamiltonian
+      matrix elements
+- [x] up-to-three-center contributions to the repulsive energy
+- [x] up-to-two-center contributions to the U and W kernel matrix elements
+- [x] Giese-York mapping to a (multipolar) auxiliary basis (up to quadrupoles)
 
-* Both the potential superposition and density superposition
-schemes are available.
+As such, Hotcent can generate parameter files for semi-empirical
+tight-binding as well as ab-initio tight-binding calculations.
 
-* With regards to exchange-correlation functionals, the PW92
+With regards to exchange-correlation functionals, the PW92
 (LDA) functional is natively available, and other LDA/GGA
 functionals can be applied through integration with the PyLibXC
 module shipped with [LibXC](https://www.tddft.org/programs/libxc).
