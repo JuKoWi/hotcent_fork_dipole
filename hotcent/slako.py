@@ -1,707 +1,10 @@
 #-----------------------------------------------------------------------------#
-#   Hotcent: calculating one- and two-center Slater-Koster integrals,         #
-#            based on parts of the Hotbit code                                #
-#   Copyright 2018-2021 Maxime Van den Bossche                                #
+#   Hotcent: a tool for generating tight-binding parameter files              #
+#   Copyright 2018-2023 Maxime Van den Bossche                                #
 #   SPDX-License-Identifier: GPL-3.0-or-later                                 #
 #-----------------------------------------------------------------------------#
-""" Defintion of the SlaterKosterTable class (and
-supporting methods) for calculating Slater-Koster
-integrals.
-
-The code below draws heavily from the Hotbit code
-written by Pekka Koskinen (https://github.com/pekkosk/
-hotbit/blob/master/hotbit/parametrization/slako.py).
-"""
-import os
-import sys
+"""Utilities related to Slater-Koster integrals."""
 import numpy as np
-from scipy.interpolate import SmoothBivariateSpline
-from ase.units import Bohr
-from ase.data import atomic_numbers, atomic_masses, covalent_radii
-from hotcent.timing import Timer
-from hotcent.xc import XC_PW92, LibXC
-from hotcent.interpolation import CubicSplineFunction
-try:
-    import matplotlib.pyplot as plt
-except ImportError:
-    plt = None
-try:
-    import _hotcent
-except ModuleNotFoundError:
-    print('Warning: C-extensions not available')
-    _hotcent = None
-
-
-class SlaterKosterTable:
-    def __init__(self, ela, elb, txt='-', timing=False):
-        """ Construct Slater-Koster table for given elements.
-
-        Parameters:
-        -----------
-        ela:    AtomicDFT object
-        elb:    AtomicDFT object
-        txt:    where output should be printed
-                use '-' for stdout (default), None for /dev/null,
-                any other string for a text file, or a file handle
-        timing: output of timing summary after calculation
-        """
-        self.ela = ela
-        self.elb = elb
-
-        if ela.get_symbol() != elb.get_symbol():
-            self.nel = 2
-            self.pairs = [(ela, elb), (elb, ela)]
-            self.elements = [ela, elb]
-        else:
-            self.nel = 1
-            self.pairs = [(ela, elb)]
-            self.elements = [ela]
-
-        if txt is None:
-            self.txt = open(os.devnull, 'w')
-        elif isinstance(txt, str):
-            if txt == '-':
-                self.txt = sys.stdout
-            else:
-                self.txt = open(txt, 'a')
-        else:
-            self.txt = txt
-
-        self.timer = Timer('SlaterKosterTable', txt=self.txt, enabled=timing)
-
-    def __del__(self):
-        self.timer.summary()
-
-    def write(self, filename=None, pair=None, eigenvalues={},
-              hubbardvalues={}, occupations={}, spe=0.):
-        """ Write SK tables to a file
-
-        filename: str with name of file to write to.
-                  The file format is selected by the extension
-                  (.par or .skf).
-                  Defaults to self.ela-self.elb_no_repulsion.skf
-
-        pair: either (symbol_a, symbol_b) or (symbol_b, symbol_a)
-              to select which of the two SK tables to write
-
-        other kwargs: {nl: value}-dictionaries with eigenvalues,
-              hubbardvalues and valence orbital occupations, as well
-              as the spin-polarization error (all typically calculated
-              on the basis of atomic DFT calculations). These will be
-              written to the second line of a homo-nuclear .skf file.
-              Examples: hubbardvalues={'2s': 0.5}, spe=0.2,
-                        occupations={'3d':10, '4s': 1}, etc.
-        """
-        if pair is None:
-            pair = (self.ela.get_symbol(), self.elb.get_symbol())
-
-        fn = '%s-%s_no_repulsion.skf' % pair if filename is None else filename
-
-        ext = fn[-4:]
-
-        assert ext in ['.par', '.skf'], \
-               "Unknown format: %s (-> choose .par or .skf)" % ext
-
-        with open(fn, 'w') as handle:
-            if ext == '.par':
-                self._write_par(handle)
-            elif ext == '.skf':
-                self._write_skf(handle, pair, eigenvalues, hubbardvalues,
-                                occupations, spe)
-
-    def _write_skf(self, handle, pair, eigval, hubval, occup, spe):
-        """ Write to SKF file format; this function
-        is an adaptation of hotbit.io.hbskf
-
-        By default the 'simple' format is chosen, and the 'extended'
-        format is only used when necessary (i.e. when there are f-electrons
-        included in the valence of one of the elements).
-        """
-        symbols = (self.ela.get_symbol(), self.elb.get_symbol())
-        if pair == symbols:
-             index = 0
-        elif pair == symbols[::-1]:
-             index = 1
-        else:
-             msg = 'Requested ' + str(pair) + ' pair, but this calculator '
-             msg += 'is restricted to the %s-%s pair.' % symbols
-             raise ValueError(msg)
-
-        extended_format = any(['f' in nl
-                               for nl in (self.ela.valence + self.elb.valence)])
-        if extended_format:
-            print('@', file=handle)
-
-        grid_dist = self.Rgrid[1] - self.Rgrid[0]
-        grid_npts = len(self.tables[index])
-        grid_npts += int(self.Rgrid[0] / (self.Rgrid[1] - self.Rgrid[0]))
-        print("%.12f, %d" % (grid_dist, grid_npts), file=handle)
-
-        el1, el2 = self.ela.get_symbol(), self.elb.get_symbol()
-        if el1 == el2:
-            fields = ['E_f', 'E_d', 'E_p', 'E_s', 'SPE', 'U_f', 'U_d',
-                      'U_p', 'U_s', 'f_f', 'f_d', 'f_p', 'f_s']
-
-            if not extended_format:
-                fields = [field for field in fields if field[-1] != 'f']
-
-            labels = {'SPE': spe}
-            for prefix, d in zip(['E', 'U', 'f'], [eigval, hubval, occup]):
-                keys = list(d.keys())
-                for l in ['s', 'p', 'd', 'f']:
-                    check = [key[-1] == l for key in keys]
-                    assert sum(check) in [0, 1], (keys, l)
-                    if sum(check) == 1:
-                        key = keys[check.index(True)]
-                        labels['%s_%s' % (prefix, l)] = d[key]
-
-            line = ' '.join(fields)
-            for field in fields:
-                val = labels[field] if field in labels else 0
-                s = '%d' % val if isinstance(val, int) else '%.6f' % val
-                line = line.replace(field, s)
-            print(line, file=handle)
-
-        m = atomic_masses[atomic_numbers[symbols[index]]]
-        print("%.3f, 19*0.0" % m, file=handle)
-
-        # Table containing the Slater-Koster integrals
-        if extended_format:
-            indices = range(2*NUMSK)
-        else:
-            indices = [INTEGRALS.index(name) for name in INTEGRALS
-                       if 'f' not in name[:2]]
-            indices.extend([j+NUMSK for j in indices])
-
-        if self.Rgrid[0] != 0:
-            n = int(self.Rgrid[0] / (self.Rgrid[1] - self.Rgrid[0]))
-            for i in range(n):
-                print('%d*0.0,' % len(indices), file=handle)
-
-        ct, theader = 0, ''
-        for i in range(len(self.tables[index])):
-            line = ''
-            for j in indices:
-                if self.tables[index][i, j] == 0:
-                    ct += 1
-                    theader = str(ct) + '*0.0 '
-                else:
-                    ct = 0
-                    line += theader
-                    theader = ''
-                    line += '{0: 1.12e}  '.format(self.tables[index][i, j])
-
-            if theader != '':
-                ct = 0
-                line += theader
-
-            print(line, file=handle)
-
-    def _write_par(self, handle):
-        for p, (e1, e2) in enumerate(self.pairs):
-            line = '%s-%s_table=' % (e1.get_symbol(), e2.get_symbol())
-            print(line, file=handle)
-
-            for i, R in enumerate(self.Rgrid):
-                print('%.6e' % R, end=' ', file=handle)
-
-                for t in range(2*NUMSK):
-                    x = self.tables[p][i, t]
-                    if abs(x) < 1e-90:
-                        print('0.', end=' ', file=handle)
-                    else:
-                        print('%.6e' % x, end=' ', file=handle)
-                print(file=handle)
-
-            print('\n\n', file=handle)
-
-    def plot(self, filename=None):
-        """ Plot the Slater-Koster table with matplotlib.
-
-        parameters:
-        ===========
-        filename:     name for the figure
-        """
-        self.timer.start('plotting')
-        assert plt is not None, 'Matplotlib could not be imported!'
-
-        fig = plt.figure()
-        fig.subplots_adjust(hspace=1e-4, wspace=1e-4)
-
-        el1 = self.ela.get_symbol()
-        rmax = 6 * covalent_radii[atomic_numbers[el1]] / Bohr
-        ymax = max(1, self.tables[0].max())
-        if self.nel == 2:
-            el2 = self.elb.get_symbol()
-            rmax = max(rmax, 6 * covalent_radii[atomic_numbers[el2]] / Bohr)
-            ymax = max(ymax, self.tables[1].max())
-
-        for i in range(NUMSK):
-            name = INTEGRALS[i]
-            ax = plt.subplot(NUMSK//2, 2, i + 1)
-
-            for p, (e1, e2) in enumerate(self.pairs):
-                s1, s2 = e1.get_symbol(), e2.get_symbol()
-
-                if p == 0:
-                    s = '-'
-                    lw = 1
-                    alpha = 1.0
-                else:
-                    s = '--'
-                    lw = 4
-                    alpha = 0.2
-
-                if np.all(abs(self.tables[p][:, i]) < 1e-10):
-                    ax.text(0.03, 0.5 + p * 0.15,
-                            'No %s integrals for <%s|%s>' % (name, s1, s2),
-                            transform=ax.transAxes, size=10, va='center')
-
-                    if not ax.is_last_row():
-                        plt.xticks([], [])
-                    if not ax.is_first_col():
-                        plt.yticks([], [])
-                else:
-                    plt.plot(self.Rgrid, self.tables[p][:, i] , c='r',
-                             ls=s, lw=lw, alpha=alpha)
-                    plt.plot(self.Rgrid, self.tables[p][:, i+NUMSK], c='b',
-                             ls=s, lw=lw, alpha=alpha)
-                    plt.axhline(0, c='k', ls='--')
-                    ax.text(0.8, 0.1 + p * 0.15, name, size=10,
-                            transform=ax.transAxes)
-
-                    if ax.is_last_row():
-                        plt.xlabel('r (Bohr)')
-                    else:
-                        plt.xticks([], [])
-                    if not ax.is_first_col():
-                        plt.yticks([],[])
-
-                plt.xlim([0, rmax])
-                plt.ylim(-ymax, ymax)
-
-        plt.figtext(0.3, 0.95, 'H', color='r', size=20)
-        plt.figtext(0.34, 0.95, 'S', color='b', size=20)
-        plt.figtext(0.38, 0.95, ' Slater-Koster tables', size=20)
-        e1, e2 = self.ela.get_symbol(), self.elb.get_symbol()
-        plt.figtext(0.3, 0.92, '(thin solid: <%s|%s>, wide dashed: <%s|%s>)' \
-                    % (e1, e2, e2, e1), size=10)
-
-        if filename is None:
-            filename = '%s-%s_slako.pdf' % (e1, e2)
-        plt.savefig(filename, bbox_inches='tight')
-        plt.clf()
-        self.timer.stop('plotting')
-
-    def get_range(self, fractional_limit):
-        """ Define ranges for the atoms: largest r such that Rnl(r)<limit. """
-        wf_range = 0.
-
-        for el in self.elements:
-            r = max([el.get_wf_range(nl, fractional_limit)
-                     for nl in el.get_valence_orbitals()])
-            print('Wave function range for %s = %.5f a0' % (el.get_symbol(), r),
-                  file=self.txt)
-            wf_range = max(r, wf_range)
-
-        assert wf_range < 20, 'Wave function range exceeds 20 Bohr radii. ' \
-                              'Decrease wflimit?'
-        return wf_range
-
-    def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
-            superposition='potential', xc='LDA', stride=1):
-        """ Calculate the Slater-Koster table.
-
-        parameters:
-        ------------
-        rmin, dr, N: parameters defining the equidistant grid of interatomic
-                separations: the shortest distance rmin and grid spacing dr
-                (both in Bohr radii) and the number of grid points N.
-        ntheta: number of angular divisions in polar grid
-                (more dense towards bonding region).
-        nr:     number of radial divisions in polar grid
-                (more dense towards origins).
-                with p=q=2 (powers in polar grid) ntheta~3*nr is
-                optimal (with fixed grid size)
-                with ntheta=150, nr=50 you get~1E-4 accuracy for H-elements
-                (beyond that, gain is slow with increasing grid size)
-        wflimit: value below which the radial wave functions are considered
-                to be negligible. This determines how far the polar grids
-                around the atomic centers extend in space.
-        superposition: 'density' or 'potential': whether to use the density
-                superposition or potential superposition approach for the
-                Hamiltonian integrals.
-        xc:     name of the exchange-correlation functional to be used
-                in calculating the effective potential in the density
-                superposition scheme. If the PyLibXC module is available,
-                any LDA or GGA (but not hybrid or MGGA) functional available
-                via LibXC can be specified. E.g. for using the N12
-                functional, set xc='XC_GGA_X_N12+XC_GGA_C_N12'.
-                If PyLibXC is not available, only the local density
-                approximation xc='PW92' (alias: 'LDA') can be chosen.
-        stride: the desired SK-table typically has quite a large number
-                of points (N=500-1000), even though the integrals
-                themselves are comparatively smooth. To speed up the
-                construction of the SK-table, one can therefore restrict
-                the expensive integrations to a subset N' = N // stride,
-                and map the resulting curves on the N-grid afterwards.
-                The default stride = 1 means that N' = N (no shortcut).
-        """
-        print('\n\n', file=self.txt)
-        print('***********************************************', file=self.txt)
-        print('Slater-Koster table construction for %s and %s' % \
-              (self.ela.get_symbol(), self.elb.get_symbol()), file=self.txt)
-        print('***********************************************', file=self.txt)
-        self.txt.flush()
-
-        assert N is not None, 'Need to set number of grid points N!'
-        assert rmin >= 1e-3, 'For stability, please set rmin >= 1e-3'
-        assert superposition in ['density', 'potential']
-
-        self.timer.start('calculate_tables')
-        self.wf_range = self.get_range(wflimit)
-        Nsub = N // stride
-        Rgrid = rmin + stride * dr * np.arange(Nsub)
-        tables = [np.zeros((Nsub, 2*NUMSK)) for i in range(self.nel)]
-        dH = 0.
-        Hmax = 0.
-
-        for p, (e1, e2) in enumerate(self.pairs):
-            print('Integrals:', end=' ', file=self.txt)
-            selected = select_integrals(e1, e2)
-            for s in selected:
-                print(s[0], end=' ', file=self.txt)
-            print(file=self.txt, flush=True)
-
-        for i, R in enumerate(Rgrid):
-            if R > 2 * self.wf_range:
-                break
-
-            grid, area = self.make_grid(R, nt=ntheta, nr=nr)
-
-            if  i == Nsub - 1 or Nsub // 10 == 0 or i % (Nsub // 10) == 0:
-                print('R=%8.2f, %i grid points ...' % (R, len(grid)),
-                      file=self.txt, flush=True)
-
-            for p, (e1, e2) in enumerate(self.pairs):
-                selected = select_integrals(e1, e2)
-                S, H, H2 = 0., 0., 0.
-                if len(grid) > 0:
-                    S, H, H2 = self.calculate_mels(selected, e1, e2, R, grid,
-                                                   area, xc=xc,
-                                                   superposition=superposition)
-                    Hmax = max(Hmax, max(abs(H)))
-                    dH = max(dH, max(abs(H - H2)))
-                tables[p][i, :NUMSK] = H
-                tables[p][i, NUMSK:] = S
-
-        if superposition == 'potential':
-            print('Maximum value for H=%.2g' % Hmax, file=self.txt)
-            print('Maximum error for H=%.2g' % dH, file=self.txt)
-            print('     Relative error=%.2g %%' % (dH / Hmax * 100),
-                  file=self.txt)
-
-        self.Rgrid = rmin + dr * np.arange(N)
-
-        if stride > 1:
-            self.tables = [np.zeros((N, 2*NUMSK)) for i in range(self.nel)]
-            for p in range(self.nel):
-                for i in range(2*NUMSK):
-                    spl = CubicSplineFunction(Rgrid, tables[p][:, i])
-                    self.tables[p][:, i] = spl(self.Rgrid)
-        else:
-            self.tables = tables
-
-        # Smooth the curves near the cutoff
-        for p in range(self.nel):
-            for i in range(2*NUMSK):
-                self.tables[p][:, i] = tail_smoothening(self.Rgrid,
-                                                        self.tables[p][:, i])
-
-        self.timer.stop('calculate_tables')
-
-    def calculate_mels(self, selected, e1, e2, R, grid, area,
-                       superposition='potential', xc='LDA'):
-        """ Perform integration for selected H and S integrals.
-
-        parameters:
-        -----------
-        selected: list of [('dds', '3d', '4d'), (...)]
-        e1: <bra| element
-        e2: |ket> element
-        R: e1 is at origin, e2 at z=R
-        grid: list of grid points on (d, z)-plane
-        area: d-z areas of the grid points.
-        superposition: 'density' or 'potential' superposition scheme
-        xc: exchange-correlation functional (see description in self.run())
-
-        return:
-        -------
-        List of H,S and H2 for selected integrals. In the potential
-        superposition scheme, H2 is calculated using a different technique
-        and can be used for error estimation. This is not available
-        for the density superposition scheme, where simply H2=0 is returned.
-
-        S: simply R1 * R2 * angle_part
-
-        H: operate (derivate) R2 <R1 | t + Veff - Conf1 - Conf2 | R2>.
-           With potential superposition: Veff = Veff1 + Veff2
-           With density superposition: Veff = Vxc(n1 + n2)
-
-        H2: operate with full h2 and hence use eigenvalue of | R2>
-            with full Veff2:
-              <R1 | (t1 + Veff1) + Veff2 - Conf1 - Conf2 | R2>
-            = <R1 | h1 + Veff2 - Conf1 - Conf2 | R2> (operate with h1 on left)
-            = <R1 | e1 + Veff2 - Conf1 - Conf2 | R2>
-            = e1 * S + <R1 | Veff2 - Conf1 - Conf2 | R2>
-            -> H and H2 can be compared and error estimated
-        """
-        self.timer.start('calculate_mels')
-
-        # common for all integrals (not wf-dependent parts)
-        self.timer.start('prelude')
-        x = grid[:, 0]
-        y = grid[:, 1]
-        r1 = np.sqrt(x**2 + y**2)
-        r2 = np.sqrt(x**2 + (R - y)**2)
-        c1 = y / r1  # cosine of theta_1
-        c2 = (y - R) / r2  # cosine of theta_2
-        s1 = np.sqrt(1. - c1**2)  # sine of theta_1
-        s2 = np.sqrt(1. - c2**2)  # sine of theta_2
-
-        if superposition == 'potential':
-            self.timer.start('vrho')
-            v1 = e1.effective_potential(r1) - e1.confinement(r1)
-            v2 = e2.effective_potential(r2) - e2.confinement(r2)
-            veff = v1 + v2
-            self.timer.stop('vrho')
-        elif superposition == 'density':
-            self.timer.start('vrho')
-            rho = e1.electron_density(r1) + e2.electron_density(r2)
-            veff = e1.nuclear_potential(r1) + e1.hartree_potential(r1)
-            veff += e2.nuclear_potential(r2) + e2.hartree_potential(r2)
-            if xc in ['LDA', 'PW92']:
-                xc = XC_PW92()
-                veff += xc.vxc(rho)
-                self.timer.stop('vrho')
-            else:
-                xc = LibXC(xc)
-                drho1 = e1.electron_density(r1, der=1)
-                drho2 = e2.electron_density(r2, der=1)
-                grad_x = drho1 * s1
-                grad_x += drho2 * s2
-                grad_y = drho1 * c1
-                grad_y += drho2 * c2
-                sigma = grad_x**2 + grad_y**2
-                out = xc.compute_all(rho, sigma)
-                veff += out['vrho']
-                self.timer.stop('vrho')
-                self.timer.start('vsigma')
-                # add gradient corrections to vxc
-                # provided that we have enough points
-                # (otherwise we get "dfitpack.error:
-                # (m>=(kx+1)*(ky+1)) failed for hidden m")
-                if out['vsigma'] is not None and len(x) > 16:
-                    splx = SmoothBivariateSpline(x, y, out['vsigma'] * grad_x)
-                    sply = SmoothBivariateSpline(x, y, out['vsigma'] * grad_y)
-                    veff += -2. * splx(x, y, dx=1, dy=0, grid=False)
-                    veff += -2. * sply(x, y, dx=0, dy=1, grid=False)
-                self.timer.stop('vsigma')
-
-        assert np.shape(veff) == (len(grid),)
-        self.timer.stop('prelude')
-
-        # calculate all selected integrals
-        Sl, Hl, H2l = np.zeros(NUMSK), np.zeros(NUMSK), np.zeros(NUMSK)
-
-        for integral, nl1, nl2 in selected:
-            l2 = ANGULAR_MOMENTUM[nl2[1]]
-
-            gphi = g(c1, c2, s1, s2, integral)
-            aux = gphi * area * x
-
-            Rnl1 = e1.Rnl(r1, nl1)
-            Rnl2 = e2.Rnl(r2, nl2)
-            ddunl2 = e2.unl(r2, nl2, der=2)
-
-            S = np.sum(Rnl1 * Rnl2 * aux)
-            H = np.sum(Rnl1 * (-0.5 * ddunl2 / r2 + (veff + \
-                       l2 * (l2 + 1) / (2 * r2 ** 2)) * Rnl2) * aux)
-
-            if superposition == 'potential':
-                H2 = np.sum(Rnl1 * Rnl2 * aux * (v2 - e1.confinement(r1)))
-                H2 += e1.get_epsilon(nl1) * S
-            elif superposition == 'density':
-                H2 = 0
-
-            index = INTEGRALS.index(integral)
-            Sl[index] = S
-            Hl[index] = H
-            H2l[index] = H2
-
-        self.timer.stop('calculate_mels')
-        return Sl, Hl, H2l
-
-    def make_grid(self, Rz, nt, nr, p=2, q=2, view=False):
-        """ Construct a double-polar grid.
-
-        Parameters:
-        -----------
-        Rz: element 1 is at origin, element 2 at z=Rz
-        nt: number of theta grid points
-        nr: number of radial grid points
-        p: power describing the angular distribution of grid points
-           (larger puts more weight towards theta=0)
-        q: power describing the radial disribution of grid points
-           (larger puts more weight towards centers)
-        view: view the distribution of grid points with matplotlib
-
-        Plane at R/2 divides two polar grids.
-
-
-         ^ (z-axis)
-         |--------_____               phi_j
-         |       /     ----__         *
-         |      /            \       /  *
-         |     /               \    /  X *                X=coordinates of the center of area element(z,d),
-         |    /                  \  \-----* phi_(j+1)     area=(r_(i+1)**2-r_i**2)*(phi_(j+1)-phi_j)/2
-         |   /                    \  r_i   r_(i+1)
-         |  /                      \
-         | /                       |
-         *2------------------------|           polar centered on atom 2
-         | \                       |
-         |  \                     /                                                     1
-         |   \                   /                                                     /  \
-         |-------------------------- z=h -line         ordering of sector slice       /     \
-         |   /                   \                                      points:      /        \
-         |  /                     \                                                 /          \
-         | /                       |                                               /     0       4
-         *1------------------------|--->      polar centered on atom 1            2            /
-         | \                       |    (r_perpendicular (xy-plane) = 'd-axis')    \        /
-         |  \                      /                                                 \   /
-         |   \                    /                                                    3
-         |    \                  /
-         |     \               /
-         |      \           /
-         |       \ ___ ---
-         |---------
-        """
-        self.timer.start('make_grid')
-        rmin, rmax = 1e-7, self.wf_range
-        h = Rz / 2
-
-        if _hotcent is not None:
-            grid, area = _hotcent.make_grid(Rz, rmin, rmax, nt, nr, p, q)
-        else:
-            max_range = self.wf_range
-            T = np.linspace(0, 1, nt) ** p * np.pi
-            R = rmin + np.linspace(0, 1, nr) ** q * (rmax - rmin)
-
-            area = np.array([])
-            d = np.array([])
-            z = np.array([])
-
-            # first calculate grid for polar centered on atom 1:
-            # the z=h-like starts cutting full elements starting from point (1)
-            Tj0 = T[:nt - 1]
-            Tj1 = T[1: nt]
-
-            for i in range(nr - 1):
-                # corners of area element
-                d1 = R[i + 1] * np.sin(Tj0)
-                z1 = R[i + 1] * np.cos(Tj0)
-                d2 = R[i] * np.sin(Tj0)
-                z2 = R[i] * np.cos(Tj0)
-                d3 = R[i] * np.sin(Tj1)
-                z3 = R[i] * np.cos(Tj1)
-                d4 = R[i + 1] * np.sin(Tj1)
-                z4 = R[i + 1] * np.cos(Tj1)
-
-                cond_list = [z1 <= h,  # area fully inside region
-                     (z1 > h) * (z2 <= h) * (z4 <= h),  # corner 1 outside region
-                     (z1 > h) * (z2 > h) * (z3 <= h) * (z4 <= h),  # 1 & 2 outside
-                     (z1 > h) * (z2 > h) * (z3 <= h) * (z4 > h),  # only 3 inside
-                     (z1 > h) * (z2 <= h) * (z3 <= h) * (z4 > h),  # 1 & 4 outside
-                     (z1 > h) * (z3 > h) * ~((z2 <= h) * (z4 > h))]
-
-                r0_list = [0.5 * (R[i] + R[i + 1]),
-                           0.5 * (R[i] + R[i + 1]),
-                           0.5 * (R[i] + R[i + 1]),
-                           lambda x: 0.5 * (R[i] + h / np.cos(x)),
-                           lambda x: 0.5 * (R[i] + h / np.cos(x)),
-                           0,
-                           np.nan]
-                r0 = np.piecewise(Tj1, cond_list, r0_list)
-
-                Th0 = np.piecewise(h / R[i], [np.abs(h / R[i]) > 1],
-                                   [np.nan, lambda x: np.arccos(x)])
-                Th1 = np.piecewise(h / R[i + 1], [np.abs(h / R[i + 1]) > 1],
-                                   [np.nan, lambda x: np.arccos(x)])
-
-                t0_list = [lambda x: 0.5 * x,
-                           0.5 * Th1,
-                           0.5 * Th1,
-                           0.5 * Th0,
-                           lambda x: 0.5 * x,
-                           0,
-                           np.nan]
-                t0 = 0.5 * Tj1
-                t0 += np.piecewise(Tj0, cond_list, t0_list)
-
-                rr = 0.5 * (R[i + 1] ** 2 - R[i] ** 2)
-                A_list0 = [lambda x: rr * -x,
-                           lambda x: rr * -x - 0.5 * R[i + 1] ** 2 * (Th1 - x) \
-                                     + 0.5 * h ** 2 * (np.tan(Th1) - np.tan(x)),
-                           lambda x: rr * -x - (rr * -x + 0.5 * R[i + 1] ** 2 \
-                                     * (Th1 - Th0)),
-                           0.,
-                           lambda x: 0.5 * h ** 2 * -np.tan(x) \
-                                     - 0.5 * R[i] ** 2 * -x,
-                           -1,
-                           np.nan]
-                A = np.piecewise(Tj0, cond_list, A_list0)
-
-                A_list1 = [lambda x: rr * x,
-                           lambda x: rr * x,
-                           lambda x: rr * x - (rr * Th0 - 0.5 * h ** 2 \
-                                     * (np.tan(Th1) - np.tan(Th0))),
-                           lambda x: 0.5 * h ** 2 * (np.tan(x) - np.tan(Th0)) \
-                                     - 0.5 * R[i] ** 2 * (x - Th0),
-                           lambda x: 0.5 * h ** 2 * np.tan(x) \
-                                     - 0.5 * R[i] ** 2 * x,
-                           0,
-                           np.nan]
-                A += np.piecewise(Tj1, cond_list, A_list1)
-
-                dd = r0 * np.sin(t0)
-                zz = r0 * np.cos(t0)
-                select = np.sqrt(dd ** 2 + zz ** 2) < max_range
-                select *= np.sqrt(dd ** 2 + (Rz - zz) ** 2) < max_range
-                select *= A > 0
-                area = np.hstack((area, A[select]))
-                d = np.hstack((d, dd[select]))
-                z = np.hstack((z, zz[select]))
-            grid = np.array([d, z]).T
-
-        self.timer.start('symmetrize')
-        # calculate the polar centered on atom 2 by mirroring the other grid
-        grid2 = grid.copy()
-        grid2[:, 1] = -grid[:, 1]
-        shift = np.zeros_like(grid)
-        shift[:, 1] = 2 * h
-        grid = np.concatenate((grid, grid2 + shift))
-        area = np.concatenate((area, area))
-        self.timer.stop('symmetrize')
-
-        if view:
-            assert plt is not None, 'Matplotlib could not be imported!'
-            plt.plot([h, h ,h])
-            plt.scatter(grid[:, 0], grid[:, 1], s=10 * area / np.max(area))
-            plt.show()
-            plt.clf()
-
-        self.timer.stop('make_grid')
-        return grid, area
 
 
 INTEGRALS = ['ffs', 'ffp', 'ffd', 'fff',
@@ -711,12 +14,88 @@ INTEGRALS = ['ffs', 'ffp', 'ffd', 'fff',
 
 NUMSK = len(INTEGRALS)
 
-ANGULAR_MOMENTUM = {'s': 0, 'p': 1, 'd': 2, 'f': 3}
+
+INTEGRAL_PAIRS = {
+    'sss': ('s', 's'),
+    'sps': ('s', 'pz'),
+    'sds': ('s', 'dz2'),
+    'sfs': ('s', 'fz3'),
+    'sgs': ('s', 'g5'),
+    'pps': ('pz', 'pz'),
+    'ppp': ('px', 'px'),
+    'pds': ('pz', 'dz2'),
+    'pdp': ('px', 'dxz'),
+    'pgs': ('pz', 'g5'),
+    'pgp': ('px', 'g6'),
+    'pfs': ('pz', 'fz3'),
+    'pfp': ('px', 'fxz2'),
+    'dds': ('dz2', 'dz2'),
+    'ddp': ('dxz', 'dxz'),
+    'ddd': ('dxy', 'dxy'),
+    'dfs': ('dz2', 'fz3'),
+    'dfp': ('dxz', 'fxz2'),
+    'dfd': ('dxy', 'fxyz'),
+    'dgs': ('dz2', 'g5'),
+    'dgp': ('dxz', 'g6'),
+    'dgd': ('dxy', 'g3'),
+    'ffs': ('fz3', 'fz3'),
+    'ffp': ('fxz2', 'fxz2'),
+    'ffd': ('fxyz', 'fxyz'),
+    'fff': ('fx(x2-3y2)', 'fx(x2-3y2)'),
+    'fgs': ('fz3', 'g5'),
+    'fgp': ('fxz2', 'g6'),
+    'fgd': ('fxyz', 'g3'),
+    'fgf': ('fx(x2-3y2)', 'g8'),
+    'ggs': ('g5', 'g5'),
+    'ggp': ('g6', 'g6'),
+    'ggd': ('g3', 'g3'),
+    'ggf': ('g8', 'g8'),
+    'ggg': ('g1', 'g1'),
+}
 
 
-def select_orbitals(val1, val2, integral):
-    """ Select orbitals from given valences to calculate given integral.
-    e.g. ['2s', '2p'], ['4s', '3d'], 'sds' --> ('2s', '3d')
+def get_integral_pair(integral):
+    """ Returns the orbital pair used for calculating
+    the given Slater-Koster integral. """
+    if integral in INTEGRAL_PAIRS:
+        lm1, lm2 = INTEGRAL_PAIRS[integral]
+    else:
+        lm2, lm1 = INTEGRAL_PAIRS[integral[1] + integral[0] + integral[2]]
+    return (lm1, lm2)
+
+
+def search_integrals(lm1, lm2):
+    """ Returns the sigma/pi/... integrals to be considered for the
+    given pair of orbitals. """
+    integrals, ordered = [], []
+
+    for integral, pair in INTEGRAL_PAIRS.items():
+        if pair == (lm1, lm2):
+            integrals.append(integral)
+            ordered.append(True)
+        elif pair == (lm2, lm1):
+            integrals.append(integral)
+            ordered.append(False)
+
+    return integrals, ordered
+
+
+def select_subshells(val1, val2, integral):
+    """
+    Select subshells from given valence sets to calculate given
+    Slater-Koster integral.
+
+    Parameters
+    ----------
+    val1, val2 : list of str
+        Valence subshell sets (e.g. ['2s', '2p'], ['4s', '3d']).
+    integral : str
+        Slater-Koster integral label (e.g. 'sds').
+
+    Returns
+    -------
+    nl1, nl2 : str
+        Matching subshell pair (e.g. ('2s', '3d') in this example).
     """
     nl1 = None
     for nl in val1:
@@ -735,16 +114,29 @@ def select_integrals(e1, e2):
     """ Return list of integrals (integral, nl1, nl2)
     to be done for element pair e1, e2. """
     selected = []
-    val1, val2 = e1.get_valence_orbitals(), e2.get_valence_orbitals()
-
-    for integral in INTEGRALS:
-        nl1, nl2 = select_orbitals(val1, val2, integral)
-        if nl1 is None or nl2 is None:
-            continue
-        else:
-            selected.append((integral, nl1, nl2))
-
+    for ival1, valence1 in enumerate(e1.basis_sets):
+        for ival2, valence2 in enumerate(e2.basis_sets):
+            for integral in INTEGRALS:
+                nl1, nl2 = select_subshells(valence1, valence2, integral)
+                if nl1 is not None and nl2 is not None:
+                    selected.append((integral, nl1, nl2))
     return selected
+
+
+def print_integral_overview(e1, e2, selected, file):
+    """ Prints an overview of the selected Slater-Koster integrals. """
+    for bas1 in range(len(e1.basis_sets)):
+        for bas2 in range(len(e2.basis_sets)):
+            sym1 = e1.get_symbol() + '+'*bas1
+            sym2 = e2.get_symbol() + '+'*bas2
+            print('Integrals for %s-%s pair:' % (sym1, sym2), end=' ',
+                  file=file)
+            for integral, nl1, nl2 in selected:
+                if e1.get_basis_set_index(nl1) == bas1 and \
+                   e2.get_basis_set_index(nl2) == bas2:
+                    print('_'.join([nl1, nl2, integral]), end=' ', file=file)
+            print(file=file, flush=True)
+    return
 
 
 def g(c1, c2, s1, s2, integral):
@@ -793,79 +185,1036 @@ def g(c1, c2, s1, s2, integral):
         return np.sqrt(3.) / 2 * c2
     elif integral == 'sss':
         return 0.5 * np.ones_like(c1)
+    elif integral == 'sgs':
+        return 105*c2**4/16. - 45*c2**2/8 + 9/16.
+    elif integral == 'pgs':
+        return 3*np.sqrt(3)*(35*c2**4 - 30*c2**2 + 3)*c1/16.
+    elif integral == 'pgp':
+        return 3*np.sqrt(30)*(7*c2**2 - 3)*s2*s1*c2/16.
+    elif integral == 'dgs':
+        return 3*np.sqrt(5)*(3*c1**2 - 1)*(35*c2**4 - 30*c2**2 + 3)/32.
+    elif integral == 'dgp':
+        return 15*np.sqrt(6)*(28*(-8*s2**3*c2 + 4*s2*c2)*s1*c1 \
+                              + 16*s2*s1*c2*c1)/512.
+    elif integral == 'dgd':
+        return 15*np.sqrt(3)*(7*c2**2 - 1)*s2**2*s1**2/32.
+    elif integral == 'fgs':
+        return 3*np.sqrt(7)*(5*c1**2 - 3)*(35*c2**4 - 30*c2**2 + 3)*c1/32.
+    elif integral == 'fgp':
+        return 3*np.sqrt(105)*(7*c2**2 - 3)*(5*c1**2 - 1)*s2*s1*c2/32.
+    elif integral == 'fgd':
+        return 15*np.sqrt(21)*(7*c2**2 - 1)*s2**2*s1**2*c1/32.
+    elif integral == 'fgf':
+        return 105*s2**3*s1**3*c2/32.
+    elif integral == 'ggs':
+        return 9*(35*c2**4 - 30*c2**2 + 3)*(35*c1**4 - 30*c1**2 + 3)/128.
+    elif integral == 'ggp':
+        return 45*(7*c2**2 - 3)*(7*c1**2 - 3)*s2*s1*c2*c1/32.
+    elif integral == 'ggd':
+        return 45*(7*c2**2 - 1)*(7*c1**2 - 1)*s2**2*s1**2/64.
+    elif integral == 'ggf':
+        return 315*s2**3*s1**3*c2*c1/32.
+    elif integral == 'ggg':
+        return 315*s2**4*s1**4/256.
 
 
-def tail_smoothening(x, y):
-    """ For given grid-function y(x), make smooth tail.
-
-    Aim is to get (e.g. for Slater-Koster tables and repulsions) smoothly
-    behaving energies and forces near cutoff region.
-
-    Make is such that y and y' go smoothly exactly to zero at last point.
-    Method: take largest neighboring points y_k and y_(k+1) (k<N-3) such
-    that line through them passes zero below x_(N-1). Then fit
-    third-order polynomial through points y_k, y_k+1 and y_N-1.
-
-    Return:
-    smoothed y-function on same grid.
+def dg(c1, c2, s1, s2, integral):
+    """ Returns an array with the c1, c2, s1 and s2 derivatives
+    of g(c1, c2, s1, s2) for the given integral.
     """
-    if np.all(abs(y) < 1e-10):
-        return y
+    if integral == 'sss':
+        return [0, 0, 0, 0]
+    elif integral == 'sps':
+        return [0, np.sqrt(3)/2, 0, 0]
+    elif integral == 'sds':
+        return [0, 3*np.sqrt(5)*c2/2, 0, 0]
+    elif integral == 'sfs':
+        return [0, 3*np.sqrt(7)*(5*c2**2 - 1)/4, 0, 0]
+    elif integral == 'pps':
+        return [3*c2/2, 3*c1/2, 0, 0]
+    elif integral == 'ppp':
+        return [0, 0, 3*s2/4, 3*s1/4]
+    elif integral == 'pds':
+        return [np.sqrt(15)*(3*c2**2 - 1)/4, 3*np.sqrt(15)*c1*c2/2, 0, 0]
+    elif integral == 'pdp':
+        return [0, 3*np.sqrt(5)*s1*s2/4, 3*np.sqrt(5)*c2*s2/4,
+                3*np.sqrt(5)*c2*s1/4]
+    elif integral == 'pfs':
+        return [np.sqrt(21)*c2*(5*c2**2 - 3)/4,
+                3*np.sqrt(21)*c1*(5*c2**2 - 1)/4, 0, 0]
+    elif integral == 'pfp':
+        return [0, 15*np.sqrt(14)*c2*s1*s2/8,
+                3*np.sqrt(14)*s2*(5*c2**2 - 1)/16,
+                3*np.sqrt(14)*s1*(5*c2**2 - 1)/16]
+    elif integral == 'dds':
+        return [15*c1*(3*c2**2 - 1)/4, 15*c2*(3*c1**2 - 1)/4, 0, 0]
+    elif integral == 'ddp':
+        return [15*c2*s1*s2/4, 15*c1*s1*s2/4, 15*c1*c2*s2/4, 15*c1*c2*s1/4]
+    elif integral == 'ddd':
+        return [0, 0, 15*s1*s2**2/8, 15*s1**2*s2/8]
+    elif integral == 'dfs':
+        return [3*np.sqrt(35)*c1*c2*(5*c2**2 - 3)/4,
+                3*np.sqrt(35)*(3*c1**2 - 1)*(5*c2**2 - 1)/8, 0, 0]
+    elif integral == 'dfp':
+        return [3*np.sqrt(70)*s1*s2*(5*c2**2 - 1)/16,
+                15*np.sqrt(70)*c1*c2*s1*s2/8,
+                3*np.sqrt(70)*c1*s2*(5*c2**2 - 1)/16,
+                3*np.sqrt(70)*c1*s1*(5*c2**2 - 1)/16]
+    elif integral == 'dfd':
+        return [0, 15*np.sqrt(7)*s1**2*s2**2/16, 15*np.sqrt(7)*c2*s1*s2**2/8,
+                15*np.sqrt(7)*c2*s1**2*s2/8]
+    elif integral == 'ffs':
+        return [21*c2*(5*c1**2 - 1)*(5*c2**2 - 3)/8,
+                21*c1*(5*c1**2 - 3)*(5*c2**2 - 1)/8, 0, 0]
+    elif integral == 'ffp':
+        return [105*c1*s1*s2*(5*c2**2 - 1)/16, 105*c2*s1*s2*(5*c1**2 - 1)/16,
+                21*s2*(5*c1**2 - 1)*(5*c2**2 - 1)/32,
+                21*s1*(5*c1**2 - 1)*(5*c2**2 - 1)/32]
+    elif integral == 'ffd':
+        return [105*c2*s1**2*s2**2/16, 105*c1*s1**2*s2**2/16,
+                105*c1*c2*s1*s2**2/8, 105*c1*c2*s1**2*s2/8]
+    elif integral == 'fff':
+        return [0, 0, 105*s1**2*s2**3/32, 105*s1**3*s2**2/32]
+
+
+def get_twocenter_phi_integral(lm1, lm2, c1, c2, s1, s2):
+    """ Similar to the g() function above, but for every
+    (lm1, lm2) combination including s/p/d/f/g/h angular momenta.
+
+    Parameters
+    ----------
+    lm1, lm2 : str
+        Orbital labels.
+    c1, c2, s1, s2 : np.ndarray
+        Cosine (c1 and c2) and sine (s1 and s2) of the
+        theta_1 and theta2 angles, respectively.
+
+    Returns
+    -------
+    ghi : np.ndarray
+        Y_{lm1}(\theta_1) Y_{lm1}(\theta_2)
+        \int Y_{lm1}(\phi_1) Y_{lm1}(\phi_2) d\phi
+    """
+    if lm1 == 's' and lm2 == 's':
+        gphi = 1/2.
+    elif lm1 == 's' and lm2 == 'pz':
+        gphi = np.sqrt(3)*c2/2.
+    elif lm1 == 's' and lm2 == 'dz2':
+        gphi = np.sqrt(5)*(3*c2**2 - 1)/4.
+    elif lm1 == 's' and lm2 == 'fz3':
+        gphi = np.sqrt(7)*(5*c2**2 - 3)*c2/4.
+    elif lm1 == 's' and lm2 == 'g5':
+        gphi = 105*c2**4/16. - 45*c2**2/8 + 9/16.
+    elif lm1 == 's' and lm2 == 'h6':
+        gphi = np.sqrt(11)*(63*c2**4 - 70*c2**2 + 15)*c2/16.
+    elif lm1 == 'px' and lm2 == 'px':
+        gphi = 3*s2*s1/4.
+    elif lm1 == 'px' and lm2 == 'dxz':
+        gphi = 3*np.sqrt(5)*s2*s1*c2/4.
+    elif lm1 == 'px' and lm2 == 'fxz2':
+        gphi = 3*np.sqrt(14)*(5*c2**2 - 1)*s2*s1/16.
+    elif lm1 == 'px' and lm2 == 'g6':
+        gphi = 3*np.sqrt(30)*(7*c2**2 - 3)*s2*s1*c2/16.
+    elif lm1 == 'px' and lm2 == 'h7':
+        gphi = 3*np.sqrt(55)*(21*c2**4 - 14*c2**2 + 1)*s2*s1/32.
+    elif lm1 == 'py' and lm2 == 'py':
+        gphi = 3*s2*s1/4.
+    elif lm1 == 'py' and lm2 == 'dyz':
+        gphi = 3*np.sqrt(5)*s2*s1*c2/4.
+    elif lm1 == 'py' and lm2 == 'fyz2':
+        gphi = 3*np.sqrt(14)*(5*c2**2 - 1)*s2*s1/16.
+    elif lm1 == 'py' and lm2 == 'g4':
+        gphi = 3*np.sqrt(30)*(7*c2**2 - 3)*s2*s1*c2/16.
+    elif lm1 == 'py' and lm2 == 'h5':
+        gphi = 3*np.sqrt(55)*(21*c2**4 - 14*c2**2 + 1)*s2*s1/32.
+    elif lm1 == 'pz' and lm2 == 's':
+        gphi = np.sqrt(3)*c1/2.
+    elif lm1 == 'pz' and lm2 == 'pz':
+        gphi = 3*c2*c1/2.
+    elif lm1 == 'pz' and lm2 == 'dz2':
+        gphi = np.sqrt(15)*(3*c2**2 - 1)*c1/4.
+    elif lm1 == 'pz' and lm2 == 'fz3':
+        gphi = np.sqrt(21)*(5*c2**2 - 3)*c2*c1/4.
+    elif lm1 == 'pz' and lm2 == 'g5':
+        gphi = 3*np.sqrt(3)*(35*c2**4 - 30*c2**2 + 3)*c1/16.
+    elif lm1 == 'pz' and lm2 == 'h6':
+        gphi = np.sqrt(33)*(63*c2**4 - 70*c2**2 + 15)*c2*c1/16.
+    elif lm1 == 'dxy' and lm2 == 'dxy':
+        gphi = 15*s2**2*s1**2/16.
+    elif lm1 == 'dxy' and lm2 == 'fxyz':
+        gphi = 15*np.sqrt(7)*s2**2*s1**2*c2/16.
+    elif lm1 == 'dxy' and lm2 == 'g3':
+        gphi = 15*np.sqrt(3)*(6 - 7*s2**2)*s2**2*s1**2/32.
+    elif lm1 == 'dxy' and lm2 == 'h4':
+        gphi = 15*np.sqrt(77)*(2 - 3*s2**2)*s2**2*s1**2*c2/32.
+    elif lm1 == 'dyz' and lm2 == 'py':
+        gphi = 3*np.sqrt(5)*s2*s1*c1/4.
+    elif lm1 == 'dyz' and lm2 == 'dyz':
+        gphi = 15*s2*s1*c2*c1/4.
+    elif lm1 == 'dyz' and lm2 == 'fyz2':
+        gphi = 3*np.sqrt(70)*(5*c2**2 - 1)*s2*s1*c1/16.
+    elif lm1 == 'dyz' and lm2 == 'g4':
+        gphi = 15*np.sqrt(6)*(7*c2**2 - 3)*s2*s1*c2*c1/16.
+    elif lm1 == 'dyz' and lm2 == 'h5':
+        gphi = 15*np.sqrt(11)*(21*c2**4 - 14*c2**2 + 1)*s2*s1*c1/32.
+    elif lm1 == 'dxz' and lm2 == 'px':
+        gphi = 3*np.sqrt(5)*s2*s1*c1/4.
+    elif lm1 == 'dxz' and lm2 == 'dxz':
+        gphi = 15*s2*s1*c2*c1/4.
+    elif lm1 == 'dxz' and lm2 == 'fxz2':
+        gphi = 3*np.sqrt(70)*(5*c2**2 - 1)*s2*s1*c1/16.
+    elif lm1 == 'dxz' and lm2 == 'g6':
+        gphi = 15*np.sqrt(6)*(7*c2**2 - 3)*s2*s1*c2*c1/16.
+    elif lm1 == 'dxz' and lm2 == 'h7':
+        gphi = 15*np.sqrt(11)*(21*c2**4 - 14*c2**2 + 1)*s2*s1*c1/32.
+    elif lm1 == 'dx2-y2' and lm2 == 'dx2-y2':
+        gphi = 15*s2**2*s1**2/16.
+    elif lm1 == 'dx2-y2' and lm2 == 'fz(x2-y2)':
+        gphi = 15*np.sqrt(7)*s2**2*s1**2*c2/16.
+    elif lm1 == 'dx2-y2' and lm2 == 'g7':
+        gphi = 15*np.sqrt(3)*(6 - 7*s2**2)*s2**2*s1**2/32.
+    elif lm1 == 'dx2-y2' and lm2 == 'h8':
+        gphi = 15*np.sqrt(77)*(2 - 3*s2**2)*s2**2*s1**2*c2/32.
+    elif lm1 == 'dz2' and lm2 == 's':
+        gphi = np.sqrt(5)*(3*c1**2 - 1)/4.
+    elif lm1 == 'dz2' and lm2 == 'pz':
+        gphi = np.sqrt(15)*(3*c1**2 - 1)*c2/4.
+    elif lm1 == 'dz2' and lm2 == 'dz2':
+        gphi = 5*(3*c2**2 - 1)*(3*c1**2 - 1)/8.
+    elif lm1 == 'dz2' and lm2 == 'fz3':
+        gphi = np.sqrt(35)*(5*c2**2 - 3)*(3*c1**2 - 1)*c2/8.
+    elif lm1 == 'dz2' and lm2 == 'g5':
+        gphi = 3*np.sqrt(5)*(3*c1**2 - 1)*(35*c2**4 - 30*c2**2 + 3)/32.
+    elif lm1 == 'dz2' and lm2 == 'h6':
+        gphi = np.sqrt(55)*(3*c1**2 - 1)*(63*c2**4 - 70*c2**2 + 15)*c2/32.
+    elif lm1 == 'fx(x2-3y2)' and lm2 == 'fx(x2-3y2)':
+        gphi = 35*s2**3*s1**3/32.
+    elif lm1 == 'fx(x2-3y2)' and lm2 == 'g8':
+        gphi = 105*s2**3*s1**3*c2/32.
+    elif lm1 == 'fx(x2-3y2)' and lm2 == 'h9':
+        gphi = 35*np.sqrt(11)*(9*c2**2 - 1)*s2**3*s1**3/128.
+    elif lm1 == 'fy(3x2-y2)' and lm2 == 'fy(3x2-y2)':
+        gphi = 35*s2**3*s1**3/32.
+    elif lm1 == 'fy(3x2-y2)' and lm2 == 'g2':
+        gphi = 105*s2**3*s1**3*c2/32.
+    elif lm1 == 'fy(3x2-y2)' and lm2 == 'h3':
+        gphi = 35*np.sqrt(11)*(9*c2**2 - 1)*s2**3*s1**3/128.
+    elif lm1 == 'fz(x2-y2)' and lm2 == 'dx2-y2':
+        gphi = 15*np.sqrt(7)*s2**2*s1**2*c1/16.
+    elif lm1 == 'fz(x2-y2)' and lm2 == 'fz(x2-y2)':
+        gphi = 105*s2**2*s1**2*c2*c1/16.
+    elif lm1 == 'fz(x2-y2)' and lm2 == 'g7':
+        gphi = 15*np.sqrt(21)*(6 - 7*s2**2)*s2**2*s1**2*c1/32.
+    elif lm1 == 'fz(x2-y2)' and lm2 == 'h8':
+        gphi = 105*np.sqrt(11)*(2 - 3*s2**2)*s2**2*s1**2*c2*c1/32.
+    elif lm1 == 'fxyz' and lm2 == 'dxy':
+        gphi = 15*np.sqrt(7)*s2**2*s1**2*c1/16.
+    elif lm1 == 'fxyz' and lm2 == 'fxyz':
+        gphi = 105*s2**2*s1**2*c2*c1/16.
+    elif lm1 == 'fxyz' and lm2 == 'g3':
+        gphi = 15*np.sqrt(21)*(6 - 7*s2**2)*s2**2*s1**2*c1/32.
+    elif lm1 == 'fxyz' and lm2 == 'h4':
+        gphi = 105*np.sqrt(11)*(2 - 3*s2**2)*s2**2*s1**2*c2*c1/32.
+    elif lm1 == 'fyz2' and lm2 == 'py':
+        gphi = 3*np.sqrt(14)*(5*c1**2 - 1)*s2*s1/16.
+    elif lm1 == 'fyz2' and lm2 == 'dyz':
+        gphi = 3*np.sqrt(70)*(5*c1**2 - 1)*s2*s1*c2/16.
+    elif lm1 == 'fyz2' and lm2 == 'fyz2':
+        gphi = 21*(5*c2**2 - 1)*(5*c1**2 - 1)*s2*s1/32.
+    elif lm1 == 'fyz2' and lm2 == 'g4':
+        gphi = 3*np.sqrt(105)*(7*c2**2 - 3)*(5*c1**2 - 1)*s2*s1*c2/32.
+    elif lm1 == 'fyz2' and lm2 == 'h5':
+        gphi = 3*np.sqrt(770)*(5*c1**2 - 1)*(21*c2**4 - 14*c2**2 + 1)*s2*s1/128.
+    elif lm1 == 'fxz2' and lm2 == 'px':
+        gphi = 3*np.sqrt(14)*(5*c1**2 - 1)*s2*s1/16.
+    elif lm1 == 'fxz2' and lm2 == 'dxz':
+        gphi = 3*np.sqrt(70)*(5*c1**2 - 1)*s2*s1*c2/16.
+    elif lm1 == 'fxz2' and lm2 == 'fxz2':
+        gphi = 21*(5*c2**2 - 1)*(5*c1**2 - 1)*s2*s1/32.
+    elif lm1 == 'fxz2' and lm2 == 'g6':
+        gphi = 3*np.sqrt(105)*(7*c2**2 - 3)*(5*c1**2 - 1)*s2*s1*c2/32.
+    elif lm1 == 'fxz2' and lm2 == 'h7':
+        gphi = 3*np.sqrt(770)*(5*c1**2 - 1)*(21*c2**4 - 14*c2**2 + 1)*s2*s1/128.
+    elif lm1 == 'fz3' and lm2 == 's':
+        gphi = np.sqrt(7)*(5*c1**2 - 3)*c1/4.
+    elif lm1 == 'fz3' and lm2 == 'pz':
+        gphi = np.sqrt(21)*(5*c1**2 - 3)*c2*c1/4.
+    elif lm1 == 'fz3' and lm2 == 'dz2':
+        gphi = np.sqrt(35)*(3*c2**2 - 1)*(5*c1**2 - 3)*c1/8.
+    elif lm1 == 'fz3' and lm2 == 'fz3':
+        gphi = 7*(5*c2**2 - 3)*(5*c1**2 - 3)*c2*c1/8.
+    elif lm1 == 'fz3' and lm2 == 'g5':
+        gphi = 3*np.sqrt(7)*(5*c1**2 - 3)*(35*c2**4 - 30*c2**2 + 3)*c1/32.
+    elif lm1 == 'fz3' and lm2 == 'h6':
+        gphi = np.sqrt(77)*(5*c1**2 - 3)*(63*c2**4 - 70*c2**2 + 15)*c2*c1/32.
+    elif lm1 == 'g1' and lm2 == 'g1':
+        gphi = 315*s2**4*s1**4/256.
+    elif lm1 == 'g1' and lm2 == 'h2':
+        gphi = 315*np.sqrt(11)*s2**4*s1**4*c2/256.
+    elif lm1 == 'g2' and lm2 == 'fy(3x2-y2)':
+        gphi = 105*s2**3*s1**3*c1/32.
+    elif lm1 == 'g2' and lm2 == 'g2':
+        gphi = 315*s2**3*s1**3*c2*c1/32.
+    elif lm1 == 'g2' and lm2 == 'h3':
+        gphi = 105*np.sqrt(11)*(9*c2**2 - 1)*s2**3*s1**3*c1/128.
+    elif lm1 == 'g3' and lm2 == 'dxy':
+        gphi = 15*np.sqrt(3)*(6 - 7*s1**2)*s2**2*s1**2/32.
+    elif lm1 == 'g3' and lm2 == 'fxyz':
+        gphi = 15*np.sqrt(21)*(6 - 7*s1**2)*s2**2*s1**2*c2/32.
+    elif lm1 == 'g3' and lm2 == 'g3':
+        gphi = 45*(7*s2**2 - 6)*(7*s1**2 - 6)*s2**2*s1**2/64.
+    elif lm1 == 'g3' and lm2 == 'h4':
+        gphi = 15*np.sqrt(231)*(3*s2**2 - 2)*(7*s1**2 - 6)*s2**2*s1**2*c2/64.
+    elif lm1 == 'g4' and lm2 == 'py':
+        gphi = 3*np.sqrt(30)*(7*c1**2 - 3)*s2*s1*c1/16.
+    elif lm1 == 'g4' and lm2 == 'dyz':
+        gphi = 15*np.sqrt(6)*(7*c1**2 - 3)*s2*s1*c2*c1/16.
+    elif lm1 == 'g4' and lm2 == 'fyz2':
+        gphi = 3*np.sqrt(105)*(5*c2**2 - 1)*(7*c1**2 - 3)*s2*s1*c1/32.
+    elif lm1 == 'g4' and lm2 == 'g4':
+        gphi = 45*(7*c2**2 - 3)*(7*c1**2 - 3)*s2*s1*c2*c1/32.
+    elif lm1 == 'g4' and lm2 == 'h5':
+        gphi = 15*np.sqrt(66)*(7*c1**2 - 3)*(21*c2**4 - 14*c2**2 + 1)*s2*s1*c1/128.
+    elif lm1 == 'g5' and lm2 == 's':
+        gphi = 105*c1**4/16. - 45*c1**2/8 + 9/16.
+    elif lm1 == 'g5' and lm2 == 'pz':
+        gphi = 3*np.sqrt(3)*(35*c1**4 - 30*c1**2 + 3)*c2/16.
+    elif lm1 == 'g5' and lm2 == 'dz2':
+        gphi = 3*np.sqrt(5)*(3*c2**2 - 1)*(35*c1**4 - 30*c1**2 + 3)/32.
+    elif lm1 == 'g5' and lm2 == 'fz3':
+        gphi = 3*np.sqrt(7)*(5*c2**2 - 3)*(35*c1**4 - 30*c1**2 + 3)*c2/32.
+    elif lm1 == 'g5' and lm2 == 'g5':
+        gphi = 9*(35*c2**4 - 30*c2**2 + 3)*(35*c1**4 - 30*c1**2 + 3)/128.
+    elif lm1 == 'g5' and lm2 == 'h6':
+        gphi = 3*np.sqrt(11)*(63*c2**4 - 70*c2**2 + 15)*(35*c1**4 - 30*c1**2 + 3)*c2/128.
+    elif lm1 == 'g6' and lm2 == 'px':
+        gphi = 3*np.sqrt(30)*(7*c1**2 - 3)*s2*s1*c1/16.
+    elif lm1 == 'g6' and lm2 == 'dxz':
+        gphi = 15*np.sqrt(6)*(7*c1**2 - 3)*s2*s1*c2*c1/16.
+    elif lm1 == 'g6' and lm2 == 'fxz2':
+        gphi = 3*np.sqrt(105)*(5*c2**2 - 1)*(7*c1**2 - 3)*s2*s1*c1/32.
+    elif lm1 == 'g6' and lm2 == 'g6':
+        gphi = 45*(7*c2**2 - 3)*(7*c1**2 - 3)*s2*s1*c2*c1/32.
+    elif lm1 == 'g6' and lm2 == 'h7':
+        gphi = 15*np.sqrt(66)*(7*c1**2 - 3)*(21*c2**4 - 14*c2**2 + 1)*s2*s1*c1/128.
+    elif lm1 == 'g7' and lm2 == 'dx2-y2':
+        gphi = 15*np.sqrt(3)*(6 - 7*s1**2)*s2**2*s1**2/32.
+    elif lm1 == 'g7' and lm2 == 'fz(x2-y2)':
+        gphi = 15*np.sqrt(21)*(6 - 7*s1**2)*s2**2*s1**2*c2/32.
+    elif lm1 == 'g7' and lm2 == 'g7':
+        gphi = 45*(7*s2**2 - 6)*(7*s1**2 - 6)*s2**2*s1**2/64.
+    elif lm1 == 'g7' and lm2 == 'h8':
+        gphi = 15*np.sqrt(231)*(3*s2**2 - 2)*(7*s1**2 - 6)*s2**2*s1**2*c2/64.
+    elif lm1 == 'g8' and lm2 == 'fx(x2-3y2)':
+        gphi = 105*s2**3*s1**3*c1/32.
+    elif lm1 == 'g8' and lm2 == 'g8':
+        gphi = 315*s2**3*s1**3*c2*c1/32.
+    elif lm1 == 'g8' and lm2 == 'h9':
+        gphi = 105*np.sqrt(11)*(9*c2**2 - 1)*s2**3*s1**3*c1/128.
+    elif lm1 == 'g9' and lm2 == 'g9':
+        gphi = 315*s2**4*s1**4/256.
+    elif lm1 == 'g9' and lm2 == 'h10':
+        gphi = 315*np.sqrt(11)*s2**4*s1**4*c2/256.
+    elif lm1 == 'h1' and lm2 == 'h1':
+        gphi = 693*s2**5*s1**5/512.
+    elif lm1 == 'h2' and lm2 == 'g1':
+        gphi = 315*np.sqrt(11)*s2**4*s1**4*c1/256.
+    elif lm1 == 'h2' and lm2 == 'h2':
+        gphi = 3465*s2**4*s1**4*c2*c1/256.
+    elif lm1 == 'h3' and lm2 == 'fy(3x2-y2)':
+        gphi = 35*np.sqrt(11)*(9*c1**2 - 1)*s2**3*s1**3/128.
+    elif lm1 == 'h3' and lm2 == 'g2':
+        gphi = 105*np.sqrt(11)*(9*c1**2 - 1)*s2**3*s1**3*c2/128.
+    elif lm1 == 'h3' and lm2 == 'h3':
+        gphi = 385*(9*c2**2 - 1)*(9*c1**2 - 1)*s2**3*s1**3/512.
+    elif lm1 == 'h4' and lm2 == 'dxy':
+        gphi = 15*np.sqrt(77)*(2 - 3*s1**2)*s2**2*s1**2*c1/32.
+    elif lm1 == 'h4' and lm2 == 'fxyz':
+        gphi = 105*np.sqrt(11)*(2 - 3*s1**2)*s2**2*s1**2*c2*c1/32.
+    elif lm1 == 'h4' and lm2 == 'g3':
+        gphi = 15*np.sqrt(231)*(7*s2**2 - 6)*(3*s1**2 - 2)*s2**2*s1**2*c1/64.
+    elif lm1 == 'h4' and lm2 == 'h4':
+        gphi = 1155*(3*s2**2 - 2)*(3*s1**2 - 2)*s2**2*s1**2*c2*c1/64.
+    elif lm1 == 'h5' and lm2 == 'py':
+        gphi = 3*np.sqrt(55)*(21*c1**4 - 14*c1**2 + 1)*s2*s1/32.
+    elif lm1 == 'h5' and lm2 == 'dyz':
+        gphi = 15*np.sqrt(11)*(21*c1**4 - 14*c1**2 + 1)*s2*s1*c2/32.
+    elif lm1 == 'h5' and lm2 == 'fyz2':
+        gphi = 3*np.sqrt(770)*(5*c2**2 - 1)*(21*c1**4 - 14*c1**2 + 1)*s2*s1/128.
+    elif lm1 == 'h5' and lm2 == 'g4':
+        gphi = 15*np.sqrt(66)*(7*c2**2 - 3)*(21*c1**4 - 14*c1**2 + 1)*s2*s1*c2/128.
+    elif lm1 == 'h5' and lm2 == 'h5':
+        gphi = 165*(21*c2**4 - 14*c2**2 + 1)*(21*c1**4 - 14*c1**2 + 1)*s2*s1/256.
+    elif lm1 == 'h6' and lm2 == 's':
+        gphi = np.sqrt(11)*(63*c1**4 - 70*c1**2 + 15)*c1/16.
+    elif lm1 == 'h6' and lm2 == 'pz':
+        gphi = np.sqrt(33)*(63*c1**4 - 70*c1**2 + 15)*c2*c1/16.
+    elif lm1 == 'h6' and lm2 == 'dz2':
+        gphi = np.sqrt(55)*(3*c2**2 - 1)*(63*c1**4 - 70*c1**2 + 15)*c1/32.
+    elif lm1 == 'h6' and lm2 == 'fz3':
+        gphi = np.sqrt(77)*(5*c2**2 - 3)*(63*c1**4 - 70*c1**2 + 15)*c2*c1/32.
+    elif lm1 == 'h6' and lm2 == 'g5':
+        gphi = 3*np.sqrt(11)*(35*c2**4 - 30*c2**2 + 3)*(63*c1**4 - 70*c1**2 + 15)*c1/128.
+    elif lm1 == 'h6' and lm2 == 'h6':
+        gphi = 11*(63*c2**4 - 70*c2**2 + 15)*(63*c1**4 - 70*c1**2 + 15)*c2*c1/128.
+    elif lm1 == 'h7' and lm2 == 'px':
+        gphi = 3*np.sqrt(55)*(21*c1**4 - 14*c1**2 + 1)*s2*s1/32.
+    elif lm1 == 'h7' and lm2 == 'dxz':
+        gphi = 15*np.sqrt(11)*(21*c1**4 - 14*c1**2 + 1)*s2*s1*c2/32.
+    elif lm1 == 'h7' and lm2 == 'fxz2':
+        gphi = 3*np.sqrt(770)*(5*c2**2 - 1)*(21*c1**4 - 14*c1**2 + 1)*s2*s1/128.
+    elif lm1 == 'h7' and lm2 == 'g6':
+        gphi = 15*np.sqrt(66)*(7*c2**2 - 3)*(21*c1**4 - 14*c1**2 + 1)*s2*s1*c2/128.
+    elif lm1 == 'h7' and lm2 == 'h7':
+        gphi = 165*(21*c2**4 - 14*c2**2 + 1)*(21*c1**4 - 14*c1**2 + 1)*s2*s1/256.
+    elif lm1 == 'h8' and lm2 == 'dx2-y2':
+        gphi = 15*np.sqrt(77)*(2 - 3*s1**2)*s2**2*s1**2*c1/32.
+    elif lm1 == 'h8' and lm2 == 'fz(x2-y2)':
+        gphi = 105*np.sqrt(11)*(2 - 3*s1**2)*s2**2*s1**2*c2*c1/32.
+    elif lm1 == 'h8' and lm2 == 'g7':
+        gphi = 15*np.sqrt(231)*(7*s2**2 - 6)*(3*s1**2 - 2)*s2**2*s1**2*c1/64.
+    elif lm1 == 'h8' and lm2 == 'h8':
+        gphi = 1155*(3*s2**2 - 2)*(3*s1**2 - 2)*s2**2*s1**2*c2*c1/64.
+    elif lm1 == 'h9' and lm2 == 'fx(x2-3y2)':
+        gphi = 35*np.sqrt(11)*(9*c1**2 - 1)*s2**3*s1**3/128.
+    elif lm1 == 'h9' and lm2 == 'g8':
+        gphi = 105*np.sqrt(11)*(9*c1**2 - 1)*s2**3*s1**3*c2/128.
+    elif lm1 == 'h9' and lm2 == 'h9':
+        gphi = 385*(9*c2**2 - 1)*(9*c1**2 - 1)*s2**3*s1**3/512.
+    elif lm1 == 'h10' and lm2 == 'g9':
+        gphi = 315*np.sqrt(11)*s2**4*s1**4*c1/256.
+    elif lm1 == 'h10' and lm2 == 'h10':
+        gphi = 3465*s2**4*s1**4*c2*c1/256.
+    elif lm1 == 'h11' and lm2 == 'h11':
+        gphi = 693*s2**5*s1**5/512.
+    else:
+        gphi = 0
+    return gphi
+
+
+def get_twocenter_phi_integrals_derivatives(lm1, lm2, c1, c2, s1, s2):
+    """
+    Returns the equivalent of get_twocenter_phi_integrals() with
+    selected derivatives of the involved spherical harmonics
+    for combinations including s/p/d angular momenta.
+
+    Parameters
+    ----------
+    lm1, lm2 : str
+        Orbital labels.
+    c1, c2, s1, s2 : np.ndarray
+        Cosine (c1 and c2) and sine (s1 and s2) of the
+        theta1 and theta2 angles, respectively.
+
+    Returns
+    -------
+    dghi : list of 4 np.ndarray
+        List with the following four integrals:
+            dY_{lm1}(\theta_1)/d\theta_1 dY_{lm1}(\theta_2)/d\theta_2
+            \int Y_{lm1}(\phi) Y_{lm1}(\phi) d\phi,
+            Y_{lm1}(\theta_1) Y_{lm1}(\theta_2)
+            \int dY_{lm1}(\phi)/d\phi dY_{lm1}(\phi)/d\phi d\phi,
+            dY_{lm1}(\theta_1)/d\theta_1 Y_{lm1}(\theta_2)
+            \int Y_{lm1}(\phi) Y_{lm1}(\phi) d\phi,
+            Y_{lm1}(\theta_1) dY_{lm1}(\theta_2)/d\theta_2
+            \int Y_{lm1}(\phi) Y_{lm1}(\phi) d\phi.
+    """
+    if lm1 == 's' and lm2 == 'pz':
+        dgphi = [
+            0,
+            0,
+            0,
+            -np.sqrt(3)*s2/2.,
+        ]
+    elif lm1 == 's' and lm2 == 'dz2':
+        dgphi = [
+            0,
+            0,
+            0,
+            -3*np.sqrt(5)*s2*c2/2.,
+        ]
+    elif lm1 == 'px' and lm2 == 's':
+        dgphi = [
+            0,
+            np.sqrt(3)*s1/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'px' and lm2 == 'px':
+        dgphi = [
+            3*c2*c1/4.,
+            3*s2*s1/4.,
+            3*s2*c1/4.,
+            3*s1*c2/4.,
+        ]
+    elif lm1 == 'px' and lm2 == 'py':
+        dgphi = [
+            0,
+            3*s2*s1/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'px' and lm2 == 'pz':
+        dgphi = [
+            0,
+            3*s1*c2/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'px' and lm2 == 'dxy':
+        dgphi = [
+            0,
+            3*np.sqrt(5)*s2**2*s1/8.,
+            0,
+            0,
+        ]
+    elif lm1 == 'px' and lm2 == 'dyz':
+        dgphi = [
+            0,
+            3*np.sqrt(5)*s2*s1*c2/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'px' and lm2 == 'dxz':
+        dgphi = [
+            3*np.sqrt(5)*(2*c2**2 - 1)*c1/4.,
+            3*np.sqrt(5)*s2*s1*c2/4.,
+            3*np.sqrt(5)*s2*c2*c1/4.,
+            3*np.sqrt(5)*(2*c2**2 - 1)*s1/4.,
+        ]
+    elif lm1 == 'px' and lm2 == 'dx2-y2':
+        dgphi = [
+            0,
+            3*np.sqrt(5)*s2**2*s1/8.,
+            0,
+            0,
+        ]
+    elif lm1 == 'px' and lm2 == 'dz2':
+        dgphi = [
+            0,
+            np.sqrt(15)*(3*c2**2 - 1)*s1/8.,
+            0,
+            0,
+        ]
+    elif lm1 == 'py' and lm2 == 's':
+        dgphi = [
+            0,
+            np.sqrt(3)*s1/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'py' and lm2 == 'px':
+        dgphi = [
+            0,
+            3*s2*s1/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'py' and lm2 == 'py':
+        dgphi = [
+            3*c2*c1/4.,
+            3*s2*s1/4.,
+            3*s2*c1/4.,
+            3*s1*c2/4.,
+        ]
+    elif lm1 == 'py' and lm2 == 'pz':
+        dgphi = [
+            0,
+            3*s1*c2/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'py' and lm2 == 'dxy':
+        dgphi = [
+            0,
+            3*np.sqrt(5)*s2**2*s1/8.,
+            0,
+            0,
+        ]
+    elif lm1 == 'py' and lm2 == 'dyz':
+        dgphi = [
+            3*np.sqrt(5)*(2*c2**2 - 1)*c1/4.,
+            3*np.sqrt(5)*s2*s1*c2/4.,
+            3*np.sqrt(5)*s2*c2*c1/4.,
+            3*np.sqrt(5)*(2*c2**2 - 1)*s1/4.,
+        ]
+    elif lm1 == 'py' and lm2 == 'dxz':
+        dgphi = [
+            0,
+            3*np.sqrt(5)*s2*s1*c2/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'py' and lm2 == 'dx2-y2':
+        dgphi = [
+            0,
+            3*np.sqrt(5)*s2**2*s1/8.,
+            0,
+            0,
+        ]
+    elif lm1 == 'py' and lm2 == 'dz2':
+        dgphi = [
+            0,
+            np.sqrt(15)*(3*c2**2 - 1)*s1/8.,
+            0,
+            0,
+        ]
+    elif lm1 == 'pz' and lm2 == 's':
+        dgphi = [
+            0,
+            0,
+            -np.sqrt(3)*s1/2.,
+            0,
+        ]
+    elif lm1 == 'pz' and lm2 == 'pz':
+        dgphi = [
+            3*s2*s1/2.,
+            0,
+            -3*s1*c2/2.,
+            -3*s2*c1/2.,
+        ]
+    elif lm1 == 'pz' and lm2 == 'dz2':
+        dgphi = [
+            3*np.sqrt(15)*s2*s1*c2/2.,
+            0,
+            np.sqrt(15)*(1 - 3*c2**2)*s1/4.,
+            -3*np.sqrt(15)*s2*c2*c1/2.,
+        ]
+    elif lm1 == 'dxy' and lm2 == 's':
+        dgphi = [
+            0,
+            np.sqrt(15)*s1**2/2.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dxy' and lm2 == 'px':
+        dgphi = [
+            0,
+            3*np.sqrt(5)*s2*s1**2/2.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dxy' and lm2 == 'py':
+        dgphi = [
+            0,
+            3*np.sqrt(5)*s2*s1**2/2.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dxy' and lm2 == 'pz':
+        dgphi = [
+            0,
+            3*np.sqrt(5)*s1**2*c2/2.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dxy' and lm2 == 'dxy':
+        dgphi = [
+            15*s2*s1*c2*c1/4.,
+            15*s2**2*s1**2/4.,
+            15*s2**2*s1*c1/8.,
+            15*s2*s1**2*c2/8.,
+        ]
+    elif lm1 == 'dxy' and lm2 == 'dyz':
+        dgphi = [
+            0,
+            15*s2*s1**2*c2/2.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dxy' and lm2 == 'dxz':
+        dgphi = [
+            0,
+            15*s2*s1**2*c2/2.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dxy' and lm2 == 'dx2-y2':
+        dgphi = [
+            0,
+            15*s2**2*s1**2/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dxy' and lm2 == 'dz2':
+        dgphi = [
+            0,
+            5*np.sqrt(3)*(3*c2**2 - 1)*s1**2/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dyz' and lm2 == 's':
+        dgphi = [
+            0,
+            np.sqrt(15)*s1*c1/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dyz' and lm2 == 'px':
+        dgphi = [
+            0,
+            3*np.sqrt(5)*s2*s1*c1/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dyz' and lm2 == 'py':
+        dgphi = [
+            3*np.sqrt(5)*(2*c1**2 - 1)*c2/4.,
+            3*np.sqrt(5)*s2*s1*c1/4.,
+            3*np.sqrt(5)*(2*c1**2 - 1)*s2/4.,
+            3*np.sqrt(5)*s1*c2*c1/4.,
+        ]
+    elif lm1 == 'dyz' and lm2 == 'pz':
+        dgphi = [
+            0,
+            3*np.sqrt(5)*s1*c2*c1/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dyz' and lm2 == 'dxy':
+        dgphi = [
+            0,
+            15*s2**2*s1*c1/8.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dyz' and lm2 == 'dyz':
+        dgphi = [
+            15*(2*c2**2 - 1)*(2*c1**2 - 1)/4.,
+            15*s2*s1*c2*c1/4.,
+            15*(2*c1**2 - 1)*s2*c2/4.,
+            15*(2*c2**2 - 1)*s1*c1/4.,
+        ]
+    elif lm1 == 'dyz' and lm2 == 'dxz':
+        dgphi = [
+            0,
+            15*s2*s1*c2*c1/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dyz' and lm2 == 'dx2-y2':
+        dgphi = [
+            0,
+            15*s2**2*s1*c1/8.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dyz' and lm2 == 'dz2':
+        dgphi = [
+            0,
+            5*np.sqrt(3)*(3*c2**2 - 1)*s1*c1/8.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dxz' and lm2 == 's':
+        dgphi = [
+            0,
+            np.sqrt(15)*s1*c1/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dxz' and lm2 == 'px':
+        dgphi = [
+            3*np.sqrt(5)*(2*c1**2 - 1)*c2/4.,
+            3*np.sqrt(5)*s2*s1*c1/4.,
+            3*np.sqrt(5)*(2*c1**2 - 1)*s2/4.,
+            3*np.sqrt(5)*s1*c2*c1/4.,
+        ]
+    elif lm1 == 'dxz' and lm2 == 'py':
+        dgphi = [
+            0,
+            3*np.sqrt(5)*s2*s1*c1/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dxz' and lm2 == 'pz':
+        dgphi = [
+            0,
+            3*np.sqrt(5)*s1*c2*c1/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dxz' and lm2 == 'dxy':
+        dgphi = [
+            0,
+            15*s2**2*s1*c1/8.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dxz' and lm2 == 'dyz':
+        dgphi = [
+            0,
+            15*s2*s1*c2*c1/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dxz' and lm2 == 'dxz':
+        dgphi = [
+            15*(2*c2**2 - 1)*(2*c1**2 - 1)/4.,
+            15*s2*s1*c2*c1/4.,
+            15*(2*c1**2 - 1)*s2*c2/4.,
+            15*(2*c2**2 - 1)*s1*c1/4.,
+        ]
+    elif lm1 == 'dxz' and lm2 == 'dx2-y2':
+        dgphi = [
+            0,
+            15*s2**2*s1*c1/8.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dxz' and lm2 == 'dz2':
+        dgphi = [
+            0,
+            5*np.sqrt(3)*(3*c2**2 - 1)*s1*c1/8.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dx2-y2' and lm2 == 's':
+        dgphi = [
+            0,
+            np.sqrt(15)*s1**2/2.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dx2-y2' and lm2 == 'px':
+        dgphi = [
+            0,
+            3*np.sqrt(5)*s2*s1**2/2.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dx2-y2' and lm2 == 'py':
+        dgphi = [
+            0,
+            3*np.sqrt(5)*s2*s1**2/2.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dx2-y2' and lm2 == 'pz':
+        dgphi = [
+            0,
+            3*np.sqrt(5)*s1**2*c2/2.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dx2-y2' and lm2 == 'dxy':
+        dgphi = [
+            0,
+            15*s2**2*s1**2/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dx2-y2' and lm2 == 'dyz':
+        dgphi = [
+            0,
+            15*s2*s1**2*c2/2.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dx2-y2' and lm2 == 'dxz':
+        dgphi = [
+            0,
+            15*s2*s1**2*c2/2.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dx2-y2' and lm2 == 'dx2-y2':
+        dgphi = [
+            15*s2*s1*c2*c1/4.,
+            15*s2**2*s1**2/4.,
+            15*s2**2*s1*c1/8.,
+            15*s2*s1**2*c2/8.,
+        ]
+    elif lm1 == 'dx2-y2' and lm2 == 'dz2':
+        dgphi = [
+            0,
+            5*np.sqrt(3)*(3*c2**2 - 1)*s1**2/4.,
+            0,
+            0,
+        ]
+    elif lm1 == 'dz2' and lm2 == 's':
+        dgphi = [
+            0,
+            0,
+            -3*np.sqrt(5)*s1*c1/2.,
+            0,
+        ]
+    elif lm1 == 'dz2' and lm2 == 'pz':
+        dgphi = [
+            3*np.sqrt(15)*s2*s1*c1/2.,
+            0,
+            -3*np.sqrt(15)*s1*c2*c1/2.,
+            np.sqrt(15)*(1 - 3*c1**2)*s2/4.,
+        ]
+    elif lm1 == 'dz2' and lm2 == 'dz2':
+        dgphi = [
+            45*s2*s1*c2*c1/2.,
+            0,
+            15*(1 - 3*c2**2)*s1*c1/4.,
+            15*(1 - 3*c1**2)*s2*c2/4.,
+        ]
+    else:
+        dgphi = [0, 0, 0, 0]
+
+    return dgphi
+
+
+def tail_smoothening(x, y_in, eps_inner=1e-8, eps_outer=1e-16, window_size=5):
+    """ Smoothens the tail for the given function y(x).
+
+    Parameters
+    ----------
+    x : np.array
+        Array with grid points (strictly increasing).
+    y_in : np.array
+        Array with function values.
+    eps_inner : float, optional
+        Inner threshold. Tail values with magnitudes between this value and
+        the outer threshold are subjected to moving window averaging to
+        reduce noise.
+    eps_outer : float, optional
+        Outer threshold. Tail values with magnitudes below this value
+        are set to zero.
+    window_size : int, optional
+        Moving average window size (odd integers only).
+
+    Returns
+    -------
+    y_out : np.array
+        Array with function values with a smoothed tail.
+    """
+    assert window_size % 2 == 1, 'Window size needs to be odd.'
+
+    y_out = np.copy(y_in)
+    N = len(y_out)
+
+    if np.all(abs(y_in) < eps_outer):
+        return y_out
 
     Nzero = 0
-    for i in range(len(y) - 1, 1, -1):
-        if abs(y[i]) < 1e-60:
+    izero = -1
+    for izero in range(N-1, 1, -1):
+        if abs(y_out[izero]) < eps_outer:
             Nzero += 1
         else:
             break
 
-    N = len(y) - Nzero
-    y = y[:N]
-    xmax = x[:N][-1]
+    y_out[izero+1:] = 0.
 
-    for i in range(N - 3, 1, -1):
-        x0i = x[i] - y[i] / ((y[i + 1] - y[i]) /(x[i + 1] - x[i]))
-        if x0i < xmax:
-            k = i
+    Nsmall = 0
+    for ismall in range(izero, 1, -1):
+        if abs(y_out[ismall]) < eps_inner:
+            Nsmall += 1
+        else:
             break
     else:
-        print('N:', N, 'len(y):', len(y))
-        for i in range(len(y)):
-            print(x[i], y[i])
-        raise RuntimeError('Problem with tail smoothening')
+        ismall -= 1
 
-    if k < N / 4:
-        for i in range(N):
-            print(x[i], y[i])
-        msg = 'Problem with tail smoothening: requires too large tail.'
-        raise RuntimeError(msg)
+    if Nsmall > 0:
+        tail = np.empty(Nsmall-1)
+        half = (window_size - 1) // 2
+        for j, i in enumerate(range(ismall+1, izero)):
+            tail[j] = np.mean(y_out[i-half:i+half+1])
 
-    if k == N - 3:
-        y[-1] = 0.
-        y = np.append(y, np.zeros(Nzero))
-        return y
+        y_out[ismall+1:izero] = tail
+
+    return y_out
+
+
+def write_skf(handle, Rgrid, table, has_diagonal_data, is_extended, eigval,
+              hubval, occup, spe, mass, has_offdiagonal_data, offdiag_H,
+              offdiag_S):
+    """
+    Writes a parameter file in '.skf' format.
+
+    Parameters
+    ----------
+    handle : file handle
+        Handle of an open file.
+    Rgrid : list or array
+        Lists with interatomic distances.
+    table : nd.ndarray
+        Two-dimensional array with the Slater-Koster table.
+
+    Other parameters
+    ----------------
+    See Offsite2cTable.write()
+    """
+    assert not (has_diagonal_data and has_offdiagonal_data)
+
+    if is_extended:
+        print('@', file=handle)
+
+    grid_dist = Rgrid[1] - Rgrid[0]
+    grid_npts, numint = np.shape(table)
+    assert (numint % NUMSK) == 0
+    nzeros = int(np.round(Rgrid[0] / grid_dist)) - 1
+    assert nzeros >= 0
+    print("%.12f, %d" % (grid_dist, grid_npts + nzeros), file=handle)
+
+    if has_diagonal_data or has_offdiagonal_data:
+        if has_diagonal_data:
+            prefixes, dicts = ['E', 'U', 'f'], [eigval, hubval, occup]
+            fields = ['E_f', 'E_d', 'E_p', 'E_s', 'SPE', 'U_f', 'U_d',
+                      'U_p', 'U_s', 'f_f', 'f_d', 'f_p', 'f_s']
+            labels = {'SPE': spe}
+        elif has_offdiagonal_data:
+            prefixes, dicts = ['H', 'S'], [offdiag_H, offdiag_S]
+            fields = ['H_f', 'H_d', 'H_p', 'H_s',
+                      'S_f', 'S_d', 'S_p', 'S_s']
+            labels = {}
+
+        if not is_extended:
+            fields = [field for field in fields if field[-1] != 'f']
+
+        for prefix, d in zip(prefixes, dicts):
+            for l in ['s', 'p', 'd', 'f']:
+                if l in d:
+                    key = '%s_%s' % (prefix, l)
+                    labels[key] = d[l]
+
+        line = ' '.join(fields)
+        for field in fields:
+            val = labels[field] if field in labels else 0
+            s = '%d' % val if isinstance(val, int) else '%.6f' % val
+            line = line.replace(field, s)
+
+        print(line, file=handle)
+
+    print("%.3f, 19*0.0" % mass, file=handle)
+
+    # Table containing the Slater-Koster integrals
+    numtab = numint // NUMSK
+    assert numtab > 0
+
+    if is_extended:
+        indices = list(range(numtab*NUMSK))
     else:
-        # g(x)=c2*(xmax-x)**m + c3*(xmax-x)**(m+1) goes through
-        # (xk,yk),(xk+1,yk+1) and (xmax,0)
-        # Try different m if g(x) should change sign (this we do not want)
-        sgn = np.sign(y[k])
-        for m in range(2, 10):
-            a1, a2 = (xmax - x[k]) ** m, (xmax - x[k]) ** (m + 1)
-            b1, b2 = (xmax-  x[k + 1]) ** m, (xmax - x[k + 1]) ** (m + 1)
-            c3 = (y[k] - a1 * y[k + 1] / b1) / (a2 - a1 * b2 / b1)
-            c2 = (y[k] - a2 * c3) / a1
+        selected = [INTEGRALS.index(name) for name in INTEGRALS
+                    if 'f' not in name[:2]]
+        indices = []
+        for itab in range(numtab):
+            indices.extend([itab*NUMSK+j for j in selected])
 
-            for i in range(k + 2,N):
-                y[i] = c2 * (xmax - x[i]) ** 2 + c3 * (xmax - x[i]) ** 3
+    for i in range(nzeros):
+        print('%d*0.0,' % len(indices), file=handle)
 
-            y[-1] = 0.  # once more explicitly
+    for i in range(grid_npts):
+        line = ''
+        num_zero = 0
+        zero_str = ''
 
-            if np.all(y[k:] * sgn >= 0):
-                y = np.append(y, np.zeros(Nzero))
-                break
+        for j in indices:
+            if table[i, j] == 0:
+                num_zero += 1
+                zero_str = str(num_zero) + '*0.0 '
+            else:
+                num_zero = 0
+                line += zero_str
+                zero_str = ''
+                line += '{0: 1.12e}  '.format(table[i, j])
 
-            if m == 9:
-                msg = 'Problems with smoothening; need for new algorithm?'
-                raise RuntimeError(msg)
+        if zero_str != '':
+            line += zero_str
 
-    return y
+        print(line, file=handle)

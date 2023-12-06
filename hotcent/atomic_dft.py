@@ -1,7 +1,6 @@
 #-----------------------------------------------------------------------------#
-#   Hotcent: calculating one- and two-center Slater-Koster integrals,         #
-#            based on parts of the Hotbit code                                #
-#   Copyright 2018-2021 Maxime Van den Bossche                                #
+#   Hotcent: a tool for generating tight-binding parameter files              #
+#   Copyright 2018-2023 Maxime Van den Bossche                                #
 #   SPDX-License-Identifier: GPL-3.0-or-later                                 #
 #-----------------------------------------------------------------------------#
 """ Definition of the AtomicDFT class for atomic
@@ -13,16 +12,13 @@ hotbit/blob/master/hotbit/parametrization/atom.py).
 """
 import pickle
 import numpy as np
-from ase.data import atomic_numbers, covalent_radii
-from ase.units import Bohr
+from ase.units import Ha
 from hotcent.interpolation import CubicSplineFunction
-from hotcent.atomic_base import AtomicBase, nl2tuple
-from hotcent.confinement import ZeroConfinement
+from hotcent.atomic_base import AtomicBase
+from hotcent.confinement import SoftConfinement, ZeroConfinement
+from hotcent.orbitals import ANGULAR_MOMENTUM
+from hotcent.radial_grid import RadialGrid
 from hotcent.xc import XC_PW92, LibXC
-try:
-    import matplotlib.pyplot as plt
-except:
-    plt = None
 try:
     import _hotcent
 except ModuleNotFoundError:
@@ -36,7 +32,8 @@ class AtomicDFT(AtomicBase):
                  symbol,
                  xc='LDA',
                  convergence={'density':1e-7, 'energies':1e-7},
-                 perturbative_confinement=False,
+                 perturbative_confinement=True,
+                 rmin=None,
                  **kwargs):
         """ Run Kohn-Sham all-electron calculations for a given atom.
 
@@ -68,44 +65,44 @@ class AtomicDFT(AtomicBase):
 
         perturbative_confinement: determines which type of self-
             consistent calculation is performed when applying each
-            of the orbital- or density-confinement potentials:
-
-            False: apply the confinement potential in a conventional
-                  calculation with self-consistency between
-                  the density and the effective potential,
+            of the subshell- or density-confinement potentials:
 
             True: add the confinement potential to the effective
                   potential of the free (nonconfined) atom and
-                  solve for the eigenstate(s)* while keeping this
+                  solve for the subshell(s)* while keeping this
                   potential fixed.
 
-            * i.e. all valence orbitals when confining the density and
-            only the orbital in question in wave function confinement
+            False: apply the confinement potential in a conventional
+                   calculation with self-consistency between
+                   the density and the effective potential.
+
+            * i.e. all valence subshells when confining the density and
+            only the subshell in question in wave function confinement
 
             The perturbative scheme is e.g. how basis sets are
             generated in GPAW. This option is also faster than the
             self-consistent one, in particular for heavier atoms.
+
+        rmin: smallest radius in the radial grid (default: 1e-2 / Z).
+              For heavier elements, smaller rmin values (e.g. 1e-4 / Z)
+              can be needed for high precision.
         """
         AtomicBase.__init__(self, symbol, **kwargs)
+        self.timer.start('init')
 
-        print('*******************************************', file=self.txt)
-        print('Kohn-Sham all-electron calculator for %s' % self.symbol,
-              file=self.txt)
-        print('*******************************************', file=self.txt)
-
+        self.xcname = xc
         if xc in ['PW92', 'LDA']:
             self.xc = XC_PW92()
         else:
             self.xc = LibXC(xc)
 
+        self.print_header()
+
         self.convergence = convergence
         self.perturbative_confinement = perturbative_confinement
 
-        if self.scalarrel:
-            print('Using scalar relativistic corrections.', file=self.txt)
-
         maxnodes = max([n - l - 1 for n, l, nl in self.list_states()])
-        self.rmin = 1e-2 / self.Z
+        self.rmin = 1e-2 / self.Z if rmin is None else rmin
         self.N = (maxnodes + 1) * self.nodegpts
         print('max %i nodes, %i grid points' % (maxnodes, self.N),
               file=self.txt)
@@ -115,31 +112,64 @@ class AtomicDFT(AtomicBase):
         self.grid = RadialGrid(self.rgrid)
         self.timer.stop('init')
 
-    def calculate_energies(self, enl, dens, echo='valence'):
-        """ Calculate energy contributions. """
+    def __del__(self):
+        self.timer.summary()
+
+    def print_header(self):
+        template = '{0}-relativistic all-electron {1} calculator for {2}'
+        header = template.format('Scalar' if self.scalarrel else 'Non',
+                                 self.xcname, self.symbol)
+        header = '\n'.join(['*' * len(header), header, '*' * len(header)])
+        print(header, file=self.txt)
+
+    def calculate_energies(self, enl, dens, dens_xc=None, echo='valence',
+                           only_valence=False):
+        """ Returns a dictionary with the total energy and its contributions,
+        which also get printed out.
+
+        Parameters
+        ----------
+        enl : dict
+            Dictionary with the electronic eigenvalues.
+        dens : np.ndarray
+            The valence or all-electron electron density on the radial grid.
+        dens_xc : np.ndarray, optional
+            Electron density to be used instead of 'dens' when evaluating
+            the exchange-correlation energies.
+        echo : str or None, optional
+            Controls the output that gets printed (None, 'valence' or 'all').
+        only_valence : bool, optional
+            Whether the supplied density is the valence or all-electron
+            density. Also determines whether or not the core eigenvalues
+            are included in the band energy.
+
+        Returns
+        -------
+        energies : dict
+            Dictionary with the total energy and its contributions.
+        """
         self.timer.start('energies')
         assert echo in [None, 'valence', 'all']
+        assert not (only_valence and echo == 'all')
 
-        self.bs_energy = 0.0
+        band_energy = 0.0
         for n, l, nl in self.list_states():
-            self.bs_energy += self.configuration[nl] * enl[nl]
+            if only_valence and nl not in self.valence:
+                continue
+            band_energy += self.configuration[nl] * enl[nl]
 
-        vhar = self.calculate_hartree_potential(dens)
-        self.vhar_energy = 0.5 * self.grid.integrate(vhar * dens, use_dV=True)
+        vhar = self.calculate_hartree_potential(dens, only_valence=only_valence)
+        har_energy = 0.5 * self.grid.integrate(vhar * dens, use_dV=True)
 
-        exc, vxc = self.xc.evaluate(dens, self.grid)
-        self.vxc_energy = self.grid.integrate(vxc * dens, use_dV=True)
-        self.exc_energy = self.grid.integrate(exc * dens, use_dV=True)
+        d = dens if dens_xc is None else dens_xc
+        exc, vxc = self.xc.evaluate(d, self.grid)
+        vxc_energy = self.grid.integrate(vxc * d, use_dV=True)
+        exc_energy = self.grid.integrate(exc * d, use_dV=True)
 
-        vconf = self.confinement(self.rgrid)
-        self.confinement_energy = self.grid.integrate(vconf * dens,
-                                                      use_dV=True)
-
-        self.total_energy = self.bs_energy - self.vhar_energy
-        self.total_energy += -self.vxc_energy + self.exc_energy
+        total_energy = band_energy - har_energy - vxc_energy + exc_energy
 
         if echo is not None:
-            line = '%s orbital eigenvalues:' % echo
+            line = '%s subshell eigenvalues:' % echo
             print('\n'+line, file=self.txt)
             print('-' * len(line), file=self.txt)
             for n, l, nl in self.list_states():
@@ -148,31 +178,36 @@ class AtomicDFT(AtomicBase):
 
             print('\nenergy contributions:', file=self.txt)
             print('----------------------------------------', file=self.txt)
-            print('sum of eigenvalues:     %.12f' % self.bs_energy,
-                  file=self.txt)
-            print('Hartree energy:         %.12f' % self.vhar_energy,
-                  file=self.txt)
-            print('vxc correction:         %.12f' % self.vxc_energy,
-                  file=self.txt)
-            print('exchange + corr energy: %.12f' % self.exc_energy,
-                  file=self.txt)
+            print('sum of eigenvalues:     %.12f' % band_energy, file=self.txt)
+            print('Hartree energy:         %.12f' % har_energy, file=self.txt)
+            print('vxc correction:         %.12f' % vxc_energy, file=self.txt)
+            print('exchange-corr. energy:  %.12f' % exc_energy, file=self.txt)
             print('----------------------------------------', file=self.txt)
-            print('total energy:           %.12f\n' % self.total_energy,
-                  file=self.txt)
+            print('total energy:           %.12f' % total_energy, file=self.txt)
+            print(file=self.txt)
+
+        energies = {'total': total_energy,
+                    'band': band_energy,
+                    'hartree': har_energy,
+                    'vxc': vxc_energy,
+                    'exc': exc_energy}
 
         self.timer.stop('energies')
+        return energies
 
-    def calculate_density(self, unlg):
+    def calculate_density(self, unlg, only_valence=False):
         """ Calculate the radial electron density:
         sum_nl occ_nl |Rnl(r)|**2 / (4*pi)
         """
         self.timer.start('density')
         dens = np.zeros_like(self.rgrid)
         for n, l, nl in self.list_states():
+            if only_valence and nl not in self.valence:
+                continue
             dens += self.configuration[nl] * (unlg[nl] ** 2)
 
         nel1 = self.grid.integrate(dens)
-        nel2 = self.get_number_of_electrons()
+        nel2 = self.get_number_of_electrons(only_valence=only_valence)
 
         if abs(nel1 - nel2) > 1e-10:
             err = 'Integrated density %.3g' % nel1
@@ -184,15 +219,21 @@ class AtomicDFT(AtomicBase):
         self.timer.stop('density')
         return dens
 
-    def calculate_hartree_potential(self, dens):
+    def calculate_hartree_potential(self, dens, only_valence=False, nel=None):
         """ Calculate the Hartree potential. """
         self.timer.start('Hartree')
         dV = self.grid.get_dvolumes()
         r, r0 = self.rgrid, self.grid.get_r0grid()
         N = self.N
-        n0 = 0.5 * (dens[1:] + dens[:-1])
-        nel = self.get_number_of_electrons()
-        n0 *= nel / np.sum(n0 * dV) if nel > 0 else 0.
+
+        if nel is None:
+            nel = self.get_number_of_electrons(only_valence=only_valence)
+
+        if np.isclose(nel, 0.):
+            n0 = np.zeros(np.size(dens) - 1)
+        else:
+            n0 = 0.5 * (dens[1:] + dens[:-1])
+            n0 *= nel / np.sum(n0 * dV)
 
         if _hotcent is not None:
             vhar = _hotcent.hartree(n0, dV, r, r0, N)
@@ -234,17 +275,18 @@ class AtomicDFT(AtomicBase):
     def run(self, write=None):
         """ Execute the required atomic DFT calculations
 
-        Parameters:
-
-        write: None or a filename for saving the rgrid, effective
-               potential and electron density.
+        Parameters
+        ----------
+        write : None or str, optional
+            Filename for saving the rgrid, effective
+            potential and electron density (if not None).
         """
         def header(*args):
             print('=' * 50, file=self.txt)
             print('\n'.join(args), file=self.txt)
             print('=' * 50, file=self.txt)
 
-        val = self.get_valence_orbitals()
+        val = self.get_valence_subshells()
         confinement = self.confinement
 
         assert all([nl in val for nl in self.wf_confinement])
@@ -260,7 +302,7 @@ class AtomicDFT(AtomicBase):
         if self.perturbative_confinement:
             self.confinement = ZeroConfinement()
             header('Initial run without any confinement',
-                   'for pre-converging orbitals and eigenvalues')
+                   'for pre-converging subshells and eigenvalues')
             dens_free, veff_free, enl_free, unlg_free, Rnlg_free = \
                                                                self.outer_scf()
 
@@ -269,7 +311,7 @@ class AtomicDFT(AtomicBase):
             if self.confinement is None:
                 self.confinement = ZeroConfinement()
             header('Applying %s' % self.confinement,
-                   'to get a confined %s orbital' % nl)
+                   'to get a confined %s subshell' % nl)
 
             if self.perturbative_confinement:
                 veff = veff_free + self.confinement(self.rgrid)
@@ -288,7 +330,7 @@ class AtomicDFT(AtomicBase):
         self.confinement = confinement
         if self.confinement is None:
             self.confinement = ZeroConfinement()
-        extra = '' if len(nl_x) == 0 else '\nand the confined %s orbital(s)' \
+        extra = '' if len(nl_x) == 0 else '\nand the confined %s subshell(s)' \
                                            % ' and '.join(nl_x)
         header('Applying %s' % self.confinement,
                'to get the confined electron density%s' % extra)
@@ -313,7 +355,9 @@ class AtomicDFT(AtomicBase):
 
         self.veff = self.calculate_veff(self.dens)
         self.vhar = self.calculate_hartree_potential(self.dens)
-        exc, self.vxc = self.xc.evaluate(self.dens, self.grid)
+        self.densval = self.calculate_density(self.unlg, only_valence=True)
+        self.vharval = self.calculate_hartree_potential(self.densval,
+                                                        only_valence=True)
 
         if write is not None:
             with open(write, 'w') as f:
@@ -322,8 +366,59 @@ class AtomicDFT(AtomicBase):
                 pickle.dump(self.dens, f)
 
         self.solved = True
-        self.timer.summary()
         self.txt.flush()
+
+    def get_onecenter_integrals(self, nl1, nl2):
+        """
+        Calculates one-center Hamiltonian and overlap integrals.
+
+        Parameters
+        ----------
+        nl1, nl2 : str
+            Subshell labels.
+
+        Returns
+        -------
+        H, S : float
+            The selected H and S integrals (<phi_nl1|H|phi_nl2>
+            and <phi_nl1|phi_nl2>, respectively).
+        """
+        l = ANGULAR_MOMENTUM[nl2[1]]
+
+        if ANGULAR_MOMENTUM[nl1[1]] != l:
+            return 0., 0.
+
+        S = self.grid.integrate(self.unlg[nl1] * self.unlg[nl2])
+
+        # Non-scalar-relativistic H
+        hpsi = -0.5 * self.unl(self.rgrid, nl2, der=2)
+        hpsi += (self.veff + l*(l+1) / (2.*self.rgrid**2)) * self.unlg[nl2]
+        H = self.grid.integrate(self.unlg[nl1] * hpsi)
+
+        if self.scalarrel:
+            spl = CubicSplineFunction(self.rgrid, self.veff)
+            dveff = spl(self.rgrid, der=1)
+
+            c = 137.036
+            eps = H  # initial guess
+
+            while True:
+                M = 1. - (self.veff - eps) / (2. * c**2)
+                hpsi = -0.5 * self.unl(self.rgrid, nl2, der=2)
+                hpsi += (l*(l+1) / (2. * self.rgrid**2) \
+                         + M * (self.veff - eps) + eps) * self.unlg[nl2]
+                hpsi -= 1. / (4. * M * c**2) * dveff \
+                        * (self.unl(self.rgrid, nl2, der=1) \
+                           - self.unlg[nl2] / self.rgrid)
+
+                H = self.grid.integrate(self.unlg[nl1] * hpsi)
+                de = eps - H
+                if abs(de) < 1e-8:
+                    break
+                else:
+                    eps = self.mix * H + (1. - self.mix) * eps
+
+        return H, S
 
     def outer_scf(self):
         """ Solve the self-consistent potential. """
@@ -362,12 +457,10 @@ class AtomicDFT(AtomicBase):
                 print(line, file=self.txt, flush=True)
 
             if it == self.maxiter - 1:
-                if self.timing:
-                    self.timer.summary()
                 err = 'Density not converged in %i iterations' % (it + 1)
                 raise RuntimeError(err)
 
-        self.calculate_energies(enl, dens, echo='valence')
+        self.energies = self.calculate_energies(enl, dens, echo='valence')
         print('converged in %i iterations' % it, file=self.txt)
         nel = self.get_number_of_electrons()
         line = '%9.4f electrons, should be %9.4f' % \
@@ -377,9 +470,10 @@ class AtomicDFT(AtomicBase):
         self.timer.stop('outer_scf')
         return dens, veff, enl, unlg, Rnlg
 
-    def inner_scf(self, iteration, veff, enl, d_enl, dveff=None, itmax=100,
-                  solve='all'):
-        """ Solve the eigenstates for given effective potential.
+    def inner_scf(self, iteration, veff, enl, d_enl, dveff=None, maxiter=100,
+                  solve='all', ae=True):
+        """
+        Solve the eigenstates for given effective potential.
 
         u''(r) - 2*(v_eff(r)+l*(l+1)/(2r**2)-e)*u(r)=0
         ( u''(r) + c0(r)*u(r) = 0 )
@@ -388,31 +482,70 @@ class AtomicDFT(AtomicBase):
 
         u''(x) - u'(x) + c0(x(r))*u(r) = 0
 
-        Parameters:
+        Parameters
+        ----------
+        iteration : int
+            Iteration number in the SCF cycle.
+        veff : np.ndarray
+            Effective potential on the radial grid.
+        enl : dict
+            Initial guesses for each subshell's eigenvalue.
+        d_enl : dict
+            Dictionary that will contain the eigenvalue residuals.
+        dveff : np.ndarray or None, optional
+            Precomputed derivative of the effective potential
+            (used in the scalar-relativistic case).
+        maxiter : int, optional
+            Maximum number of optimization steps per subshell
+            (default: 100).
+        solve : str or list of str, optional
+            Which subshells to solve. The default 'all' means that all
+            subshells will be selected. To only solve for specific
+            subshells, use [nl1, nl2, ...].
+        ae : bool, optional
+            Whether this is an all-electron calculation (default: True)
+            which determines the expected number of nodes.
 
-        iteration: iteration number in the SCF cycle
-        itmax: maximum number of optimization steps per eigenstate
-        solve: which eigenstates to solve: solve='all' -> all states;
-               solve = [nl1, nl2, ...] -> only the given subset
+        Returns
+        -------
+        itmax : int
+            Maximum number of iterations needed for solving a subshell.
+        enl : dict of float
+            Dictionary with the solved subshell eigenvalues.
+        d_enl : dict of float
+            Dictionary with the solved subshell eigenvalue residuals.
+        unlg : dict of np.ndarray
+            Reduced radial functions on the grid for the solved subshells.
+        Rnlg : dict of np.ndarray
+            Radial functions on the grid for the solved subshells.
         """
         self.timer.start('inner_scf')
+
+        N = np.argmax(veff == np.inf)
+        has_finite_range = N > 0
+        if has_finite_range:
+            while veff[N-1] > 1e4:
+                N -= 1
+        else:
+            N = self.N
+
         if self.scalarrel and dveff is None:
-            spl = CubicSplineFunction(self.rgrid, veff)
-            dveff = spl(self.rgrid, der=1)
+            spl = CubicSplineFunction(self.rgrid[:N], veff[:N])
+            dveff = spl(self.rgrid[:N], der=1)
         elif not self.scalarrel:
             dveff = np.array([])
 
         rgrid = self.rgrid
         xgrid = self.xgrid
         dx = xgrid[1] - xgrid[0]
-        N = self.N
         unlg, Rnlg = {}, {}
+        itmax = 0
 
         for n, l, nl in self.list_states():
             if solve != 'all' and nl not in solve:
                 continue
 
-            nodes_nl = n - l - 1
+            nodes_nl = n - l - 1 if ae else 0
 
             if iteration == 0:
                 eps = -1.0 * self.Z ** 2 / n ** 2
@@ -425,19 +558,22 @@ class AtomicDFT(AtomicBase):
                 delta = d_enl[nl]
 
             direction = 'none'
-            epsmax = veff[-1] - l * (l + 1) / (2 * self.rgrid[-1] ** 2)
+
+            if not has_finite_range:
+                epsmax = veff[-1] - l * (l + 1) / (2 * self.rgrid[-1] ** 2)
+
             it = 0
-            u = np.zeros(N)
+            u = np.zeros(self.N)
             hist = []
 
             while True:
                 eps0 = eps
                 self.timer.start('coeff')
                 if _hotcent is not None:
-                    c0, c1, c2 = _hotcent.construct_coefficients(l, eps, veff,
-                                                             dveff, self.rgrid)
+                    c0, c1, c2 = _hotcent.construct_coefficients(l, eps,
+                                                veff[:N], dveff, self.rgrid[:N])
                 else:
-                    c0, c1, c2 = self.construct_coefficients(l, eps, veff,
+                    c0, c1, c2 = self.construct_coefficients(l, eps, veff[:N],
                                                              dveff=dveff)
                 assert c0[-2] < 0 and c0[-1] < 0
                 self.timer.stop('coeff')
@@ -448,11 +584,13 @@ class AtomicDFT(AtomicBase):
                 # u(r)~exp( -sqrt(c0(r)) ) (set u[-1]=1
                 # and use expansion to avoid overflows)
                 u[0:2] = rgrid[0:2] ** (l + 1)
+                u[N-1] = 0.
                 self.timer.start('shoot')
                 if _hotcent is not None:
-                    u, nodes, A, ctp = _hotcent.shoot(u, dx, c2, c1, c0, N)
+                    u[:N], nodes, A, ctp = _hotcent.shoot(u[:N], dx, c2, c1,
+                                                          c0, N)
                 else:
-                    u, nodes, A, ctp = shoot(u, dx, c2, c1, c0, N)
+                    u[:N], nodes, A, ctp = shoot(u[:N], dx, c2, c1, c0, N)
                 self.timer.stop('shoot')
 
                 self.timer.start('norm')
@@ -482,21 +620,28 @@ class AtomicDFT(AtomicBase):
                         direction = 'down'
                     eps += shift
 
-                if eps > epsmax:
+                if has_finite_range:
+                    if abs(eps - eps0) > 0.5*abs(eps0):
+                        eps = eps0 + np.sign(eps - eps0) * 0.5*abs(eps0)
+                elif eps > epsmax:
                     eps = 0.5 * (epsmax + eps0)
                 hist.append(eps)
 
                 it += 1
-                if it > 100:
-                    print('Epsilon history for %s' % nl, file=self.txt)
-                    for h in hist:
-                        print(h)
-                    print('nl=%s, eps=%f' % (nl,eps), file=self.txt)
-                    print('max epsilon', epsmax, file=self.txt)
-                    err = 'Eigensolver out of iterations. Atom not stable?'
-                    raise RuntimeError(err)
+                if it > maxiter:
+                    msg = 'Epsilon history for %s\n' % nl
+                    msg += '\n'.join(map(str, hist)) + '\n'
+                    msg += 'nl=%s, eps=%f\n' % (nl, eps)
+                    if not has_finite_range:
+                        msg += 'max epsilon: %f\n' % epsmax
+                    msg += 'Eigensolver out of iterations. Atom not stable?'
+                    raise RuntimeError(msg)
 
             itmax = max(it, itmax)
+
+            if has_finite_range:
+                self.smoothen_tail(u, N)
+
             unlg[nl] = u
             Rnlg[nl] = unlg[nl] / self.rgrid
             d_enl[nl] = abs(eps - enl[nl])
@@ -530,71 +675,206 @@ class AtomicDFT(AtomicBase):
             c1 = dveff * self.rgrid / (2 * ScR_mass * c ** 2) - 1
         return c0, c1, c2
 
-
-class RadialGrid:
-    def __init__(self,grid):
+    def find_cutoff_radius(self, nl, energy_shift=0.2, tolerance=1e-3,
+                           rcuts=None, neglect_density_change=True, **kwargs):
         """
-        mode
-        ----
+        Returns the subshell cutoff radius such that the corresponding
+        energy upshift upon soft confinement equals the given value.
 
-        rmin                                                        rmax
-        r[0]     r[1]      r[2]            ...                     r[N-1] grid
-        I----'----I----'----I----'----I----'----I----'----I----'----I
-           r0[0]     r0[1]     r0[2]       ...              r0[N-2]     r0grid
-           dV[0]     dV[1]     dV[2]       ...              dV[N-2]         dV
+        Parameters
+        ----------
+        nl : str
+            Subshell label.
+        energy_shift : float, optional
+            Energy shift in eV (default: 0.2).
+        tolerance : float, optional
+            Tolerance (in eV) for termination of the search
+            (default: 1e-3).
+        rcuts : dict, optional
+            Cutoff radii for the other valence subshells.
+            If not given, these will be left unconfined.
+        neglect_density_change : bool, optional
+            By default (True) the shifted energy is calculated in a
+            non-self-consistent fashion from an effective potential
+            that corresponds to that of the unconfined atom plus the
+            the subshell's confinement potential. By choosing False,
+            also the change in electron density due to the subshell's
+            confinement is taken into account.
 
-           dV[i] is volume element of shell between r[i] and r[i+1]
+        Other parameters
+        ----------------
+        kwargs : additional parameters to the SoftConfinement
+                 potentials
+
+        Returns
+        -------
+        rc : float
+            The cutoff radius.
         """
+        assert energy_shift > 0
+        assert nl in self.valence
+        assert self.perturbative_confinement
 
-        rmin, rmax = grid[0], grid[-1]
-        N = len(grid)
-        self.N = N
-        self.grid = grid
-        self.dr = self.grid[1:N] - self.grid[0:N - 1]
-        self.r0 = self.grid[0:N - 1] + self.dr / 2
-        # first dV is sphere (treat separately), others are shells
-        self.dV = 4 * np.pi * self.r0 ** 2 * self.dr
-        self.dV *= (4 * np.pi * rmax ** 3 / 3) / sum(self.dV)
+        rmax = float(self.rgrid[-1])
 
-    def get_grid(self):
-        """ Return the whole radial grid. """
-        return self.grid
+        # Set up the initial confinement potentials
+        wf_confinement = self.wf_confinement.copy()
+        self.wf_confinement = {}
+        for nl_ in self.valence:
+            if nl_ != nl and rcuts is not None and nl_ in rcuts:
+                rc_ = rcuts[nl_]
+            else:
+                rc_ = rmax
+            self.wf_confinement[nl_] = SoftConfinement(rc=rc_, **kwargs)
 
-    def get_N(self):
-        """ Return the number of grid points. """
-        return self.N
+        # Find the eigenvalue for the unconfined subshell
+        self.run()
+        enl_free = self.get_eigenvalue(nl)
 
-    def get_drgrid(self):
-        """ Return the grid spacings (array of length N-1). """
-        return self.dr
+        # Bisection
+        rmin = 3.
+        rc = 6.  # initial guess
+        diff = np.inf
 
-    def get_r0grid(self):
-        """ Return the mid-points between grid spacings
-        (array of length N-1).
+        while abs(diff) > tolerance:
+            if np.isfinite(diff):
+                if diff < 0:
+                    rmax = rc
+                    rc = (rc + rmin) / 2.
+                else:
+                    rmin = rc
+                    rc = (rc + rmax) / 2.
+
+            self.wf_confinement[nl].rc = rc
+            try:
+                self.run()
+
+                if neglect_density_change:
+                    e = self.get_eigenvalue(nl)
+                else:
+                    e, _ = self.get_onecenter_integrals(nl, nl)
+
+                diff = (e - enl_free) * Ha - energy_shift
+            except RuntimeError:
+                # Convergence problems. This is usually due to
+                # too strong confinement (eigenvalues becoming positive)
+                diff = 1.
+
+        self.wf_confinement = wf_confinement
+        self.solved = False
+        return rc
+
+    def find_cutoff_radii(self, nl1, nl2, energy_shifts, tolerance=1e-3,
+                          **kwargs):
         """
-        return self.r0
+        Returns the valence subshell cutoff radii such that the
+        corresponding (self-consistent) energy upshifts upon soft
+        confinement equal the given values.
 
-    def get_dvolumes(self):
-        """ Return dV(r) = 4 * pi * r ** 2 * dr. """
-        return self.dV
+        Parameters
+        ----------
+        nl1 : str
+            First subshell label.
+        nl2 : str
+            Second subshell label.
+        energy_shifts : list of float
+            The energy shifts in eV for the two subshells.
+        tolerance : float, optional
+            Tolerance (in eV) for termination of the search
+            (default: 1e-3).
 
-    def plot(self, screen=True):
-        rgrid = self.get_grid()
-        plt.scatter(list(range(len(rgrid))), rgrid)
-        if screen:
-            plt.show()
+        Other parameters
+        ----------------
+        kwargs : additional parameters to the SoftConfinement
+                 potentials
 
-    def integrate(self, f, use_dV=False):
-        """ Integrate function f (given with N grid points).
-        int_rmin^rmax f*dr (use_dv=False) or int_rmin^rmax*f dV (use_dV=True)
+        Returns
+        -------
+        rcuts : dict
+            Cutoff radii for the given subshells.
         """
-        if use_dV:
-            return ((f[0:self.N - 1] + f[1:self.N]) * self.dV).sum() * 0.5
-        else:
-            return ((f[0:self.N - 1] + f[1:self.N]) * self.dr).sum() * 0.5
+        assert self.perturbative_confinement
 
-    def gradient(self, f):
-        return np.gradient(f, self.grid)
+        rmax = float(self.rgrid[-1])
 
-    def divergence(self, f):
-        return (1. / self.grid ** 2) * self.gradient(self.grid ** 2 * f)
+        # Set up the initial confinement potentials
+        wf_confinement = self.wf_confinement.copy()
+        self.wf_confinement = {nl_: SoftConfinement(rc=rmax, **kwargs)
+                               for nl_ in self.valence}
+
+        # Find the eigenvalues in the free atom
+        self.run()
+        enl_free1 = self.get_eigenvalue(nl1)
+        enl_free2 = self.get_eigenvalue(nl2)
+
+        # Bisection
+        rmin = 3.
+        rc1 = 6.  # initial guess
+        diff1 = np.inf
+        diff2 = np.inf
+
+        while max(abs(diff1), abs(diff2)) > tolerance:
+            if np.isfinite(diff1):
+                if diff1 < 0:
+                    rmax = rc1
+                    rc1 = (rc1 + rmin) / 2.
+                else:
+                    rmin = rc1
+                    rc1 = (rc1 + rmax) / 2.
+
+            self.wf_confinement = wf_confinement.copy()
+            rcuts = {nl1: rc1}
+            rc2 = self.find_cutoff_radius(nl2, energy_shift=energy_shifts[1],
+                                          tolerance=tolerance,
+                                          neglect_density_change=False,
+                                          rcuts=rcuts, **kwargs)
+            rcuts[nl2] = rc2
+
+            self.wf_confinement = {
+                nl1: SoftConfinement(rc=rc1, **kwargs),
+                nl2: SoftConfinement(rc=rc2, **kwargs),
+            }
+            try:
+                self.run()
+                e1, _ = self.get_onecenter_integrals(nl1, nl1)
+                e2, _ = self.get_onecenter_integrals(nl2, nl2)
+                diff1 = (e1 - enl_free1) * Ha - energy_shifts[0]
+                diff2 = (e2 - enl_free2) * Ha - energy_shifts[1]
+            except RuntimeError:
+                # Convergence problems. This is usually due to
+                # too strong confinement (eigenvalues becoming positive)
+                diff1 = 1.
+
+        self.wf_confinement = wf_confinement
+        self.solved = False
+        return rcuts
+
+    def find_polarization_radius(self, energy_shift=0.3, **kwargs):
+        """
+        Returns the characteristic radius used in GPAW's quasi-Gaussian
+        method for generating polarization functions.
+
+        Parameters
+        ----------
+        energy_shift : float, optional
+            Energy shift in eV (default: 0.3).
+
+        Other parameters
+        ----------------
+        kwargs : additional parameters to the find_cutoff_radius() method
+
+        Returns
+        -------
+        r_pol : float
+            The characteristic radius.
+        """
+        assert self.perturbative_confinement
+
+        rcmax = -np.inf
+        for nl in self.valence:
+            rc = self.find_cutoff_radius(nl, energy_shift=energy_shift,
+                                         **kwargs)
+            rcmax = max(rcmax, rc)
+
+        r_pol = 0.25 * rcmax
+        return r_pol

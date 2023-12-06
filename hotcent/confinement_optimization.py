@@ -1,7 +1,6 @@
 #-----------------------------------------------------------------------------#
-#   Hotcent: calculating one- and two-center Slater-Koster integrals,         #
-#            based on parts of the Hotbit code                                #
-#   Copyright 2018-2021 Maxime Van den Bossche                                #
+#   Hotcent: a tool for generating tight-binding parameter files              #
+#   Copyright 2018-2023 Maxime Van den Bossche                                #
 #   SPDX-License-Identifier: GPL-3.0-or-later                                 #
 #-----------------------------------------------------------------------------#
 """ Tools for optimizing confinement parameters. """
@@ -13,7 +12,7 @@ from ase.io import read
 from ase.spectrum.band_structure import BandStructure
 from ase.calculators.dftb import Dftb
 from hotcent.atomic_base import AtomicBase
-from hotcent.slako import SlaterKosterTable
+from hotcent.offsite_twocenter import Offsite2cTable
 try:
     import matplotlib
     matplotlib.use('agg')
@@ -28,13 +27,13 @@ class ConfinementOptimizer:
 
         arguments: one (or several) AtomicBase instance(s).
                    Note: the eigenvalues, hubbardvalues, occupations,
-                   and spe kwargs passed to the SlaterKosterTable.write()
+                   and spe kwargs passed to the Offsite2cTable.write()
                    function (to be included in the SKF files) need to
                    be included in the atom's info (dict) attribute, i.e.
                        atom.info = {'eigenvalues': {'2s': ...}, ...}
         verbose:   whether to print output or not
         sk_kwargs: additional keyword arguments to be passed to the
-                   SlaterKosterTable.run() method. If different arguments
+                   Offsite2cTable.run() method. If different arguments
                    need to be passed to different element pairs, these
                    can be specified using dictionaries. To e.g. set a
                    different number of grid points N for the C-C pair:
@@ -57,7 +56,7 @@ class ConfinementOptimizer:
                         s2 = self.atoms[j].symbol
                         prefix1, prefix2 = s1 + '-' + s2, s2 + '-' + s1
                         assert prefix1 in val or prefix2 in val, \
-                               msg % (pair1, pair2, key)
+                               msg % (prefix1, prefix2, key)
         self.sk_kwargs = sk_kwargs
 
     def run(self, func, initial_guess={}, args=(), **opt_kwargs):
@@ -187,16 +186,16 @@ class ConfinementOptimizer:
                     else:
                         sk_kwargs[key] = val
 
-                sk = SlaterKosterTable(atom1, atom2, timing=False, txt=None)
-                sk.run(**sk_kwargs)
+                off2c = Offsite2cTable(atom1, atom2, timing=False, txt=None)
+                off2c.run(**sk_kwargs)
 
-                filename = '%s-%s.skf' % (s1, s2)
-                if s1 == s2:
-                    sk.write(filename=filename, pair=(s1, s2), **atom1.info)
-                else:
-                    sk.write(filename=filename, pair=(s1, s2))
-                    filename = '%s-%s.skf' % (s2, s1)
-                    sk.write(filename=filename, pair=(s2, s1))
+                write_kwargs = atom1.info if s1 == s2 else {}
+                off2c.write(**write_kwargs)
+                os.rename('%s-%s_offsite2c.skf' % (s1, s2),
+                          '%s-%s.skf' % (s1, s2))
+                if s1 != s2:
+                    os.rename('%s-%s_offsite2c.skf' % (s2, s1),
+                              '%s-%s.skf' % (s2, s1))
         return
 
 
@@ -316,7 +315,7 @@ class DftbPlusBandStructure:
         calc = Dftb(atoms=atoms, kpts=bs.kpts_scf, slako_dir=slako_dir,
                     **self.dftbplus_kwargs)
         atoms.set_calculator(calc)
-        etot = atoms.get_potential_energy()
+        atoms.get_potential_energy()
 
         efermi = calc.get_fermi_level()
         if bs.reference_level == 'vbm':
@@ -333,7 +332,7 @@ class DftbPlusBandStructure:
         calc = Dftb(atoms=atoms, kpts=bs.path.kpts, slako_dir=slako_dir,
                     **kwargs)
         atoms.set_calculator(calc)
-        etot = atoms.get_potential_energy()
+        atoms.get_potential_energy()
 
         # Update the reference level, k-points,
         # and eigenenergies

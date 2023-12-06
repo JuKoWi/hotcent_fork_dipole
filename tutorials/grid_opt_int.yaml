@@ -1,0 +1,38 @@
+# Loose integration grid settings to speed up tutorial 3
+Si-Si:
+    chgoff2c:
+        nr: 100
+        ntheta: 300
+    chgon2c:
+        nr: 100
+        ntheta: 300
+    magoff2c:
+        nr: 100
+        ntheta: 300
+    magon2c:
+        nr: 100
+        ntheta: 300
+    map2c:
+        nr: 50
+        ntheta: 150
+    off2c:
+        nr: 100
+        ntheta: 300
+    off3c:
+        nr: 30
+        ntheta: 90
+        nphi: 9
+    on2c:
+        nr: 100
+        ntheta: 300
+    on3c:
+        nr: 30
+        ntheta: 90
+        nphi: 9
+    rep2c:
+        nr: 100
+        ntheta: 300
+    rep3c:
+        nr: 30
+        ntheta: 90
+        nphi: 9

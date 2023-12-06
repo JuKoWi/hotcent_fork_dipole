@@ -11,7 +11,73 @@ Development version
   the SKF files are now written in the 'extended' format instead
   of the 'simple' format.
 
+* The 'perturbative' confinement scheme is now the default for
+  AtomicDFT calculations (the 'perturbative_confinement' keyword).
+
 * Maintenance related to changes in ASE, Matplotlib and LibXC.
+
+* Bugfix: there was an off-by-one error in the number of zero-valued
+  integrals printed in the Slater-Koster files for distances below
+  'rmin'.
+
+* The Python version is now required to be >= v3.6.
+  The ASE dependency now needs to be >= v22.0 and
+  the (optional) PyLibXC dependency >= v5.0.
+  PyYAML and pytest are two new dependencies.
+
+* Bugfix: gradient corrections to the exchange-correlation potential
+  for two-center integrals were wrong.
+
+* The hotcent.slako.SlaterKosterTable class has been moved to
+  hotcent.offsite_twocenter.Offsite2cTable. The default
+  '<el1>-<el2>_no_repulsion.skf' template for the corresponding
+  Slater-Koster file name has furthermore been changed to
+  '<el1>-<el2>_offsite2c.skf' and the default superposition scheme
+  is changed to density superposition.
+
+* Dropped support for writing '.par' Slater-Koster files
+  (only the SKF format remains).
+
+* Added functionality for non-minimal basis sets (see
+  AtomicBase.generate_nonminimal_basis()). Currently basis sets up to
+  triple-zeta with polarization (TZP) can be generated.
+
+* Hubbard parameters (U values) are now calculated as derivatives of
+  the corresponding Hamiltonian matrix elements in the isolated atom
+  (no longer as second derivatives of the total energy). The present
+  version may hence produce U values that are slightly different from
+  previous versions.
+
+* Added the possibility to calculate spin constants (W values).
+  This requires the otherwise optional PyLibXC dependency.
+
+* Implemented analytical methods for Hubbard value and spin constant
+  calculations based on the (Hartree-)XC kernel (instead of finite
+  differentiation of atomic eigenvalues).
+
+* Added the possibility to calculate higher-order corrections to
+  Hamiltonian and (Hartree-)XC kernel matrix elements:
+
+  - three-center expansion for off-site H integrals
+  - two- and three-center expansions for on-site H integrals
+  - two-center expansion for on- and off-site "U" and "W"
+    integrals associated with difference and magnetization densities,
+    respectively.
+
+* Added the possibility to calculate the needed (Hartree-)XC kernel
+  and (Giese-York) mapping integrals when the difference and magnetization
+  densities are expanded in a (possibly multipolar) auxiliary basis set.
+
+* Changed the tail smoothening procedure to a moving average for
+  simplicity and robustness.
+
+* Added the 'hotcent-basis', 'hotcent-concat' and 'hotcent-tables'
+  command-line tools.
+
+* Renamed the `hotcent.tools` submodule to `hotcent.confinement_optimization`.
+
+* Updated the existing two tutorials and added `Tutorial 3` about generating
+  3cTB-GY parameter sets.
 
 
 Version 1.0

@@ -1,7 +1,7 @@
 """ This example aims to reproduce the Au-Au
 Slater-Koster table generation procedure by
 Fihey and coworkers (doi:10.1002/jcc.24046). """
-from hotcent.slako import SlaterKosterTable
+from hotcent.offsite_twocenter import Offsite2cTable
 from hotcent.confinement import PowerConfinement
 from hotcent.atomic_dft import AtomicDFT
 
@@ -18,6 +18,7 @@ atom = AtomicDFT(element,
                  xc=xc,
                  confinement=conf,
                  wf_confinement=wf_conf,
+                 perturbative_confinement=False,
                  configuration='[Xe] 4f14 5d10 6s1 6p0',
                  valence=['5d', '6s', '6p'],
                  scalarrel=True,
@@ -32,8 +33,7 @@ atom.plot_density()
 
 # Compute Slater-Koster integrals:
 rmin, dr, N = 0.4, 0.02, 900
-sk = SlaterKosterTable(atom, atom, timing=True)
-sk.run(rmin, dr, N, superposition='density', xc=xc)
-sk.write('Au-Au_no_repulsion.par')
-sk.write('Au-Au_no_repulsion.skf')
-sk.plot()
+off2c = Offsite2cTable(atom, atom, timing=True)
+off2c.run(rmin, dr, N, superposition='density', xc=xc)
+off2c.write()
+off2c.plot()

@@ -1,7 +1,6 @@
 #-----------------------------------------------------------------------------#
-#   Hotcent: calculating one- and two-center Slater-Koster integrals,         #
-#            based on parts of the Hotbit code                                #
-#   Copyright 2018-2021 Maxime Van den Bossche                                #
+#   Hotcent: a tool for generating tight-binding parameter files              #
+#   Copyright 2018-2023 Maxime Van den Bossche                                #
 #   SPDX-License-Identifier: GPL-3.0-or-later                                 #
 #-----------------------------------------------------------------------------#
 """ Definition of spline functions used by the
@@ -12,18 +11,47 @@ written by Pekka Koskinen (https://github.com/pekkosk/
 hotbit/blob/master/box/interpolation.py).
 """
 import numpy as np
-from scipy.linalg import norm
-from scipy.optimize import fminbound, brentq
-from scipy.interpolate import splprep, splrep, splev, splint, CubicSpline
+from scipy.optimize import brentq
+from scipy.interpolate import splrep, splev, splint, CubicSpline
 try:
     import matplotlib.pyplot as plt
 except:
     plt = None
 
 
+def build_interpolator(x, y, cutoff=None):
+    """
+    Convenience function for building a (cubic) spline interpolator.
+
+    Parameters
+    ----------
+    x, y : np.ndarray
+        Numpy arrays with the coordinates and functional values.
+    cutoff : float or None
+        Function values for x above this cutoff are considered
+        to be exactly zero. If None (default), no cutoff is applied.
+
+    Returns
+    -------
+    fct : CubicSplineFunction
+        An interpolating spline which returns zero when out of bounds.
+    """
+    if cutoff is None:
+        fct = CubicSplineFunction(x, y)
+    else:
+        if (x[-1] < cutoff):
+            N = len(x)
+        else:
+            N = np.argmax(x > cutoff)
+
+        bc_type = ('natural', 'clamped')
+        fct = CubicSplineFunction(x[:N], y[:N], bc_type=bc_type)
+    return fct
+
+
 class CubicSplineFunction(CubicSpline):
-    def __init__(self, x, y):
-        CubicSpline.__init__(self, x, y, bc_type='natural', extrapolate=False)
+    def __init__(self, x, y, bc_type='natural'):
+        CubicSpline.__init__(self, x, y, bc_type=bc_type, extrapolate=False)
 
     def __call__(self, x, der=0):
         if isinstance(x, np.ndarray):

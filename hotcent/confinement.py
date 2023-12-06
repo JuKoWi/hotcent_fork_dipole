@@ -1,7 +1,6 @@
 #-----------------------------------------------------------------------------#
-#   Hotcent: calculating one- and two-center Slater-Koster integrals,         #
-#            based on parts of the Hotbit code                                #
-#   Copyright 2018-2021 Maxime Van den Bossche                                #
+#   Hotcent: a tool for generating tight-binding parameter files              #
+#   Copyright 2018-2023 Maxime Van den Bossche                                #
 #   SPDX-License-Identifier: GPL-3.0-or-later                                 #
 #-----------------------------------------------------------------------------#
 """ Definition of confinement potentials """
@@ -78,7 +77,7 @@ class SoftConfinement(Confinement):
         ri = self.x_ri * self.rc
         condlist = [r < ri, np.logical_and(ri <= r, r < self.rc), r >= self.rc]
         funclist = [0., lambda x: self.amp * np.exp(-(self.rc - ri) / (x - ri)) \
-                                  / (self.rc - x), lambda x: 0., np.inf]
+                                  / (self.rc - x), np.inf]
         return np.piecewise(r, condlist, funclist)
 
     def __str__(self):
