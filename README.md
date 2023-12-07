@@ -1,15 +1,20 @@
 # Hotcent
 
 *Hotcent* is a tool for generating tight-binding parameter files
-starting from atomic DFT calculations with spherical confinement
+starting from atomic DFT calculations with spherical confinement.
+
 Hotcent was originally based on parts of the [Hotbit](
 https://github.com/pekkosk/hotbit/) code but has evolved considerably
 since then.
 
-The development of Hotcent was started as part of the following study:
+Hotcent was initially developed as part of the following study:
 
 M. Van den Bossche, J. Chem. Phys. A. **2019**, 123 (13), 3038-3045
 [(doi)](https://dx.doi.org/10.1021/acs.jpca.9b00927).
+
+The code has then been considerably expanded and reworked as part of
+the development currently described in the [preprint on ChemRxiv](
+https://doi.org/10.26434/chemrxiv-2023-v7ljv).
 
 
 ## Features
@@ -24,6 +29,8 @@ Hotcent can generate parameters representing:
 
 As such, Hotcent can generate parameter files for semi-empirical
 tight-binding as well as ab-initio tight-binding calculations.
+For more information please consult the [preprint on ChemRxiv](
+https://doi.org/10.26434/chemrxiv-2023-v7ljv).
 
 With regards to exchange-correlation functionals, the PW92
 (LDA) functional is natively available, and other LDA/GGA
