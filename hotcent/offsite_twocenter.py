@@ -141,7 +141,7 @@ class Offsite2cTable(MultiAtomIntegrator):
         self.timer.stop('run_offsite2c')
 
     def calculate(self, selected, e1, e2, R, grid, area,
-                  superposition='potential', xc='LDA', only_overlap=False,
+                  superposition='density', xc='LDA', only_overlap=False,
                   symmetrize_kinetic=True):
         """
         Calculates the selected Hamiltonian and overlap integrals.

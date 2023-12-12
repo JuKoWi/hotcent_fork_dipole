@@ -78,7 +78,7 @@ def test_off2c(atoms):
     # B-H sss integrals
     selected = ('sss', '2s', '1s')
     out = off2c.calculate([selected], atom_B, atom_H, R, grid, area,
-                          symmetrize_kinetic=False)
+                          symmetrize_kinetic=False, superposition='potential')
     results = {key: out[i][selected]
                for i, key in enumerate(['S', 'H', 'H2'])}
     references = {
@@ -93,7 +93,7 @@ def test_off2c(atoms):
     # H-B sps integrals
     selected = ('sps', '1s', '2p')
     out = off2c.calculate([selected], atom_H, atom_B, R, grid, area,
-                          symmetrize_kinetic=False)
+                          symmetrize_kinetic=False, superposition='potential')
     results = {key: out[i][selected]
                for i, key in enumerate(['S', 'H', 'H2'])}
     references = {
