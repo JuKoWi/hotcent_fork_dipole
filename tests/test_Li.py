@@ -137,7 +137,7 @@ def test_spin(atoms):
     W = {label: {} for label in labels}
     for atom, label in zip(atoms, labels):
         for nl in atom.valence:
-            W[label][nl] = atom.get_spin_constant(nl, nl)
+            W[label][nl] = atom.get_spin_constant(nl)
 
     msg = 'Too large difference for W_{0} (AE: {1}, PP: {2})'
     tol = 5e-4
@@ -156,9 +156,9 @@ def test_spin_analytical(atoms):
         for label in labels:
             for nl in atom.valence:
                 if label == 'analytical':
-                    W[label][nl] = atom.get_analytical_spin_constant(nl, nl)
+                    W[label][nl] = atom.get_analytical_spin_constant(nl)
                 elif label == 'numerical':
-                    W[label][nl] = atom.get_spin_constant(nl, nl, maxstep=0.2)
+                    W[label][nl] = atom.get_spin_constant(nl, maxstep=0.2)
 
         msg = 'Too large diff. for W_{0}-{1} (analytical: {2}, numerical: {3})'
         tol = 5e-4

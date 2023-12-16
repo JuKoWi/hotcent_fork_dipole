@@ -970,7 +970,7 @@ class AtomicBase:
         U += self.grid.integrate(dens_nl1 * vhar2, use_dV=True)
         return U
 
-    def get_spin_constant(self, nl, nl2=None, maxstep=0.5, scheme=None):
+    def get_spin_constant(self, nl1, nl2=None, maxstep=0.5, scheme=None):
         """
         Calculates the spin constant of the given subshell based on
         derivatives of its up-eigenvalue with respect to the up/down-
@@ -978,18 +978,21 @@ class AtomicBase:
 
         Parameters
         ----------
-        nl : str
+        nl1 : str
             First subshell label (e.g. '2p').
         nl2 : str
-            Second subshell label.
+            Second subshell label. If None (the default) it will be
+            taken equal to the first subshell label.
 
         Other Parameters
         ----------------
         maxstep, scheme: see calculate_eigenvalue_derivative().
         """
-        dedf_up = self.calculate_eigenvalue_derivative(nl, nl2, maxstep=maxstep,
+        nl2 = nl1 if nl2 is None else nl2
+
+        dedf_up = self.calculate_eigenvalue_derivative(nl1, nl2, maxstep=maxstep,
                                                        scheme=scheme, spin='up')
-        dedf_down = self.calculate_eigenvalue_derivative(nl, nl2,
+        dedf_down = self.calculate_eigenvalue_derivative(nl1, nl2,
                                     maxstep=maxstep, scheme=scheme, spin='down')
         W = 0.5 * (dedf_up - dedf_down)
         return W
