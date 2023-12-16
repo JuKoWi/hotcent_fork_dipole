@@ -235,7 +235,7 @@ def test_chg1c(aux_basis, atom):
             vals = []
             for valence in atom.basis_sets:
                 for nl in valence:
-                    vals.append(U['Analytical'][(key, nl)])
+                    vals.append(U[(key, nl)])
 
         for i, (val, ref) in enumerate(zip(vals, refs)):
             U_diff = np.abs(val - ref)

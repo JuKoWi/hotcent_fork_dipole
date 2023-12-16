@@ -710,8 +710,7 @@ def chgon1c(el1, **kwargs):
         if basis == 'auxiliary':
             run_kwargs.update(xc=xc)
         else:
-            maxstep = 0.125 if el1 == 'H' else 0.25
-            run_kwargs.update(maxstep=maxstep)
+            run_kwargs.update(method='analytical')
 
         calc.run(**run_kwargs)
         calc.write()
@@ -766,8 +765,7 @@ def magon1c(el1, **kwargs):
         if basis == 'auxiliary':
             run_kwargs.update(xc=xc)
         else:
-            maxstep = 0.125 if el1 == 'H' else 0.25
-            run_kwargs.update(maxstep=maxstep)
+            run_kwargs.update(method='analytical')
 
         calc.run(**run_kwargs)
         calc.write()

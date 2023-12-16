@@ -4,6 +4,7 @@
 #   SPDX-License-Identifier: GPL-3.0-or-later                                 #
 #-----------------------------------------------------------------------------#
 import numpy as np
+from collections import OrderedDict
 from ase.units import Ha
 from hotcent.fluctuation_onecenter import NUML_1CK, write_1ck
 from hotcent.fluctuation_twocenter import (
@@ -65,36 +66,38 @@ class Onsite1cWMainTable(SingleAtomIntegrator):
     """
     def __init__(self, el, txt=None):
         SingleAtomIntegrator.__init__(self, el, txt=txt)
-        self.methods = ['Numerical', 'Analytical']
 
-    def run(self, maxstep=0.25):
+    def run(self, method='analytical', maxstep=0.25):
         """
         Calculates the onsite, one-center "W" integrals.
 
         Parameters
         ----------
+        method : str, optional
+            Whether to calculate the integrals analytically
+            ('analytical') or via numerical differentiation
+            ('numerical').
         maxstep : float, optional
-            Step size to use for integrals evaluated via
-            numerical differentiation.
+            Step size to use for the integrals, if evaluated
+            via numerical differentiation.
         """
         self.print_header()
 
-        self.tables = {method: {} for method in self.methods}
-        self.keys = []
+        self.method = method
+        self.tables = OrderedDict()
 
         for valence1 in self.el.basis_sets:
             for nl1 in valence1:
                 for valence2 in self.el.basis_sets:
                     for nl2 in valence2:
-                        key = (nl1, nl2)
-                        self.keys.append(key)
-
-                        W = self.el.get_spin_constant(nl1, nl2, scheme=None,
-                                                      maxstep=maxstep)
-                        self.tables['Numerical'][key] = W
-
-                        W = self.el.get_analytical_spin_constant(nl1, nl2)
-                        self.tables['Analytical'][key] = W
+                        if method == 'analytical':
+                            W = self.el.get_analytical_spin_constant(nl1, nl2)
+                        elif method == 'numerical':
+                            W = self.el.get_spin_constant(nl1, nl2, scheme=None,
+                                                          maxstep=maxstep)
+                        else:
+                            raise ValueError('Unknown method:', method)
+                        self.tables[(nl1, nl2)] = W
         return
 
     def write(self):
@@ -109,24 +112,22 @@ class Onsite1cWMainTable(SingleAtomIntegrator):
         print('Writing to %s' % filename, file=self.txt)
 
         with open(filename, 'w') as f:
-            template = '%s spin constant for %s (%s, %s) [%s]: %.6f\n'
+            f.write('Method: {0}\n'.format(self.method))
 
-            for key in self.keys:
-                nl1, nl2 = key
+            f.write('Spin constant table:\n')
+            template = '%16s: %10.6f [%s] %10.6f [%s]\n'
 
-                for method in self.methods:
-                    W = self.tables[method][key]
-                    f.write(template % (method, sym, nl1, nl2, 'Ha', W))
-                    f.write(template % (method, sym, nl1, nl2, 'eV', W * Ha))
+            Ws = []
+            for (nl1, nl2), W in self.tables.items():
+                W_eV = W * Ha
+                key = 'W_%s-%s' % (nl1, nl2)
+                f.write(template % (key, W, 'Ha', W_eV, 'eV'))
+                Ws.append(W_eV)
 
             # Repeat in list form for convenience (only eV)
-            template = '%s spin constant list for %s [eV]: %s\n'
-
-            for method in self.methods:
-                W = [self.tables[method][key] * Ha for key in self.keys]
-                lst = '[' + ', '.join(list(map(lambda x: '%.3f' % x, W))) + ']'
-                f.write(template % (method, sym, lst))
-
+            f.write('Spin constant list [eV]:\n')
+            Ws_str = '[' + ', '.join(list(map(lambda x: '%.3f' % x, Ws))) + ']'
+            f.write('    %s: %s\n' % (sym, Ws_str))
         return
 
 
