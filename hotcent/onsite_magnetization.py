@@ -61,11 +61,13 @@ class Onsite1cWMainTable(SingleAtomIntegrator):
     ----------
     el : AtomicBase-like object
         Object with atomic properties.
-    txt : None or filehandle
-        Where to print output to (None for stdout).
+
+    Other parameters
+    ----------------
+    See SingleAtomIntegrator
     """
-    def __init__(self, el, txt=None):
-        SingleAtomIntegrator.__init__(self, el, txt=txt)
+    def __init__(self, el, **kwargs):
+        SingleAtomIntegrator.__init__(self, el, **kwargs)
 
     def run(self, method='analytical', maxstep=0.25):
         """
@@ -141,11 +143,13 @@ class Onsite1cWAuxiliaryTable(SingleAtomIntegrator):
     ----------
     el : AtomicBase-like object
         Object with atomic properties.
-    txt : None or filehandle
-        Where to print output to (None for stdout).
+
+    Other parameters
+    ----------------
+    See SingleAtomIntegrator
     """
-    def __init__(self, el, txt=None):
-        SingleAtomIntegrator.__init__(self, el, txt=txt)
+    def __init__(self, el, **kwargs):
+        SingleAtomIntegrator.__init__(self, el, **kwargs)
         assert self.el.aux_basis.get_lmax() < NUML_1CK
 
     def run(self, xc='LDA'):
