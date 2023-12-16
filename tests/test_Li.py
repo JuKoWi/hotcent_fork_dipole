@@ -131,6 +131,44 @@ def test_hubbard_analytical(atoms):
             assert diff < tol, msg.format(nl, ae_or_pp, val_ana, val_num)
 
 
+@pytest.mark.parametrize('atoms', [PBE_LibXC], indirect=True)
+def test_spin(atoms):
+    labels = ['AE', 'PP']
+    W = {label: {} for label in labels}
+    for atom, label in zip(atoms, labels):
+        for nl in atom.valence:
+            W[label][nl] = atom.get_spin_constant(nl, nl)
+
+    msg = 'Too large difference for W_{0} (AE: {1}, PP: {2})'
+    tol = 5e-4
+
+    for nl, val_ae in W['AE'].items():
+        val_pp = W['PP'][nl]
+        diff = abs(val_ae - val_pp)
+        assert diff < tol, msg.format(nl, val_ae, val_pp)
+
+
+@pytest.mark.parametrize('atoms', [LDA, PBE_LibXC], indirect=True)
+def test_spin_analytical(atoms):
+    for atom, ae_or_pp in zip(atoms, ['AE', 'PP']):
+        labels = ['analytical', 'numerical']
+        W = {label: {} for label in labels}
+        for label in labels:
+            for nl in atom.valence:
+                if label == 'analytical':
+                    W[label][nl] = atom.get_analytical_spin_constant(nl, nl)
+                elif label == 'numerical':
+                    W[label][nl] = atom.get_spin_constant(nl, nl, maxstep=0.2)
+
+        msg = 'Too large diff. for W_{0}-{1} (analytical: {2}, numerical: {3})'
+        tol = 5e-4
+
+        for nl, val_ana in W['analytical'].items():
+            val_num = W['numerical'][nl]
+            diff = abs(val_ana - val_num)
+            assert diff < tol, msg.format(nl, ae_or_pp, val_ana, val_num)
+
+
 @pytest.mark.parametrize('R', [R1])
 @pytest.mark.parametrize('atoms', [PBE_LibXC], indirect=True)
 def test_rep2c(atoms, R):

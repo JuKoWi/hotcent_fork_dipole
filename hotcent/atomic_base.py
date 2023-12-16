@@ -792,10 +792,10 @@ class AtomicBase:
 
         if self.perturbative_confinement:
             veff_original = np.copy(self.veff)
-            only_valence = not isinstance(self.pp, PhillipsKleinmanPP)
+            has_pseudo = not isinstance(self.pp, PhillipsKleinmanPP)
 
             # Obtain dens & veff for the default electronic configuration
-            dens = self.calculate_density(self.unlg, only_valence=only_valence)
+            dens = self.calculate_density(self.unlg, only_valence=has_pseudo)
 
             # Update density and number of electrons
             self.configuration[self.valence[0]] += diff
@@ -806,10 +806,14 @@ class AtomicBase:
 
             if spin is not None:
                 # Recalculate the XC part of the effective potential
-                exc, vxc = self.xc.evaluate(dens, self.grid)
+                dens_xc = np.copy(dens)
+                if has_pseudo:
+                    dens_xc = self.add_core_electron_density(dens_xc)
+
+                exc, vxc = self.xc.evaluate(dens_xc, self.grid)
                 self.veff -= vxc
 
-                dens_up = (dens - dens_nl2) / 2.
+                dens_up = (dens_xc - dens_nl2) / 2.
                 dens_down = np.copy(dens_up)
                 if spin == 'up':
                     dens_up += dens_nl2
