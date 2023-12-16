@@ -10,27 +10,27 @@ try:
     from pylibxc.version import __version__ as pylibxc_version
     has_pylibxc = True
     assert int(pylibxc_version[0]) >= 5, \
-           'PyLibXC >= v5 is needed (found {0})'.format(pylibxc_version)
+           'pylibxc >= v5 is needed (found {0})'.format(pylibxc_version)
 except ImportError:
-    print('Warning -- could not load LibXC')
+    print('Warning -- could not load pylibxc')
     has_pylibxc = False
 
 
 class LibXC:
     def __init__(self, xcname, spin_polarized=False):
         """
-        Interface to PyLibXC.
+        Interface to pylibxc.
 
         Parameters
         ----------
         xcname : str
-            Combination of LibXC functional names,
+            Combination of Libxc functional names,
             e.g. 'GGA_X_PBE+GGA_C_PBE'.
         spin_polarized : bool, optional
             Whether to select the spin-polarized version
             of the functionals (default: False).
         """
-        assert has_pylibxc, 'Using XC other than LDA requires PyLibXC!'
+        assert has_pylibxc, 'Using XC other than LDA requires pylibxc!'
 
         self.xcname = xcname
         self.names = self.xcname.split('+')
@@ -45,7 +45,7 @@ class LibXC:
                 self.functionals.append(func)
             except KeyError as err:
                 print('KeyError:', err)
-                print('>>> Bad XC name. For valid LibXC functional names, see')
+                print('>>> Bad XC name. For valid Libxc functional names, see')
                 print('>>> https://www.tddft.org/programs/libxc/functionals/')
                 raise
 

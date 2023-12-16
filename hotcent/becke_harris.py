@@ -58,7 +58,7 @@ class BeckeHarris:
     elements : dict of AtomicBase-like
         Atomic calculators for every anticipated chemical element.
     xc : str, optional
-        Exchange-correlation functional from LibXC.
+        Exchange-correlation functional from Libxc.
         Default: LDA_X+LDA_C_PW, i.e. LDA in the PW92 parametrization.
     settings_T, settings_V : tuple of 2 ints
         Settings for the Becke integration grids for integrals involving

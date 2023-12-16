@@ -57,10 +57,10 @@ class Offsite2cTable(MultiAtomIntegrator):
             Name of the exchange-correlation functional to be used
             in calculating the effective potential in the density
             superposition scheme (default: 'LDA').
-            If the PyLibXC module is available, any LDA or GGA (but not
-            hybrid or MGGA) functional available via LibXC can be specified.
+            If the pylibxc module is available, any LDA or GGA (but not
+            hybrid or MGGA) functional available via Libxc can be specified.
             To e.g. use the N12 functional, set 'XC_GGA_X_N12+XC_GGA_C_N12'.
-            If PyLibXC is not available, only the local density approximation
+            If pylibxc is not available, only the local density approximation
             xc='LDA' (alias: 'PW92') can be chosen.
         stride : int, optional
             The desired Skater-Koster table typically has quite a large

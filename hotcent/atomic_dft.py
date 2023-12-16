@@ -52,11 +52,11 @@ class AtomicDFT(AtomicBase):
         -----------
         xc: Name of the XC functional. If 'LDA' or 'PW92' are provided,
             then Hotcent's native LDA implementation will be used.
-            For all other functionals, the PyLibXC module is required,
-            which is bundled with LibXC.
+            For all other functionals, the pylibxc module is required,
+            which is bundled with Libxc.
             The names of the implemented functionals can be found
             on https://www.tddft.org/programs/libxc/functionals/
-            Often one needs to combine different LibXC functionals, e.g.
+            Often one needs to combine different Libxc functionals, e.g.
                 xc='GGA_X_PBE+GGA_C_PBE'  # for PBE XC
 
         convergence: convergence criterion dictionary

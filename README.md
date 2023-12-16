@@ -33,11 +33,9 @@ For more information please consult the [preprint on ChemRxiv](
 https://doi.org/10.26434/chemrxiv-2023-v7ljv).
 
 With regards to exchange-correlation functionals, the PW92
-(LDA) functional is natively available, and other LDA/GGA
-functionals can be applied through integration with the PyLibXC
-module shipped with [LibXC](https://www.tddft.org/programs/libxc).
-Hybrid and meta-GGA functionals cannot currently be used in
-Hotcent.
+(LDA) functional is natively available, and other LDA/GGA functionals
+can be applied [through integration with Libxc](#libxc).
+Hybrid and meta-GGA functionals cannot currently be used in Hotcent.
 
 
 ## Installation
@@ -63,18 +61,18 @@ the installation should also provide the `hotcent-basis`, `hotcent-concat`
 and `hotcent-setup` command line tools.
 
 
-### PyLibXC
+### Libxc
 
-If you want to use functionals other than the PW92 LDA, the [PyLibXC](
+If you want to use functionals other than the PW92 LDA, the [pylibxc](
 https://www.tddft.org/programs/libxc/installation/#python-library) module
 needs to be available, which provides a Python interface to all
-LibXC functionals. A recent LibXC version is required (>= v5.1).
+Libxc functionals. A recent Libxc version is required (>= v5.1).
 
 
 ## Testing
 
 The test suite makes use of the [pytest](https://docs.pytest.org) framework
-and requires that PyLibXC is installed.
+and requires that pylibxc is installed.
 
 Example usage:
 ```shell

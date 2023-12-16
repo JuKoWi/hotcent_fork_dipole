@@ -14,7 +14,7 @@ Development version
 * The 'perturbative' confinement scheme is now the default for
   AtomicDFT calculations (the 'perturbative_confinement' keyword).
 
-* Maintenance related to changes in ASE, Matplotlib and LibXC.
+* Maintenance related to changes in ASE, Matplotlib and Libxc.
 
 * Bugfix: there was an off-by-one error in the number of zero-valued
   integrals printed in the Slater-Koster files for distances below
@@ -22,7 +22,7 @@ Development version
 
 * The Python version is now required to be >= v3.6.
   The ASE dependency now needs to be >= v22.0 and
-  the (optional) PyLibXC dependency >= v5.0.
+  the (optional) Libxc dependency >= v5.1.
   PyYAML and pytest are two new dependencies.
 
 * Bugfix: gradient corrections to the exchange-correlation potential
@@ -49,7 +49,7 @@ Development version
   previous versions.
 
 * Added the possibility to calculate spin constants (W values).
-  This requires the otherwise optional PyLibXC dependency.
+  This requires the otherwise optional Libxc dependency.
 
 * Implemented analytical methods for Hubbard value and spin constant
   calculations based on the (Hartree-)XC kernel (instead of finite
