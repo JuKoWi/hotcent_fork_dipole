@@ -824,11 +824,19 @@ class AtomicDFT(AtomicBase):
 
             self.wf_confinement = wf_confinement.copy()
             rcuts = {nl1: rc1}
-            rc2 = self.find_cutoff_radius(nl2, energy_shift=energy_shifts[1],
-                                          tolerance=tolerance,
-                                          neglect_density_change=False,
-                                          rcuts=rcuts, **kwargs)
-            rcuts[nl2] = rc2
+
+            try:
+                rc2 = self.find_cutoff_radius(nl2,
+                                              energy_shift=energy_shifts[1],
+                                              tolerance=tolerance,
+                                              neglect_density_change=False,
+                                              rcuts=rcuts, **kwargs)
+                rcuts[nl2] = rc2
+            except RuntimeError:
+                # Convergence problems. This is usually due to
+                # too strong confinement (eigenvalues becoming positive)
+                diff1 = 1.
+                continue
 
             self.wf_confinement = {
                 nl1: SoftConfinement(rc=rc1, **kwargs),
