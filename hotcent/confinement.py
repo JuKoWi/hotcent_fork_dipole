@@ -38,16 +38,21 @@ class ZeroConfinement(Confinement):
 
 
 class PowerConfinement(Confinement):
-    def __init__(self, r0=1., s=2, adjustable=[]):
+    def __init__(self, r0=1., s=2, ubound=1e4, adjustable=[]):
         self.r0 = r0
         self.s = s
+        self.ubound = ubound
         Confinement.__init__(self, adjustable=adjustable)
 
     def __call__(self, r):
-        return (r / self.r0) ** self.s
+        rbound = self.r0 * self.ubound**(1. / self.s)
+        condlist = [r < rbound]
+        funclist = [lambda x: (x / self.r0)**self.s, self.ubound]
+        return np.piecewise(r, condlist, funclist)
 
     def __str__(self):
-        return 'PowerConfinement(r0=%.6f, s=%.6f)' % (self.r0, self.s)
+        return 'PowerConfinement(r0=%.6f, s=%.6f, ubound=%.1e)' \
+               % (self.r0, self.s, self.ubound)
 
 
 class WoodsSaxonConfinement(Confinement):

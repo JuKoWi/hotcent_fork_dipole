@@ -79,6 +79,9 @@ Development version
 * Updated the existing two tutorials and added `Tutorial 3` about generating
   3cTB-GY parameter sets.
 
+* Added an upper bound (default: 1e4 Ha) to PowerConfinement potentials
+  to avoid problems for higher *s* values (e.g. *s* >= 4), see issue #4.
+
 
 Version 1.0
 ===========
