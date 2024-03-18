@@ -4,7 +4,7 @@
 starting from atomic DFT calculations with spherical confinement.
 
 Hotcent was originally based on parts of the [Hotbit](
-https://github.com/pekkosk/hotbit/) code but has evolved considerably
+https://github.com/pekkosk/hotbit/) code but has much evolved
 since then.
 
 Hotcent was initially developed as part of the following study:
@@ -12,9 +12,13 @@ Hotcent was initially developed as part of the following study:
 M. Van den Bossche, J. Chem. Phys. A. **2019**, 123 (13), 3038-3045
 [(doi)](https://dx.doi.org/10.1021/acs.jpca.9b00927).
 
-The code has then been considerably expanded and reworked as part of
-the development currently described in the [preprint on ChemRxiv](
-https://doi.org/10.26434/chemrxiv-2023-v7ljv).
+The code has then been considerably expanded and reworked for:
+
+M. Van den Bossche, J. Chem. Theory Comput. **2024**
+[(doi)](https://doi.org/10.1021/acs.jctc.4c00018).
+
+Please consider citing the 2019 paper when using Hotcent version v1.0
+(and earlier) and the 2024 paper for later Hotcent versions.
 
 
 ## Features
@@ -29,8 +33,8 @@ Hotcent can generate parameters representing:
 
 As such, Hotcent can generate parameter files for semi-empirical
 tight-binding as well as ab-initio tight-binding calculations.
-For more information please consult the [preprint on ChemRxiv](
-https://doi.org/10.26434/chemrxiv-2023-v7ljv).
+For more information please consult the [2024 paper](
+https://doi.org/10.1021/acs.jctc.4c00018).
 
 With regards to exchange-correlation functionals, the PW92
 (LDA) functional is natively available, and other LDA/GGA functionals
