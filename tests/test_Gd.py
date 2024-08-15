@@ -52,6 +52,7 @@ def test_off2c(R, atom):
     off2c = Offsite2cTable(atom, atom)
     off2c.run(rmin=rmin, dr=dr, N=N, superposition='density', xc=xc,
               smoothen_tails=False, ntheta=300, nr=100)
+    off2c.write()
     H, S = off2c.tables[(0, 0, 0)][0, :20], off2c.tables[(0, 0, 0)][0, 20:41]
 
     HS_ref = {

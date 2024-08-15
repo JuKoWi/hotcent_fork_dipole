@@ -320,17 +320,17 @@ class Offsite2cTable(MultiAtomIntegrator):
             return Sl, Hl, H2l
 
     def write(self, eigenvalues=None, hubbardvalues=None, occupations=None,
-              spe=None, offdiagonal_H=None, offdiagonal_S=None):
+              spe=None, offdiagonal_H=None, offdiagonal_S=None,
+              filename_template='{el1}-{el2}_offsite2c.skf'):
         """
         Writes all Slater-Koster integral tables to file.
-
-        All parameters are optional and are only written in the
-        homonuclear case.
-
-        The filename template corresponds to '<el1>-<el2>_offsite2c.skf'.
         By default the 'simple' SKF format is chosen, and the 'extended'
         SKF format is only used when necessary (i.e. when a basis set
         includes f-electrons).
+
+        Note that the parameters related to one-center properties
+        ('eigenvalues', 'hubbardvalues', ..., 'offdiagonal_S')
+        are only used in the homonuclear case.
 
         Parameters
         ----------
@@ -352,6 +352,12 @@ class Offsite2cTable(MultiAtomIntegrator):
             {(nl1, nl2): value} dictionary with the off-diagonal,
             one-center, onsite overlap integrals. Only needed for
             non-minimal basis sets.
+        filename_template : str, optional
+            Template for the names of the SKF output file(s).
+            Needs to contain '{el1}' and '{el2}' fields, which will be
+            filled in with the element symbols (followed, as usual,
+            with '+' characters in the case of second-or-higher-zeta
+            basis subsets).
         """
         def copy_dict1(dict_src, dict_dest, valence):
             if dict_src is None:
@@ -378,8 +384,8 @@ class Offsite2cTable(MultiAtomIntegrator):
 
             for bas1, valence1 in enumerate(e1.basis_sets):
                 for bas2, valence2 in enumerate(e2.basis_sets):
-                    template = '%s-%s_offsite2c.skf'
-                    filename = template % (sym1 + '+'*bas1, sym2  + '+'*bas2)
+                    filename = filename_template.format(el1=sym1 + '+'*bas1,
+                                                        el2=sym2 + '+'*bas2)
                     print('Writing to %s' % filename, file=self.txt, flush=True)
 
                     is_extended = any([nl[1]=='f' for nl in valence1+valence2])
