@@ -168,13 +168,30 @@ class Repulsion2cTable(MultiAtomIntegrator):
         rho1 = e1.electron_density(r1)
         rho2 = e2.electron_density(r2)
         rho12 = rho1 + rho2
+
+        if e1.pp.has_nonzero_rho_core:
+            rho1_val = e1.electron_density(r1, only_valence=True)
+        else:
+            rho1_val = rho1
+
+        if e2.pp.has_nonzero_rho_core:
+            rho2_val = e2.electron_density(r2, only_valence=True)
+        else:
+            rho2_val = rho2
+
+        if e1.pp.has_nonzero_rho_core or e2.pp.has_nonzero_rho_core:
+            rho12_val = rho1_val + rho2_val
+        else:
+            rho12_val = rho12
+
         self.timer.stop('prelude')
 
         self.timer.start('xc')
         if xc in ['LDA', 'PW92']:
             xc = XC_PW92()
             Exc = -np.sum((rho1 * xc.exc(rho1) + rho2 * xc.exc(rho2)) * aux)
-            Evxc = -np.sum((rho1 * xc.vxc(rho1) + rho2 * xc.vxc(rho2)) * aux)
+            Evxc = -np.sum((rho1_val * xc.vxc(rho1) \
+                            + rho2_val * xc.vxc(rho2)) * aux)
             exc12 = xc.exc(rho12)
             vxc12 = xc.vxc(rho12)
         else:
@@ -183,15 +200,21 @@ class Repulsion2cTable(MultiAtomIntegrator):
             sigma = e1.electron_density(r1, der=1)**2
             out = xc.compute_all(rho1, sigma)
             Exc = -np.sum(rho1 * out['zk'] * aux)
-            Evxc = -np.sum(rho1 * out['vrho'] * aux)
+            Evxc = -np.sum(rho1_val * out['vrho'] * aux)
             if xc.add_gradient_corrections:
+                if e1.pp.has_nonzero_rho_core:
+                    sigma = e1.electron_density(r1, der=1) \
+                            * e1.electron_density(r1, der=1, only_valence=True)
                 Evxc -= 2. * np.sum(out['vsigma'] * sigma * aux)
 
             sigma = e2.electron_density(r2, der=1)**2
             out = xc.compute_all(rho2, sigma)
             Exc -= np.sum(rho2 * out['zk'] * aux)
-            Evxc -= np.sum(rho2 * out['vrho'] * aux)
+            Evxc -= np.sum(rho2_val * out['vrho'] * aux)
             if xc.add_gradient_corrections:
+                if e2.pp.has_nonzero_rho_core:
+                    sigma = e2.electron_density(r2, der=1) \
+                            * e2.electron_density(r2, der=1, only_valence=True)
                 Evxc -= 2. * np.sum(out['vsigma'] * sigma * aux)
 
             c1 = y / r1  # cosine of theta_1
@@ -205,19 +228,34 @@ class Repulsion2cTable(MultiAtomIntegrator):
             exc12 = out['zk']
             vxc12 = out['vrho']
             if xc.add_gradient_corrections:
+                if e1.pp.has_nonzero_rho_core or e2.pp.has_nonzero_rho_core:
+                    if e1.pp.has_nonzero_rho_core:
+                        drho1_val = e1.electron_density(r1, der=1,
+                                                        only_valence=True)
+                    else:
+                        drho1_val = drho1
+
+                    if e2.pp.has_nonzero_rho_core:
+                        drho2_val = e2.electron_density(r2, der=1,
+                                                        only_valence=True)
+                    else:
+                        drho2_val = drho2
+
+                    sigma = (drho1*s1 + drho2*s2) \
+                            * (drho1_val*s1 + drho2_val*s2) \
+                            + (drho1*c1 + drho2*c2) \
+                            * (drho1_val*c1 + drho2_val*c2)
+
                 Evxc += 2. * np.sum(out['vsigma'] * sigma * aux)
 
         Exc += np.sum(exc12 * rho12 * aux)
-        Evxc += np.sum(vxc12 * rho12 * aux)
+        Evxc += np.sum(vxc12 * rho12_val * aux)
         self.timer.stop('xc')
-
-        rho1 = e1.electron_density(r1, only_valence=True)
-        rho2 = e2.electron_density(r2, only_valence=True)
 
         vhar1 = e1.hartree_potential(r1, only_valence=True)
         vhar2 = e2.hartree_potential(r2, only_valence=True)
-        Ehar = np.sum(vhar1 * rho2 * aux)
-        Ehar += np.sum(vhar2 * rho1 * aux)
+        Ehar = np.sum(vhar1 * rho2_val * aux)
+        Ehar += np.sum(vhar2 * rho1_val * aux)
 
         Z1 = e1.get_number_of_electrons(only_valence=True)
         Z2 = e2.get_number_of_electrons(only_valence=True)

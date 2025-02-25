@@ -4,6 +4,7 @@ mentioned). The core corrections are needed for a close agreement.
 """
 import os
 import pytest
+import numpy as np
 from hotcent.atomic_dft import AtomicDFT
 from hotcent.confinement import SoftConfinement
 from hotcent.kleinman_bylander import KleinmanBylanderPP
@@ -11,7 +12,7 @@ from hotcent.pseudo_atomic_dft import PseudoAtomicDFT
 from hotcent.siesta_ion import write_ion
 
 
-R1 = 4.0
+R1 = 3.0
 PBE_LibXC = 'GGA_X_PBE+GGA_C_PBE'
 LDA = 'LDA'
 
@@ -91,6 +92,35 @@ def test_on1c(atoms):
         val_pp = H['PP'][nl]
         diff = abs(val_ae - val_pp)
         assert diff < tol, msg.format(nl, val_ae, val_pp)
+
+    # Check the total energy contributions, which should match
+    # those making up the 'one-center repulsion'
+
+    # Reference values (from BeckeHarris tool)
+    E_ref = {
+        'PP': {
+            'hartree': 0.116032085,  # Siesta:  0.11670949
+            'exc': -0.43069638,  # Siesta: -0.43069856
+            'vxc': -0.14408409,  # Siesta: -0.14407436
+            'total': -0.50821969,  # calculated from above + Eband
+                                   # Siesta: -0.50890660
+        },
+        'AE': {
+            'hartree': 4.03050014,
+            'exc': -1.78612238,
+            'vxc': -2.28282590,
+            'total': -7.44900889,  # calculated from above + Eband
+        },
+    }
+
+    msg = 'Too large error for {0} component "{1}" (value={2})'
+
+    for atom, label in zip(atoms, labels):
+        for component, ref in E_ref[label].items():
+            tol = 1e-3 if label == 'AE' else 1e-4
+            val = atom.energies[component]
+            diff = abs(val - ref)
+            assert diff < tol, msg.format(label, component, val)
 
 
 @pytest.mark.parametrize('atoms', [PBE_LibXC], indirect=True)
@@ -185,7 +215,57 @@ def test_rep2c(atoms, R):
                   shift=False, ntheta=600, nr=200)
         Erep[label] = rep2c.erep[0]
 
-    msg = 'Too large difference for E_rep (AE: {0}, PP: {1})'
-    etol = 3e-4
-    E_diff = abs(Erep['AE'] - Erep['PP'])
-    assert E_diff < etol, msg.format(Erep['AE'], Erep['PP'])
+    # Reference values (from BeckeHarris tool)
+    Erep_ref = {
+        'AE': 0.13414078,
+        'PP': 0.13454636,  # Siesta value: 0.13447176
+    }
+
+    etol = 2e-5
+    msg = 'Too large error for E_rep {0} (value={1})'
+
+    for label, ref in Erep_ref.items():
+        val = Erep[label]
+        diff = abs(val - ref)
+        assert diff < etol, msg.format(label, val)
+
+
+@pytest.fixture(scope='module')
+def grids(request):
+    all_grids = {
+        R1: (R1, np.array([R1]), np.array([R1*np.sqrt(3.)/2]),
+             np.array([np.pi/2])),
+    }
+    return all_grids[request.param]
+
+
+@pytest.mark.parametrize('nphi', ['adaptive'])
+@pytest.mark.parametrize('grids', [R1], indirect=True)
+@pytest.mark.parametrize('atoms', [PBE_LibXC], indirect=True)
+def test_rep3c(nphi, grids, atoms):
+    from hotcent.repulsion_threecenter import Repulsion3cTable
+
+    R, Rgrid, Sgrid, Tgrid = grids
+    xc = atoms[0].xcname
+
+    labels = ['AE', 'PP']
+    Erep = {}
+    for atom, label in zip(atoms, labels):
+        rep3c = Repulsion3cTable(atom, atom)
+        Erep[(R, label)] = rep3c.run(atom, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid,
+                                     nphi=nphi, xc=xc, ntheta=300, nr=100,
+                                     write=False)
+
+    # Reference values from BeckeHarris tool
+    Erep_ref = {
+        (R1, 'AE'): -0.00330668,
+        (R1, 'PP'): -0.00303908,  # Siesta value: -.00305317
+    }
+
+    etol = 5e-5
+    msg = 'Too large error for E_rep {0} (value={1})'
+
+    for label, ref in Erep_ref.items():
+        val = Erep[label][('Li', 'Li')]['s_s'][0][1]
+        diff = abs(val - ref)
+        assert diff < etol, msg.format(label, val)

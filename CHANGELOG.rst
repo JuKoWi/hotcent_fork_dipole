@@ -10,6 +10,10 @@ Development version
   a 'filename_template' keyword argument which can be used to similar effect
   as the corresponding 'filename' keyword argument from Hotcent <= v1.
 
+* Bugfix: in all-electron calculations as well as pseudopotential
+  calculations with non-linear core corrections, there was an error in
+  the Vxc integral contribution to the two- and three-center repulsion.
+
 
 Version 2.0.0
 =============

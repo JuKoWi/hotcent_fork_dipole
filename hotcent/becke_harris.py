@@ -852,7 +852,7 @@ class BeckeHarris:
                     nlpp += sAC * eps * sCB
         return nlpp
 
-    def run_repulsion(self, atoms_ase):
+    def run_repulsion(self, atoms_ase, **kwargs):
         self.atoms_ase = atoms_ase
         self.atoms_becke = ase2becke(atoms_ase)
         print('=== Repulsion ===')
@@ -871,17 +871,17 @@ class BeckeHarris:
             print()
             return
 
-        results_mc = self.calculate_multicenter_repulsion()
+        results_mc = self.calculate_multicenter_repulsion(**kwargs)
         print_energies(results_mc, 'Multi-center')
 
-        results_1c = self.calculate_onecenter_repulsion()
+        results_1c = self.calculate_onecenter_repulsion(**kwargs)
         print_energies(results_1c, 'One-center')
 
         for key, values in results_1c.items():
             results_mc[key] -= np.sum(values)
         print_energies(results_mc, 'Multi-center minus one-center')
 
-        results_2c = self.calculate_twocenter_repulsion()
+        results_2c = self.calculate_twocenter_repulsion(**kwargs)
         print_energies(results_2c, 'Two-center')
 
         for key, values in results_2c.items():
@@ -889,9 +889,9 @@ class BeckeHarris:
         print_energies(results_mc, 'Multi-center minus one- & two-center')
         return
 
-    def calculate_multicenter_repulsion(self):
+    def calculate_multicenter_repulsion(self, only_valence=True):
         all_indices = list(range(len(self.atoms_becke)))
-        only_val = dict(only_valence=True)
+        only_val = dict(only_valence=only_valence)
 
         def get_drho(x, y, z, indices, deriv2=True):
             drho = {}
@@ -919,9 +919,10 @@ class BeckeHarris:
 
         def Vxc_rho_mc(x, y, z):
             rho = self.get_rho(x, y, z, all_indices)
+            rho_val = self.get_rho(x, y, z, all_indices, **only_val)
             drho = get_drho(x, y, z, all_indices, deriv2=True)
             vxc = self.get_vxc(rho, **drho)
-            return vxc * rho
+            return vxc * rho_val
 
         def Enuc_mc():
             Enuc = 0.
@@ -947,9 +948,9 @@ class BeckeHarris:
         }
         return results
 
-    def calculate_onecenter_repulsion(self):
+    def calculate_onecenter_repulsion(self, only_valence=True):
         results = {key: [] for key in ['Enuc', 'Evhar', 'Evxc', 'Exc']}
-        only_val = dict(only_valence=True)
+        only_val = dict(only_valence=only_valence)
 
         def get_drho(x, y, z, indices, deriv2=True):
             drho = {}
@@ -979,8 +980,10 @@ class BeckeHarris:
             def Vxc_rho_1c(x, y, z):
                 rC = np.sqrt((x - xC)**2 + (y - yC)**2 + (z - zC)**2)
                 rho = self.elements[symC].electron_density(rC)
+                rho_val = self.elements[symC].electron_density(
+                             rC, **only_val)
                 drho = get_drho(x, y, z, [iC], deriv2=True)
-                return self.get_vxc(rho, **drho) * rho
+                return self.get_vxc(rho, **drho) * rho_val
 
             results['Enuc'].append(0.)
             results['Evhar'].append(becke.integral(atoms_1c, Vhar_rho_1c))
@@ -989,9 +992,9 @@ class BeckeHarris:
 
         return results
 
-    def calculate_twocenter_repulsion(self):
+    def calculate_twocenter_repulsion(self, only_valence=True):
         all_indices = list(range(len(self.atoms_becke)))
-        only_val = dict(only_valence=True)
+        only_val = dict(only_valence=only_valence)
 
         def get_drho(x, y, z, indices, deriv2=True):
             drho = {}
@@ -1042,16 +1045,21 @@ class BeckeHarris:
                 def Vxc_rho_2c(x, y, z):
                     rC = np.sqrt((x - xC)**2 + (y - yC)**2 + (z - zC)**2)
                     rhoC = self.elements[symC].electron_density(rC)
+                    rhoC_val = self.elements[symC].electron_density(
+                                   rC, **only_val)
                     drho = get_drho(x, y, z, [iC], deriv2=True)
-                    vxc_rho = -self.get_vxc(rhoC, **drho) * rhoC
+                    vxc_rho = -self.get_vxc(rhoC, **drho) * rhoC_val
 
                     rD = np.sqrt((x - xD)**2 + (y - yD)**2 + (z - zD)**2)
                     rhoD = self.elements[symD].electron_density(rD)
+                    rhoD_val = self.elements[symD].electron_density(
+                                   rD, **only_val)
                     drho = get_drho(x, y, z, [iD], deriv2=True)
-                    vxc_rho -= self.get_vxc(rhoD, **drho) * rhoD
+                    vxc_rho -= self.get_vxc(rhoD, **drho) * rhoD_val
 
                     drho = get_drho(x, y, z, [iC, iD], deriv2=True)
-                    vxc_rho += self.get_vxc(rhoC+rhoD, **drho) * (rhoC + rhoD)
+                    vxc_rho += self.get_vxc(rhoC+rhoD, **drho) \
+                               * (rhoC_val + rhoD_val)
                     return 0.5 * vxc_rho
 
                 def Enuc_2c():

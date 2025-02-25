@@ -199,8 +199,8 @@ def test_rep2c(R, atom):
     E = rep2c.erep[0]
 
     E_ref = {
-        (R1, PBE_LibXC): 0.61549730,
-        (R1, LDA): 0.59900832,
+        (R1, PBE_LibXC): 0.49887749,
+        (R1, LDA): 0.46719540,
     }
 
     etol = 5e-5

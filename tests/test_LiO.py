@@ -1,4 +1,4 @@
-""" Tests for multipole-related functionality.
+""" Tests for multipole-related functionality (and repulsion).
 
 Reference values come from the BeckeHarris tool, unless mentioned otherwise.
 """
@@ -2679,3 +2679,84 @@ def test_off2cM(R, atoms):
             assert M_diff < tol, msg.format(key, constraint_method, str(val))
 
     return
+
+
+@pytest.mark.parametrize('R', [R1])
+@pytest.mark.parametrize('atoms', [DZP_PBE], indirect=True)
+def test_rep2c(atoms, R):
+    from hotcent.repulsion_twocenter import Repulsion2cTable
+
+    atom_Li, atom_O = atoms
+    xc = atom_O.xcname
+    rmin, dr, N = R, R, 2
+
+    Erep = {}
+    for pair in [(atom_Li, atom_O), (atom_O, atom_Li)]:
+        label = (pair[0].symbol, pair[1].symbol)
+        rep2c = Repulsion2cTable(*pair)
+        rep2c.run(rmin=rmin, dr=dr, N=N, xc=xc, smoothen_tails=False,
+                  shift=False, ntheta=900, nr=300)
+        Erep[label] = rep2c.erep[0]
+
+    Erep_ref = 0.64333297
+
+    tol = 2e-5
+    msg = 'Too large error for E_rep {0} (value={1})'
+
+    for label, val in Erep.items():
+        diff = abs(val - Erep_ref)
+        assert diff < tol, msg.format(label, val)
+
+
+@pytest.fixture(scope='module')
+def grids(request):
+    all_grids = {
+        R1: (R1, np.array([R1]), np.array([R1*np.sqrt(3.)/2]),
+             np.array([np.pi/2])),
+    }
+    return all_grids[request.param]
+
+
+@pytest.mark.parametrize('nphi', ['adaptive'])
+@pytest.mark.parametrize('grids', [R1], indirect=True)
+@pytest.mark.parametrize('atoms', [DZP_PBE], indirect=True)
+def test_rep3c(nphi, grids, atoms):
+    from hotcent.repulsion_threecenter import Repulsion3cTable
+
+    atom_Li, atom_O = atoms
+    xc = atom_O.xcname
+    R, Rgrid, Sgrid, Tgrid = grids
+
+    triplets = [
+        (atom_Li, atom_Li, atom_O),
+        (atom_Li, atom_O, atom_Li),
+        (atom_Li, atom_O, atom_O),
+        (atom_O, atom_Li, atom_Li),
+        (atom_O, atom_Li, atom_O),
+        (atom_O, atom_O, atom_Li),
+    ]
+
+    Erep = {}
+    for atom1, atom2, atom3 in triplets:
+        label = (atom1.symbol, atom2.symbol, atom3.symbol)
+        rep3c = Repulsion3cTable(atom1, atom2)
+        Erep[(R, label)] = rep3c.run(atom3, Rgrid, Sgrid=Sgrid, Tgrid=Tgrid,
+                                     nphi=nphi, xc=xc, ntheta=300, nr=100,
+                                     write=False)
+
+    Erep_ref = {
+        ('Li', 'Li', 'O'): -0.00201423,
+        ('Li', 'O', 'Li'): -0.00201636,
+        ('Li', 'O', 'O'): -0.00396291,
+        ('O', 'Li', 'Li'): -0.00201636,
+        ('O', 'Li', 'O'): -0.00396291,
+        ('O', 'O', 'Li'): -0.00392420,
+    }
+
+    tol = 6e-5
+    msg = 'Too large error for E_rep {0} (value={1})'
+
+    for label, ref in Erep_ref.items():
+        val = Erep[(R, label)][(label[0], label[1])]['s_s'][0][1]
+        diff = abs(val - ref)
+        assert diff < tol, msg.format(label, val)

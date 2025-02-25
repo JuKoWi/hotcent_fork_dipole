@@ -110,6 +110,21 @@ class Repulsion3cTable(MultiAtomIntegrator):
         rho2 = e2.electron_density(r2)
         rho12 = rho1 + rho2
 
+        if e1.pp.has_nonzero_rho_core:
+            rho1_val = e1.electron_density(r1, only_valence=True)
+        else:
+            rho1_val = rho1
+
+        if e2.pp.has_nonzero_rho_core:
+            rho2_val = e2.electron_density(r2, only_valence=True)
+        else:
+            rho2_val = rho2
+
+        if e1.pp.has_nonzero_rho_core or e2.pp.has_nonzero_rho_core:
+            rho12_val = rho1_val + rho2_val
+        else:
+            rho12_val = rho12
+
         self.timer.start('vxc')
         if xc in ['LDA', 'PW92']:
             exc_spl = EXC_PW92_Spline()
@@ -118,24 +133,30 @@ class Repulsion3cTable(MultiAtomIntegrator):
             exc12 = np.sum(rho12 * exc_spl(rho12) * aux)
 
             vxc_spl = VXC_PW92_Spline()
-            evxc1 = np.sum(rho1 * vxc_spl(rho1) * aux)
-            evxc2 = np.sum(rho2 * vxc_spl(rho2) * aux)
-            evxc12 = np.sum(rho12 * vxc_spl(rho12) * aux)
+            evxc1 = np.sum(rho1_val * vxc_spl(rho1) * aux)
+            evxc2 = np.sum(rho2_val * vxc_spl(rho2) * aux)
+            evxc12 = np.sum(rho12_val * vxc_spl(rho12) * aux)
         else:
             xc = LibXC(xc)
 
             sigma = e1.electron_density(r1, der=1)**2
             out = xc.compute_all(rho1, sigma)
             exc1 = np.sum(rho1 * out['zk'] * aux)
-            evxc1 = np.sum(rho1 * out['vrho'] * aux)
+            evxc1 = np.sum(rho1_val * out['vrho'] * aux)
             if xc.add_gradient_corrections:
+                if e1.pp.has_nonzero_rho_core:
+                    sigma = e1.electron_density(r1, der=1) \
+                            * e1.electron_density(r1, der=1, only_valence=True)
                 evxc1 += 2. * np.sum(out['vsigma'] * sigma * aux)
 
             sigma = e2.electron_density(r2, der=1)**2
             out = xc.compute_all(rho2, sigma)
             exc2 = np.sum(rho2 * out['zk'] * aux)
-            evxc2 = np.sum(rho2 * out['vrho'] * aux)
+            evxc2 = np.sum(rho2_val * out['vrho'] * aux)
             if xc.add_gradient_corrections:
+                if e2.pp.has_nonzero_rho_core:
+                    sigma = e2.electron_density(r2, der=1) \
+                            * e2.electron_density(r2, der=1, only_valence=True)
                 evxc2 += 2. * np.sum(out['vsigma'] * sigma * aux)
 
             c1 = y / r1  # cosine of theta_1
@@ -151,8 +172,36 @@ class Repulsion3cTable(MultiAtomIntegrator):
             sigma = grad_rho12_x**2 + grad_rho12_y**2
             out = xc.compute_all(rho12, sigma)
             exc12 = np.sum(rho12 * out['zk'] * aux)
-            evxc12 = np.sum(rho12 * out['vrho'] * aux)
+            evxc12 = np.sum(rho12_val * out['vrho'] * aux)
+
             if xc.add_gradient_corrections:
+                if e1.pp.has_nonzero_rho_core:
+                    drho1_val = e1.electron_density(r1, der=1,
+                                                    only_valence=True)
+                    grad_rho1_val_x = drho1_val * s1
+                    grad_rho1_val_y = drho1_val * c1
+                else:
+                    grad_rho1_val_x = grad_rho1_x
+                    grad_rho1_val_y = grad_rho1_y
+
+                if e2.pp.has_nonzero_rho_core:
+                    drho2_val = e2.electron_density(r2, der=1,
+                                                    only_valence=True)
+                    grad_rho2_val_x = drho2_val * s2
+                    grad_rho2_val_y = drho2_val * c2
+                else:
+                    grad_rho2_val_x = grad_rho2_x
+                    grad_rho2_val_y = grad_rho2_y
+
+                if e1.pp.has_nonzero_rho_core or e2.pp.has_nonzero_rho_core:
+                    grad_rho12_val_x = grad_rho1_val_x + grad_rho2_val_x
+                    grad_rho12_val_y = grad_rho1_val_y + grad_rho2_val_y
+                    sigma = grad_rho12_x * grad_rho12_val_x \
+                            + grad_rho12_y * grad_rho12_val_y
+                else:
+                    grad_rho12_val_x = grad_rho12_x
+                    grad_rho12_val_y = grad_rho12_y
+
                 evxc12 += 2. * np.sum(out['vsigma'] * sigma * aux)
 
         self.timer.stop('vxc')
@@ -167,15 +216,39 @@ class Repulsion3cTable(MultiAtomIntegrator):
             rho23 = rho2 + rho3
             rho123 = rho12 + rho3
 
+            if e3.pp.has_nonzero_rho_core:
+                rho3_val = e3.electron_density(rA, only_valence=True)
+            else:
+                rho3_val = rho3
+
+            if e1.pp.has_nonzero_rho_core or \
+               e3.pp.has_nonzero_rho_core:
+                rho13_val = rho1_val + rho3_val
+            else:
+                rho13_val = rho13
+
+            if e2.pp.has_nonzero_rho_core or \
+               e3.pp.has_nonzero_rho_core:
+                rho23_val = rho2_val + rho3_val
+            else:
+                rho23_val = rho23
+
+            if e1.pp.has_nonzero_rho_core or \
+               e2.pp.has_nonzero_rho_core or \
+               e3.pp.has_nonzero_rho_core:
+                rho123_val = rho12_val + rho3_val
+            else:
+                rho123_val = rho123
+
             if xc in ['LDA', 'PW92']:
                 exc3 = np.sum(rho3 * exc_spl(rho3) * aux)
                 exc13 = np.sum(rho13 * exc_spl(rho13) * aux)
                 exc23 = np.sum(rho23 * exc_spl(rho23) * aux)
                 exc123 = np.sum(rho123 * exc_spl(rho123) * aux)
-                evxc3 = np.sum(rho3 * vxc_spl(rho3) * aux)
-                evxc13 = np.sum(rho13 * vxc_spl(rho13) * aux)
-                evxc23 = np.sum(rho23 * vxc_spl(rho23) * aux)
-                evxc123 = np.sum(rho123 * vxc_spl(rho123) * aux)
+                evxc3 = np.sum(rho3_val * vxc_spl(rho3) * aux)
+                evxc13 = np.sum(rho13_val * vxc_spl(rho13) * aux)
+                evxc23 = np.sum(rho23_val * vxc_spl(rho23) * aux)
+                evxc123 = np.sum(rho123_val * vxc_spl(rho123) * aux)
             else:
                 drdx = (x - x0*np.cos(phi)) / rA
                 drdy = (y - y0) / rA
@@ -187,11 +260,30 @@ class Repulsion3cTable(MultiAtomIntegrator):
                 grad_rho3_y = drho3 * drdy
                 grad_rho3_phi = drho3 * drdphi / x
 
+                if e3.pp.has_nonzero_rho_core:
+                    drho3_val = e3.electron_density(rA, der=1,
+                                                    only_valence=True)
+                else:
+                    drho3_val = drho3
+
+                if xc.add_gradient_corrections:
+                    if e3.pp.has_nonzero_rho_core:
+                        grad_rho3_val_x = drho3_val * drdx
+                        grad_rho3_val_y = drho3_val * drdy
+                        grad_rho3_val_phi = drho3_val * drdphi / x
+                    else:
+                        grad_rho3_val_x = grad_rho3_x
+                        grad_rho3_val_y = grad_rho3_y
+                        grad_rho3_val_phi = grad_rho3_phi
+
                 sigma = drho3**2 * (drdx**2 + drdy**2 + (drdphi/x)**2)
                 out = xc.compute_all(rho3, sigma)
                 exc3 = np.sum(rho3 * out['zk'] * aux)
-                evxc3 = np.sum(rho3 * out['vrho'] * aux)
+                evxc3 = np.sum(rho3_val * out['vrho'] * aux)
                 if xc.add_gradient_corrections:
+                    if e3.pp.has_nonzero_rho_core:
+                        sigma = drho3 * drho3_val \
+                                * (drdx**2 + drdy**2 + (drdphi/x)**2)
                     evxc3 += 2. * np.sum(out['vsigma'] * sigma * aux)
 
                 sigma = (grad_rho1_x + grad_rho3_x)**2 \
@@ -199,8 +291,15 @@ class Repulsion3cTable(MultiAtomIntegrator):
                         + grad_rho3_phi**2
                 out = xc.compute_all(rho13, sigma)
                 exc13 = np.sum(rho13 * out['zk'] * aux)
-                evxc13 = np.sum(rho13 * out['vrho'] * aux)
+                evxc13 = np.sum(rho13_val * out['vrho'] * aux)
                 if xc.add_gradient_corrections:
+                    if e1.pp.has_nonzero_rho_core or \
+                       e3.pp.has_nonzero_rho_core:
+                        sigma = (grad_rho1_x + grad_rho3_x) \
+                                * (grad_rho1_val_x + grad_rho3_val_x) \
+                                + (grad_rho1_y + grad_rho3_y) \
+                                * (grad_rho1_val_y + grad_rho3_val_y) \
+                                + grad_rho3_phi * grad_rho3_val_phi
                     evxc13 += 2. * np.sum(out['vsigma'] * sigma * aux)
 
                 sigma = (grad_rho2_x + grad_rho3_x)**2 \
@@ -208,8 +307,15 @@ class Repulsion3cTable(MultiAtomIntegrator):
                         + grad_rho3_phi**2
                 out = xc.compute_all(rho23, sigma)
                 exc23 = np.sum(rho23 * out['zk'] * aux)
-                evxc23 = np.sum(rho23 * out['vrho'] * aux)
+                evxc23 = np.sum(rho23_val * out['vrho'] * aux)
                 if xc.add_gradient_corrections:
+                    if e2.pp.has_nonzero_rho_core or \
+                       e3.pp.has_nonzero_rho_core:
+                        sigma = (grad_rho2_x + grad_rho3_x) \
+                                * (grad_rho2_val_x + grad_rho3_val_x) \
+                                + (grad_rho2_y + grad_rho3_y) \
+                                * (grad_rho2_val_y + grad_rho3_val_y) \
+                                + grad_rho3_phi * grad_rho3_val_phi
                     evxc23 += 2. * np.sum(out['vsigma'] * sigma * aux)
 
                 sigma = (grad_rho12_x + grad_rho3_x)**2 \
@@ -217,8 +323,16 @@ class Repulsion3cTable(MultiAtomIntegrator):
                         + grad_rho3_phi**2
                 out = xc.compute_all(rho123, sigma)
                 exc123 = np.sum(rho123 * out['zk'] * aux)
-                evxc123 = np.sum(rho123 * out['vrho'] * aux)
+                evxc123 = np.sum(rho123_val * out['vrho'] * aux)
                 if xc.add_gradient_corrections:
+                    if e1.pp.has_nonzero_rho_core or \
+                       e2.pp.has_nonzero_rho_core or \
+                       e3.pp.has_nonzero_rho_core:
+                        sigma = (grad_rho12_x + grad_rho3_x) \
+                                * (grad_rho12_val_x + grad_rho3_val_x) \
+                                + (grad_rho12_y + grad_rho3_y) \
+                                * (grad_rho12_val_y + grad_rho3_val_y) \
+                                + grad_rho3_phi * grad_rho3_val_phi
                     evxc123 += 2. * np.sum(out['vsigma'] * sigma * aux)
 
             Exc = exc123 - exc12 - exc13 - exc23 + exc1 + exc2 + exc3

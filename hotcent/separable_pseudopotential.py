@@ -32,6 +32,7 @@ class SeparablePP:
         self.overlap_fct = {}  # dict with core-valence overlap functions
         self.overlap_onsite = {}
         self.initialized_elements = []
+        self.has_nonzero_rho_core = True
 
         if txt is None:
             self.txt = open(os.devnull, 'w')

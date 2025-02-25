@@ -163,7 +163,7 @@ class AtomicDFT(AtomicBase):
 
         d = dens if dens_xc is None else dens_xc
         exc, vxc = self.xc.evaluate(d, self.grid)
-        vxc_energy = self.grid.integrate(vxc * d, use_dV=True)
+        vxc_energy = self.grid.integrate(vxc * dens, use_dV=True)
         exc_energy = self.grid.integrate(exc * d, use_dV=True)
 
         total_energy = band_energy - har_energy - vxc_energy + exc_energy
