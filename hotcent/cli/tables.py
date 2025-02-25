@@ -15,6 +15,7 @@ from time import time
 from ase.data import atomic_numbers, covalent_radii
 from ase.units import Bohr
 from hotcent import __version__
+from hotcent.atomic_dft import AtomicDFT
 from hotcent.confinement import SoftConfinement
 from hotcent.kleinman_bylander import KleinmanBylanderPP
 from hotcent.offsite_chargetransfer import Offsite2cMTable, Offsite2cUTable
@@ -415,26 +416,30 @@ def get_atoms(*elements, label=None, only_1c=False, pseudo_path=None, txt='-',
                                           x_ri=setup['confinement']['x_ri'],
                                           rc=rc)
 
-        pp_path = setup['pseudopotential']['filename']
-        pp_path = os.path.join(pseudo_path, pp_path)
-        setup['pseudopotential'].update(filename=pp_path)
+        if setup['pseudopotential'] is None:
+            atom = AtomicDFT(el, txt=txt, wf_confinement=wf_conf,
+                             **setup['atom'])
+        else:
+            pp_path = setup['pseudopotential']['filename']
+            pp_path = os.path.join(pseudo_path, pp_path)
+            setup['pseudopotential'].update(filename=pp_path)
 
-        if 'sha256sum' in setup['pseudopotential']:
-            sha256sum = get_file_checksum(pp_path, algorithm='sha256')
+            if 'sha256sum' in setup['pseudopotential']:
+                sha256sum = get_file_checksum(pp_path, algorithm='sha256')
+                msg = 'The checksum for {0} does not match the one in {1}'
+                assert sha256sum == setup['pseudopotential']['sha256sum'], \
+                       msg.format(pp_path, filename)
+                del setup['pseudopotential']['sha256sum']
 
-            assert sha256sum == setup['pseudopotential']['sha256sum'], \
-                   'The checksum for {0} does not match the one in {1}'.format(
-                   pp_path, filename)
-            del setup['pseudopotential']['sha256sum']
+            pp = KleinmanBylanderPP(txt=txt, **setup['pseudopotential'])
+            atom = PseudoAtomicDFT(el, pp, txt=txt, wf_confinement=wf_conf,
+                                   **setup['atom'])
 
-        pp = KleinmanBylanderPP(txt=txt, **setup['pseudopotential'])
-
-        atom = PseudoAtomicDFT(el, pp, txt=txt, wf_confinement=wf_conf,
-                               **setup['atom'])
         atom.run()
         atom.generate_nonminimal_basis(**setup['basis'])
         atom.pp.build_projectors(atom)
-        atom.generate_auxiliary_basis(**setup['auxiliary_basis'])
+        if setup['auxiliary_basis'] is not None:
+            atom.generate_auxiliary_basis(**setup['auxiliary_basis'])
 
         eigenvalues[el], hubbardvalues[el], occupations[el] = {}, {}, {}
         offdiagonal_H[el], offdiagonal_S[el] = {}, {}
