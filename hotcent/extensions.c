@@ -25970,7 +25970,7 @@ if (!__Pyx_RefNanny) {
   /* "hotcent/extensions.pyx":1
  * #-----------------------------------------------------------------------------#             # <<<<<<<<<<<<<<
  * #   Hotcent: a tool for generating tight-binding parameter files              #
- * #   Copyright 2018-2024 Maxime Van den Bossche                                #
+ * #   Copyright 2018-2025 Maxime Van den Bossche                                #
  */
   __pyx_t_4 = __Pyx_PyDict_NewPresized(0); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 1, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
