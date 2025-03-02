@@ -6,6 +6,12 @@ Release notes
 Development version
 ===================
 
+
+Version 2.0.1
+=============
+
+02 March 2025
+
 * The hotcent.offsite_twocenter.Offsite2cTable.write method now accepts
   a 'filename_template' keyword argument which can be used to similar effect
   as the corresponding 'filename' keyword argument from Hotcent <= v1.
