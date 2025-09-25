@@ -1,4 +1,0 @@
-import hotcent
-
-import hotcent.offsite_twocenter_dipole
-from hotcent.offsite_twocenter_dipole import Offsite2cTableDipole

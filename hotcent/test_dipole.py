@@ -1,4 +1,5 @@
 from offsite_twocenter_dipole import Offsite2cTableDipole
+from onsite_twocenter_dipole import Onsite2cTable
 from optparse import OptionParser
 from ase.units import Bohr
 from ase.data import covalent_radii, atomic_numbers
@@ -46,4 +47,5 @@ off2c = Offsite2cTableDipole(atom, atom, timing=True)
 off2c.run(rmin, dr, N, superposition=opt.superposition,
           xc=opt.functional, stride=opt.stride)
 off2c.write()
-off2c.plot()
+on2c = Onsite2cTable(atom, atom, timing=True)
+on2c.run(rmin=rmin, dr=dr, N=N)
