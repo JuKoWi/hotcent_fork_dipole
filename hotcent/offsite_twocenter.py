@@ -89,7 +89,7 @@ class Offsite2cTable(MultiAtomIntegrator):
         tables = {}
 
         for p, (e1, e2) in enumerate(self.pairs):
-            selected = select_integrals(e1, e2)
+            selected = select_integrals(e1, e2) # list of integrals to be done for each subshell
             print_integral_overview(e1, e2, selected, file=self.txt)
 
             for bas1 in range(len(e1.basis_sets)):

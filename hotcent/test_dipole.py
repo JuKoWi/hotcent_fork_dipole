@@ -41,7 +41,9 @@ atom.plot_Rnl(only_valence=False)
 atom.plot_density()
 
 # Compute Slater-Koster integrals:
-rmin, dr, N = 0.5, 0.05, 250
+rmin, dr, N = 0.1, 0.05, 250
 off2c = Offsite2cTableDipole(atom, atom, timing=True)
 off2c.run(rmin, dr, N, superposition=opt.superposition,
           xc=opt.functional, stride=opt.stride)
+off2c.write()
+off2c.plot()
