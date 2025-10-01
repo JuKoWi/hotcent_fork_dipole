@@ -25,6 +25,7 @@
             pytest
             pyyaml
             scipy
+	    sympy
           ];
 
           pythonImportsCheck = [ "hotcent" ];
