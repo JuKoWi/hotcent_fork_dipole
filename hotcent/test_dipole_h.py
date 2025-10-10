@@ -33,13 +33,13 @@ atom = AtomicDFT(element,
                  xc=opt.functional,
                  confinement=PowerConfinement(r0=r0, s=2),
                  perturbative_confinement=False,
-                 configuration='[He] 2s2 2p2',
+                 configuration='[He] 2s 2p',
                  valence=['2s', '2p'],
                  timing=True,
                  )
-atom.run()
-atom.plot_Rnl(only_valence=False)
-atom.plot_density()
+# atom.run()
+# atom.plot_Rnl(only_valence=False)
+# atom.plot_density()
 
 # Compute Slater-Koster integrals:
 rmin, dr, N = 0.1, 0.05, 250
@@ -47,5 +47,8 @@ off2c = Offsite2cTableDipole(atom, atom, timing=True)
 off2c.run(rmin, dr, N, superposition=opt.superposition,
           xc=opt.functional, stride=opt.stride)
 off2c.write()
+off2c.plot_minimal()
 on2c = Onsite2cTable(atom, atom, timing=True)
 on2c.run(rmin=rmin, dr=dr, N=N)
+on2c.write()
+print(f'Basis = {atom.basis_sets}')

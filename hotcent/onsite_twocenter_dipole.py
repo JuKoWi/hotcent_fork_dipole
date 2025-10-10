@@ -14,8 +14,7 @@ class Onsite2cTable(MultiAtomIntegrator):
                                      **kwargs)
 
     def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
-            smoothen_tails=True, shift=False, superposition='density',
-            xc='LDA'):
+            smoothen_tails=True, shift=False):
         """
         Calculates on-site two-center dipole integrals.
 
@@ -36,7 +35,6 @@ class Onsite2cTable(MultiAtomIntegrator):
                'rmin must be a multiple of dr'
         assert N is not None, 'Need to set number of grid points N!'
         assert rmin >= 1e-3, 'For stability, please set rmin >= 1e-3'
-        assert superposition == 'density'
 
         wf_range = self.get_range(wflimit)
         grid, area = self.make_grid(wf_range, nt=ntheta, nr=nr)
@@ -46,7 +44,7 @@ class Onsite2cTable(MultiAtomIntegrator):
         self.tables = {}
 
         e1, e2 = self.ela, self.elb
-        selected = select_integrals(e1, e1)
+        selected = select_integrals(e1, e1) # (sk_label, nl1, nl2)
         print_integral_overview(e1, e1, selected, file=self.txt)
 
         for bas1a in range(len(e1.basis_sets)):
@@ -59,8 +57,7 @@ class Onsite2cTable(MultiAtomIntegrator):
                     print('R=%8.2f, %i grid points ...' % (R, len(grid)),
                           file=self.txt, flush=True)
 
-                D = self.calculate(selected, e1, e2, R, grid, area,
-                                   superposition=superposition, xc=xc)
+                D = self.calculate(selected, e1, e2, R, grid, area)
                 for key in selected:
                     integral, nl1a, nl1b = key
                     bas1a = e1.get_basis_set_index(nl1a)
@@ -99,12 +96,6 @@ class Onsite2cTable(MultiAtomIntegrator):
         s1 = x / r1  # sine of theta_1
         s2 = x / r2  # sine of theta_2
 
-        rho = e1.electron_density(r1) + e2.electron_density(r2)
-        veff = e1.neutral_atom_potential(r1)
-        veff += e2.neutral_atom_potential(r2)
-
-        assert np.shape(veff) == (len(grid),)
-        V = veff - e1.effective_potential(r1)
         sym1, sym2 = e1.get_symbol(), e2.get_symbol()
         self.timer.stop('prelude')
 
@@ -115,7 +106,7 @@ class Onsite2cTable(MultiAtomIntegrator):
             Rnl1b = e1.Rnl(r1, nl1b)
             gphi = phi3(c1, c1, s1, s1, integral)
             aux = gphi * area * x
-            val = np.sum(Rnl1a * Rnl1b * V * aux)
+            val = np.sum(Rnl1a * Rnl1b * aux)
 
             results[key] = val
         self.timer.stop('calculate_onsite2c')

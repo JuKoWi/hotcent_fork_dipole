@@ -1,5 +1,5 @@
 from sympy import *
-CODE = True
+CODE = False 
 init_printing(use_unicode=True)
 
 phi, theta1 = symbols('phi theta1')
@@ -64,10 +64,13 @@ operator = {
 }
 
 counter = 0
+unique_integrals = []
 for name_i, i in first_center.items():
     for name_j, j in operator.items():
         for name_k, k in second_center.items():
             integral = integrate(i * j * k, (phi, 0, 2 * pi))
+            if not (integral in unique_integrals):
+                unique_integrals.append(integral)
             if integral != 0:
                 counter += 1
                 if CODE:
@@ -77,6 +80,8 @@ for name_i, i in first_center.items():
                     txt = txt.replace('cos(theta2)', 'c2')
                     txt = txt.replace('cos(theta1)', 'c1')
                     txt = txt.replace('sin(theta1)', 's1')
+                    txt = txt.replace('cos(2*theta2)', '2*c2**2-1')
+                    txt = txt.replace('cos(2*theta1)', '2*c1**2-1')
                     txt = txt.replace('pi', 'np.pi')
                     print(txt) 
                 else:
@@ -84,3 +89,4 @@ for name_i, i in first_center.items():
 
                 
 print(counter)
+print(len(unique_integrals))

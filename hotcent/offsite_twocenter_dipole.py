@@ -233,7 +233,7 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
 
         for i in range(NUMSK):
             name = INTEGRALS[i]
-            ax = plt.subplot(NUMSK//2, 2, i + 1)
+            ax = plt.subplot(NUMSK//2 +1, 2, i + 1)
 
             for p, (e1, e2) in enumerate(self.pairs):
                 s1, s2 = e1.get_symbol(), e2.get_symbol()
@@ -286,3 +286,94 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
         plt.savefig(filename, bbox_inches='tight')
         plt.clf()
         self.timer.stop('plotting')
+
+    def plot_minimal(self, filename=None, bas1=0, bas2=0):
+        """plot that only shows columns that are nonzero"""
+
+        self.timer.start('plotting')
+        assert plt is not None, 'Matplotlib could not be imported!'
+
+        fig = plt.figure()
+        fig.subplots_adjust(hspace=1e-4, wspace=1e-4)
+
+        el1 = self.ela.get_symbol()
+        rmax = 6 * covalent_radii[atomic_numbers[el1]] / Bohr
+        ymax = max(1, self.tables[(0, bas1, bas2)].max())
+        if self.nel == 2:
+            el2 = self.elb.get_symbol()
+            rmax = max(rmax, 6 * covalent_radii[atomic_numbers[el2]] / Bohr)
+            ymax = max(ymax, self.tables[(1, bas1, bas2)].max())
+
+        table = self.tables[(0,0,0)]
+        print(np.shape(table))
+        threshold = 1e-10
+        nonzero_col = np.where(np.any(np.abs(table) > threshold, axis=0))[0]
+
+        for i, col in enumerate(nonzero_col): 
+            name = INTEGRALS[col]
+            ax = plt.subplot(len(nonzero_col)//2 +1, 2, i + 1)
+
+            for p, (e1, e2) in enumerate(self.pairs):
+                s1, s2 = e1.get_symbol(), e2.get_symbol()
+                key = (p, bas1, bas2)
+
+                if p == 0:
+                    s = '-'
+                    lw = 1
+                    alpha = 1.0
+                else:
+                    s = '--'
+                    lw = 4
+                    alpha = 0.2
+
+                if np.all(abs(self.tables[key][:, col]) < 1e-10):
+                    ax.text(0.03, 0.5 + p * 0.15,
+                            'No %s integrals for <%s|%s>' % (name, s1, s2),
+                            transform=ax.transAxes, size=10, va='center')
+
+                    if not ax.get_subplotspec().is_last_row():
+                        plt.xticks([], [])
+                    if not ax.get_subplotspec().is_first_col():
+                        plt.yticks([], [])
+                else:
+                    plt.plot(self.Rgrid, self.tables[key][:, col] , c='r',
+                             ls=s, lw=lw, alpha=alpha)
+                    plt.axhline(0, c='k', ls='--')
+                    ax.text(0.8, 0.1 + p * 0.15, name, size=10,
+                            transform=ax.transAxes)
+
+                    if ax.get_subplotspec().is_last_row():
+                        plt.xlabel('r (Bohr)')
+                    else:
+                        plt.xticks([], [])
+                    if not ax.get_subplotspec().is_first_col():
+                        plt.yticks([],[])
+
+                plt.xlim([0, rmax])
+                plt.ylim(-ymax, ymax)
+
+        plt.figtext(0.3, 0.95, 'D', color='r', size=20)
+        plt.figtext(0.38, 0.95, ' Slater-Koster tables', size=20)
+        sym1, sym2 = self.ela.get_symbol(), self.elb.get_symbol()
+        plt.figtext(0.3, 0.92, '(thin solid: <%s|%s>, wide dashed: <%s|%s>)' \
+                    % (sym1, sym2, sym2, sym1), size=10)
+        # plt.show()
+
+        if filename is None:
+            filename = '%s-%s_slako-dipole.pdf' % (sym1 + '+'*bas1, sym2 + '+'*bas2)
+        plt.savefig(filename, bbox_inches='tight')
+        plt.clf()
+        self.timer.stop('plotting')
+        
+    def calculate_analytical(self, R, sk_label):
+    def get_twocenter_directly(self):
+        direct_table = np.zeros(np.shape(self.tables[(0,0,0)]))
+        table = self.tables[(0,0,0)]
+        threshold = 1e-10
+        nonzero_col = np.where(np.any(np.abs(table) > threshold, axis=0))[0]
+        for i, sk_label in enumerate(nonzero_col):
+            for R in self.Rgrid:
+                pass
+                """ function needs: name of first spherical, name of second spherical, name of third spherical
+                    for radial parts: subshell of first, subshell of third
+                """
