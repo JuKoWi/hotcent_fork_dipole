@@ -6,65 +6,65 @@ unified format for the label: 1., 3. and 5. letter give nl, others just for dist
 (x,y,z) for p, (1,2,3,4,5) for d
 """
 INTEGRALS = [
-    'sspxpx',
-    'sspxd2',
-    'sspypy',
-    'sspyd4',
-    'sspzss',
-    'sspzpz',
-    'sspzd3',
-    'pxpxss',
-    'pxpxpz',
-    'pxpxd3',
-    'pxpxd5',
-    'pxpyd1',
-    'pxpzpx',
-    'pxpzd2',
-    'pypxd1',
-    'pypyss',
-    'pypypz',
-    'pypyd3',
-    'pypyd5',
-    'pypzpy',
-    'pypzd4',
-    'pzpxpx',
-    'pzpxd2',
-    'pzpypy',
-    'pzpyd4',
-    'pzpzss',
-    'pzpzpz',
-    'pzpzd3',
-    'd1pxpy',
-    'd1pxd4',
-    'd1pypx',
-    'd1pyd2',
-    'd1pzd1',
-    'd2pxss',
-    'd2pxpz',
-    'd2pxd3',
-    'd2pxd5',
-    'd2pyd1',
-    'd2pzpx',
-    'd2pzd2',
-    'd3pxpx',
-    'd3pxd2',
-    'd3pypy',
-    'd3pyd4',
-    'd3pzss',
-    'd3pzpz',
-    'd3pzd3',
-    'd4pxd1',
-    'd4pyss',
-    'd4pypz',
-    'd4pyd3',
-    'd4pyd5',
-    'd4pzpy',
-    'd4pzd4',
-    'd5pxpx',
-    'd5pxd2',
-    'd5pypy',
-    'd5pyd4',
-    'd5pzd5'
+        'sspxpx',
+        'sspxd2',
+        'sspypy',
+        'sspyd4',
+        'sspzss',
+        'sspzpz',
+        'sspzd3',
+        'pxpxss',
+        'pxpxpz',
+        'pxpxd3',
+        'pxpxd5',
+        'pxpyd1',
+        'pxpzpx',
+        'pxpzd2',
+        'pypxd1',
+        'pypyss',
+        'pypypz',
+        'pypyd3',
+        'pypyd5',
+        'pypzpy',
+        'pypzd4',
+        'pzpxpx',
+        'pzpxd2',
+        'pzpypy',
+        'pzpyd4',
+        'pzpzss',
+        'pzpzpz',
+        'pzpzd3',
+        'd1pxpy',
+        'd1pxd4',
+        'd1pypx',
+        'd1pyd2',
+        'd1pzd1',
+        'd2pxss',
+        'd2pxpz',
+        'd2pxd3',
+        'd2pxd5',
+        'd2pyd1',
+        'd2pzpx',
+        'd2pzd2',
+        'd3pxpx',
+        'd3pxd2',
+        'd3pypy',
+        'd3pyd4',
+        'd3pzss',
+        'd3pzpz',
+        'd3pzd3',
+        'd4pxd1',
+        'd4pyss',
+        'd4pypz',
+        'd4pyd3',
+        'd4pyd5',
+        'd4pzpy',
+        'd4pzd4',
+        'd5pxpx',
+        'd5pxd2',
+        'd5pypy',
+        'd5pyd4',
+        'd5pzd5',
 ] 
 
 NUMSK = len(INTEGRALS)
@@ -88,13 +88,13 @@ def phi3(c1, c2, s1, s2, sk_label):
     elif sk_label == 'sspzpz':
             return 0.75*c1*c2/np.sqrt(np.pi)
     elif sk_label == 'sspzd3':
-            return 0.0625*np.sqrt(15)*(3*2*c2**2-1 + 1)*c1/np.sqrt(np.pi)
+            return 0.0625*np.sqrt(15)*(3*(2*c2**2-1) + 1)*c1/np.sqrt(np.pi)
     elif sk_label == 'pxpxss':
             return 0.375*s1**2/np.sqrt(np.pi)
     elif sk_label == 'pxpxpz':
             return 0.375*np.sqrt(3)*s1**2*c2/np.sqrt(np.pi)
     elif sk_label == 'pxpxd3':
-            return 0.09375*np.sqrt(5)*(3*2*c2**2-1 + 1)*s1**2/np.sqrt(np.pi)
+            return 0.09375*np.sqrt(5)*(3*(2*c2**2-1) + 1)*s1**2/np.sqrt(np.pi)
     elif sk_label == 'pxpxd5':
             return -0.09375*np.sqrt(15)*s1**2*s2**2/np.sqrt(np.pi)
     elif sk_label == 'pxpyd1':
@@ -110,7 +110,7 @@ def phi3(c1, c2, s1, s2, sk_label):
     elif sk_label == 'pypypz':
             return 0.375*np.sqrt(3)*s1**2*c2/np.sqrt(np.pi)
     elif sk_label == 'pypyd3':
-            return 0.09375*np.sqrt(5)*(3*2*c2**2-1 + 1)*s1**2/np.sqrt(np.pi)
+            return 0.09375*np.sqrt(5)*(3*(2*c2**2-1) + 1)*s1**2/np.sqrt(np.pi)
     elif sk_label == 'pypyd5':
             return 0.09375*np.sqrt(15)*s1**2*s2**2/np.sqrt(np.pi)
     elif sk_label == 'pypzpy':
@@ -130,7 +130,7 @@ def phi3(c1, c2, s1, s2, sk_label):
     elif sk_label == 'pzpzpz':
             return 0.75*np.sqrt(3)*c1**2*c2/np.sqrt(np.pi)
     elif sk_label == 'pzpzd3':
-            return 0.1875*np.sqrt(5)*(3*2*c2**2-1 + 1)*c1**2/np.sqrt(np.pi)
+            return 0.1875*np.sqrt(5)*(3*(2*c2**2-1) + 1)*c1**2/np.sqrt(np.pi)
     elif sk_label == 'd1pxpy':
             return 0.09375*np.sqrt(15)*s1**3*s2/np.sqrt(np.pi)
     elif sk_label == 'd1pxd4':
@@ -146,7 +146,7 @@ def phi3(c1, c2, s1, s2, sk_label):
     elif sk_label == 'd2pxpz':
             return 0.375*np.sqrt(15)*s1**2*c1*c2/np.sqrt(np.pi)
     elif sk_label == 'd2pxd3':
-            return 0.46875*(3*2*c2**2-1 + 1)*s1**2*c1/np.sqrt(np.pi)
+            return 0.46875*(3*(2*c2**2-1) + 1)*s1**2*c1/np.sqrt(np.pi)
     elif sk_label == 'd2pxd5':
             return -0.46875*np.sqrt(3)*s1**2*s2**2*c1/np.sqrt(np.pi)
     elif sk_label == 'd2pyd1':
@@ -156,19 +156,19 @@ def phi3(c1, c2, s1, s2, sk_label):
     elif sk_label == 'd2pzd2':
             return 1.875*np.sqrt(3)*s1*s2*c1**2*c2/np.sqrt(np.pi)
     elif sk_label == 'd3pxpx':
-            return 0.09375*np.sqrt(5)*(3*2*c1**2-1 + 1)*s1*s2/np.sqrt(np.pi)
+            return 0.09375*np.sqrt(5)*(3*(2*c1**2-1) + 1)*s1*s2/np.sqrt(np.pi)
     elif sk_label == 'd3pxd2':
-            return 0.46875*(3*2*c1**2-1 + 1)*s1*s2*c2/np.sqrt(np.pi)
+            return 0.46875*(3*(2*c1**2-1) + 1)*s1*s2*c2/np.sqrt(np.pi)
     elif sk_label == 'd3pypy':
-            return 0.09375*np.sqrt(5)*(3*2*c1**2-1 + 1)*s1*s2/np.sqrt(np.pi)
+            return 0.09375*np.sqrt(5)*(3*(2*c1**2-1) + 1)*s1*s2/np.sqrt(np.pi)
     elif sk_label == 'd3pyd4':
-            return 0.46875*(3*2*c1**2-1 + 1)*s1*s2*c2/np.sqrt(np.pi)
+            return 0.46875*(3*(2*c1**2-1) + 1)*s1*s2*c2/np.sqrt(np.pi)
     elif sk_label == 'd3pzss':
-            return 0.0625*np.sqrt(15)*(3*2*c1**2-1 + 1)*c1/np.sqrt(np.pi)
+            return 0.0625*np.sqrt(15)*(3*(2*c1**2-1) + 1)*c1/np.sqrt(np.pi)
     elif sk_label == 'd3pzpz':
-            return 0.1875*np.sqrt(5)*(3*2*c1**2-1 + 1)*c1*c2/np.sqrt(np.pi)
+            return 0.1875*np.sqrt(5)*(3*(2*c1**2-1) + 1)*c1*c2/np.sqrt(np.pi)
     elif sk_label == 'd3pzd3':
-            return 0.078125*np.sqrt(3)*(3*2*c1**2-1 + 1)*(3*2*c2**2-1 + 1)*c1/np.sqrt(np.pi)
+            return 0.078125*np.sqrt(3)*(3*(2*c1**2-1) + 1)*(3*(2*c2**2-1) + 1)*c1/np.sqrt(np.pi)
     elif sk_label == 'd4pxd1':
             return 0.46875*np.sqrt(3)*s1**2*s2**2*c1/np.sqrt(np.pi)
     elif sk_label == 'd4pyss':
@@ -176,7 +176,7 @@ def phi3(c1, c2, s1, s2, sk_label):
     elif sk_label == 'd4pypz':
             return 0.375*np.sqrt(15)*s1**2*c1*c2/np.sqrt(np.pi)
     elif sk_label == 'd4pyd3':
-            return 0.46875*(3*2*c2**2-1 + 1)*s1**2*c1/np.sqrt(np.pi)
+            return 0.46875*(3*(2*c2**2-1) + 1)*s1**2*c1/np.sqrt(np.pi)
     elif sk_label == 'd4pyd5':
             return 0.46875*np.sqrt(3)*s1**2*s2**2*c1/np.sqrt(np.pi)
     elif sk_label == 'd4pzpy':

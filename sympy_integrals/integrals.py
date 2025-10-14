@@ -1,5 +1,5 @@
 from sympy import *
-CODE = False 
+CODE = True 
 init_printing(use_unicode=True)
 
 phi, theta1 = symbols('phi theta1')
@@ -80,8 +80,8 @@ for name_i, i in first_center.items():
                     txt = txt.replace('cos(theta2)', 'c2')
                     txt = txt.replace('cos(theta1)', 'c1')
                     txt = txt.replace('sin(theta1)', 's1')
-                    txt = txt.replace('cos(2*theta2)', '2*c2**2-1')
-                    txt = txt.replace('cos(2*theta1)', '2*c1**2-1')
+                    txt = txt.replace('cos(2*theta2)', '(2*c2**2-1)')
+                    txt = txt.replace('cos(2*theta1)', '(2*c1**2-1)')
                     txt = txt.replace('pi', 'np.pi')
                     print(txt) 
                 else:
