@@ -2,7 +2,7 @@
 import numpy as np
 from ase.data import atomic_numbers, atomic_masses
 from hotcent.multiatom_integrator import MultiAtomIntegrator
-from slako_dipole import (phi3, INTEGRALS, NUMSK,
+from hotcent.slako_dipole import (phi3, INTEGRALS, NUMSK,
                            print_integral_overview, select_integrals,
                            tail_smoothening, write_skf)
 from hotcent.xc import XC_PW92, LibXC

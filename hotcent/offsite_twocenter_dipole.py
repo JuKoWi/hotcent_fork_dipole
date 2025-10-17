@@ -4,7 +4,7 @@ from ase.data import atomic_numbers, atomic_masses, covalent_radii
 from hotcent.multiatom_integrator import MultiAtomIntegrator
 from hotcent.orbitals import ANGULAR_MOMENTUM
 from hotcent.interpolation import CubicSplineFunction
-from slako_dipole import (INTEGRALS, print_integral_overview, select_integrals, NUMSK, phi3, tail_smoothening, write_skf)
+from hotcent.slako_dipole import (INTEGRALS, print_integral_overview, select_integrals, NUMSK, phi3, tail_smoothening, write_skf)
 import matplotlib.pyplot as plt
 
 class Offsite2cTableDipole(MultiAtomIntegrator):
@@ -366,6 +366,7 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
         self.timer.stop('plotting')
         
     def calculate_analytical(self, R, sk_label):
+        pass
     def get_twocenter_directly(self):
         direct_table = np.zeros(np.shape(self.tables[(0,0,0)]))
         table = self.tables[(0,0,0)]
