@@ -1,24 +1,8 @@
 import numpy as np
 import sympy as sp
+import pickle
 
-# check euler angles
-
-# define vector
-R = np.array([0,0,-1])
-
-# calculate angles
-r = np.sqrt(R[0]**2 + R[1]**2 + R[2]**2)
-theta = np.arccos(R[2]/r)
-phi = np.arctan2(R[1], R[0])
-
-# define matrix
-def matrix(theta, phi):
-    mat1 = np.array([[np.cos(-phi), -np.sin(-phi), 0], [np.sin(-phi), np.cos(-phi), 0], [0,0,1]])
-    mat2 = np.array([[np.cos(-theta), 0, np.sin(-theta)], [0,1,0], [-np.sin(-theta), 0, np.cos(-theta)]])
-    mat = mat2 @ mat1
-    return mat 
-
-beta = sp.symbols('beta')
+phi = sp.symbols('phi')
 theta = sp.symbols('theta')
 
 def to_spherical(R):
@@ -27,18 +11,18 @@ def to_spherical(R):
     phi = np.arctan2(R[1], R[0])
     return np.array([r, theta, phi])
 
-def d_mat_elem(l, m, n, beta):
+def d_mat_elem(l, m, n, phi):
     expr = 0
     k_min = max(0, m-n)
     k_max = min(l+m, l-n)
     for k in range(k_min, k_max+1):
         prefac = (-1)**(k-m+n) * sp.sqrt(sp.factorial(l+m) * sp.factorial(l-m) * sp.factorial(l+n) * sp.factorial(l-n)) / (sp.factorial(l+m-k) * sp.factorial(k) * sp.factorial(l-k-n) * sp.factorial(k-m+n))
-        angle_part = (sp.cos(beta/2)**(2*l-2*k+m-n) * sp.sin(beta / 2)**(2*k-m+n))
+        angle_part = (sp.cos(phi/2)**(2*l-2*k+m-n) * sp.sin(phi / 2)**(2*k-m+n))
         expr += prefac * angle_part 
     return sp.trigsimp(expr)
 
 
-def d_mat(beta):
+def d_mat(phi):
     """small-d Wigner matrix for the angle beta (up to d orbitals). 
     Returns a block-diagonal 9×9 symbolic matrix with j=0,1,2 blocks."""
     d = sp.zeros(9, 9)
@@ -49,7 +33,7 @@ def d_mat(beta):
         block = sp.zeros(size, size)
         for mi, m in enumerate(range(-j, j+1)):
             for ni, n in enumerate(range(-j, j+1)):
-                block[mi, ni] = d_mat_elem(j, m, n, beta)
+                block[mi, ni] = d_mat_elem(j, m, n, phi)
         d[row_start:row_start+size, row_start:row_start+size] = block
         row_start += size
     return d
@@ -94,28 +78,13 @@ def Wigner_D_real(euler_phi, euler_theta):
 
     transform_to_comp = transform_to_real.inv()
     D_total = transform_to_real * Wigner_D_complex(euler_phi=euler_phi, euler_theta=euler_theta) * transform_to_comp
-    return D_total
 
-def phi3_transform(R):
-   pass 
-
+    with open("symbolic_D_matrix.pkl", "wb") as f:
+        pickle.dump(D_total, f)
 
 
-"""get euler angles from internuclear vector"""
-"""get list of 0 integrals"""
-"""write map from string names to quantum number"""
-def read_sk_table(R):
-    """for an internuclear distance choose best column from sk-table
-    bring it into order consistent with rotation matrix
-    """
-    pass
 
-def calculate_dipole_element_set(n_basis):
-    """calculate dipole vector for all different combination of atomic orbitals for an atom pair"""
-    dipoles = np.zeros((n_basis, n_basis, 3))
-    vec_ints = 
-
-    pass
+Wigner_D_real(euler_phi=phi, euler_theta=theta)
 
 
 

@@ -4,6 +4,7 @@ from ase.data import covalent_radii, atomic_numbers
 from hotcent.offsite_twocenter import Offsite2cTable
 from hotcent.confinement import PowerConfinement
 from hotcent.atomic_dft import AtomicDFT
+from hotcent.offsite_twocenter_dipole import Offsite2cTableDipole
 
 # Run script with --help to see the options
 p = OptionParser(usage='%prog')

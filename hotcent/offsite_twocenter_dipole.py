@@ -200,6 +200,7 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
                         copy_dict2(offdiagonal_S, offdiag_S, valence1, valence2)
 
                     table = self.tables[(p, bas1, bas2)]
+                    print(self.tables)
                     with open(filename, 'w') as f:
                         write_skf(f, self.Rgrid, table, has_diagonal_data,
                                   is_extended, eigval, hubval, occup, SPE, mass,

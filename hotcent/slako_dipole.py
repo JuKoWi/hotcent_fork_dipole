@@ -6,68 +6,114 @@ unified format for the label: 1., 3. and 5. letter give nl, others just for dist
 (x,y,z) for p, (1,2,3,4,5) for d
 """
 INTEGRALS = [
-        'sspxpx',
-        'sspxd2',
-        'sspypy',
-        'sspyd4',
-        'sspzss',
-        'sspzpz',
-        'sspzd3',
-        'pxpxss',
-        'pxpxpz',
-        'pxpxd3',
-        'pxpxd5',
-        'pxpyd1',
-        'pxpzpx',
-        'pxpzd2',
-        'pypxd1',
-        'pypyss',
-        'pypypz',
-        'pypyd3',
-        'pypyd5',
-        'pypzpy',
-        'pypzd4',
-        'pzpxpx',
-        'pzpxd2',
-        'pzpypy',
-        'pzpyd4',
-        'pzpzss',
-        'pzpzpz',
-        'pzpzd3',
-        'd1pxpy',
-        'd1pxd4',
-        'd1pypx',
-        'd1pyd2',
-        'd1pzd1',
-        'd2pxss',
-        'd2pxpz',
-        'd2pxd3',
-        'd2pxd5',
-        'd2pyd1',
-        'd2pzpx',
-        'd2pzd2',
-        'd3pxpx',
-        'd3pxd2',
-        'd3pypy',
-        'd3pyd4',
-        'd3pzss',
-        'd3pzpz',
-        'd3pzd3',
-        'd4pxd1',
-        'd4pyss',
-        'd4pypz',
-        'd4pyd3',
-        'd4pyd5',
-        'd4pzpy',
-        'd4pzd4',
-        'd5pxpx',
-        'd5pxd2',
-        'd5pypy',
-        'd5pyd4',
-        'd5pzd5',
+        (1, 0, 0, 1, -1, 1, -1),
+        (5, 0, 0, 1, -1, 2, -1),
+        (9, 0, 0, 1, 0, 0, 0),
+        (11, 0, 0, 1, 0, 1, 0),
+        (15, 0, 0, 1, 0, 2, 0),
+        (21, 0, 0, 1, 1, 1, 1),
+        (25, 0, 0, 1, 1, 2, 1),
+        (27, 1, -1, 1, -1, 0, 0),
+        (29, 1, -1, 1, -1, 1, 0),
+        (33, 1, -1, 1, -1, 2, 0),
+        (35, 1, -1, 1, -1, 2, 2),
+        (37, 1, -1, 1, 0, 1, -1),
+        (41, 1, -1, 1, 0, 2, -1),
+        (49, 1, -1, 1, 1, 2, -2),
+        (55, 1, 0, 1, -1, 1, -1),
+        (59, 1, 0, 1, -1, 2, -1),
+        (63, 1, 0, 1, 0, 0, 0),
+        (65, 1, 0, 1, 0, 1, 0),
+        (69, 1, 0, 1, 0, 2, 0),
+        (75, 1, 0, 1, 1, 1, 1),
+        (79, 1, 0, 1, 1, 2, 1),
+        (85, 1, 1, 1, -1, 2, -2),
+        (93, 1, 1, 1, 0, 1, 1),
+        (97, 1, 1, 1, 0, 2, 1),
+        (99, 1, 1, 1, 1, 0, 0),
+        (101, 1, 1, 1, 1, 1, 0),
+        (105, 1, 1, 1, 1, 2, 0),
+        (107, 1, 1, 1, 1, 2, 2),
+        (111, 2, -2, 1, -1, 1, 1),
+        (115, 2, -2, 1, -1, 2, 1),
+        (121, 2, -2, 1, 0, 2, -2),
+        (127, 2, -2, 1, 1, 1, -1),
+        (131, 2, -2, 1, 1, 2, -1),
+        (135, 2, -1, 1, -1, 0, 0),
+        (137, 2, -1, 1, -1, 1, 0),
+        (141, 2, -1, 1, -1, 2, 0),
+        (143, 2, -1, 1, -1, 2, 2),
+        (145, 2, -1, 1, 0, 1, -1),
+        (149, 2, -1, 1, 0, 2, -1),
+        (157, 2, -1, 1, 1, 2, -2),
+        (163, 2, 0, 1, -1, 1, -1),
+        (167, 2, 0, 1, -1, 2, -1),
+        (171, 2, 0, 1, 0, 0, 0),
+        (173, 2, 0, 1, 0, 1, 0),
+        (177, 2, 0, 1, 0, 2, 0),
+        (183, 2, 0, 1, 1, 1, 1),
+        (187, 2, 0, 1, 1, 2, 1),
+        (193, 2, 1, 1, -1, 2, -2),
+        (201, 2, 1, 1, 0, 1, 1),
+        (205, 2, 1, 1, 0, 2, 1),
+        (207, 2, 1, 1, 1, 0, 0),
+        (209, 2, 1, 1, 1, 1, 0),
+        (213, 2, 1, 1, 1, 2, 0),
+        (215, 2, 1, 1, 1, 2, 2),
+        (217, 2, 2, 1, -1, 1, -1),
+        (221, 2, 2, 1, -1, 2, -1),
+        (233, 2, 2, 1, 0, 2, 2),
+        (237, 2, 2, 1, 1, 1, 1),
+        (241, 2, 2, 1, 1, 2, 1),
 ] 
 
 NUMSK = len(INTEGRALS)
+
+def convert_quant_num(l):
+        if l == 0:
+                return 's'
+        elif l == 1:
+                return 'p'
+        elif l == 2:
+                return 'd'
+        else:
+              raise ValueError("invalid quantum number for angular momentum")
+        
+def convert_sk_index(lm_tuple):
+        """
+        Convert (l1, m1, l2, m2, l3, m3) into a string like 'sspxd1'.
+        """
+        if (len(lm_tuple)-1) % 2 != 0:
+            raise ValueError("Tuple must have pairs of (l, m) quantum numbers.")
+    
+        # mapping from l to orbital letter
+        l_map = {0: 's', 1: 'p', 2: 'd', 3: 'f', 4: 'g'}
+        # mapping for p orbitals
+        p_map = {-1: 'y', 0: 'z', 1: 'x'}
+        # mapping for d orbitals (numbered)
+        d_map = {-2: '1', -1: '2', 0: '3', 1: '4', 2: '5'}
+    
+        out = []
+        for i in range(0, len(lm_tuple)-1, 2):
+            l, m = lm_tuple[i+1], lm_tuple[i+2]
+            if l not in l_map:
+                raise ValueError(f"Unsupported l={l}")
+            l_char = l_map[l]
+        
+            if l == 0:
+                part = 's' + 's'  # always "ss"
+            elif l == 1:
+                part = 'p' + p_map.get(m, '?')
+            elif l == 2:
+                part = 'd' + d_map.get(m, '?')
+            else:
+                part = l_char  # fallback
+            out.append(part)
+    
+        return ''.join(out)
+
+
+        
 
 def phi3(c1, c2, s1, s2, sk_label): 
     """ Returns the angle-dependent part of the given two-center dipole-integral,
@@ -75,124 +121,124 @@ def phi3(c1, c2, s1, s2, sk_label):
     for the atom at origin (atom at z=Rz). These expressions are obtained
     by integrating analytically over phi.
     """
-    if sk_label == 'sspxpx':
-            return 0.375*s1*s2/np.sqrt(np.pi)
-    elif sk_label == 'sspxd2':
+    if sk_label == (1, 0, 0, 1, -1, 1, -1):
+        return 0.375*s1*s2/np.sqrt(np.pi)
+    elif sk_label == (5, 0, 0, 1, -1, 2, -1):
             return 0.375*np.sqrt(5)*s1*s2*c2/np.sqrt(np.pi)
-    elif sk_label == 'sspypy':
-            return 0.375*s1*s2/np.sqrt(np.pi)
-    elif sk_label == 'sspyd4':
-            return 0.375*np.sqrt(5)*s1*s2*c2/np.sqrt(np.pi)
-    elif sk_label == 'sspzss':
+    elif sk_label == (9, 0, 0, 1, 0, 0, 0):
             return 0.25*np.sqrt(3)*c1/np.sqrt(np.pi)
-    elif sk_label == 'sspzpz':
+    elif sk_label == (11, 0, 0, 1, 0, 1, 0):
             return 0.75*c1*c2/np.sqrt(np.pi)
-    elif sk_label == 'sspzd3':
+    elif sk_label == (15, 0, 0, 1, 0, 2, 0):
             return 0.0625*np.sqrt(15)*(3*(2*c2**2-1) + 1)*c1/np.sqrt(np.pi)
-    elif sk_label == 'pxpxss':
+    elif sk_label == (21, 0, 0, 1, 1, 1, 1):
+            return 0.375*s1*s2/np.sqrt(np.pi)
+    elif sk_label == (25, 0, 0, 1, 1, 2, 1):
+            return 0.375*np.sqrt(5)*s1*s2*c2/np.sqrt(np.pi)
+    elif sk_label == (27, 1, -1, 1, -1, 0, 0):
             return 0.375*s1**2/np.sqrt(np.pi)
-    elif sk_label == 'pxpxpz':
+    elif sk_label == (29, 1, -1, 1, -1, 1, 0):
             return 0.375*np.sqrt(3)*s1**2*c2/np.sqrt(np.pi)
-    elif sk_label == 'pxpxd3':
+    elif sk_label == (33, 1, -1, 1, -1, 2, 0):
             return 0.09375*np.sqrt(5)*(3*(2*c2**2-1) + 1)*s1**2/np.sqrt(np.pi)
-    elif sk_label == 'pxpxd5':
+    elif sk_label == (35, 1, -1, 1, -1, 2, 2):
             return -0.09375*np.sqrt(15)*s1**2*s2**2/np.sqrt(np.pi)
-    elif sk_label == 'pxpyd1':
+    elif sk_label == (37, 1, -1, 1, 0, 1, -1):
+            return 0.375*np.sqrt(3)*s1*s2*c1/np.sqrt(np.pi)
+    elif sk_label == (41, 1, -1, 1, 0, 2, -1):
+            return 0.375*np.sqrt(15)*s1*s2*c1*c2/np.sqrt(np.pi)
+    elif sk_label == (49, 1, -1, 1, 1, 2, -2):
             return 0.09375*np.sqrt(15)*s1**2*s2**2/np.sqrt(np.pi)
-    elif sk_label == 'pxpzpx':
+    elif sk_label == (55, 1, 0, 1, -1, 1, -1):
             return 0.375*np.sqrt(3)*s1*s2*c1/np.sqrt(np.pi)
-    elif sk_label == 'pxpzd2':
+    elif sk_label == (59, 1, 0, 1, -1, 2, -1):
             return 0.375*np.sqrt(15)*s1*s2*c1*c2/np.sqrt(np.pi)
-    elif sk_label == 'pypxd1':
-            return 0.09375*np.sqrt(15)*s1**2*s2**2/np.sqrt(np.pi)
-    elif sk_label == 'pypyss':
-            return 0.375*s1**2/np.sqrt(np.pi)
-    elif sk_label == 'pypypz':
-            return 0.375*np.sqrt(3)*s1**2*c2/np.sqrt(np.pi)
-    elif sk_label == 'pypyd3':
-            return 0.09375*np.sqrt(5)*(3*(2*c2**2-1) + 1)*s1**2/np.sqrt(np.pi)
-    elif sk_label == 'pypyd5':
-            return 0.09375*np.sqrt(15)*s1**2*s2**2/np.sqrt(np.pi)
-    elif sk_label == 'pypzpy':
-            return 0.375*np.sqrt(3)*s1*s2*c1/np.sqrt(np.pi)
-    elif sk_label == 'pypzd4':
-            return 0.375*np.sqrt(15)*s1*s2*c1*c2/np.sqrt(np.pi)
-    elif sk_label == 'pzpxpx':
-            return 0.375*np.sqrt(3)*s1*s2*c1/np.sqrt(np.pi)
-    elif sk_label == 'pzpxd2':
-            return 0.375*np.sqrt(15)*s1*s2*c1*c2/np.sqrt(np.pi)
-    elif sk_label == 'pzpypy':
-            return 0.375*np.sqrt(3)*s1*s2*c1/np.sqrt(np.pi)
-    elif sk_label == 'pzpyd4':
-            return 0.375*np.sqrt(15)*s1*s2*c1*c2/np.sqrt(np.pi)
-    elif sk_label == 'pzpzss':
+    elif sk_label == (63, 1, 0, 1, 0, 0, 0):
             return 0.75*c1**2/np.sqrt(np.pi)
-    elif sk_label == 'pzpzpz':
+    elif sk_label == (65, 1, 0, 1, 0, 1, 0):
             return 0.75*np.sqrt(3)*c1**2*c2/np.sqrt(np.pi)
-    elif sk_label == 'pzpzd3':
+    elif sk_label == (69, 1, 0, 1, 0, 2, 0):
             return 0.1875*np.sqrt(5)*(3*(2*c2**2-1) + 1)*c1**2/np.sqrt(np.pi)
-    elif sk_label == 'd1pxpy':
+    elif sk_label == (75, 1, 0, 1, 1, 1, 1):
+            return 0.375*np.sqrt(3)*s1*s2*c1/np.sqrt(np.pi)
+    elif sk_label == (79, 1, 0, 1, 1, 2, 1):
+            return 0.375*np.sqrt(15)*s1*s2*c1*c2/np.sqrt(np.pi)
+    elif sk_label == (85, 1, 1, 1, -1, 2, -2):
+            return 0.09375*np.sqrt(15)*s1**2*s2**2/np.sqrt(np.pi)
+    elif sk_label == (93, 1, 1, 1, 0, 1, 1):
+            return 0.375*np.sqrt(3)*s1*s2*c1/np.sqrt(np.pi)
+    elif sk_label == (97, 1, 1, 1, 0, 2, 1):
+            return 0.375*np.sqrt(15)*s1*s2*c1*c2/np.sqrt(np.pi)
+    elif sk_label == (99, 1, 1, 1, 1, 0, 0):
+            return 0.375*s1**2/np.sqrt(np.pi)
+    elif sk_label == (101, 1, 1, 1, 1, 1, 0):
+            return 0.375*np.sqrt(3)*s1**2*c2/np.sqrt(np.pi)
+    elif sk_label == (105, 1, 1, 1, 1, 2, 0):
+            return 0.09375*np.sqrt(5)*(3*(2*c2**2-1) + 1)*s1**2/np.sqrt(np.pi)
+    elif sk_label == (107, 1, 1, 1, 1, 2, 2):
+            return 0.09375*np.sqrt(15)*s1**2*s2**2/np.sqrt(np.pi)
+    elif sk_label == (111, 2, -2, 1, -1, 1, 1):
             return 0.09375*np.sqrt(15)*s1**3*s2/np.sqrt(np.pi)
-    elif sk_label == 'd1pxd4':
+    elif sk_label == (115, 2, -2, 1, -1, 2, 1):
             return 0.46875*np.sqrt(3)*s1**3*s2*c2/np.sqrt(np.pi)
-    elif sk_label == 'd1pypx':
-            return 0.09375*np.sqrt(15)*s1**3*s2/np.sqrt(np.pi)
-    elif sk_label == 'd1pyd2':
-            return 0.46875*np.sqrt(3)*s1**3*s2*c2/np.sqrt(np.pi)
-    elif sk_label == 'd1pzd1':
+    elif sk_label == (121, 2, -2, 1, 0, 2, -2):
             return 0.46875*np.sqrt(3)*s1**2*s2**2*c1/np.sqrt(np.pi)
-    elif sk_label == 'd2pxss':
+    elif sk_label == (127, 2, -2, 1, 1, 1, -1):
+            return 0.09375*np.sqrt(15)*s1**3*s2/np.sqrt(np.pi)
+    elif sk_label == (131, 2, -2, 1, 1, 2, -1):
+            return 0.46875*np.sqrt(3)*s1**3*s2*c2/np.sqrt(np.pi)
+    elif sk_label == (135, 2, -1, 1, -1, 0, 0):
             return 0.375*np.sqrt(5)*s1**2*c1/np.sqrt(np.pi)
-    elif sk_label == 'd2pxpz':
+    elif sk_label == (137, 2, -1, 1, -1, 1, 0):
             return 0.375*np.sqrt(15)*s1**2*c1*c2/np.sqrt(np.pi)
-    elif sk_label == 'd2pxd3':
+    elif sk_label == (141, 2, -1, 1, -1, 2, 0):
             return 0.46875*(3*(2*c2**2-1) + 1)*s1**2*c1/np.sqrt(np.pi)
-    elif sk_label == 'd2pxd5':
+    elif sk_label == (143, 2, -1, 1, -1, 2, 2):
             return -0.46875*np.sqrt(3)*s1**2*s2**2*c1/np.sqrt(np.pi)
-    elif sk_label == 'd2pyd1':
-            return 0.46875*np.sqrt(3)*s1**2*s2**2*c1/np.sqrt(np.pi)
-    elif sk_label == 'd2pzpx':
+    elif sk_label == (145, 2, -1, 1, 0, 1, -1):
             return 0.375*np.sqrt(15)*s1*s2*c1**2/np.sqrt(np.pi)
-    elif sk_label == 'd2pzd2':
+    elif sk_label == (149, 2, -1, 1, 0, 2, -1):
             return 1.875*np.sqrt(3)*s1*s2*c1**2*c2/np.sqrt(np.pi)
-    elif sk_label == 'd3pxpx':
+    elif sk_label == (157, 2, -1, 1, 1, 2, -2):
+            return 0.46875*np.sqrt(3)*s1**2*s2**2*c1/np.sqrt(np.pi)
+    elif sk_label == (163, 2, 0, 1, -1, 1, -1):
             return 0.09375*np.sqrt(5)*(3*(2*c1**2-1) + 1)*s1*s2/np.sqrt(np.pi)
-    elif sk_label == 'd3pxd2':
+    elif sk_label == (167, 2, 0, 1, -1, 2, -1):
             return 0.46875*(3*(2*c1**2-1) + 1)*s1*s2*c2/np.sqrt(np.pi)
-    elif sk_label == 'd3pypy':
-            return 0.09375*np.sqrt(5)*(3*(2*c1**2-1) + 1)*s1*s2/np.sqrt(np.pi)
-    elif sk_label == 'd3pyd4':
-            return 0.46875*(3*(2*c1**2-1) + 1)*s1*s2*c2/np.sqrt(np.pi)
-    elif sk_label == 'd3pzss':
+    elif sk_label == (171, 2, 0, 1, 0, 0, 0):
             return 0.0625*np.sqrt(15)*(3*(2*c1**2-1) + 1)*c1/np.sqrt(np.pi)
-    elif sk_label == 'd3pzpz':
+    elif sk_label == (173, 2, 0, 1, 0, 1, 0):
             return 0.1875*np.sqrt(5)*(3*(2*c1**2-1) + 1)*c1*c2/np.sqrt(np.pi)
-    elif sk_label == 'd3pzd3':
+    elif sk_label == (177, 2, 0, 1, 0, 2, 0):
             return 0.078125*np.sqrt(3)*(3*(2*c1**2-1) + 1)*(3*(2*c2**2-1) + 1)*c1/np.sqrt(np.pi)
-    elif sk_label == 'd4pxd1':
+    elif sk_label == (183, 2, 0, 1, 1, 1, 1):
+            return 0.09375*np.sqrt(5)*(3*(2*c1**2-1) + 1)*s1*s2/np.sqrt(np.pi)
+    elif sk_label == (187, 2, 0, 1, 1, 2, 1):
+            return 0.46875*(3*(2*c1**2-1) + 1)*s1*s2*c2/np.sqrt(np.pi)
+    elif sk_label == (193, 2, 1, 1, -1, 2, -2):
             return 0.46875*np.sqrt(3)*s1**2*s2**2*c1/np.sqrt(np.pi)
-    elif sk_label == 'd4pyss':
-            return 0.375*np.sqrt(5)*s1**2*c1/np.sqrt(np.pi)
-    elif sk_label == 'd4pypz':
-            return 0.375*np.sqrt(15)*s1**2*c1*c2/np.sqrt(np.pi)
-    elif sk_label == 'd4pyd3':
-            return 0.46875*(3*(2*c2**2-1) + 1)*s1**2*c1/np.sqrt(np.pi)
-    elif sk_label == 'd4pyd5':
-            return 0.46875*np.sqrt(3)*s1**2*s2**2*c1/np.sqrt(np.pi)
-    elif sk_label == 'd4pzpy':
+    elif sk_label == (201, 2, 1, 1, 0, 1, 1):
             return 0.375*np.sqrt(15)*s1*s2*c1**2/np.sqrt(np.pi)
-    elif sk_label == 'd4pzd4':
+    elif sk_label == (205, 2, 1, 1, 0, 2, 1):
             return 1.875*np.sqrt(3)*s1*s2*c1**2*c2/np.sqrt(np.pi)
-    elif sk_label == 'd5pxpx':
-            return -0.09375*np.sqrt(15)*s1**3*s2/np.sqrt(np.pi)
-    elif sk_label == 'd5pxd2':
-            return -0.46875*np.sqrt(3)*s1**3*s2*c2/np.sqrt(np.pi)
-    elif sk_label == 'd5pypy':
-            return 0.09375*np.sqrt(15)*s1**3*s2/np.sqrt(np.pi)
-    elif sk_label == 'd5pyd4':
-            return 0.46875*np.sqrt(3)*s1**3*s2*c2/np.sqrt(np.pi)
-    elif sk_label == 'd5pzd5':
+    elif sk_label == (207, 2, 1, 1, 1, 0, 0):
+            return 0.375*np.sqrt(5)*s1**2*c1/np.sqrt(np.pi)
+    elif sk_label == (209, 2, 1, 1, 1, 1, 0):
+            return 0.375*np.sqrt(15)*s1**2*c1*c2/np.sqrt(np.pi)
+    elif sk_label == (213, 2, 1, 1, 1, 2, 0):
+            return 0.46875*(3*(2*c2**2-1) + 1)*s1**2*c1/np.sqrt(np.pi)
+    elif sk_label == (215, 2, 1, 1, 1, 2, 2):
             return 0.46875*np.sqrt(3)*s1**2*s2**2*c1/np.sqrt(np.pi)
+    elif sk_label == (217, 2, 2, 1, -1, 1, -1):
+            return -0.09375*np.sqrt(15)*s1**3*s2/np.sqrt(np.pi)
+    elif sk_label == (221, 2, 2, 1, -1, 2, -1):
+            return -0.46875*np.sqrt(3)*s1**3*s2*c2/np.sqrt(np.pi)
+    elif sk_label == (233, 2, 2, 1, 0, 2, 2):
+            return 0.46875*np.sqrt(3)*s1**2*s2**2*c1/np.sqrt(np.pi)
+    elif sk_label == (237, 2, 2, 1, 1, 1, 1):
+            return 0.09375*np.sqrt(15)*s1**3*s2/np.sqrt(np.pi)
+    elif sk_label == (241, 2, 2, 1, 1, 2, 1):
+            return 0.46875*np.sqrt(3)*s1**3*s2*c2/np.sqrt(np.pi)
 
 def select_integrals(e1, e2):
     """ Return list of integrals (integral, nl1, nl2)
@@ -225,12 +271,12 @@ def select_subshells(val1, val2, sk_label):
     """
     nl1 = None
     for nl in val1:
-        if nl[1] == sk_label[0]:
+        if nl[1] == convert_quant_num(sk_label[1]):
             nl1 = nl
 
     nl2 = None
     for nl in val2:
-        if nl[1] == sk_label[4]:
+        if nl[1] == convert_quant_num(sk_label[5]):
             nl2 = nl
 
     return nl1, nl2
@@ -247,7 +293,7 @@ def print_integral_overview(e1, e2, selected, file):
             for integral, nl1, nl2 in selected:
                 if e1.get_basis_set_index(nl1) == bas1 and \
                    e2.get_basis_set_index(nl2) == bas2:
-                    print('_'.join([nl1, nl2, integral]), end=' ', file=file)
+                    print('_'.join([nl1, nl2, convert_sk_index(integral)]), end=' ', file=file)
             print(file=file, flush=True)
     return
 
@@ -333,6 +379,7 @@ def write_skf(handle, Rgrid, table, has_diagonal_data, is_extended, eigval,
     See Offsite2cTable.write()
     """
     # TODO find out what all the other quantities are, that do not come from table
+    print(table)
     assert not (has_diagonal_data and has_offdiagonal_data)
 
     if is_extended:
@@ -374,7 +421,7 @@ def write_skf(handle, Rgrid, table, has_diagonal_data, is_extended, eigval,
 
         print(line, file=handle)
 
-    print("%.3f, 19*0.0" % mass, file=handle)
+    print("%.3f, 19*0.0" % mass, file=handle) # TODO change number of columns
 
     # Table containing the Slater-Koster integrals
     numtab = numint // NUMSK
@@ -389,27 +436,13 @@ def write_skf(handle, Rgrid, table, has_diagonal_data, is_extended, eigval,
         for itab in range(numtab):
             indices.extend([itab*NUMSK+j for j in selected])
 
-    for i in range(nzeros):
-        print('%d*0.0,' % len(indices), file=handle)
+#     for i in range(nzeros):
+#       print('%d*0.0,' % len(indices), file=handle)
 
     for i in range(grid_npts):
         line = ''
-        num_zero = 0
-        zero_str = ''
-
         for j in indices:
-            if table[i, j] == 0:
-                num_zero += 1
-                zero_str = str(num_zero) + '*0.0 ' # WTF, which machine can read this without getting confused?
-            else:
-                num_zero = 0
-                line += zero_str
-                zero_str = ''
                 line += '{0: 1.12e}  '.format(table[i, j])
-
-        if zero_str != '':
-            line += zero_str
-
         print(line, file=handle)
     
     

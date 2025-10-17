@@ -2,7 +2,7 @@
 """ This example aims to reproduce the Eu-Eu Slater-Koster
 table in the rare-0-2 dataset from Sanna and coworkers
 (doi:10.1103/PhysRevB.76.155128). """
-from offsite_twocenter_dipole import Offsite2cTableDipole
+from hotcent.offsite_twocenter_dipole import Offsite2cTableDipole
 from hotcent.confinement import PowerConfinement
 from hotcent.atomic_dft import AtomicDFT
 
