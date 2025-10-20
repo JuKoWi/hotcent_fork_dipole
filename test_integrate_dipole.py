@@ -1,4 +1,4 @@
-from hotcent.dipole import SK_Integral
+from hotcent.new_dipole.dipole import SK_Integral
 from ase import Atoms
 from ase.io import write
 
@@ -14,4 +14,4 @@ integral = SK_Integral('C', 'C')
 integral.load_atom_pair('C2.xyz')
 integral.choose_relevant_matrix()
 integral.load_SK_dipole_file('C-C_offsite2c-dipole.skf')
-integral.calculate_dipole()
+print(integral.calculate_dipole())

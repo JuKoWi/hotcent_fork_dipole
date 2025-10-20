@@ -1,5 +1,5 @@
-from hotcent.offsite_twocenter_dipole import Offsite2cTableDipole
-from hotcent.onsite_twocenter_dipole import Onsite2cTable
+from hotcent.new_dipole.offsite_twocenter_dipole import Offsite2cTableDipole
+from hotcent.new_dipole.onsite_twocenter_dipole import Onsite2cTable
 from optparse import OptionParser
 from ase.units import Bohr
 from ase.data import covalent_radii, atomic_numbers

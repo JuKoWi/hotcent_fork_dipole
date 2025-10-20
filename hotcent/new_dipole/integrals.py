@@ -1,4 +1,5 @@
 from sympy import *
+import pickle
 CODE =False 
 init_printing(use_unicode=True)
 
@@ -76,6 +77,11 @@ def get_index_list():
                 tuple = (count, i[1], i[2], j[1], j[2], k[1], k[2])
                 identifier.append(tuple)
                 count += 1
+
+    with open("identifier_nonzeros.pkl", "wb") as f:
+        pickle.dump(identifier, f)
+        pickle.dump(nonzeros, f)
+    
     return identifier, nonzeros 
 
     

@@ -1,11 +1,12 @@
+
 import numpy as np
 import ase as ase
 import pickle
 import os
 import sympy as sp
-from hotcent.integrals import get_index_list
-from hotcent.rotation_transform import Wigner_D_real, to_spherical
-from hotcent.slako_dipole import NUMSK, INTEGRALS
+from hotcent.new_dipole.integrals import get_index_list
+from hotcent.new_dipole.rotation_transform import Wigner_D_real, to_spherical
+from hotcent.new_dipole.slako_dipole import NUMSK, INTEGRALS
 
 class SK_Integral:
     """calculate S,H or d matrix elements between two atoms 
@@ -75,6 +76,7 @@ class SK_Integral:
         dipole_elements = self.Wigner_D @ integral_vec
         n_functions = int(np.sqrt(len(self.quant_num_list)/3))
         dipole_element_components = np.zeros((n_functions, n_functions, 3))
+        return dipole_elements
 
 class System:
     
