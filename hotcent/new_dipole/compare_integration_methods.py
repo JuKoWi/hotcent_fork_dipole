@@ -1,9 +1,22 @@
 import numpy as np
+from ase import Atoms
+from ase.io import write
 import pickle
 import time
 from scipy.integrate import nquad
 import sympy as sp
-from scipy.integrate import tplquad
+from hotcent.new_dipole.dipole import SK_Integral
+
+from hotcent.new_dipole.offsite_twocenter_dipole import Offsite2cTableDipole
+from hotcent.new_dipole.onsite_twocenter_dipole import Onsite2cTable
+from optparse import OptionParser
+from ase.units import Bohr
+from ase.data import covalent_radii, atomic_numbers
+from hotcent.confinement import PowerConfinement
+from hotcent.atomic_dft import AtomicDFT
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 x, y, z = sp.symbols("x, y, z")
 r = sp.sqrt(x**2 + y**2 + z**2)
@@ -77,7 +90,7 @@ operator = {
 
 
 
-def get_2c_integrals(pos_at1, zeta1, zeta2):
+def get_2c_integrals(pos_at1, zeta1, zeta2, comparison):
     """Compute two-center integrals numerically with singularity-safe handling."""
     t_start = time.time()
     count = 0
@@ -110,7 +123,8 @@ def get_2c_integrals(pos_at1, zeta1, zeta2):
                 print(f"Testing integral {name_i}-{name_j}-{name_k}")
                 num, err = nquad(safe_f, [[-10, 10], [-10, 10], [-10, 10]])
                 results[count] = num
-                print(f"Result = {num:.6e}, Estimated error = {err:.2e}")
+                print(f"sk value:{comparison[count]}, numerical: {num} ")
+                # print(f"Result = {num:.6e}, Estimated error = {err:.2e}")
 
                 count += 1
     t_end = time.time()
@@ -119,34 +133,60 @@ def get_2c_integrals(pos_at1, zeta1, zeta2):
         pickle.dump(results, f)
     return results
 
+def compare_matrix_elements(zeta1):
 
+    #set up atomic system with skf files
+    p = OptionParser(usage='%prog')
+    p.add_option('-f', '--functional', default='LDA',
+                 help='Which density functional to apply? '
+                      'E.g. LDA (default), GGA_X_PBE+GGA_C_PBE, ...')
+    p.add_option('-s', '--superposition',
+                 default='potential',
+                 help='Which superposition scheme? '
+                      'Choose "potential" (default) or "density"')
+    p.add_option('-t', '--stride', default=1, type=int,
+                 help='Which SK-table stride length? Default = 1. '
+                      'See hotcent.slako.run for more information.')
+    opt, args = p.parse_args()
 
+    element = 'C'
+    r0 = 1.85 * covalent_radii[atomic_numbers[element]] / Bohr
+    atom = AtomicDFT(element,
+                     xc=opt.functional,
+                     confinement=PowerConfinement(r0=r0, s=2),
+                     perturbative_confinement=False,
+                     configuration='[He] 2s2 2p2',
+                     valence=['2s', '2p'],
+                     timing=True,
+                     )
+    atom.Rnl_fct['2s'] = np.exp(-zeta1[0]*atom.rgrid**2) 
+    atom.Rnl_fct['2p'] = np.exp(-zeta1[1]*atom.rgrid**2)
+    atom.run()
+    atom.plot_Rnl(only_valence=False)
 
-# def get_2c_integrals(pos_at1, zeta1, zeta2):
-#     """ for a certain interatomic vector, get the dipole elements analytically
-#         give the gaussian width as zeta lists for the kinds of integrals 
-#     """
-#     count = 0
-#     identifier = []
-#     results = np.zeros((len(operator) * len(first_center) * len(second_center)))
-#     for name_i, i in first_center.items():
-#         for name_j, j in operator.items():
-#             for name_k, k in second_center.items():
-#                 zeta1_val = zeta1[i[1]]
-#                 zeta2_val = zeta2[k[1]]
-#                 R1 = radial_1.subs({b: zeta1_val})
-#                 R2 = radial_2.subs({b: zeta2_val, })
-#                 integrand = i[0] * R1 * j[0] * k[0] * R2
-#                 integrand = integrand.subs({x0: pos_at1[0], y0: pos_at1[1], z0: pos_at1[2]})
-#                 try:
-#                     res = sp.integrate(integrand, (x, -sp.oo, sp.oo), (y, -sp.oo, sp.oo), (z, -sp.oo, sp.oo))
-#                     results[count] = float(res.evalf())
-#                 except Exception as e:
-#                     print(f"Skipped {i}-{j}-{k}: {e}")
-#                     results[count] = np.nan
-#                 print(res.evalf())
-#                 results[count] = res.evalf()
-#                 tuple = (count, i[1], i[2], j[1], j[2], k[1], k[2])
-#                 identifier.append(tuple)
-#                 count += 1
-#     return results
+    # Compute Slater-Koster integrals:
+    rmin, dr, N = 0.1, 0.05, 250
+    off2c = Offsite2cTableDipole(atom, atom, timing=True)
+    off2c.run(rmin, dr, N, superposition=opt.superposition,
+              xc=opt.functional, stride=opt.stride)
+    off2c.write()
+    off2c.plot_minimal()
+
+    atoms = Atoms('C2', positions=[
+        [0.0, 0.0, 0.0],
+        [0.0, 1.0, 1.54]
+    ])
+
+    #assemble actual matrix elements
+    write('C2.xyz', atoms)
+    method1 = SK_Integral('C', 'C')
+    method1.load_atom_pair('C2.xyz')
+    method1.choose_relevant_matrix()
+    method1.load_SK_dipole_file('C-C_offsite2c-dipole.skf')
+    res1 = method1.calculate_dipole()
+
+    #calculate directly brute force
+    res2 = get_2c_integrals(pos_at1=method1.R_vec, zeta1=zeta1, zeta2=zeta1, comparison=res1)
+
+    
+

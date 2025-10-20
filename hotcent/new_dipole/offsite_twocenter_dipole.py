@@ -368,6 +368,7 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
         
     def calculate_analytical(self, R, sk_label):
         pass
+
     def get_twocenter_directly(self):
         direct_table = np.zeros(np.shape(self.tables[(0,0,0)]))
         table = self.tables[(0,0,0)]
