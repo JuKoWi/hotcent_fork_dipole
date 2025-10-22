@@ -379,7 +379,7 @@ def write_skf(handle, Rgrid, table, has_diagonal_data, is_extended, eigval,
     See Offsite2cTable.write()
     """
     # TODO find out what all the other quantities are, that do not come from table
-    print(table)
+#     print(table)
     assert not (has_diagonal_data and has_offdiagonal_data)
 
     if is_extended:

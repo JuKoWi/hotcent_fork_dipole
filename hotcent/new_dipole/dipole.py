@@ -53,15 +53,23 @@ class SK_Integral:
 
     def choose_relevant_matrix(self):
         R_spherical = to_spherical(R=self.R_vec)
-        theta_val = R_spherical[1]
-        phi_val = R_spherical[2]
-        self.Wigner_D = np.array(self.Wigner_D_sym(theta_val, phi_val), dtype=complex)
+        euler_theta_val = -R_spherical[1] # rotate back on z-axis
+        euler_phi_val = -R_spherical[2] #rotate back on z-axis
+        print(f"euler angles: phi={euler_phi_val}, theta={euler_theta_val}") 
+        self.Wigner_D = np.array(self.Wigner_D_sym(euler_theta_val, euler_phi_val), dtype=complex)
         idx_pstart = 1
         idx_pend = 3
         D1 = self.Wigner_D
+        print("complex rotation matrix")
+        print(D1)
         D2 = self.Wigner_D
         D_r = self.Wigner_D[idx_pstart:idx_pend+1, idx_pstart:idx_pend+1]
         D = np.kron(D1, np.kron(D_r, D2))
+        print("tensorprod rotation matrix")
+        print(D)
+        print("compare to identity automatically")
+        print(np.allclose(D1, np.eye(np.shape(D1)[0])))
+        print(np.allclose(D, np.eye(np.shape(D)[0])))
         self.Wigner_D = D
 
     def calculate_dipole(self):

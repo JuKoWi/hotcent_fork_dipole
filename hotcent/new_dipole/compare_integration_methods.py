@@ -174,7 +174,7 @@ def compare_matrix_elements(zeta1):
 
     atoms = Atoms('C2', positions=[
         [0.0, 0.0, 0.0],
-        [0.0, 1.0, 1.54]
+        [0.0, 0.0, 1.54]
     ])
 
     #assemble actual matrix elements
@@ -183,10 +183,10 @@ def compare_matrix_elements(zeta1):
     method1.load_atom_pair('C2.xyz')
     method1.choose_relevant_matrix()
     method1.load_SK_dipole_file('C-C_offsite2c-dipole.skf')
-    res1 = method1.calculate_dipole()
+    # res1 = method1.calculate_dipole()
 
     #calculate directly brute force
-    res2 = get_2c_integrals(pos_at1=method1.R_vec, zeta1=zeta1, zeta2=zeta1, comparison=res1)
+    # res2 = get_2c_integrals(pos_at1=method1.R_vec, zeta1=zeta1, zeta2=zeta1, comparison=res1)
 
     
 
