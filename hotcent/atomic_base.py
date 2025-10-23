@@ -296,7 +296,7 @@ class AtomicBase:
         return self.unl_fct[nl](r, der=der)
 
     def electron_density(self, r, der=0, only_valence=False):
-        """ Return the all-electron density at r. """
+        """ Return the alllectron density at r. """
         assert self.solved, NOT_SOLVED_MESSAGE
 
         if self.densval_fct is None or self.dens_fct is None:

@@ -11,7 +11,7 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
     def __init__(self, *args, **kwargs):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
 
-    def run(self, rmin=0.4, dr=0.02, N=None, superposition='density', xc='LDA', nr=50, stride=1, wflimit=1e-7, ntheta=150, smoothen_tails=True):
+    def run(self, rmin=0.4, dr=0.02, N=None, superposition='density', xc='LDA', nr=50, stride=1, wflimit=1e-7, ntheta=150, smoothen_tails=True, zeta_dict=None):
 
         self.print_header()
 
@@ -48,7 +48,7 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
             for p, (e1, e2) in enumerate(self.pairs):
                 selected = select_integrals(e1, e2) #tripel (label, nl, nl)
                 if len(grid) > 0:
-                    D = self.calculate(selected, e1, e2, R, grid, area)
+                    D = self.calculate(selected, e1, e2, R, grid, area, zeta_dict=zeta_dict)
                     for key in selected:
                         sk_label, nl1, nl2 = key
                         bas1 = e1.get_basis_set_index(nl1)
@@ -78,7 +78,7 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
         self.timer.stop('run_offsite2c')
         #TODO: do I have to worry about pseudopotentials, probably not
 
-    def calculate(self, selected, e1, e2, R, grid, area):
+    def calculate(self, selected, e1, e2, R, grid, area, zeta_dict):
 
         self.timer.start('calculate_offsite2c')
 
@@ -105,7 +105,9 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
             aux = gphi * area * x * r1
 
             Rnl1 = e1.Rnl(r1, nl1)
+            Rnl1 = r1**zeta_dict[nl1][1] * np.exp(-zeta_dict[nl1][0]*r1**2) #overwrite with gaussian for testing
             Rnl2 = e2.Rnl(r2, nl2)
+            Rnl2 = r2**zeta_dict[nl2][1] * np.exp(-zeta_dict[nl2][0]*r2**2) #overwrite with gaussian for testing
             D = np.sum(Rnl1 * Rnl2 * aux)
             Dl[key] = D
 

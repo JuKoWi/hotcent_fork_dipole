@@ -1,0 +1,5 @@
+coordinate: [0.         0.         1.88972613]
+sk-value 	 numerical
+Testing integral ss-ry-ss
+0j 	0.0
+Testing integral ss-ry-py

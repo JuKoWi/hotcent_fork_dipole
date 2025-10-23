@@ -4,6 +4,8 @@ import ase as ase
 import pickle
 import os
 import sympy as sp
+from scipy.interpolate import CubicSpline
+from hotcent.new_dipole.utils import *
 from hotcent.new_dipole.integrals import get_index_list
 from hotcent.new_dipole.rotation_transform import Wigner_D_real, to_spherical
 from hotcent.new_dipole.slako_dipole import NUMSK, INTEGRALS
@@ -32,8 +34,8 @@ class SK_Integral:
     def load_atom_pair(self, path):
         """load position and basis functions to compute the integrals for"""
         atoms = ase.io.read(path)
-        self.R_vec = atoms.get_distance(0, 1, vector=True) 
-        self.r = atoms.get_distance(0,1, vector=False)
+        self.R_vec = angstrom_to_bohr(atoms.get_distance(0, 1, vector=True))
+        self.r = angstrom_to_bohr(atoms.get_distance(0,1, vector=False))
 
     def load_SK_dipole_file(self, path):
         with open(path, "r") as f:
@@ -47,7 +49,7 @@ class SK_Integral:
                     delta_R, n_points = float(parts[0]), int(parts[1])
         data = np.loadtxt(path, skiprows=3+extended)
         self.delta_R = delta_R
-        self.n_points = n_points
+        self.n_points = n_points -1 # TODO: find out, why this is printed as higher as the actual number of data points
         self.sk_table = data 
         
 
@@ -76,11 +78,10 @@ class SK_Integral:
         """for every pair of basis functions calculate three components of dipole function
         for n basis gives (n,n,3) array"""
         R_grid = self.delta_R + self.delta_R * np.arange(self.n_points) 
-        sk_rownumber= np.argmin(np.abs(R_grid-self.r))
-        sk_row = self.sk_table[sk_rownumber]
+        cs = CubicSpline(R_grid, self.sk_table) 
         integral_vec = np.zeros((len(self.quant_num_list)))
         for i, label in enumerate(INTEGRALS):
-            integral_vec[label[0]] = sk_row[i]
+            integral_vec[label[0]] = cs(self.r)[i]
         dipole_elements = self.Wigner_D @ integral_vec
         n_functions = int(np.sqrt(len(self.quant_num_list)/3))
         dipole_element_components = np.zeros((n_functions, n_functions, 3))

@@ -87,31 +87,4 @@ def Wigner_D_real(euler_phi, euler_theta):
 Wigner_D_real(euler_phi=phi, euler_theta=theta)
 
 
-
-# d_mat(0)
-
-# print(sp.simplify(d_mat_elem(1,1,1, beta=beta)- 1/2 * (1 +sp.cos(beta))) == 0)
-# print(sp.simplify(d_mat_elem(1,1,0, beta=beta) - 1/sp.sqrt(2) * sp.sin(beta)) == 0)
-# print(sp.simplify(d_mat_elem(1,1,-1, beta=beta)-1/2 * (1 -sp.cos(beta))) == 0)
-# print(sp.simplify(d_mat_elem(1,0,0, beta=beta)-sp.cos(beta)) == 0)
-
-# print(d_mat_elem(2,2,2, beta=beta).equals( +1/4 * (1 + sp.cos(beta))**2)) 
-# print(d_mat_elem(2,2,1, beta=beta).equals( +1/2 * sp.sin(beta) *(1+sp.cos(beta))))
-# print(d_mat_elem(2,2,0, beta=beta).equals( -sp.sqrt(3/8)* sp.sin(beta)**2))
-# print(d_mat_elem(2,2,-1,beta=beta).equals( - 1/2 * sp.sin(beta) * (1-sp.cos(beta))))
-# print(d_mat_elem(2,2,-2,beta=beta).equals( - 1/4 * (1-sp.cos(beta))**2)) 
-# print(d_mat_elem(2,1,1, beta=beta).equals( - 1/2 * (2*sp.cos(beta)**2 -sp.cos(beta) -1)))
-# print(d_mat_elem(2,1,0, beta=beta).equals( - sp.sqrt(3/8) * sp.sin(2*beta)))
-# print(d_mat_elem(2,1,-1,beta=beta).equals( - 1/2 * (-2* sp.cos(beta)**2 + sp.cos(beta) + 1)))
-# print(d_mat_elem(2,0,0, beta=beta).equals( - 1/2 * (3*sp.cos(beta)**2 -1))) 
- 
-# print(d_mat_elem(2,2,2, beta=beta).equals( sp.trigsimp(1/4 * (1 + sp.cos(beta))**2)))
-# print(d_mat_elem(2,2,1, beta=beta).equals( sp.trigsimp(1/2 * sp.sin(beta) *(1+sp.cos(beta)))))
-# print(d_mat_elem(2,2,0, beta=beta).equals( sp.trigsimp(sp.sqrt(3/8)* sp.sin(beta)**2)))
-# print(d_mat_elem(2,2,-1,beta=beta).equals( sp.trigsimp(1/2 * sp.sin(beta) * (1-sp.cos(beta)))))
-# print(d_mat_elem(2,2,-2,beta=beta).equals( sp.trigsimp(1/4 * (1-sp.cos(beta))**2)) )
-# print(d_mat_elem(2,1,1, beta=beta).equals( sp.trigsimp(1/2 * (2*sp.cos(beta)**2 -sp.cos(beta) -1))))
-# print(d_mat_elem(2,1,0, beta=beta).equals( sp.trigsimp(sp.sqrt(3/8) * sp.sin(2*beta))))
-# print(d_mat_elem(2,1,-1,beta=beta).equals( sp.trigsimp(1/2 * (-2* sp.cos(beta)**2 + sp.cos(beta) + 1))))
-# print(d_mat_elem(2,0,0, beta=beta).equals( sp.trigsimp(1/2 * (3*sp.cos(beta)**2 -1))) )
  
