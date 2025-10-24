@@ -70,9 +70,35 @@ class SK_Integral:
         print("tensorprod rotation matrix")
         print(D)
         print("compare to identity automatically")
-        print(np.allclose(D1, np.eye(np.shape(D1)[0])))
-        print(np.allclose(D, np.eye(np.shape(D)[0])))
+        # print(np.allclose(D1, np.eye(np.shape(D1)[0])))
+        # print(np.allclose(D, np.eye(np.shape(D)[0])))
         self.Wigner_D = D
+
+    def check_rotation_implementation(self):
+        #check composition
+        R_spherical = to_spherical(R=self.R_vec)
+        euler_theta_val = -R_spherical[1] # rotate back on z-axis
+        euler_phi_val = -R_spherical[2] #rotate back on z-axis
+        idx_pstart = 1
+        idx_pend = 3
+        Wigner_D_phi = np.array(self.Wigner_D_sym(0, euler_phi_val), dtype=complex)
+        Wigner_D_theta = np.array(self.Wigner_D_sym(euler_theta_val, 0), dtype=complex)
+        D1_phi = Wigner_D_phi
+        D2_phi = Wigner_D_phi
+        D1_theta = Wigner_D_theta
+        D2_theta = Wigner_D_theta
+        D_r_phi = Wigner_D_phi[idx_pstart:idx_pend+1, idx_pstart:idx_pend+1]
+        D_r_theta = Wigner_D_theta[idx_pstart:idx_pend+1, idx_pstart:idx_pend+1]
+        D_phi = np.kron(D1_phi, np.kron(D_r_phi, D2_phi))
+        D_theta = np.kron(D1_theta, np.kron(D_r_theta, D2_theta))
+        print("check composition of rotations")
+        print(np.allclose(self.Wigner_D, D_theta @ D_phi))
+        #check unitary
+        D_dagger = np.transpose(self.Wigner_D.conj(), (1,0))
+        print("check if unitary")
+        print(np.allclose(self.Wigner_D @ D_dagger, np.eye(np.shape(self.Wigner_D)[0])))
+    
+
 
     def calculate_dipole(self):
         """for every pair of basis functions calculate three components of dipole function
