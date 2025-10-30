@@ -119,9 +119,9 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
                 Rnl1 = r**zeta_dict[nl1][1] * np.exp(-zeta_dict[nl1][0]*r**2) #overwrite with gaussian for testing
                 Rnl2 = e2.Rnl(r, nl2)
                 Rnl2 = r**zeta_dict[nl2][1] * np.exp(-zeta_dict[nl2][0]*r**2) #overwrite with gaussian for testing
-                radial_integral = trapezoid(y=Rnl1 * Rnl2* r**2, x=r, dx=dr)
+                radial_integral = trapezoid(y=Rnl1 * Rnl2* r**2 * r, x=r, dx=dr)
 
-                D = radial_integral * angle_integral.evalf()
+                D = np.sqrt(4*np.pi/3) * radial_integral * angle_integral.evalf()
             else:
                 gphi = phi3(c1, c2, s1, s2, integral)
                 aux = gphi * area * x * r1
@@ -131,7 +131,7 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
                 Rnl2 = e2.Rnl(r2, nl2)
                 Rnl2 = r2**zeta_dict[nl2][1] * np.exp(-zeta_dict[nl2][0]*r2**2) #overwrite with gaussian for testing
 
-                D = np.sum(Rnl1 * Rnl2 * aux)
+                D = np.sqrt(4*np.pi/3) * np.sum(Rnl1 * Rnl2 * aux)
             Dl[key] = D
 
         

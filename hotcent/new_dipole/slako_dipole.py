@@ -388,9 +388,9 @@ def write_skf(handle, Rgrid, table, has_diagonal_data, is_extended, eigval,
     grid_dist = Rgrid[1] - Rgrid[0]
     grid_npts, numint = np.shape(table)
     assert (numint % NUMSK) == 0
-    nzeros = int(np.round(Rgrid[0] / grid_dist)) - 1
-    assert nzeros >= 0
-    print("%.12f, %d" % (grid_dist, grid_npts + nzeros), file=handle)
+#     nzeros = int(np.round(Rgrid[0] / grid_dist)) - 1
+#     assert nzeros >= 0
+    print("%.12f, %d" % (grid_dist, grid_npts ), file=handle)
 
     if has_diagonal_data or has_offdiagonal_data:
         if has_diagonal_data:

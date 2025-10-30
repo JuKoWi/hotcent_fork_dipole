@@ -106,7 +106,7 @@ def get_analytic_2c_integrals(pos_at1, zeta1, zeta2, comparison):
                 R1 = radial_1.subs({b: zeta1_val})
                 R2 = radial_2.subs({b: zeta2_val})
                 integrand = i[0] * R1 * j[0] * k[0] * R2 * r**i[1] * r_0**k[1] # eliminate poles by multiplying with r as if it was part of the radial part
-                print(integrand)
+                # print(integrand)
                 integrand = integrand.subs({x0: pos_at1[0], y0: pos_at1[1], z0: pos_at1[2]})
 
                 analyt_int = sp.integrate(sp.integrate(sp.integrate(integrand, (x, -sp.oo, sp.oo)), (y, -sp.oo, sp.oo)), (z, -sp.oo, sp.oo))
@@ -116,13 +116,14 @@ def get_analytic_2c_integrals(pos_at1, zeta1, zeta2, comparison):
                 # f_num = sp.lambdify((x, y, z), integrand, "numpy")
 
                 print(f"Testing integral {name_i}-{name_j}-{name_k}", file=file)
-                print(f"Testing integral {name_i}-{name_j}-{name_k}")
+                # print(f"Testing integral {name_i}-{name_j}-{name_k}")
                 # num, err = nquad(f_num, [[-20, 20], [-20, 20], [-20, 20]])
                 results[count] = analyt_int_value 
-                print(f"sk value:{comparison[count]}")
+                # print(f"sk value:{comparison[count]}")
                 # print(f" numerical: {num}")
-                print(f"analytical: {analyt_int_value}")
-                print(f'{comparison[count]} \t{analyt_int_value}',file=file)
+                # print(f"analytical: {analyt_int_value}")
+                print(f'{comparison[count]} \t{analyt_int_value}\t{analyt_int_value/comparison[count]}',file=file)
+                # print(analyt_int_value/comparison[count])
                 # print(f"Result = {num:.6e}, Estimated error = {err:.2e}")
 
                 count += 1
@@ -173,7 +174,7 @@ def get_numeric_2c_integrals(pos_at1, zeta1, zeta2, comparison):
     return results
 
 def compare_matrix_elements(zeta1):
-    USE_EXISTING_SKF = True
+    USE_EXISTING_SKF = True 
 
     if not USE_EXISTING_SKF:
         #set up atomic system with skf files
@@ -213,7 +214,7 @@ def compare_matrix_elements(zeta1):
 
     atoms = Atoms('Ge2', positions=[
         [0.0, 0.0, 0.0],
-        [0.0, 0.0, 0.0]
+        [0.0, 0.0, 1.0]
     ])
 
     #assemble actual matrix elements
