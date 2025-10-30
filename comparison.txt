@@ -1,25 +1,24 @@
-coordinate: [0. 0. 0.]
-sk-value 	 numerical
+coordinate: [0.         0.         1.88972613]
+sk-value 	 analytic
 Testing integral ss-ry-ss
-0j 	0.0
+0j 	0
 Testing integral ss-ry-py
-(0.03310356320990457+0j) 	0.03391880880753306
+(0.005556136440192318+0j) 	0.0113768940138907
 Testing integral ss-ry-pz
-0j 	0.0
+0j 	0
 Testing integral ss-ry-px
-0j 	0.0
+0j 	0
 Testing integral ss-ry-d1
-0j 	0.0
+0j 	0
 Testing integral ss-ry-d2
-(-0.001850658749933685+0j) 	0.0
+(-0.01173888766143068+0j) 	-0.0240368518154041
 Testing integral ss-ry-d3
-0j 	0.0
+0j 	0
 Testing integral ss-ry-d4
-0j 	0.0
+0j 	0
 Testing integral ss-ry-d5
-0j 	0.0
+0j 	0
 Testing integral ss-rz-ss
-(0.0019111823153348665+0j) 	0.0
+(0.012127793808139773+0j) 	0.0248251538070175
 Testing integral ss-rz-py
-0j 	0.0
-Testing integral ss-rz-pz
+0j 	0

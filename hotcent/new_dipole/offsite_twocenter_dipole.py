@@ -7,7 +7,7 @@ from hotcent.interpolation import CubicSplineFunction
 from hotcent.new_dipole.slako_dipole import (INTEGRALS, print_integral_overview, select_integrals, NUMSK, phi3, tail_smoothening, write_skf)
 import matplotlib.pyplot as plt
 import sympy as sp
-from hotcent.new_dipole.integrals import first_center, second_center, operator
+from hotcent.new_dipole.integrals import first_center, second_center, operator, pick_quantum_number
 
 class Offsite2cTableDipole(MultiAtomIntegrator):
     def __init__(self, *args, **kwargs):
@@ -17,7 +17,7 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
         self.print_header()
 
         assert N is not None, 'Need to set number of grid points N!'
-        assert rmin >= 1e-3, 'For stability, please set rmin >= 1e-3'
+        assert dr >= 1e-3, 'For stability, please set rmin >= 1e-3'
         assert np.isclose(rmin / dr, np.round(rmin / dr)), \
                'rmin must be a multiple of dr'
         assert superposition in ['density', 'potential']
@@ -110,7 +110,14 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
             Rnl2 = e2.Rnl(r2, nl2)
             Rnl2 = r2**zeta_dict[nl2][1] * np.exp(-zeta_dict[nl2][0]*r2**2) #overwrite with gaussian for testing
             
-            D = np.sum(Rnl1 * Rnl2 * aux)
+            if R == 0:
+                Y1 = pick_quantum_number(first_center, (integral[1], integral[2]))[0]
+                Yr = pick_quantum_number(operator, (integral[3], integral[4]))[0]
+                Y2 = pick_quantum_number(second_center,(integral[5], integral[6]))[0]
+                # angle_integral = sp.integrate(Y1 * Yr * Y2, )
+                D = 0
+            else:
+                D = np.sum(Rnl1 * Rnl2 * aux)
             Dl[key] = D
 
         

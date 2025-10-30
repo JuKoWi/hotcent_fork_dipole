@@ -47,7 +47,7 @@ class SK_Integral:
                     delta_R, n_points = float(parts[0]), int(parts[1])
         data = np.loadtxt(path, skiprows=3+extended)
         self.delta_R = delta_R
-        self.n_points = n_points -1 # TODO: find out, why this is printed as higher as the actual number of data points
+        self.n_points = n_points 
         self.sk_table = data 
 
     def set_euler_angles(self):
@@ -106,6 +106,8 @@ class SK_Integral:
         """for every pair of basis functions calculate three components of dipole function
         for n basis gives (n,n,3) array"""
         R_grid = self.delta_R + self.delta_R * np.arange(self.n_points) 
+        print(np.shape(R_grid))
+        print(np.shape(self.sk_table))
         cs = CubicSpline(R_grid, self.sk_table, extrapolate=True) 
         integral_vec = np.zeros((len(self.quant_num_list)))
         for i, label in enumerate(INTEGRALS):

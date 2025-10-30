@@ -89,8 +89,51 @@ operator = {
 }
 
 
+def get_analytic_2c_integrals(pos_at1, zeta1, zeta2, comparison):
+    """Compute two-center integrals numerically with singularity-safe handling."""
+    file = open("comparison.txt", 'w')
+    print(f'coordinate: {pos_at1}', file=file)
+    print("sk-value \t analytic", file=file)
+    t_start = time.time()
+    count = 0
+    results = np.zeros((len(operator) * len(first_center) * len(second_center)))
+    
+    for name_i, i in first_center.items():
+        for name_j, j in operator.items():
+            for name_k, k in second_center.items():
+                zeta1_val = zeta1[i[1]]
+                zeta2_val = zeta2[k[1]]
+                R1 = radial_1.subs({b: zeta1_val})
+                R2 = radial_2.subs({b: zeta2_val})
+                integrand = i[0] * R1 * j[0] * k[0] * R2 * r**i[1] * r_0**k[1] # eliminate poles by multiplying with r as if it was part of the radial part
+                print(integrand)
+                integrand = integrand.subs({x0: pos_at1[0], y0: pos_at1[1], z0: pos_at1[2]})
 
-def get_2c_integrals(pos_at1, zeta1, zeta2, comparison):
+                analyt_int = sp.integrate(sp.integrate(sp.integrate(integrand, (x, -sp.oo, sp.oo)), (y, -sp.oo, sp.oo)), (z, -sp.oo, sp.oo))
+                analyt_int_value = analyt_int.evalf()
+                
+                # Precompile symbolic -> numeric function once
+                # f_num = sp.lambdify((x, y, z), integrand, "numpy")
+
+                print(f"Testing integral {name_i}-{name_j}-{name_k}", file=file)
+                print(f"Testing integral {name_i}-{name_j}-{name_k}")
+                # num, err = nquad(f_num, [[-20, 20], [-20, 20], [-20, 20]])
+                results[count] = analyt_int_value 
+                print(f"sk value:{comparison[count]}")
+                # print(f" numerical: {num}")
+                print(f"analytical: {analyt_int_value}")
+                print(f'{comparison[count]} \t{analyt_int_value}',file=file)
+                # print(f"Result = {num:.6e}, Estimated error = {err:.2e}")
+
+                count += 1
+    t_end = time.time()
+    print(f"integration took {t_end-t_start}")
+    with open("analytical_integrals_list.pkl", "wb") as f:
+        pickle.dump(results, f)
+    file.close()
+    return results
+
+def get_numeric_2c_integrals(pos_at1, zeta1, zeta2, comparison):
     """Compute two-center integrals numerically with singularity-safe handling."""
     file = open("comparison.txt", 'w')
     print(f'coordinate: {pos_at1}', file=file)
@@ -130,7 +173,7 @@ def get_2c_integrals(pos_at1, zeta1, zeta2, comparison):
     return results
 
 def compare_matrix_elements(zeta1):
-    USE_EXISTING_SKF = False 
+    USE_EXISTING_SKF = True
 
     if not USE_EXISTING_SKF:
         #set up atomic system with skf files
@@ -161,7 +204,7 @@ def compare_matrix_elements(zeta1):
 
         # Compute Slater-Koster integrals:
         zeta_dict = {'4s': (zeta1[0], 0), '4p': (zeta1[1],1), '3d': (zeta1[2], 2)}
-        rmin, dr, N = 0.1, 0.05, 250
+        rmin, dr, N = 0.05, 0.05, 250
         off2c = Offsite2cTableDipole(atom, atom, timing=True)
         off2c.run(rmin, dr, N, superposition=opt.superposition,
                   xc=opt.functional, stride=opt.stride, zeta_dict=zeta_dict)
@@ -170,7 +213,7 @@ def compare_matrix_elements(zeta1):
 
     atoms = Atoms('Ge2', positions=[
         [0.0, 0.0, 0.0],
-        [0.0, 0.0, 0.0]
+        [0.0, 0.0, 1.0]
     ])
 
     #assemble actual matrix elements
@@ -184,7 +227,7 @@ def compare_matrix_elements(zeta1):
     method1.check_rotation_implementation()
 
     #calculate directly brute force
-    res2 = get_2c_integrals(pos_at1=method1.R_vec, zeta1=zeta1, zeta2=zeta1, comparison=res1)
+    res2 = get_analytic_2c_integrals(pos_at1=method1.R_vec, zeta1=zeta1, zeta2=zeta1, comparison=res1)
 
     
 

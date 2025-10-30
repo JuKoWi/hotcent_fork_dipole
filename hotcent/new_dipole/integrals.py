@@ -64,6 +64,13 @@ operator = {
     "px": (px_1,1,1),
 }
 
+def pick_quantum_number(dictionary, lm):
+    for key, value in dictionary.items():
+        if value[1] == lm[0] and value[2] == lm[1]:
+            return value
+    raise ValueError("Element missing: No spherical harmonic for this quantum number combination")
+        
+
 def get_index_list():
     count = 0
     identifier = []
