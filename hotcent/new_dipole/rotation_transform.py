@@ -4,6 +4,7 @@ import pickle
 
 phi = sp.symbols('phi')
 theta = sp.symbols('theta')
+gamma = sp.symbols('gamma')
 
 def to_spherical(R):
     r = np.sqrt(np.sum(R**2))
@@ -47,12 +48,13 @@ def z_rot_mat(phi):
             count += 1
     return Dz
         
-def Wigner_D_complex(euler_phi, euler_theta):
+def Wigner_D_complex(euler_phi, euler_theta, euler_gamma):
     Dz = z_rot_mat(euler_phi)
     dy = d_mat(euler_theta)
-    return dy * Dz
+    Dz2 = z_rot_mat(euler_gamma) #last rotation around z-axis
+    return dy * Dz * Dz2
     
-def Wigner_D_real(euler_phi, euler_theta):
+def Wigner_D_real(euler_phi, euler_theta, euler_gamma):
     transform_to_real = sp.zeros(9,9)
 
     #s
@@ -77,14 +79,13 @@ def Wigner_D_real(euler_phi, euler_theta):
     transform_to_real[6,6] = 1
 
     transform_to_comp = transform_to_real.inv()
-    D_total = transform_to_real * Wigner_D_complex(euler_phi=euler_phi, euler_theta=euler_theta) * transform_to_comp
+    D_total = transform_to_real * Wigner_D_complex(euler_phi=euler_phi, euler_theta=euler_theta, euler_gamma=euler_gamma) * transform_to_comp
 
     with open("symbolic_D_matrix.pkl", "wb") as f:
         pickle.dump(D_total, f)
 
 
 
-Wigner_D_real(euler_phi=phi, euler_theta=theta)
 
 
  

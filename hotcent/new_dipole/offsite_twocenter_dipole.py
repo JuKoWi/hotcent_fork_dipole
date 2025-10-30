@@ -6,13 +6,14 @@ from hotcent.orbitals import ANGULAR_MOMENTUM
 from hotcent.interpolation import CubicSplineFunction
 from hotcent.new_dipole.slako_dipole import (INTEGRALS, print_integral_overview, select_integrals, NUMSK, phi3, tail_smoothening, write_skf)
 import matplotlib.pyplot as plt
+import sympy as sp
+from hotcent.new_dipole.integrals import first_center, second_center, operator
 
 class Offsite2cTableDipole(MultiAtomIntegrator):
     def __init__(self, *args, **kwargs):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
 
-    def run(self, rmin=0.4, dr=0.02, N=None, superposition='density', xc='LDA', nr=50, stride=1, wflimit=1e-7, ntheta=150, smoothen_tails=True, zeta_dict=None):
-
+    def run(self, rmin=0.02, dr=0.02, N=None, superposition='density', xc='LDA', nr=50, stride=1, wflimit=1e-7, ntheta=150, smoothen_tails=True, zeta_dict=None):
         self.print_header()
 
         assert N is not None, 'Need to set number of grid points N!'
@@ -108,6 +109,7 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
             Rnl1 = r1**zeta_dict[nl1][1] * np.exp(-zeta_dict[nl1][0]*r1**2) #overwrite with gaussian for testing
             Rnl2 = e2.Rnl(r2, nl2)
             Rnl2 = r2**zeta_dict[nl2][1] * np.exp(-zeta_dict[nl2][0]*r2**2) #overwrite with gaussian for testing
+            
             D = np.sum(Rnl1 * Rnl2 * aux)
             Dl[key] = D
 

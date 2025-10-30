@@ -1,7 +1,25 @@
-coordinate: [-1.88972613 -1.88972613  1.88972613]
+coordinate: [0. 0. 0.]
 sk-value 	 numerical
 Testing integral ss-ry-ss
-0j 	-0.0003491147632620632
+0j 	0.0
 Testing integral ss-ry-py
-(0.00013252318550483207+0j) 	-0.0004113514175107071
+(0.03310356320990457+0j) 	0.03391880880753306
 Testing integral ss-ry-pz
+0j 	0.0
+Testing integral ss-ry-px
+0j 	0.0
+Testing integral ss-ry-d1
+0j 	0.0
+Testing integral ss-ry-d2
+(-0.001850658749933685+0j) 	0.0
+Testing integral ss-ry-d3
+0j 	0.0
+Testing integral ss-ry-d4
+0j 	0.0
+Testing integral ss-ry-d5
+0j 	0.0
+Testing integral ss-rz-ss
+(0.0019111823153348665+0j) 	0.0
+Testing integral ss-rz-py
+0j 	0.0
+Testing integral ss-rz-pz

@@ -106,7 +106,7 @@ def get_2c_integrals(pos_at1, zeta1, zeta2, comparison):
                 zeta2_val = zeta2[k[1]]
                 R1 = radial_1.subs({b: zeta1_val})
                 R2 = radial_2.subs({b: zeta2_val})
-                integrand = i[0] * R1 * j[0] * k[0] * R2 * r**i[1] * r_0**k[1] * 0.5# eliminate poles by multiplying with r as if it was part of the radial part
+                integrand = i[0] * R1 * j[0] * k[0] * R2 * r**i[1] * r_0**k[1] # eliminate poles by multiplying with r as if it was part of the radial part
                 print(integrand)
                 integrand = integrand.subs({x0: pos_at1[0], y0: pos_at1[1], z0: pos_at1[2]})
                 
@@ -130,7 +130,7 @@ def get_2c_integrals(pos_at1, zeta1, zeta2, comparison):
     return results
 
 def compare_matrix_elements(zeta1):
-    USE_EXISTING_SKF = True
+    USE_EXISTING_SKF = False 
 
     if not USE_EXISTING_SKF:
         #set up atomic system with skf files
@@ -170,13 +170,14 @@ def compare_matrix_elements(zeta1):
 
     atoms = Atoms('Ge2', positions=[
         [0.0, 0.0, 0.0],
-        [-1.0, -1.0, 1.0]
+        [0.0, 0.0, 0.0]
     ])
 
     #assemble actual matrix elements
     write('Ge2.xyz', atoms)
     method1 = SK_Integral('Ge', 'Ge')
     method1.load_atom_pair('Ge2.xyz')
+    method1.set_euler_angles()
     method1.choose_relevant_matrix()
     method1.load_SK_dipole_file('Ge-Ge_offsite2c-dipole.skf')
     res1 = method1.calculate_dipole()
