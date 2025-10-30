@@ -19,7 +19,7 @@ dzx_1 = 1/2 * sqrt(15/pi) * cos(theta1) * cos(phi) * sin(theta1)
 dx2y2_1 = 1/4 * sqrt(15/pi) * cos(2 * phi) * sin(theta1)**2
 
 
-phi, theta2 = symbols('phi theta2')
+theta2 = symbols('theta2')
 
 """centered at second atom"""
 s_2 = 1/(2 * sqrt(pi))

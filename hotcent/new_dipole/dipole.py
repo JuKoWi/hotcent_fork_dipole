@@ -105,10 +105,9 @@ class SK_Integral:
     def calculate_dipole(self):
         """for every pair of basis functions calculate three components of dipole function
         for n basis gives (n,n,3) array"""
-        R_grid = self.delta_R + self.delta_R * np.arange(self.n_points) 
-        print(np.shape(R_grid))
-        print(np.shape(self.sk_table))
-        cs = CubicSpline(R_grid, self.sk_table, extrapolate=True) 
+        R_grid = self.delta_R * np.arange(self.n_points) 
+        print(R_grid)
+        cs = CubicSpline(R_grid, self.sk_table) 
         integral_vec = np.zeros((len(self.quant_num_list)))
         for i, label in enumerate(INTEGRALS):
             integral_vec[label[0]] = cs(self.r)[i]

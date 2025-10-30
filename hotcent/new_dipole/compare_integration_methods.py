@@ -204,7 +204,7 @@ def compare_matrix_elements(zeta1):
 
         # Compute Slater-Koster integrals:
         zeta_dict = {'4s': (zeta1[0], 0), '4p': (zeta1[1],1), '3d': (zeta1[2], 2)}
-        rmin, dr, N = 0.05, 0.05, 250
+        rmin, dr, N = 0.0, 0.05, 250
         off2c = Offsite2cTableDipole(atom, atom, timing=True)
         off2c.run(rmin, dr, N, superposition=opt.superposition,
                   xc=opt.functional, stride=opt.stride, zeta_dict=zeta_dict)
@@ -213,7 +213,7 @@ def compare_matrix_elements(zeta1):
 
     atoms = Atoms('Ge2', positions=[
         [0.0, 0.0, 0.0],
-        [0.0, 0.0, 1.0]
+        [0.0, 0.0, 0.0]
     ])
 
     #assemble actual matrix elements

@@ -1,9 +1,9 @@
-coordinate: [0.         0.         1.88972613]
+coordinate: [0. 0. 0.]
 sk-value 	 analytic
 Testing integral ss-ry-ss
 0j 	0
 Testing integral ss-ry-py
-(0.005556136440192318+0j) 	0.0113768940138907
+(0.03310266367716001+0j) 	0.0678376176148376
 Testing integral ss-ry-pz
 0j 	0
 Testing integral ss-ry-px
@@ -11,7 +11,7 @@ Testing integral ss-ry-px
 Testing integral ss-ry-d1
 0j 	0
 Testing integral ss-ry-d2
-(-0.01173888766143068+0j) 	-0.0240368518154041
+(-0.0018504951554610008+0j) 	0
 Testing integral ss-ry-d3
 0j 	0
 Testing integral ss-ry-d4
@@ -19,6 +19,470 @@ Testing integral ss-ry-d4
 Testing integral ss-ry-d5
 0j 	0
 Testing integral ss-rz-ss
-(0.012127793808139773+0j) 	0.0248251538070175
+(0.001911313544251+0j) 	0
 Testing integral ss-rz-py
+0j 	0
+Testing integral ss-rz-pz
+(0.03302852386397+0j) 	0.0678376176148376
+Testing integral ss-rz-px
+0j 	0
+Testing integral ss-rz-d1
+0j 	0
+Testing integral ss-rz-d2
+0j 	0
+Testing integral ss-rz-d3
+(-0.002134374900098+0j) 	0
+Testing integral ss-rz-d4
+0j 	0
+Testing integral ss-rz-d5
+0j 	0
+Testing integral ss-rx-ss
+0j 	0
+Testing integral ss-rx-py
+0j 	0
+Testing integral ss-rx-pz
+0j 	0
+Testing integral ss-rx-px
+(0.03310266367716001+0j) 	0.0678376176148376
+Testing integral ss-rx-d1
+0j 	0
+Testing integral ss-rx-d2
+0j 	0
+Testing integral ss-rx-d3
+0j 	0
+Testing integral ss-rx-d4
+(-0.0018504951554610008+0j) 	0
+Testing integral ss-rx-d5
+0j 	0
+Testing integral py-ry-ss
+(0.03310266367716001+0j) 	0.0678376176148376
+Testing integral py-ry-py
+0j 	0
+Testing integral py-ry-pz
+(-0.0014333873838680007+0j) 	0
+Testing integral py-ry-px
+0j 	0
+Testing integral py-ry-d1
+0j 	0
+Testing integral py-ry-d2
+0j 	0
+Testing integral py-ry-d3
+(-0.018457536609080005+0j) 	-0.0379223811046035
+Testing integral py-ry-d4
+0j 	0
+Testing integral py-ry-d5
+(-0.03205135257931002+0j) 	-0.0656834908171632
+Testing integral py-rz-ss
+0j 	0
+Testing integral py-rz-py
+(0.0014333873838680007+0j) 	0
+Testing integral py-rz-pz
+0j 	0
+Testing integral py-rz-px
+0j 	0
+Testing integral py-rz-d1
+0j 	0
+Testing integral py-rz-d2
+(0.031973056387720016+0j) 	0.0656834908171632
+Testing integral py-rz-d3
+0j 	0
+Testing integral py-rz-d4
+0j 	0
+Testing integral py-rz-d5
+0j 	0
+Testing integral py-rx-ss
+0j 	0
+Testing integral py-rx-py
+0j 	0
+Testing integral py-rx-pz
+0j 	0
+Testing integral py-rx-px
+0j 	0
+Testing integral py-rx-d1
+(0.03205135257931002+0j) 	0.0656834908171632
+Testing integral py-rx-d2
+0j 	0
+Testing integral py-rx-d3
+0j 	0
+Testing integral py-rx-d4
+0j 	0
+Testing integral py-rx-d5
+0j 	0
+Testing integral pz-ry-ss
+0j 	0
+Testing integral pz-ry-py
+(0.0014333873838680007+0j) 	0
+Testing integral pz-ry-pz
+0j 	0
+Testing integral pz-ry-px
+0j 	0
+Testing integral pz-ry-d1
+0j 	0
+Testing integral pz-ry-d2
+(0.031973056387720016+0j) 	0.0656834908171632
+Testing integral pz-ry-d3
+0j 	0
+Testing integral pz-ry-d4
+0j 	0
+Testing integral pz-ry-d5
+0j 	0
+Testing integral pz-rz-ss
+(0.03319404847237+0j) 	0.0678376176148376
+Testing integral pz-rz-py
+0j 	0
+Testing integral pz-rz-pz
+(0.001430177035785+0j) 	0
+Testing integral pz-rz-px
+0j 	0
+Testing integral pz-rz-d1
+0j 	0
+Testing integral pz-rz-d2
+0j 	0
+Testing integral pz-rz-d3
+(0.03689257590863+0j) 	0.0758447622092070
+Testing integral pz-rz-d4
+0j 	0
+Testing integral pz-rz-d5
+0j 	0
+Testing integral pz-rx-ss
+0j 	0
+Testing integral pz-rx-py
+0j 	0
+Testing integral pz-rx-pz
+0j 	0
+Testing integral pz-rx-px
+(0.0014333873838680007+0j) 	0
+Testing integral pz-rx-d1
+0j 	0
+Testing integral pz-rx-d2
+0j 	0
+Testing integral pz-rx-d3
+0j 	0
+Testing integral pz-rx-d4
+(0.031973056387720016+0j) 	0.0656834908171632
+Testing integral pz-rx-d5
+0j 	0
+Testing integral px-ry-ss
+0j 	0
+Testing integral px-ry-py
+0j 	0
+Testing integral px-ry-pz
+0j 	0
+Testing integral px-ry-px
+0j 	0
+Testing integral px-ry-d1
+(0.03205135257931002+0j) 	0.0656834908171632
+Testing integral px-ry-d2
+0j 	0
+Testing integral px-ry-d3
+0j 	0
+Testing integral px-ry-d4
+0j 	0
+Testing integral px-ry-d5
+0j 	0
+Testing integral px-rz-ss
+0j 	0
+Testing integral px-rz-py
+0j 	0
+Testing integral px-rz-pz
+0j 	0
+Testing integral px-rz-px
+(0.0014333873838680007+0j) 	0
+Testing integral px-rz-d1
+0j 	0
+Testing integral px-rz-d2
+0j 	0
+Testing integral px-rz-d3
+0j 	0
+Testing integral px-rz-d4
+(0.031973056387720016+0j) 	0.0656834908171632
+Testing integral px-rz-d5
+0j 	0
+Testing integral px-rx-ss
+(0.03310266367716001+0j) 	0.0678376176148376
+Testing integral px-rx-py
+0j 	0
+Testing integral px-rx-pz
+(-0.0014333873838680007+0j) 	0
+Testing integral px-rx-px
+0j 	0
+Testing integral px-rx-d1
+0j 	0
+Testing integral px-rx-d2
+0j 	0
+Testing integral px-rx-d3
+(-0.018457536609080005+0j) 	-0.0379223811046035
+Testing integral px-rx-d4
+0j 	0
+Testing integral px-rx-d5
+(0.03205135257931002+0j) 	0.0656834908171632
+Testing integral d1-ry-ss
+0j 	0
+Testing integral d1-ry-py
+0j 	0
+Testing integral d1-ry-pz
+0j 	0
+Testing integral d1-ry-px
+(0.03205135257931002+0j) 	0.0656834908171632
+Testing integral d1-ry-d1
+0j 	0
+Testing integral d1-ry-d2
+0j 	0
+Testing integral d1-ry-d3
+0j 	0
+Testing integral d1-ry-d4
+(-0.0017917250784540012+0j) 	0
+Testing integral d1-ry-d5
+0j 	0
+Testing integral d1-rz-ss
+0j 	0
+Testing integral d1-rz-py
+0j 	0
+Testing integral d1-rz-pz
+0j 	0
+Testing integral d1-rz-px
+0j 	0
+Testing integral d1-rz-d1
+(0.0017917250784540008+0j) 	0
+Testing integral d1-rz-d2
+0j 	0
+Testing integral d1-rz-d3
+0j 	0
+Testing integral d1-rz-d4
+0j 	0
+Testing integral d1-rz-d5
+0j 	0
+Testing integral d1-rx-ss
+0j 	0
+Testing integral d1-rx-py
+(0.03205135257931002+0j) 	0.0656834908171632
+Testing integral d1-rx-pz
+0j 	0
+Testing integral d1-rx-px
+0j 	0
+Testing integral d1-rx-d1
+0j 	0
+Testing integral d1-rx-d2
+(-0.0017917250784540012+0j) 	0
+Testing integral d1-rx-d3
+0j 	0
+Testing integral d1-rx-d4
+0j 	0
+Testing integral d1-rx-d5
+0j 	0
+Testing integral d2-ry-ss
+(0.0018504951554610008+0j) 	0
+Testing integral d2-ry-py
+0j 	0
+Testing integral d2-ry-pz
+(0.031973056387720016+0j) 	0.0656834908171632
+Testing integral d2-ry-px
+0j 	0
+Testing integral d2-ry-d1
+0j 	0
+Testing integral d2-ry-d2
+0j 	0
+Testing integral d2-ry-d3
+(-0.003100831870360001+0j) 	0
+Testing integral d2-ry-d4
+0j 	0
+Testing integral d2-ry-d5
+(-0.0017917250784540012+0j) 	0
+Testing integral d2-rz-ss
+0j 	0
+Testing integral d2-rz-py
+(0.032133313969140015+0j) 	0.0656834908171632
+Testing integral d2-rz-pz
+0j 	0
+Testing integral d2-rz-px
+0j 	0
+Testing integral d2-rz-d1
+0j 	0
+Testing integral d2-rz-d2
+(0.0017873481882840008+0j) 	0
+Testing integral d2-rz-d3
+0j 	0
+Testing integral d2-rz-d4
+0j 	0
+Testing integral d2-rz-d5
+0j 	0
+Testing integral d2-rx-ss
+0j 	0
+Testing integral d2-rx-py
+0j 	0
+Testing integral d2-rx-pz
+0j 	0
+Testing integral d2-rx-px
+0j 	0
+Testing integral d2-rx-d1
+(0.0017917250784540012+0j) 	0
+Testing integral d2-rx-d2
+0j 	0
+Testing integral d2-rx-d3
+0j 	0
+Testing integral d2-rx-d4
+0j 	0
+Testing integral d2-rx-d5
+0j 	0
+Testing integral d3-ry-ss
+0j 	0
+Testing integral d3-ry-py
+(-0.018457536609080005+0j) 	-0.0379223811046035
+Testing integral d3-ry-pz
+0j 	0
+Testing integral d3-ry-px
+0j 	0
+Testing integral d3-ry-d1
+0j 	0
+Testing integral d3-ry-d2
+(0.003100831870360001+0j) 	0
+Testing integral d3-ry-d3
+0j 	0
+Testing integral d3-ry-d4
+0j 	0
+Testing integral d3-ry-d5
+0j 	0
+Testing integral d3-rz-ss
+(0.002140273763263+0j) 	0
+Testing integral d3-rz-py
+0j 	0
+Testing integral d3-rz-pz
+(0.0370774181971+0j) 	0.0758447622092070
+Testing integral d3-rz-px
+0j 	0
+Testing integral d3-rz-d1
+0j 	0
+Testing integral d3-rz-d2
+0j 	0
+Testing integral d3-rz-d3
+(0.001786417199932+0j) 	0
+Testing integral d3-rz-d4
+0j 	0
+Testing integral d3-rz-d5
+0j 	0
+Testing integral d3-rx-ss
+0j 	0
+Testing integral d3-rx-py
+0j 	0
+Testing integral d3-rx-pz
+0j 	0
+Testing integral d3-rx-px
+(-0.018457536609080005+0j) 	-0.0379223811046035
+Testing integral d3-rx-d1
+0j 	0
+Testing integral d3-rx-d2
+0j 	0
+Testing integral d3-rx-d3
+0j 	0
+Testing integral d3-rx-d4
+(0.003100831870360001+0j) 	0
+Testing integral d3-rx-d5
+0j 	0
+Testing integral d4-ry-ss
+0j 	0
+Testing integral d4-ry-py
+0j 	0
+Testing integral d4-ry-pz
+0j 	0
+Testing integral d4-ry-px
+0j 	0
+Testing integral d4-ry-d1
+(0.0017917250784540012+0j) 	0
+Testing integral d4-ry-d2
+0j 	0
+Testing integral d4-ry-d3
+0j 	0
+Testing integral d4-ry-d4
+0j 	0
+Testing integral d4-ry-d5
+0j 	0
+Testing integral d4-rz-ss
+0j 	0
+Testing integral d4-rz-py
+0j 	0
+Testing integral d4-rz-pz
+0j 	0
+Testing integral d4-rz-px
+(0.032133313969140015+0j) 	0.0656834908171632
+Testing integral d4-rz-d1
+0j 	0
+Testing integral d4-rz-d2
+0j 	0
+Testing integral d4-rz-d3
+0j 	0
+Testing integral d4-rz-d4
+(0.0017873481882840008+0j) 	0
+Testing integral d4-rz-d5
+0j 	0
+Testing integral d4-rx-ss
+(0.0018504951554610008+0j) 	0
+Testing integral d4-rx-py
+0j 	0
+Testing integral d4-rx-pz
+(0.031973056387720016+0j) 	0.0656834908171632
+Testing integral d4-rx-px
+0j 	0
+Testing integral d4-rx-d1
+0j 	0
+Testing integral d4-rx-d2
+0j 	0
+Testing integral d4-rx-d3
+(-0.003100831870360001+0j) 	0
+Testing integral d4-rx-d4
+0j 	0
+Testing integral d4-rx-d5
+(0.0017917250784540012+0j) 	0
+Testing integral d5-ry-ss
+0j 	0
+Testing integral d5-ry-py
+(-0.03205135257931002+0j) 	-0.0656834908171632
+Testing integral d5-ry-pz
+0j 	0
+Testing integral d5-ry-px
+0j 	0
+Testing integral d5-ry-d1
+0j 	0
+Testing integral d5-ry-d2
+(0.0017917250784540012+0j) 	0
+Testing integral d5-ry-d3
+0j 	0
+Testing integral d5-ry-d4
+0j 	0
+Testing integral d5-ry-d5
+0j 	0
+Testing integral d5-rz-ss
+0j 	0
+Testing integral d5-rz-py
+0j 	0
+Testing integral d5-rz-pz
+0j 	0
+Testing integral d5-rz-px
+0j 	0
+Testing integral d5-rz-d1
+0j 	0
+Testing integral d5-rz-d2
+0j 	0
+Testing integral d5-rz-d3
+0j 	0
+Testing integral d5-rz-d4
+0j 	0
+Testing integral d5-rz-d5
+(0.0017917250784540008+0j) 	0
+Testing integral d5-rx-ss
+0j 	0
+Testing integral d5-rx-py
+0j 	0
+Testing integral d5-rx-pz
+0j 	0
+Testing integral d5-rx-px
+(0.03205135257931002+0j) 	0.0656834908171632
+Testing integral d5-rx-d1
+0j 	0
+Testing integral d5-rx-d2
+0j 	0
+Testing integral d5-rx-d3
+0j 	0
+Testing integral d5-rx-d4
+(-0.0017917250784540012+0j) 	0
+Testing integral d5-rx-d5
 0j 	0

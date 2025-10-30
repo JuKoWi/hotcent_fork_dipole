@@ -7,7 +7,8 @@ from hotcent.interpolation import CubicSplineFunction
 from hotcent.new_dipole.slako_dipole import (INTEGRALS, print_integral_overview, select_integrals, NUMSK, phi3, tail_smoothening, write_skf)
 import matplotlib.pyplot as plt
 import sympy as sp
-from hotcent.new_dipole.integrals import first_center, second_center, operator, pick_quantum_number
+from hotcent.new_dipole.integrals import first_center, second_center, operator, pick_quantum_number, phi, theta1, theta2
+from scipy.integrate import trapezoid
 
 class Offsite2cTableDipole(MultiAtomIntegrator):
     def __init__(self, *args, **kwargs):
@@ -22,8 +23,10 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
                'rmin must be a multiple of dr'
         assert superposition in ['density', 'potential']
 
+        self.r_min = rmin
         self.timer.start('run_offsite2c') # TODO check what this does
         wf_range = self.get_range(wflimit)
+        self.wf_range = wf_range
         Nsub = N // stride
         Rgrid = rmin + stride * dr * np.arange(Nsub)
         tables = {}
@@ -102,21 +105,32 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
         for key in selected:
             integral, nl1, nl2 = key
 
-            gphi = phi3(c1, c2, s1, s2, integral)
-            aux = gphi * area * x * r1
-
-            Rnl1 = e1.Rnl(r1, nl1)
-            Rnl1 = r1**zeta_dict[nl1][1] * np.exp(-zeta_dict[nl1][0]*r1**2) #overwrite with gaussian for testing
-            Rnl2 = e2.Rnl(r2, nl2)
-            Rnl2 = r2**zeta_dict[nl2][1] * np.exp(-zeta_dict[nl2][0]*r2**2) #overwrite with gaussian for testing
             
             if R == 0:
                 Y1 = pick_quantum_number(first_center, (integral[1], integral[2]))[0]
                 Yr = pick_quantum_number(operator, (integral[3], integral[4]))[0]
                 Y2 = pick_quantum_number(second_center,(integral[5], integral[6]))[0]
-                # angle_integral = sp.integrate(Y1 * Yr * Y2, )
-                D = 0
+                Y2 = Y2.subs(theta2, theta1)
+                angle_integral = sp.integrate(sp.integrate(Y1*Yr*Y2*sp.sin(theta1), (phi, 0, 2*sp.pi)), (theta1, 0, sp.pi))
+
+                dr = 0.001
+                r = np.arange(start=0, stop=self.wf_range, step=dr)
+                Rnl1 = e1.Rnl(r, nl1)
+                Rnl1 = r**zeta_dict[nl1][1] * np.exp(-zeta_dict[nl1][0]*r**2) #overwrite with gaussian for testing
+                Rnl2 = e2.Rnl(r, nl2)
+                Rnl2 = r**zeta_dict[nl2][1] * np.exp(-zeta_dict[nl2][0]*r**2) #overwrite with gaussian for testing
+                radial_integral = trapezoid(y=Rnl1 * Rnl2* r**2, x=r, dx=dr)
+
+                D = radial_integral * angle_integral.evalf()
             else:
+                gphi = phi3(c1, c2, s1, s2, integral)
+                aux = gphi * area * x * r1
+
+                Rnl1 = e1.Rnl(r1, nl1)
+                Rnl1 = r1**zeta_dict[nl1][1] * np.exp(-zeta_dict[nl1][0]*r1**2) #overwrite with gaussian for testing
+                Rnl2 = e2.Rnl(r2, nl2)
+                Rnl2 = r2**zeta_dict[nl2][1] * np.exp(-zeta_dict[nl2][0]*r2**2) #overwrite with gaussian for testing
+
                 D = np.sum(Rnl1 * Rnl2 * aux)
             Dl[key] = D
 
