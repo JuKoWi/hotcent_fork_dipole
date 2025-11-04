@@ -40,6 +40,7 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
                     tables[(p, bas1, bas2)] = np.zeros((Nsub, NUMSK))
 
         for i, R in enumerate(Rgrid):
+            # print(R)
             if R > 2 * wf_range:
                 break
 
@@ -53,12 +54,12 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
                 selected = select_integrals(e1, e2) #tripel (label, nl, nl)
                 if len(grid) > 0:
                     D = self.calculate(selected, e1, e2, R, grid, area, zeta_dict=zeta_dict)
-                    for key in selected:
+                    for j,key in enumerate(sorted(selected, key=lambda x: x[0][0])):
                         sk_label, nl1, nl2 = key
+                        # print(sk_label)
                         bas1 = e1.get_basis_set_index(nl1)
                         bas2 = e2.get_basis_set_index(nl2)
-                        index = INTEGRALS.index(sk_label)
-                        tables[(p, bas1, bas2)][i, index] = D[key] 
+                        tables[(p, bas1, bas2)][i, j] = D[key]  #determines the order of sk-columns listed in sk-file?
         
         self.Rgrid = rmin + dr * np.arange(N)
 
@@ -336,7 +337,7 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
         nonzero_col = np.where(np.any(np.abs(table) > threshold, axis=0))[0]
 
         for i, col in enumerate(nonzero_col): 
-            name = INTEGRALS[col]
+            name = sorted(INTEGRALS.items(), key=lambda x: x[0][0])[col]
             ax = plt.subplot(len(nonzero_col)//2 +1, 2, i + 1)
 
             for p, (e1, e2) in enumerate(self.pairs):

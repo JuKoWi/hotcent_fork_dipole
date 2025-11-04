@@ -1,4 +1,5 @@
 import numpy as np
+import os
 from ase import Atoms
 from ase.io import write
 import pickle
@@ -32,22 +33,22 @@ dxy_1 = sp.sqrt(15/(4 * sp.pi)) *x*y/r**2
 dyz_1 = sp.sqrt(15 / (4*sp.pi)) * y*z/r**2
 dxz_1 = sp.sqrt(15/(4* sp.pi)) * x*z/r**2
 dx2y2_1 = sp.sqrt(15/(16*sp.pi)) * (x**2-y**2)/r**2
-dz2_1 = sp.sqrt(5 / (16 * sp.pi)) * (2*z**2 -x**2 -y**2)/r**2
+dz2_1 = sp.sqrt(5 / (16 * sp.pi)) * (3*z**2 -r**2)/r**2
 
 x0, y0, z0 = sp.symbols("x0, y0, z0")
-r_0 = sp.sqrt((x-x0)**2 + (y-y0)**2 + (z-z0)**2)
+r_2 = sp.sqrt((x-x0)**2 + (y-y0)**2 + (z-z0)**2)
 
 s_2 = s_1
 
-px_2 = sp.sqrt(3 / (4 * sp.pi)) * (x-x0)/r_0
-py_2 = sp.sqrt(3 / (4 * sp.pi)) * (y-y0)/r_0
-pz_2 = sp.sqrt(3 / (4 * sp.pi)) * (z-z0)/r_0 
+px_2 = sp.sqrt(3 / (4 * sp.pi)) * (x-x0)/r_2
+py_2 = sp.sqrt(3 / (4 * sp.pi)) * (y-y0)/r_2
+pz_2 = sp.sqrt(3 / (4 * sp.pi)) * (z-z0)/r_2 
 
-dxy_2 = sp.sqrt(15 / (4 * sp.pi)) * (x-x0)*(y-y0)/r_0**2
-dyz_2 = sp.sqrt(15 / (4 * sp.pi)) * (y-y0)*(z-z0)/r_0**2
-dxz_2 = sp.sqrt(15 / (4 * sp.pi)) * (x-x0)*(z-z0)/r_0**2
-dx2y2_2 = sp.sqrt(15 / (16*sp.pi)) * ((x-x0)**2-(y-y0)**2)/r_0**2
-dz2_2 = sp.sqrt(5 / (16 * sp.pi)) * (2*(z-z0)**2 -(x-x0)**2 -(y-y0)**2)/r_0**2
+dxy_2 = sp.sqrt(15 / (4 * sp.pi)) * (x-x0)*(y-y0)/r_2**2
+dyz_2 = sp.sqrt(15 / (4 * sp.pi)) * (y-y0)*(z-z0)/r_2**2
+dxz_2 = sp.sqrt(15 / (4 * sp.pi)) * (x-x0)*(z-z0)/r_2**2
+dx2y2_2 = sp.sqrt(15 / (16*sp.pi)) * ((x-x0)**2-(y-y0)**2)/r_2**2
+dz2_2 = sp.sqrt(5 / (16 * sp.pi)) * (3 * (z-z0)**2 - r_2**2)/r_2**2
 
 rx_1 = x
 ry_1 = y 
@@ -101,28 +102,31 @@ def get_analytic_2c_integrals(pos_at1, zeta1, zeta2, comparison):
     for name_i, i in first_center.items():
         for name_j, j in operator.items():
             for name_k, k in second_center.items():
+                # if (i[1]<2 and k[1]<2):
                 zeta1_val = zeta1[i[1]]
                 zeta2_val = zeta2[k[1]]
                 R1 = radial_1.subs({b: zeta1_val})
                 R2 = radial_2.subs({b: zeta2_val})
-                integrand = i[0] * R1 * j[0] * k[0] * R2 * r**i[1] * r_0**k[1] # eliminate poles by multiplying with r as if it was part of the radial part
+                integrand = i[0] * R1 * j[0] * k[0] * R2 * r**i[1] * r_2**k[1] # eliminate poles by multiplying with r as if it was part of the radial part
                 # print(integrand)
-                integrand = integrand.subs({x0: pos_at1[0], y0: pos_at1[1], z0: pos_at1[2]})
 
+                integrand = integrand.subs({x0: pos_at1[0], y0: pos_at1[1], z0: pos_at1[2]})
                 analyt_int = sp.integrate(sp.integrate(sp.integrate(integrand, (x, -sp.oo, sp.oo)), (y, -sp.oo, sp.oo)), (z, -sp.oo, sp.oo))
+                # analyt_int = analyt_int.subs({x0: pos_at1[0], y0: pos_at1[1], z0: pos_at1[2]})
                 analyt_int_value = analyt_int.evalf()
                 
                 # Precompile symbolic -> numeric function once
                 # f_num = sp.lambdify((x, y, z), integrand, "numpy")
 
                 print(f"Testing integral {name_i}-{name_j}-{name_k}", file=file)
-                # print(f"Testing integral {name_i}-{name_j}-{name_k}")
                 # num, err = nquad(f_num, [[-20, 20], [-20, 20], [-20, 20]])
                 results[count] = analyt_int_value 
-                # print(f"sk value:{comparison[count]}")
+                abs_err = comparison[count] - analyt_int
+                print(f"Testing integral {name_i}-{name_j}-{name_k}")
+                print(f"sk value:{comparison[count]}")
                 # print(f" numerical: {num}")
-                # print(f"analytical: {analyt_int_value}")
-                print(f'{comparison[count]} \t{analyt_int_value}\t{analyt_int_value/comparison[count]}',file=file)
+                print(f"analytical: {analyt_int_value}")
+                print(f'{comparison[count]} \t{analyt_int_value}',file=file)
                 # print(analyt_int_value/comparison[count])
                 # print(f"Result = {num:.6e}, Estimated error = {err:.2e}")
 
@@ -150,7 +154,7 @@ def get_numeric_2c_integrals(pos_at1, zeta1, zeta2, comparison):
                 zeta2_val = zeta2[k[1]]
                 R1 = radial_1.subs({b: zeta1_val})
                 R2 = radial_2.subs({b: zeta2_val})
-                integrand = i[0] * R1 * j[0] * k[0] * R2 * r**i[1] * r_0**k[1] # eliminate poles by multiplying with r as if it was part of the radial part
+                integrand = i[0] * R1 * j[0] * k[0] * R2 * r**i[1] * r_2**k[1] # eliminate poles by multiplying with r as if it was part of the radial part
                 print(integrand)
                 integrand = integrand.subs({x0: pos_at1[0], y0: pos_at1[1], z0: pos_at1[2]})
                 
@@ -208,13 +212,15 @@ def compare_matrix_elements(zeta1):
         rmin, dr, N = 0.0, 0.05, 250
         off2c = Offsite2cTableDipole(atom, atom, timing=True)
         off2c.run(rmin, dr, N, superposition=opt.superposition,
-                  xc=opt.functional, stride=opt.stride, zeta_dict=zeta_dict)
+                  xc=opt.functional, stride=opt.stride, zeta_dict=zeta_dict, 
+                #   nr=100, ntheta=300
+                  )
         off2c.write()
         off2c.plot_minimal()
 
     atoms = Atoms('Ge2', positions=[
         [0.0, 0.0, 0.0],
-        [0.0, 0.0, 1.0]
+        [1.0, 0.0, 0.0]
     ])
 
     #assemble actual matrix elements
@@ -229,6 +235,11 @@ def compare_matrix_elements(zeta1):
 
     #calculate directly brute force
     res2 = get_analytic_2c_integrals(pos_at1=method1.R_vec, zeta1=zeta1, zeta2=zeta1, comparison=res1)
+    
+    file_path = "symbolic_D_matrix.pkl"
+    if os.path.exists(file_path):
+        os.remove(file_path)
+
 
     
 

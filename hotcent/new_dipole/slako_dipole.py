@@ -5,67 +5,67 @@ Y1*Y1*Y2
 unified format for the label: 1., 3. and 5. letter give nl, others just for distinguishing
 (x,y,z) for p, (1,2,3,4,5) for d
 """
-INTEGRALS = [
-        (1, 0, 0, 1, -1, 1, -1),
-        (5, 0, 0, 1, -1, 2, -1),
-        (9, 0, 0, 1, 0, 0, 0),
-        (11, 0, 0, 1, 0, 1, 0),
-        (15, 0, 0, 1, 0, 2, 0),
-        (21, 0, 0, 1, 1, 1, 1),
-        (25, 0, 0, 1, 1, 2, 1),
-        (27, 1, -1, 1, -1, 0, 0),
-        (29, 1, -1, 1, -1, 1, 0),
-        (33, 1, -1, 1, -1, 2, 0),
-        (35, 1, -1, 1, -1, 2, 2),
-        (37, 1, -1, 1, 0, 1, -1),
-        (41, 1, -1, 1, 0, 2, -1),
-        (49, 1, -1, 1, 1, 2, -2),
-        (55, 1, 0, 1, -1, 1, -1),
-        (59, 1, 0, 1, -1, 2, -1),
-        (63, 1, 0, 1, 0, 0, 0),
-        (65, 1, 0, 1, 0, 1, 0),
-        (69, 1, 0, 1, 0, 2, 0),
-        (75, 1, 0, 1, 1, 1, 1),
-        (79, 1, 0, 1, 1, 2, 1),
-        (85, 1, 1, 1, -1, 2, -2),
-        (93, 1, 1, 1, 0, 1, 1),
-        (97, 1, 1, 1, 0, 2, 1),
-        (99, 1, 1, 1, 1, 0, 0),
-        (101, 1, 1, 1, 1, 1, 0),
-        (105, 1, 1, 1, 1, 2, 0),
-        (107, 1, 1, 1, 1, 2, 2),
-        (111, 2, -2, 1, -1, 1, 1),
-        (115, 2, -2, 1, -1, 2, 1),
-        (121, 2, -2, 1, 0, 2, -2),
-        (127, 2, -2, 1, 1, 1, -1),
-        (131, 2, -2, 1, 1, 2, -1),
-        (135, 2, -1, 1, -1, 0, 0),
-        (137, 2, -1, 1, -1, 1, 0),
-        (141, 2, -1, 1, -1, 2, 0),
-        (143, 2, -1, 1, -1, 2, 2),
-        (145, 2, -1, 1, 0, 1, -1),
-        (149, 2, -1, 1, 0, 2, -1),
-        (157, 2, -1, 1, 1, 2, -2),
-        (163, 2, 0, 1, -1, 1, -1),
-        (167, 2, 0, 1, -1, 2, -1),
-        (171, 2, 0, 1, 0, 0, 0),
-        (173, 2, 0, 1, 0, 1, 0),
-        (177, 2, 0, 1, 0, 2, 0),
-        (183, 2, 0, 1, 1, 1, 1),
-        (187, 2, 0, 1, 1, 2, 1),
-        (193, 2, 1, 1, -1, 2, -2),
-        (201, 2, 1, 1, 0, 1, 1),
-        (205, 2, 1, 1, 0, 2, 1),
-        (207, 2, 1, 1, 1, 0, 0),
-        (209, 2, 1, 1, 1, 1, 0),
-        (213, 2, 1, 1, 1, 2, 0),
-        (215, 2, 1, 1, 1, 2, 2),
-        (217, 2, 2, 1, -1, 1, -1),
-        (221, 2, 2, 1, -1, 2, -1),
-        (233, 2, 2, 1, 0, 2, 2),
-        (237, 2, 2, 1, 1, 1, 1),
-        (241, 2, 2, 1, 1, 2, 1),
-] 
+INTEGRALS = {
+        (1, 0, 0, 1, -1, 1, -1): lambda c1, c2, s1, s2: 0.375*s1*s2/np.sqrt(np.pi),
+        (5, 0, 0, 1, -1, 2, -1): lambda c1, c2, s1, s2: 0.375*np.sqrt(5)*s1*s2*c2/np.sqrt(np.pi),
+        (9, 0, 0, 1, 0, 0, 0): lambda c1, c2, s1, s2: 0.25*np.sqrt(3)*c1/np.sqrt(np.pi),
+        (11, 0, 0, 1, 0, 1, 0): lambda c1, c2, s1, s2: 0.75*c1*c2/np.sqrt(np.pi),
+        (15, 0, 0, 1, 0, 2, 0): lambda c1, c2, s1, s2: 0.125*np.sqrt(15)*(3*c2**2 - 1)*c1/np.sqrt(np.pi),
+        (21, 0, 0, 1, 1, 1, 1): lambda c1, c2, s1, s2: 0.375*s1*s2/np.sqrt(np.pi),
+        (25, 0, 0, 1, 1, 2, 1): lambda c1, c2, s1, s2: 0.375*np.sqrt(5)*s1*s2*c2/np.sqrt(np.pi),
+        (27, 1, -1, 1, -1, 0, 0): lambda c1, c2, s1, s2: 0.375*s1**2/np.sqrt(np.pi),
+        (29, 1, -1, 1, -1, 1, 0): lambda c1, c2, s1, s2: 0.375*np.sqrt(3)*s1**2*c2/np.sqrt(np.pi),
+        (33, 1, -1, 1, -1, 2, 0): lambda c1, c2, s1, s2: 0.1875*np.sqrt(5)*(3*c2**2 - 1)*s1**2/np.sqrt(np.pi),
+        (35, 1, -1, 1, -1, 2, 2): lambda c1, c2, s1, s2: -0.09375*np.sqrt(15)*s1**2*s2**2/np.sqrt(np.pi),
+        (37, 1, -1, 1, 0, 1, -1): lambda c1, c2, s1, s2: 0.375*np.sqrt(3)*s1*s2*c1/np.sqrt(np.pi),
+        (41, 1, -1, 1, 0, 2, -1): lambda c1, c2, s1, s2: 0.375*np.sqrt(15)*s1*s2*c1*c2/np.sqrt(np.pi),
+        (49, 1, -1, 1, 1, 2, -2): lambda c1, c2, s1, s2: 0.09375*np.sqrt(15)*s1**2*s2**2/np.sqrt(np.pi),
+        (55, 1, 0, 1, -1, 1, -1): lambda c1, c2, s1, s2: 0.375*np.sqrt(3)*s1*s2*c1/np.sqrt(np.pi),
+        (59, 1, 0, 1, -1, 2, -1): lambda c1, c2, s1, s2: 0.375*np.sqrt(15)*s1*s2*c1*c2/np.sqrt(np.pi),
+        (63, 1, 0, 1, 0, 0, 0): lambda c1, c2, s1, s2: 0.75*c1**2/np.sqrt(np.pi),
+        (65, 1, 0, 1, 0, 1, 0): lambda c1, c2, s1, s2: 0.75*np.sqrt(3)*c1**2*c2/np.sqrt(np.pi),
+        (69, 1, 0, 1, 0, 2, 0): lambda c1, c2, s1, s2: 0.375*np.sqrt(5)*(3*c2**2 - 1)*c1**2/np.sqrt(np.pi),
+        (75, 1, 0, 1, 1, 1, 1): lambda c1, c2, s1, s2: 0.375*np.sqrt(3)*s1*s2*c1/np.sqrt(np.pi),
+        (79, 1, 0, 1, 1, 2, 1): lambda c1, c2, s1, s2: 0.375*np.sqrt(15)*s1*s2*c1*c2/np.sqrt(np.pi),
+        (85, 1, 1, 1, -1, 2, -2): lambda c1, c2, s1, s2: 0.09375*np.sqrt(15)*s1**2*s2**2/np.sqrt(np.pi),
+        (93, 1, 1, 1, 0, 1, 1): lambda c1, c2, s1, s2: 0.375*np.sqrt(3)*s1*s2*c1/np.sqrt(np.pi),
+        (97, 1, 1, 1, 0, 2, 1): lambda c1, c2, s1, s2: 0.375*np.sqrt(15)*s1*s2*c1*c2/np.sqrt(np.pi),
+        (99, 1, 1, 1, 1, 0, 0): lambda c1, c2, s1, s2: 0.375*s1**2/np.sqrt(np.pi),
+        (101, 1, 1, 1, 1, 1, 0): lambda c1, c2, s1, s2: 0.375*np.sqrt(3)*s1**2*c2/np.sqrt(np.pi),
+        (105, 1, 1, 1, 1, 2, 0): lambda c1, c2, s1, s2: 0.1875*np.sqrt(5)*(3*c2**2 - 1)*s1**2/np.sqrt(np.pi),
+        (107, 1, 1, 1, 1, 2, 2): lambda c1, c2, s1, s2: 0.09375*np.sqrt(15)*s1**2*s2**2/np.sqrt(np.pi),
+        (111, 2, -2, 1, -1, 1, 1): lambda c1, c2, s1, s2: 0.09375*np.sqrt(15)*s1**3*s2/np.sqrt(np.pi),
+        (115, 2, -2, 1, -1, 2, 1): lambda c1, c2, s1, s2: 0.46875*np.sqrt(3)*s1**3*s2*c2/np.sqrt(np.pi),
+        (121, 2, -2, 1, 0, 2, -2): lambda c1, c2, s1, s2: 0.46875*np.sqrt(3)*s1**2*s2**2*c1/np.sqrt(np.pi),
+        (127, 2, -2, 1, 1, 1, -1): lambda c1, c2, s1, s2: 0.09375*np.sqrt(15)*s1**3*s2/np.sqrt(np.pi),
+        (131, 2, -2, 1, 1, 2, -1): lambda c1, c2, s1, s2: 0.46875*np.sqrt(3)*s1**3*s2*c2/np.sqrt(np.pi),
+        (135, 2, -1, 1, -1, 0, 0): lambda c1, c2, s1, s2: 0.375*np.sqrt(5)*s1**2*c1/np.sqrt(np.pi),
+        (137, 2, -1, 1, -1, 1, 0): lambda c1, c2, s1, s2: 0.375*np.sqrt(15)*s1**2*c1*c2/np.sqrt(np.pi),
+        (141, 2, -1, 1, -1, 2, 0): lambda c1, c2, s1, s2: 0.9375*(3*c2**2 - 1)*s1**2*c1/np.sqrt(np.pi),
+        (143, 2, -1, 1, -1, 2, 2): lambda c1, c2, s1, s2: -0.46875*np.sqrt(3)*s1**2*s2**2*c1/np.sqrt(np.pi),
+        (145, 2, -1, 1, 0, 1, -1): lambda c1, c2, s1, s2: 0.375*np.sqrt(15)*s1*s2*c1**2/np.sqrt(np.pi),
+        (149, 2, -1, 1, 0, 2, -1): lambda c1, c2, s1, s2: 1.875*np.sqrt(3)*s1*s2*c1**2*c2/np.sqrt(np.pi),
+        (157, 2, -1, 1, 1, 2, -2): lambda c1, c2, s1, s2: 0.46875*np.sqrt(3)*s1**2*s2**2*c1/np.sqrt(np.pi),
+        (163, 2, 0, 1, -1, 1, -1): lambda c1, c2, s1, s2: 0.1875*np.sqrt(5)*(3*c1**2 - 1)*s1*s2/np.sqrt(np.pi),
+        (167, 2, 0, 1, -1, 2, -1): lambda c1, c2, s1, s2: 0.9375*(3*c1**2 - 1)*s1*s2*c2/np.sqrt(np.pi),
+        (171, 2, 0, 1, 0, 0, 0): lambda c1, c2, s1, s2: 0.125*np.sqrt(15)*(3*c1**2 - 1)*c1/np.sqrt(np.pi),
+        (173, 2, 0, 1, 0, 1, 0): lambda c1, c2, s1, s2: 0.375*np.sqrt(5)*(3*c1**2 - 1)*c1*c2/np.sqrt(np.pi),
+        (177, 2, 0, 1, 0, 2, 0): lambda c1, c2, s1, s2: 0.3125*np.sqrt(3)*(3*c1**2 - 1)*(3*c2**2 - 1)*c1/np.sqrt(np.pi),
+        (183, 2, 0, 1, 1, 1, 1): lambda c1, c2, s1, s2: 0.1875*np.sqrt(5)*(3*c1**2 - 1)*s1*s2/np.sqrt(np.pi),
+        (187, 2, 0, 1, 1, 2, 1): lambda c1, c2, s1, s2: 0.9375*(3*c1**2 - 1)*s1*s2*c2/np.sqrt(np.pi),
+        (193, 2, 1, 1, -1, 2, -2): lambda c1, c2, s1, s2: 0.46875*np.sqrt(3)*s1**2*s2**2*c1/np.sqrt(np.pi),
+        (201, 2, 1, 1, 0, 1, 1): lambda c1, c2, s1, s2: 0.375*np.sqrt(15)*s1*s2*c1**2/np.sqrt(np.pi),
+        (205, 2, 1, 1, 0, 2, 1): lambda c1, c2, s1, s2: 1.875*np.sqrt(3)*s1*s2*c1**2*c2/np.sqrt(np.pi),
+        (207, 2, 1, 1, 1, 0, 0): lambda c1, c2, s1, s2: 0.375*np.sqrt(5)*s1**2*c1/np.sqrt(np.pi),
+        (209, 2, 1, 1, 1, 1, 0): lambda c1, c2, s1, s2: 0.375*np.sqrt(15)*s1**2*c1*c2/np.sqrt(np.pi),
+        (213, 2, 1, 1, 1, 2, 0): lambda c1, c2, s1, s2: 0.9375*(3*c2**2 - 1)*s1**2*c1/np.sqrt(np.pi),
+        (215, 2, 1, 1, 1, 2, 2): lambda c1, c2, s1, s2: 0.46875*np.sqrt(3)*s1**2*s2**2*c1/np.sqrt(np.pi),
+        (217, 2, 2, 1, -1, 1, -1): lambda c1, c2, s1, s2: -0.09375*np.sqrt(15)*s1**3*s2/np.sqrt(np.pi),
+        (221, 2, 2, 1, -1, 2, -1): lambda c1, c2, s1, s2: -0.46875*np.sqrt(3)*s1**3*s2*c2/np.sqrt(np.pi),
+        (233, 2, 2, 1, 0, 2, 2): lambda c1, c2, s1, s2: 0.46875*np.sqrt(3)*s1**2*s2**2*c1/np.sqrt(np.pi),
+        (237, 2, 2, 1, 1, 1, 1): lambda c1, c2, s1, s2: 0.09375*np.sqrt(15)*s1**3*s2/np.sqrt(np.pi),
+        (241, 2, 2, 1, 1, 2, 1): lambda c1, c2, s1, s2: 0.46875*np.sqrt(3)*s1**3*s2*c2/np.sqrt(np.pi),
+}
 
 NUMSK = len(INTEGRALS)
 
@@ -121,124 +121,7 @@ def phi3(c1, c2, s1, s2, sk_label):
     for the atom at origin (atom at z=Rz). These expressions are obtained
     by integrating analytically over phi.
     """
-    if sk_label == (1, 0, 0, 1, -1, 1, -1):
-        return 0.375*s1*s2/np.sqrt(np.pi)
-    elif sk_label == (5, 0, 0, 1, -1, 2, -1):
-            return 0.375*np.sqrt(5)*s1*s2*c2/np.sqrt(np.pi)
-    elif sk_label == (9, 0, 0, 1, 0, 0, 0):
-            return 0.25*np.sqrt(3)*c1/np.sqrt(np.pi)
-    elif sk_label == (11, 0, 0, 1, 0, 1, 0):
-            return 0.75*c1*c2/np.sqrt(np.pi)
-    elif sk_label == (15, 0, 0, 1, 0, 2, 0):
-            return 0.0625*np.sqrt(15)*(3*(2*c2**2-1) + 1)*c1/np.sqrt(np.pi)
-    elif sk_label == (21, 0, 0, 1, 1, 1, 1):
-            return 0.375*s1*s2/np.sqrt(np.pi)
-    elif sk_label == (25, 0, 0, 1, 1, 2, 1):
-            return 0.375*np.sqrt(5)*s1*s2*c2/np.sqrt(np.pi)
-    elif sk_label == (27, 1, -1, 1, -1, 0, 0):
-            return 0.375*s1**2/np.sqrt(np.pi)
-    elif sk_label == (29, 1, -1, 1, -1, 1, 0):
-            return 0.375*np.sqrt(3)*s1**2*c2/np.sqrt(np.pi)
-    elif sk_label == (33, 1, -1, 1, -1, 2, 0):
-            return 0.09375*np.sqrt(5)*(3*(2*c2**2-1) + 1)*s1**2/np.sqrt(np.pi)
-    elif sk_label == (35, 1, -1, 1, -1, 2, 2):
-            return -0.09375*np.sqrt(15)*s1**2*s2**2/np.sqrt(np.pi)
-    elif sk_label == (37, 1, -1, 1, 0, 1, -1):
-            return 0.375*np.sqrt(3)*s1*s2*c1/np.sqrt(np.pi)
-    elif sk_label == (41, 1, -1, 1, 0, 2, -1):
-            return 0.375*np.sqrt(15)*s1*s2*c1*c2/np.sqrt(np.pi)
-    elif sk_label == (49, 1, -1, 1, 1, 2, -2):
-            return 0.09375*np.sqrt(15)*s1**2*s2**2/np.sqrt(np.pi)
-    elif sk_label == (55, 1, 0, 1, -1, 1, -1):
-            return 0.375*np.sqrt(3)*s1*s2*c1/np.sqrt(np.pi)
-    elif sk_label == (59, 1, 0, 1, -1, 2, -1):
-            return 0.375*np.sqrt(15)*s1*s2*c1*c2/np.sqrt(np.pi)
-    elif sk_label == (63, 1, 0, 1, 0, 0, 0):
-            return 0.75*c1**2/np.sqrt(np.pi)
-    elif sk_label == (65, 1, 0, 1, 0, 1, 0):
-            return 0.75*np.sqrt(3)*c1**2*c2/np.sqrt(np.pi)
-    elif sk_label == (69, 1, 0, 1, 0, 2, 0):
-            return 0.1875*np.sqrt(5)*(3*(2*c2**2-1) + 1)*c1**2/np.sqrt(np.pi)
-    elif sk_label == (75, 1, 0, 1, 1, 1, 1):
-            return 0.375*np.sqrt(3)*s1*s2*c1/np.sqrt(np.pi)
-    elif sk_label == (79, 1, 0, 1, 1, 2, 1):
-            return 0.375*np.sqrt(15)*s1*s2*c1*c2/np.sqrt(np.pi)
-    elif sk_label == (85, 1, 1, 1, -1, 2, -2):
-            return 0.09375*np.sqrt(15)*s1**2*s2**2/np.sqrt(np.pi)
-    elif sk_label == (93, 1, 1, 1, 0, 1, 1):
-            return 0.375*np.sqrt(3)*s1*s2*c1/np.sqrt(np.pi)
-    elif sk_label == (97, 1, 1, 1, 0, 2, 1):
-            return 0.375*np.sqrt(15)*s1*s2*c1*c2/np.sqrt(np.pi)
-    elif sk_label == (99, 1, 1, 1, 1, 0, 0):
-            return 0.375*s1**2/np.sqrt(np.pi)
-    elif sk_label == (101, 1, 1, 1, 1, 1, 0):
-            return 0.375*np.sqrt(3)*s1**2*c2/np.sqrt(np.pi)
-    elif sk_label == (105, 1, 1, 1, 1, 2, 0):
-            return 0.09375*np.sqrt(5)*(3*(2*c2**2-1) + 1)*s1**2/np.sqrt(np.pi)
-    elif sk_label == (107, 1, 1, 1, 1, 2, 2):
-            return 0.09375*np.sqrt(15)*s1**2*s2**2/np.sqrt(np.pi)
-    elif sk_label == (111, 2, -2, 1, -1, 1, 1):
-            return 0.09375*np.sqrt(15)*s1**3*s2/np.sqrt(np.pi)
-    elif sk_label == (115, 2, -2, 1, -1, 2, 1):
-            return 0.46875*np.sqrt(3)*s1**3*s2*c2/np.sqrt(np.pi)
-    elif sk_label == (121, 2, -2, 1, 0, 2, -2):
-            return 0.46875*np.sqrt(3)*s1**2*s2**2*c1/np.sqrt(np.pi)
-    elif sk_label == (127, 2, -2, 1, 1, 1, -1):
-            return 0.09375*np.sqrt(15)*s1**3*s2/np.sqrt(np.pi)
-    elif sk_label == (131, 2, -2, 1, 1, 2, -1):
-            return 0.46875*np.sqrt(3)*s1**3*s2*c2/np.sqrt(np.pi)
-    elif sk_label == (135, 2, -1, 1, -1, 0, 0):
-            return 0.375*np.sqrt(5)*s1**2*c1/np.sqrt(np.pi)
-    elif sk_label == (137, 2, -1, 1, -1, 1, 0):
-            return 0.375*np.sqrt(15)*s1**2*c1*c2/np.sqrt(np.pi)
-    elif sk_label == (141, 2, -1, 1, -1, 2, 0):
-            return 0.46875*(3*(2*c2**2-1) + 1)*s1**2*c1/np.sqrt(np.pi)
-    elif sk_label == (143, 2, -1, 1, -1, 2, 2):
-            return -0.46875*np.sqrt(3)*s1**2*s2**2*c1/np.sqrt(np.pi)
-    elif sk_label == (145, 2, -1, 1, 0, 1, -1):
-            return 0.375*np.sqrt(15)*s1*s2*c1**2/np.sqrt(np.pi)
-    elif sk_label == (149, 2, -1, 1, 0, 2, -1):
-            return 1.875*np.sqrt(3)*s1*s2*c1**2*c2/np.sqrt(np.pi)
-    elif sk_label == (157, 2, -1, 1, 1, 2, -2):
-            return 0.46875*np.sqrt(3)*s1**2*s2**2*c1/np.sqrt(np.pi)
-    elif sk_label == (163, 2, 0, 1, -1, 1, -1):
-            return 0.09375*np.sqrt(5)*(3*(2*c1**2-1) + 1)*s1*s2/np.sqrt(np.pi)
-    elif sk_label == (167, 2, 0, 1, -1, 2, -1):
-            return 0.46875*(3*(2*c1**2-1) + 1)*s1*s2*c2/np.sqrt(np.pi)
-    elif sk_label == (171, 2, 0, 1, 0, 0, 0):
-            return 0.0625*np.sqrt(15)*(3*(2*c1**2-1) + 1)*c1/np.sqrt(np.pi)
-    elif sk_label == (173, 2, 0, 1, 0, 1, 0):
-            return 0.1875*np.sqrt(5)*(3*(2*c1**2-1) + 1)*c1*c2/np.sqrt(np.pi)
-    elif sk_label == (177, 2, 0, 1, 0, 2, 0):
-            return 0.078125*np.sqrt(3)*(3*(2*c1**2-1) + 1)*(3*(2*c2**2-1) + 1)*c1/np.sqrt(np.pi)
-    elif sk_label == (183, 2, 0, 1, 1, 1, 1):
-            return 0.09375*np.sqrt(5)*(3*(2*c1**2-1) + 1)*s1*s2/np.sqrt(np.pi)
-    elif sk_label == (187, 2, 0, 1, 1, 2, 1):
-            return 0.46875*(3*(2*c1**2-1) + 1)*s1*s2*c2/np.sqrt(np.pi)
-    elif sk_label == (193, 2, 1, 1, -1, 2, -2):
-            return 0.46875*np.sqrt(3)*s1**2*s2**2*c1/np.sqrt(np.pi)
-    elif sk_label == (201, 2, 1, 1, 0, 1, 1):
-            return 0.375*np.sqrt(15)*s1*s2*c1**2/np.sqrt(np.pi)
-    elif sk_label == (205, 2, 1, 1, 0, 2, 1):
-            return 1.875*np.sqrt(3)*s1*s2*c1**2*c2/np.sqrt(np.pi)
-    elif sk_label == (207, 2, 1, 1, 1, 0, 0):
-            return 0.375*np.sqrt(5)*s1**2*c1/np.sqrt(np.pi)
-    elif sk_label == (209, 2, 1, 1, 1, 1, 0):
-            return 0.375*np.sqrt(15)*s1**2*c1*c2/np.sqrt(np.pi)
-    elif sk_label == (213, 2, 1, 1, 1, 2, 0):
-            return 0.46875*(3*(2*c2**2-1) + 1)*s1**2*c1/np.sqrt(np.pi)
-    elif sk_label == (215, 2, 1, 1, 1, 2, 2):
-            return 0.46875*np.sqrt(3)*s1**2*s2**2*c1/np.sqrt(np.pi)
-    elif sk_label == (217, 2, 2, 1, -1, 1, -1):
-            return -0.09375*np.sqrt(15)*s1**3*s2/np.sqrt(np.pi)
-    elif sk_label == (221, 2, 2, 1, -1, 2, -1):
-            return -0.46875*np.sqrt(3)*s1**3*s2*c2/np.sqrt(np.pi)
-    elif sk_label == (233, 2, 2, 1, 0, 2, 2):
-            return 0.46875*np.sqrt(3)*s1**2*s2**2*c1/np.sqrt(np.pi)
-    elif sk_label == (237, 2, 2, 1, 1, 1, 1):
-            return 0.09375*np.sqrt(15)*s1**3*s2/np.sqrt(np.pi)
-    elif sk_label == (241, 2, 2, 1, 1, 2, 1):
-            return 0.46875*np.sqrt(3)*s1**3*s2*c2/np.sqrt(np.pi)
+    return INTEGRALS[sk_label](c1,c2,s1,s2)
 
 def select_integrals(e1, e2):
     """ Return list of integrals (integral, nl1, nl2)
@@ -246,7 +129,7 @@ def select_integrals(e1, e2):
     selected = []
     for ival1, valence1 in enumerate(e1.basis_sets):
         for ival2, valence2 in enumerate(e2.basis_sets):
-            for sk_label in INTEGRALS:
+            for sk_label, func in INTEGRALS.items():
                 nl1, nl2 = select_subshells(valence1, valence2, sk_label)
                 if nl1 is not None and nl2 is not None:
                     selected.append((sk_label, nl1, nl2))
@@ -426,22 +309,11 @@ def write_skf(handle, Rgrid, table, has_diagonal_data, is_extended, eigval,
     # Table containing the Slater-Koster integrals
     numtab = numint // NUMSK
     assert numtab > 0
-
-    if is_extended:
-        indices = list(range(numtab*NUMSK))
-    else:
-        selected = [INTEGRALS.index(name) for name in INTEGRALS
-                    if 'f' not in name[:2]]
-        indices = []
-        for itab in range(numtab):
-            indices.extend([itab*NUMSK+j for j in selected])
-
-#     for i in range(nzeros):
-#       print('%d*0.0,' % len(indices), file=handle)
-
+    
+    indices = np.shape(table)[1]
     for i in range(grid_npts):
         line = ''
-        for j in indices:
+        for j in range(indices):
                 line += '{0: 1.12e}  '.format(table[i, j])
         print(line, file=handle)
     
