@@ -9,12 +9,11 @@ phi, theta1 = symbols('phi theta1')
 s_1 = 1/(2 * sqrt(pi))
 
 py_1 = 1/2 * sqrt(3/pi) * sin(theta1) * sin(phi)
-px_1 = 1/2 * sqrt(3/pi) * cos(phi) * sin(theta1) 
 pz_1 = 1/2 * sqrt(3/pi) * cos(theta1) 
+px_1 = 1/2 * sqrt(3/pi) * cos(phi) * sin(theta1) 
 
 dxy_1 = 1/4 * sqrt(15/pi) * sin(theta1)**2 * sin(2*phi)
 dyz_1 = 1/2 * sqrt(15/pi) * cos(theta1) * sin(theta1) * sin(phi)
-# dz2_1 = 1/8 * sqrt(5/pi) * (1 + 3 * cos(2 * theta1))
 dz2_1 = 1/4 * sqrt(5/pi) * (3*cos(theta1)**2-1)
 dzx_1 = 1/2 * sqrt(15/pi) * cos(theta1) * cos(phi) * sin(theta1)
 dx2y2_1 = 1/4 * sqrt(15/pi) * cos(2 * phi) * sin(theta1)**2
@@ -26,12 +25,11 @@ theta2 = symbols('theta2')
 s_2 = 1/(2 * sqrt(pi))
 
 py_2 = 1/2 * sqrt(3/pi) * sin(theta2) * sin(phi)
-px_2 = 1/2 * sqrt(3/pi) * cos(phi) * sin(theta2) 
 pz_2 = 1/2 * sqrt(3/pi) * cos(theta2) 
+px_2 = 1/2 * sqrt(3/pi) * cos(phi) * sin(theta2) 
 
 dxy_2 = 1/4 * sqrt(15/pi) * sin(theta2)**2 * sin(2*phi)
 dyz_2 = 1/2 * sqrt(15/pi) * cos(theta2) * sin(theta2) * sin(phi)
-# dz2_2 = 1/8 * sqrt(5/pi) * (1 + 3 * cos(2 * theta2))
 dz2_2 = 1/4 * sqrt(5/pi) * (3*cos(theta2)**2-1)
 dzx_2 = 1/2 * sqrt(15/pi) * cos(theta2) * cos(phi) * sin(theta2)
 dx2y2_2 = 1/4 * sqrt(15/pi) * cos(2 * phi) * sin(theta2)**2

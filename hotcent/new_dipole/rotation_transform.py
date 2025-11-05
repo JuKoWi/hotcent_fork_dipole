@@ -2,27 +2,65 @@ import numpy as np
 import sympy as sp
 import pickle
 from sympy.physics.quantum.dagger import Dagger
-from hotcent.new_dipole.integrals import first_center, phi, theta1, first_center_complex
+from hotcent.new_dipole.integrals import first_center, phi, theta1, first_center_complex, operator
+
 
 PHI = sp.symbols('phi')
 THETA = sp.symbols('theta')
 GAMMA = sp.symbols('gamma')
 
+x, y, z = sp.symbols("x, y, z")
+r = sp.sqrt(x**2 + y**2 + z**2)
+
+
+s_1 = 1 / (2 * sp.sqrt(sp.pi))
+
+px_1 = sp.sqrt(3 / (4 * sp.pi)) * x/r
+py_1 = sp.sqrt(3 / (4 * sp.pi)) * y/r
+pz_1 = sp.sqrt(3 / (4 * sp.pi)) * z/r
+
+dxy_1 = sp.sqrt(15/(4 * sp.pi)) *x*y/r**2
+dyz_1 = sp.sqrt(15 / (4*sp.pi)) * y*z/r**2
+dxz_1 = sp.sqrt(15/(4* sp.pi)) * x*z/r**2
+dx2y2_1 = sp.sqrt(15/(16*sp.pi)) * (x**2-y**2)/r**2
+dz2_1 = sp.sqrt(5 / (16 * sp.pi)) * (3*z**2 -r**2)/r**2
+
+first_center_real = {
+    "ss": (s_1, 0,0),
+    "py": (py_1, 1,-1),
+    "pz": (pz_1, 1,0),
+    "px": (px_1,1,1),
+    "d1": (dxy_1,2,-2),
+    "d2": (dyz_1,2,-1),
+    "d3": (dz2_1,2,0),
+    "d4": (dxz_1,2,1),
+    "d5": (dx2y2_1,2,2),
+}
+
 def to_spherical(R):
     r = np.sqrt(np.sum(R**2))
     theta = np.arccos(R[2] / r)
     phi = np.arctan2(R[1], R[0])
+    # if phi < 0:
+    #     phi += 2 * np.pi
     return np.array([r, theta, phi])
 
-def d_mat_elem(l, m, n, phi):
+# def to_cart(polar):
+#     r = polar[0]
+#     theta = polar[1]
+#     phi = polar[2]
+#     x = r * 
+
+def d_mat_elem(l, m, n, theta):
     expr = 0
     k_min = max(0, m-n)
     k_max = min(l+m, l-n)
     for k in range(k_min, k_max+1):
         prefac = (-1)**(k-m+n) * sp.sqrt(sp.factorial(l+m) * sp.factorial(l-m) * sp.factorial(l+n) * sp.factorial(l-n)) / (sp.factorial(l+m-k) * sp.factorial(k) * sp.factorial(l-k-n) * sp.factorial(k-m+n))
-        angle_part = (sp.cos(phi/2)**(2*l-2*k+m-n) * sp.sin(phi / 2)**(2*k-m+n))
+        angle_part = (sp.cos(theta/2)**(2*l-2*k+m-n) * sp.sin(theta / 2)**(2*k-m+n))
         expr += prefac * angle_part 
-    return sp.trigsimp(expr)
+    return expr
+    # return sp.trigsimp(expr)
 
 
 def d_mat(theta):
@@ -58,7 +96,7 @@ def Wigner_D_complex(euler_phi, euler_theta, euler_gamma):
     Dz2 = z_rot_mat(phi=euler_gamma) #last rotation around z-axis
     # print('small d-matrix')
     # print(dy)
-    total = Dz2 * dy * Dz 
+    total = Dz* dy * Dz2
     # print('total transform for complex')
     # print(total)
     return total
@@ -78,7 +116,7 @@ def Wigner_D_real(euler_phi, euler_theta, euler_gamma):
 
 
     #d
-    transform_to_real[4,4] = sp.I / sp.sqrt(2)
+    transform_to_real[4,4] =  sp.I / sp.sqrt(2)
     transform_to_real[4,8] = -sp.I / sp.sqrt(2)
     transform_to_real[5,5] = sp.I / sp.sqrt(2)
     transform_to_real[5,7] = sp.I / sp.sqrt(2)
@@ -92,9 +130,8 @@ def Wigner_D_real(euler_phi, euler_theta, euler_gamma):
 
     transform_to_comp = transform_to_real.H
     D_total = transform_to_real * Wigner_D_complex(euler_phi=euler_phi, euler_theta=euler_theta, euler_gamma=euler_gamma) * transform_to_comp
-    # print('check for identity of transform to real harmonics')
-    # print(transform_to_comp * transform_to_real)
-    # print(transform_to_real * Dagger(transform_to_real))
+    print('check for identity of transform to real harmonics')
+    print(transform_to_comp * transform_to_real)
     with open("symbolic_D_matrix.pkl", "wb") as f:
         pickle.dump(D_total, f)
     return D_total
@@ -116,6 +153,13 @@ def evaluate_spherical_complex(key, unit_vec):
     res = res.evalf()
     return res
 
+def evaluate_spherical_operator(key, unit_vec):
+    theta_val, phi_val = to_spherical(R=unit_vec)[1:]
+    sh_func = operator[key][0]
+    res = sh_func.subs({phi: phi_val, theta1: theta_val})
+    res = res.evalf()
+    return res
+
 def check_rotation_complex():
     unit_vec1 = np.random.rand(3)
     # unit_vec1 = np.array([0,0,1])
@@ -125,7 +169,7 @@ def check_rotation_complex():
     # random_theta = 0
     Ry = np.array([[np.cos(random_theta), 0, np.sin(random_theta)], [0,1,0], [-np.sin(random_theta), 0, np.cos(random_theta)]])
     Rz = np.array([[np.cos(random_phi), - np.sin(random_phi), 0],[np.sin(random_phi), np.cos(random_phi), 0],[0,0,1]])
-    unit_vec2 = Ry @ Rz @ unit_vec1
+    unit_vec2 = Rz @ Ry @ unit_vec1
     theta1_val, phi1_val = to_spherical(unit_vec1)[1:]
     func_vec = np.zeros((9,), 'complex')
     for i, (key, item) in enumerate(first_center_complex.items()):
@@ -153,7 +197,7 @@ def check_rotation():
     random_theta = np.random.uniform(0, np.pi, size=1)[0]
     Ry = np.array([[np.cos(random_theta), 0, np.sin(random_theta)], [0,1,0], [-np.sin(random_theta), 0, np.cos(random_theta)]])
     Rz = np.array([[np.cos(random_phi), - np.sin(random_phi), 0],[np.sin(random_phi), np.cos(random_phi), 0],[0,0,1]])
-    unit_vec2 = Ry @ Rz @ unit_vec1
+    unit_vec2 = Rz @ Ry @ unit_vec1
     theta1_val, phi1_val = to_spherical(unit_vec1)[1:]
     func_vec = np.zeros((9,))
     for i, (key, item) in enumerate(first_center.items()):
@@ -182,7 +226,7 @@ def check_rotation_prod():
     random_theta = np.random.uniform(0, np.pi, size=1)[0]
     Ry = np.array([[np.cos(random_theta), 0, np.sin(random_theta)], [0,1,0], [-np.sin(random_theta), 0, np.cos(random_theta)]])
     Rz = np.array([[np.cos(random_phi), - np.sin(random_phi), 0],[np.sin(random_phi), np.cos(random_phi), 0],[0,0,1]])
-    unit_vec2 = Ry @ Rz @ unit_vec1
+    unit_vec2 = Rz @ Ry @ unit_vec1
     theta1_val, phi1_val = to_spherical(unit_vec1)[1:]
     func_vec = np.zeros((81,))
     count = 0
@@ -211,5 +255,81 @@ def check_rotation_prod():
             val1_vec[count] = val1 * val2
             count += 1
     print(np.isclose(val1_vec, result_vec))
+
+def check_rot_triple():
+    unit_vec1 = np.random.rand(3)
+    # unit_vec1 = np.array([0,0,1])
+    random_phi = np.random.uniform(0, 2*np.pi, size=1)[0]
+    random_theta = np.random.uniform(0, np.pi, size=1)[0]
+    Ry = np.array([[np.cos(random_theta), 0, np.sin(random_theta)], [0,1,0], [-np.sin(random_theta), 0, np.cos(random_theta)]])
+    Rz = np.array([[np.cos(random_phi), - np.sin(random_phi), 0],[np.sin(random_phi), np.cos(random_phi), 0],[0,0,1]])
+    unit_vec2 = Rz @ Ry @ unit_vec1
+    theta1_val, phi1_val = to_spherical(unit_vec1)[1:]
+    func_vec = np.zeros((243,))
+    count = 0
+    for i, (key, item) in enumerate(first_center.items()):
+        for k, (key3, item3) in enumerate(operator.items()):
+            for j, (key2, item2) in enumerate(first_center.items()):
+                func = item[0]
+                func2 = item2[0]
+                op = item3[0]
+                func_val = func.subs({phi:phi1_val, theta1: theta1_val})
+                func_val = func_val.evalf()
+                func_val2 = func2.subs({phi:phi1_val, theta1: theta1_val})
+                func_val2 = func_val2.evalf()
+                op_val = op.subs({phi:phi1_val, theta1: theta1_val})
+                op_val = op_val.evalf()
+                func_vec[count] = func_val * func_val2 * op_val
+                count += 1
+    D_sym = Wigner_D_real(euler_phi=PHI, euler_gamma=GAMMA, euler_theta=THETA)
+    D = sp.lambdify((PHI, THETA, GAMMA), D_sym, 'numpy')
+    D = np.real(D(-random_phi, -random_theta, 0))
+    D_op = D[1:4, 1:4]
+    D_tot = np.kron(D, np.kron(D_op, D))
+    result_vec = D_tot @ func_vec
+    val1_vec = np.zeros((243,))
+    count=0
+    for i, (key, item) in enumerate(first_center.items()):
+        for k, (key3, item3) in enumerate(operator.items()):
+            for j, (key2, item2) in enumerate(first_center.items()):
+                val1 = evaluate_spherical(key=key, unit_vec=unit_vec2)
+                val2 = evaluate_spherical(key=key2, unit_vec=unit_vec2)
+                val3 = evaluate_spherical_operator(key=key3, unit_vec=unit_vec2) 
+                val1_vec[count] = val1 * val2 * val3
+                count += 1
+    print(np.isclose(val1_vec, result_vec))
+    
+def check_harmonics_equal():
+    unit_vec = np.random.normal(size=3)
+    unit_vec = unit_vec/np.linalg.norm(unit_vec)
+    theta1_val, phi1_val = to_spherical(unit_vec)[1:]
+    complex_sh = np.zeros((9,))
+    real_sh = np.zeros((9,))
+    for i, (key, item) in enumerate(first_center.items()):
+        func = item[0]
+        func = func.subs({phi: phi1_val, theta1: theta1_val})
+        func = func.evalf()
+        complex_sh[i] = func
+    for i, (key, item) in enumerate(first_center.items()):
+        func = item[0]
+        func = func.subs({phi: phi1_val, theta1: theta1_val})
+        func = func.evalf()
+        real_sh[i] = func
+    print(np.allclose(complex_sh, real_sh))
+
+def check_vec_rotation():
+    unit_vec = np.random.normal(size=3)
+    unit_vec = unit_vec/np.linalg.norm(unit_vec)
+    theta_val, phi_val= to_spherical(unit_vec)[1:]
+    theta1_val = -theta_val 
+    phi1_val = -phi_val
+    print(unit_vec)
+    Ry = np.array([[np.cos(theta1_val), 0, np.sin(theta1_val)], [0,1,0], [-np.sin(theta1_val), 0, np.cos(theta1_val)]])
+    Rz = np.array([[np.cos(phi1_val), - np.sin(phi1_val), 0],[np.sin(phi1_val), np.cos(phi1_val), 0],[0,0,1]])
+    z_vector = Ry @ Rz @ unit_vec
+    print(np.allclose(z_vector, [0,0,1]))
+
+    
+    
 
         

@@ -7,9 +7,9 @@ import time
 from scipy.integrate import nquad
 import sympy as sp
 from hotcent.new_dipole.dipole import SK_Integral
+from hotcent.new_dipole.rotation_transform import to_spherical
 
 from hotcent.new_dipole.offsite_twocenter_dipole import Offsite2cTableDipole
-from hotcent.new_dipole.onsite_twocenter_dipole import Onsite2cTable
 from optparse import OptionParser
 from ase.units import Bohr
 from ase.data import covalent_radii, atomic_numbers
@@ -59,7 +59,7 @@ radial_1 = sp.exp(-b* (x**2 + y**2 + z**2))
 radial_2 = sp.exp(-b* ((x-x0)**2 + (y-y0)**2 + (z-z0)**2))
 
 
-first_center = {
+first_center_real = {
     "ss": (s_1, 0,0),
     "py": (py_1, 1,-1),
     "pz": (pz_1, 1,0),
@@ -91,15 +91,14 @@ operator = {
 
 
 def get_analytic_2c_integrals(pos_at1, zeta1, zeta2, comparison):
-    """Compute two-center integrals numerically with singularity-safe handling."""
     file = open("comparison.txt", 'w')
     print(f'coordinate: {pos_at1}', file=file)
     print("sk-value \t analytic", file=file)
     t_start = time.time()
     count = 0
-    results = np.zeros((len(operator) * len(first_center) * len(second_center)))
+    results = np.zeros((len(operator) * len(first_center_real) * len(second_center)))
     
-    for name_i, i in first_center.items():
+    for name_i, i in first_center_real.items():
         for name_j, j in operator.items():
             for name_k, k in second_center.items():
                 # if (i[1]<2 and k[1]<2):
@@ -138,44 +137,6 @@ def get_analytic_2c_integrals(pos_at1, zeta1, zeta2, comparison):
     file.close()
     return results
 
-def get_numeric_2c_integrals(pos_at1, zeta1, zeta2, comparison):
-    """Compute two-center integrals numerically with singularity-safe handling."""
-    file = open("comparison.txt", 'w')
-    print(f'coordinate: {pos_at1}', file=file)
-    print("sk-value \t numerical", file=file)
-    t_start = time.time()
-    count = 0
-    results = np.zeros((len(operator) * len(first_center) * len(second_center)))
-    
-    for name_i, i in first_center.items():
-        for name_j, j in operator.items():
-            for name_k, k in second_center.items():
-                zeta1_val = zeta1[i[1]]
-                zeta2_val = zeta2[k[1]]
-                R1 = radial_1.subs({b: zeta1_val})
-                R2 = radial_2.subs({b: zeta2_val})
-                integrand = i[0] * R1 * j[0] * k[0] * R2 * r**i[1] * r_2**k[1] # eliminate poles by multiplying with r as if it was part of the radial part
-                print(integrand)
-                integrand = integrand.subs({x0: pos_at1[0], y0: pos_at1[1], z0: pos_at1[2]})
-                
-                # Precompile symbolic -> numeric function once
-                f_num = sp.lambdify((x, y, z), integrand, "numpy")
-
-                print(f"Testing integral {name_i}-{name_j}-{name_k}", file=file)
-                print(f"Testing integral {name_i}-{name_j}-{name_k}")
-                num, err = nquad(f_num, [[-20, 20], [-20, 20], [-20, 20]])
-                results[count] = num
-                print(f"sk value:{comparison[count]}, numerical: {num} ")
-                print(f'{comparison[count]} \t{num}',file=file)
-                # print(f"Result = {num:.6e}, Estimated error = {err:.2e}")
-
-                count += 1
-    t_end = time.time()
-    print(f"integration took {t_end-t_start}")
-    with open("numerical_integrals_list.pkl", "wb") as f:
-        pickle.dump(results, f)
-    file.close()
-    return results
 
 def compare_matrix_elements(zeta1):
     USE_EXISTING_SKF = True 
@@ -213,14 +174,17 @@ def compare_matrix_elements(zeta1):
         off2c = Offsite2cTableDipole(atom, atom, timing=True)
         off2c.run(rmin, dr, N, superposition=opt.superposition,
                   xc=opt.functional, stride=opt.stride, zeta_dict=zeta_dict, 
-                #   nr=100, ntheta=300
+                  nr=200, ntheta=500
                   )
         off2c.write()
         off2c.plot_minimal()
 
+    vec = np.random.normal(size=3)
+    vec = vec/np.linalg.norm(vec)
+
     atoms = Atoms('Ge2', positions=[
         [0.0, 0.0, 0.0],
-        [1.0, 0.0, 0.0]
+        [vec[0], vec[1], vec[2]]
     ])
 
     #assemble actual matrix elements
@@ -233,12 +197,14 @@ def compare_matrix_elements(zeta1):
     res1 = method1.calculate_dipole()
     method1.check_rotation_implementation()
 
+    file_path = "symbolic_D_matrix.pkl"
+    file_path2 = "identifier_nonzeros.pkl"
+    if os.path.exists(file_path):
+        os.remove(file_path)
+    
     #calculate directly brute force
     res2 = get_analytic_2c_integrals(pos_at1=method1.R_vec, zeta1=zeta1, zeta2=zeta1, comparison=res1)
     
-    file_path = "symbolic_D_matrix.pkl"
-    if os.path.exists(file_path):
-        os.remove(file_path)
 
 
     
