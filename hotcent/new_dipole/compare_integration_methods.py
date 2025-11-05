@@ -120,7 +120,6 @@ def get_analytic_2c_integrals(pos_at1, zeta1, zeta2, comparison):
                 print(f"Testing integral {name_i}-{name_j}-{name_k}", file=file)
                 # num, err = nquad(f_num, [[-20, 20], [-20, 20], [-20, 20]])
                 results[count] = analyt_int_value 
-                abs_err = comparison[count] - analyt_int
                 print(f"Testing integral {name_i}-{name_j}-{name_k}")
                 print(f"sk value:{comparison[count]}")
                 # print(f" numerical: {num}")
@@ -196,11 +195,6 @@ def compare_matrix_elements(zeta1):
     method1.load_SK_dipole_file('Ge-Ge_offsite2c-dipole.skf')
     res1 = method1.calculate_dipole()
     method1.check_rotation_implementation()
-
-    file_path = "symbolic_D_matrix.pkl"
-    file_path2 = "identifier_nonzeros.pkl"
-    if os.path.exists(file_path):
-        os.remove(file_path)
     
     #calculate directly brute force
     res2 = get_analytic_2c_integrals(pos_at1=method1.R_vec, zeta1=zeta1, zeta2=zeta1, comparison=res1)

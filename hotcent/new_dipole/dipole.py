@@ -19,7 +19,6 @@ class SK_Integral:
         quant_num_list, nonzeros = get_index_list()
         self.quant_num_list = quant_num_list
         self.nonzero_idx = nonzeros
-        # THETA, PHI, GAMMA= sp.symbols('theta phi gamma')
         if os.path.exists("symbolic_D_matrix.pkl"):
             print('Symbolic D matrix exists')
         else: 
@@ -72,11 +71,6 @@ class SK_Integral:
         D2 = self.Wigner_D_single
         D_r = self.Wigner_D_single[idx_pstart:idx_pend+1, idx_pstart:idx_pend+1] # only take p for operator
         D = np.kron(D1, np.kron(D_r, D2))
-        # print("tensorprod rotation matrix")
-        # print(D)
-        # print("compare to identity automatically")
-        # print(np.allclose(D1, np.eye(np.shape(D1)[0])))
-        # print(np.allclose(D, np.eye(np.shape(D)[0])))
         self.Wigner_D_full = np.real(D)
 
     def calculate_dipole(self):
@@ -110,18 +104,12 @@ class SK_Integral:
         # D_phi = np.where(np.abs(D_phi) < 1e-15, 0, D_phi)
         D_theta = np.kron(D1_theta, np.kron(D_r_theta, D2_theta))
         # D_theta = np.where(np.abs(D_theta) < 1e-15, 0, D_theta)
-        # print(D_phi)
         print("check composition of rotations")
-        print(np.allclose(self.Wigner_D_full, D_theta @ D_phi) )
-        # print('is identity?')
-        # print(np.allclose(D_phi, np.eye(np.shape(D_phi)[0])))
+        print(np.allclose(self.Wigner_D_full, D_phi @ D_theta) )
         #check unitary
         D_dagger = np.transpose(self.Wigner_D_full.conj(), (1,0))
         print("check if unitary")
         print(np.allclose(self.Wigner_D_full @ D_dagger, np.eye(np.shape(self.Wigner_D_full)[0])))
-        print("max matrix value")
-        print(np.max(self.Wigner_D_full))
-        # sys.exit()
     
 
 

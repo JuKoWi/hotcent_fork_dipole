@@ -41,15 +41,7 @@ def to_spherical(R):
     r = np.sqrt(np.sum(R**2))
     theta = np.arccos(R[2] / r)
     phi = np.arctan2(R[1], R[0])
-    # if phi < 0:
-    #     phi += 2 * np.pi
     return np.array([r, theta, phi])
-
-# def to_cart(polar):
-#     r = polar[0]
-#     theta = polar[1]
-#     phi = polar[2]
-#     x = r * 
 
 def d_mat_elem(l, m, n, theta):
     expr = 0
@@ -60,7 +52,6 @@ def d_mat_elem(l, m, n, theta):
         angle_part = (sp.cos(theta/2)**(2*l-2*k+m-n) * sp.sin(theta / 2)**(2*k-m+n))
         expr += prefac * angle_part 
     return expr
-    # return sp.trigsimp(expr)
 
 
 def d_mat(theta):
@@ -86,19 +77,13 @@ def z_rot_mat(phi):
         for m in range(-l, l+1):
             Dz[count, count] = sp.exp(-sp.I*m*phi)
             count += 1
-    # print('z-rotation')
-    # print(Dz)
     return Dz
         
 def Wigner_D_complex(euler_phi, euler_theta, euler_gamma):
     Dz = z_rot_mat(phi=euler_phi)
     dy = d_mat(theta=euler_theta)
     Dz2 = z_rot_mat(phi=euler_gamma) #last rotation around z-axis
-    # print('small d-matrix')
-    # print(dy)
     total = Dz* dy * Dz2
-    # print('total transform for complex')
-    # print(total)
     return total
     
 def Wigner_D_real(euler_phi, euler_theta, euler_gamma):
@@ -162,11 +147,8 @@ def evaluate_spherical_operator(key, unit_vec):
 
 def check_rotation_complex():
     unit_vec1 = np.random.rand(3)
-    # unit_vec1 = np.array([0,0,1])
     random_phi = np.random.uniform(0, 2*np.pi, size=1)[0]
-    # random_phi = 0
     random_theta = np.random.uniform(0, np.pi, size=1)[0]
-    # random_theta = 0
     Ry = np.array([[np.cos(random_theta), 0, np.sin(random_theta)], [0,1,0], [-np.sin(random_theta), 0, np.cos(random_theta)]])
     Rz = np.array([[np.cos(random_phi), - np.sin(random_phi), 0],[np.sin(random_phi), np.cos(random_phi), 0],[0,0,1]])
     unit_vec2 = Rz @ Ry @ unit_vec1
@@ -192,7 +174,6 @@ def check_rotation_complex():
 
 def check_rotation():
     unit_vec1 = np.random.rand(3)
-    # unit_vec1 = np.array([0,0,1])
     random_phi = np.random.uniform(0, 2*np.pi, size=1)[0]
     random_theta = np.random.uniform(0, np.pi, size=1)[0]
     Ry = np.array([[np.cos(random_theta), 0, np.sin(random_theta)], [0,1,0], [-np.sin(random_theta), 0, np.cos(random_theta)]])
@@ -221,7 +202,6 @@ def check_rotation():
 
 def check_rotation_prod():
     unit_vec1 = np.random.rand(3)
-    # unit_vec1 = np.array([0,0,1])
     random_phi = np.random.uniform(0, 2*np.pi, size=1)[0]
     random_theta = np.random.uniform(0, np.pi, size=1)[0]
     Ry = np.array([[np.cos(random_theta), 0, np.sin(random_theta)], [0,1,0], [-np.sin(random_theta), 0, np.cos(random_theta)]])
@@ -258,7 +238,6 @@ def check_rotation_prod():
 
 def check_rot_triple():
     unit_vec1 = np.random.rand(3)
-    # unit_vec1 = np.array([0,0,1])
     random_phi = np.random.uniform(0, 2*np.pi, size=1)[0]
     random_theta = np.random.uniform(0, np.pi, size=1)[0]
     Ry = np.array([[np.cos(random_theta), 0, np.sin(random_theta)], [0,1,0], [-np.sin(random_theta), 0, np.cos(random_theta)]])

@@ -15,6 +15,7 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
 
     def run(self, rmin=0.02, dr=0.02, N=None, superposition='density', xc='LDA', nr=50, stride=1, wflimit=1e-7, ntheta=150, smoothen_tails=True, zeta_dict=None):
+        """zeta_dict: overwrite atom functions radial parts for test reasons"""
         self.print_header()
 
         assert N is not None, 'Need to set number of grid points N!'
@@ -103,38 +104,62 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
         Dl= {}
         sym1, sym2 = e1.get_symbol(), e2.get_symbol()
 
-        for key in selected:
-            integral, nl1, nl2 = key
+        if zeta_dict != None:
+            for key in selected:
+                integral, nl1, nl2 = key
 
-            
-            if R == 0:
-                Y1 = pick_quantum_number(first_center, (integral[1], integral[2]))[0]
-                Yr = pick_quantum_number(operator, (integral[3], integral[4]))[0]
-                Y2 = pick_quantum_number(second_center,(integral[5], integral[6]))[0]
-                Y2 = Y2.subs(theta2, theta1)
-                angle_integral = sp.integrate(sp.integrate(Y1*Yr*Y2*sp.sin(theta1), (phi, 0, 2*sp.pi)), (theta1, 0, sp.pi))
+                if R == 0:
+                    Y1 = pick_quantum_number(first_center, (integral[1], integral[2]))[0]
+                    Yr = pick_quantum_number(operator, (integral[3], integral[4]))[0]
+                    Y2 = pick_quantum_number(second_center,(integral[5], integral[6]))[0]
+                    Y2 = Y2.subs(theta2, theta1)
+                    angle_integral = sp.integrate(sp.integrate(Y1*Yr*Y2*sp.sin(theta1), (phi, 0, 2*sp.pi)), (theta1, 0, sp.pi))
 
-                dr = 0.001
-                r = np.arange(start=0, stop=self.wf_range, step=dr)
-                Rnl1 = e1.Rnl(r, nl1)
-                Rnl1 = r**zeta_dict[nl1][1] * np.exp(-zeta_dict[nl1][0]*r**2) #overwrite with gaussian for testing
-                Rnl2 = e2.Rnl(r, nl2)
-                Rnl2 = r**zeta_dict[nl2][1] * np.exp(-zeta_dict[nl2][0]*r**2) #overwrite with gaussian for testing
-                radial_integral = trapezoid(y=Rnl1 * Rnl2* r**2 * r, x=r, dx=dr)
+                    dr = 0.001
+                    r = np.arange(start=0, stop=self.wf_range, step=dr)
+                    Rnl1 = e1.Rnl(r, nl1)
+                    Rnl1 = r**zeta_dict[nl1][1] * np.exp(-zeta_dict[nl1][0]*r**2) #overwrite with gaussian for testing
+                    Rnl2 = e2.Rnl(r, nl2)
+                    Rnl2 = r**zeta_dict[nl2][1] * np.exp(-zeta_dict[nl2][0]*r**2) #overwrite with gaussian for testing
+                    radial_integral = trapezoid(y=Rnl1 * Rnl2* r**2 * r, x=r, dx=dr)
 
-                D = np.sqrt(4*np.pi/3) * radial_integral * angle_integral.evalf()
-            else:
-                gphi = phi3(c1, c2, s1, s2, integral)
-                aux = gphi * area * x * r1
+                    D = np.sqrt(4*np.pi/3) * radial_integral * angle_integral.evalf()
+                else:
+                    gphi = phi3(c1, c2, s1, s2, integral)
+                    aux = gphi * area * x * r1
 
-                Rnl1 = e1.Rnl(r1, nl1)
-                Rnl1 = r1**zeta_dict[nl1][1] * np.exp(-zeta_dict[nl1][0]*r1**2) #overwrite with gaussian for testing
-                Rnl2 = e2.Rnl(r2, nl2)
-                Rnl2 = r2**zeta_dict[nl2][1] * np.exp(-zeta_dict[nl2][0]*r2**2) #overwrite with gaussian for testing
+                    Rnl1 = e1.Rnl(r1, nl1)
+                    Rnl1 = r1**zeta_dict[nl1][1] * np.exp(-zeta_dict[nl1][0]*r1**2) #overwrite with gaussian for testing
+                    Rnl2 = e2.Rnl(r2, nl2)
+                    Rnl2 = r2**zeta_dict[nl2][1] * np.exp(-zeta_dict[nl2][0]*r2**2) #overwrite with gaussian for testing
 
-                D = np.sqrt(4*np.pi/3) * np.sum(Rnl1 * Rnl2 * aux)
-            Dl[key] = D
+                    D = np.sqrt(4*np.pi/3) * np.sum(Rnl1 * Rnl2 * aux)
+                Dl[key] = D
+        else:
+            for key in selected:
+                integral, nl1, nl2 = key
+                if R == 0:
+                    Y1 = pick_quantum_number(first_center, (integral[1], integral[2]))[0]
+                    Yr = pick_quantum_number(operator, (integral[3], integral[4]))[0]
+                    Y2 = pick_quantum_number(second_center,(integral[5], integral[6]))[0]
+                    Y2 = Y2.subs(theta2, theta1)
+                    angle_integral = sp.integrate(sp.integrate(Y1*Yr*Y2*sp.sin(theta1), (phi, 0, 2*sp.pi)), (theta1, 0, sp.pi))
 
+                    dr = 0.001
+                    r = np.arange(start=0, stop=self.wf_range, step=dr)
+                    Rnl1 = e1.Rnl(r, nl1)
+                    Rnl2 = e2.Rnl(r, nl2)
+                    radial_integral = trapezoid(y=Rnl1 * Rnl2* r**2 * r, x=r, dx=dr)
+                    D = np.sqrt(4*np.pi/3) * radial_integral * angle_integral.evalf()
+                else:
+                    gphi = phi3(c1, c2, s1, s2, integral)
+                    aux = gphi * area * x * r1
+
+                    Rnl1 = e1.Rnl(r1, nl1)
+                    Rnl2 = e2.Rnl(r2, nl2)
+
+                    D = np.sqrt(4*np.pi/3) * np.sum(Rnl1 * Rnl2 * aux)
+                Dl[key] = D
         
 
         self.timer.stop('calculate_offsite2c')
