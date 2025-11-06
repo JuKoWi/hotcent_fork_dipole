@@ -71,8 +71,8 @@ ry_1 = y
 rz_1 = z 
 
 a, b, c = sp.symbols("a, b, c")
-radial_1 = sp.exp(-b* (x**2 + y**2 + z**2))
-radial_2 = sp.exp(-b* ((x-x0)**2 + (y-y0)**2 + (z-z0)**2))
+radial_1 = (2 * b/sp.pi)**(3/4) * sp.exp(-b* (x**2 + y**2 + z**2))
+radial_2 = (2* b/sp.pi)**(3/4) * sp.exp(-b* ((x-x0)**2 + (y-y0)**2 + (z-z0)**2))
 
 
 first_center_real = {

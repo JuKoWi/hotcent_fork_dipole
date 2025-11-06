@@ -16,7 +16,7 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
 
     def run(self, rmin=0.02, dr=0.02, N=None, superposition='density', xc='LDA', nr=50, stride=1, wflimit=1e-7, ntheta=150, smoothen_tails=True, zeta_dict=None):
         """zeta_dict: overwrite atom functions radial parts for test reasons"""
-        self.print_header()
+        # self.print_header()
 
         assert N is not None, 'Need to set number of grid points N!'
         assert dr >= 1e-3, 'For stability, please set rmin >= 1e-3'
@@ -34,7 +34,7 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
 
         for p, (e1, e2) in enumerate(self.pairs): # iterate over ordered element pairs
             selected = select_integrals(e1, e2)
-            print_integral_overview(e1, e2, selected, file=self.txt)
+            # print_integral_overview(e1, e2, selected, file=self.txt)
 
             for bas1 in range(len(e1.basis_sets)):
                 for bas2 in range(len(e2.basis_sets)):
@@ -108,6 +108,8 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
             for key in selected:
                 integral, nl1, nl2 = key
 
+                N1 = (2 * zeta_dict[nl1][0]/np.pi)**(3/4)
+                N2 = (2 * zeta_dict[nl2][0]/np.pi)**(3/4)
                 if R == 0:
                     Y1 = pick_quantum_number(first_center, (integral[1], integral[2]))[0]
                     Yr = pick_quantum_number(operator, (integral[3], integral[4]))[0]
@@ -118,9 +120,9 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
                     dr = 0.001
                     r = np.arange(start=0, stop=self.wf_range, step=dr)
                     Rnl1 = e1.Rnl(r, nl1)
-                    Rnl1 = r**zeta_dict[nl1][1] * np.exp(-zeta_dict[nl1][0]*r**2) #overwrite with gaussian for testing
+                    Rnl1 = N1*r**zeta_dict[nl1][1] * np.exp(-zeta_dict[nl1][0]*r**2) #overwrite with gaussian for testing
                     Rnl2 = e2.Rnl(r, nl2)
-                    Rnl2 = r**zeta_dict[nl2][1] * np.exp(-zeta_dict[nl2][0]*r**2) #overwrite with gaussian for testing
+                    Rnl2 = N2*r**zeta_dict[nl2][1] * np.exp(-zeta_dict[nl2][0]*r**2) #overwrite with gaussian for testing
                     radial_integral = trapezoid(y=Rnl1 * Rnl2* r**2 * r, x=r, dx=dr)
 
                     D = np.sqrt(4*np.pi/3) * radial_integral * angle_integral.evalf()
@@ -129,9 +131,9 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
                     aux = gphi * area * x * r1
 
                     Rnl1 = e1.Rnl(r1, nl1)
-                    Rnl1 = r1**zeta_dict[nl1][1] * np.exp(-zeta_dict[nl1][0]*r1**2) #overwrite with gaussian for testing
+                    Rnl1 = N1*r1**zeta_dict[nl1][1] * np.exp(-zeta_dict[nl1][0]*r1**2) #overwrite with gaussian for testing
                     Rnl2 = e2.Rnl(r2, nl2)
-                    Rnl2 = r2**zeta_dict[nl2][1] * np.exp(-zeta_dict[nl2][0]*r2**2) #overwrite with gaussian for testing
+                    Rnl2 = N2*r2**zeta_dict[nl2][1] * np.exp(-zeta_dict[nl2][0]*r2**2) #overwrite with gaussian for testing
 
                     D = np.sqrt(4*np.pi/3) * np.sum(Rnl1 * Rnl2 * aux)
                 Dl[key] = D
