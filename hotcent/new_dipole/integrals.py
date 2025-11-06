@@ -1,12 +1,59 @@
 from sympy import *
+import time
 import pickle
 CODE = True
 init_printing(use_unicode=True)
 
 phi, theta1 = symbols('phi theta1')
 
-"""centered at first atom"""
-s_1 = 1/(2 * sqrt(pi))
+
+theta2 = symbols('theta2')
+
+
+"""complex, first atom"""
+s_1_comp_1 = 1/(2 * sqrt(pi))
+
+p1_comp_1 = 1/2 * sqrt(3/(2*pi)) * exp(- I * phi) * sin(theta1)
+p2_comp_1 = 1/2 * sqrt(3/pi) * cos(theta1) 
+p3_comp_1 = -1/2 * sqrt(3/(2*pi)) * exp(I * phi) * sin(theta1)
+
+d1_comp_1 = 1/4 * sqrt(15/(2*pi)) * exp(-2* I * phi) * sin(theta1)**2
+d2_comp_1 = 1/2 * sqrt(15/(2*pi)) * exp(-I * phi) * sin(theta1) * cos(theta1)
+d3_comp_1 = 1/4 * sqrt(5/pi) * (3*cos(theta1)**2-1)
+d4_comp_1 = -1/2 * sqrt(15/(2*pi)) * exp(I * phi) * sin(theta1) * cos(theta1)
+d5_comp_1 = 1/4 * sqrt(15/(2*pi)) * exp(2* I * phi) * sin(theta1)**2
+
+f1_comp_1 = 1/8 * sqrt(35/pi) * exp(-3*I*phi) * sin(theta1)**3
+f2_comp_1 = 1/4 * sqrt(105/(2*pi)) * exp(-2 * I* phi) * sin(theta1)**2 * cos(theta1)
+f3_comp_1 = 1/8 * sqrt(21/pi) * exp(-I * phi) * sin(theta1) * (5* cos(theta1)**2 -1)
+f4_comp_1 = 1/4 * sqrt(7/pi) * (5*cos(theta1)**3 - 3* cos(theta1))
+f5_comp_1 = -1/8 * sqrt(21/pi) * exp(I * phi) * sin(theta1) * (5*cos(theta1)**2 -1)
+f6_comp_1 = 1/4 * sqrt(105/(2*pi)) * exp(2*I*phi) * sin(theta1)**2 * cos(theta1)
+f7_comp_1 = -1/8 * sqrt(35/pi) * exp(3* I * phi) * sin(theta1)**3
+
+"""complex, second atom"""
+s_2_comp_2 = 1/(2 * sqrt(pi))
+
+p1_comp_2 = 1/2 * sqrt(3/(2*pi)) * exp(- I * phi) * sin(theta2)
+p2_comp_2 = 1/2 * sqrt(3/pi) * cos(theta2) 
+p3_comp_2 = -1/2 * sqrt(3/(2*pi)) * exp(I * phi) * sin(theta2)
+
+d1_comp_2 = 1/4 * sqrt(15/(2*pi)) * exp(-2* I * phi) * sin(theta2)**2
+d2_comp_2 = 1/2 * sqrt(15/(2*pi)) * exp(-I * phi) * sin(theta2) * cos(theta2)
+d3_comp_2 = 1/4 * sqrt(5/pi) * (3*cos(theta2)**2-1)
+d4_comp_2 = -1/2 * sqrt(15/(2*pi)) * exp(I * phi) * sin(theta2) * cos(theta2)
+d5_comp_2 = 1/4 * sqrt(15/(2*pi)) * exp(2* I * phi) * sin(theta2)**2
+
+f1_comp_2 = 1/8 * sqrt(35/pi) * exp(-3*I*phi) * sin(theta2)**3
+f2_comp_2 = 1/4 * sqrt(105/(2*pi)) * exp(-2 * I* phi) * sin(theta2)**2 * cos(theta2)
+f3_comp_2 = 1/8 * sqrt(21/pi) * exp(-I * phi) * sin(theta2) * (5* cos(theta2)**2 -1)
+f4_comp_2 = 1/4 * sqrt(7/pi) * (5*cos(theta2)**3 - 3* cos(theta2))
+f5_comp_2 = -1/8 * sqrt(21/pi) * exp(I * phi) * sin(theta2) * (5*cos(theta2)**2 -1)
+f6_comp_2 = 1/4 * sqrt(105/(2*pi)) * exp(2*I*phi) * sin(theta2)**2 * cos(theta2)
+f7_comp_2 = -1/8 * sqrt(35/pi) * exp(3* I * phi) * sin(theta2)**3
+
+"""real centered at first atom"""
+ss_1 = s_1_comp_1
 
 py_1 = 1/2 * sqrt(3/pi) * sin(theta1) * sin(phi)
 pz_1 = 1/2 * sqrt(3/pi) * cos(theta1) 
@@ -18,11 +65,16 @@ dz2_1 = 1/4 * sqrt(5/pi) * (3*cos(theta1)**2-1)
 dzx_1 = 1/2 * sqrt(15/pi) * cos(theta1) * cos(phi) * sin(theta1)
 dx2y2_1 = 1/4 * sqrt(15/pi) * cos(2 * phi) * sin(theta1)**2
 
+f1_1 = simplify(I/sqrt(2) * (f1_comp_1 + f7_comp_1))
+f2_1 = simplify(I/sqrt(2) * (f2_comp_1 - f6_comp_1))
+f3_1 = simplify(I/sqrt(2) * (f3_comp_1 + f5_comp_1))
+f4_1 = f4_comp_1
+f5_1 = simplify(1/sqrt(2) * (f3_comp_1 - f5_comp_1))
+f6_1 = simplify(1/sqrt(2) * (f2_comp_1 + f6_comp_1))
+f7_1 = simplify(1/sqrt(2) * (f1_comp_1 - f7_comp_1))
 
-theta2 = symbols('theta2')
-
-"""centered at second atom"""
-s_2 = 1/(2 * sqrt(pi))
+"""real, centered at second atom"""
+ss_2 = s_2_comp_2
 
 py_2 = 1/2 * sqrt(3/pi) * sin(theta2) * sin(phi)
 pz_2 = 1/2 * sqrt(3/pi) * cos(theta2) 
@@ -34,21 +86,16 @@ dz2_2 = 1/4 * sqrt(5/pi) * (3*cos(theta2)**2-1)
 dzx_2 = 1/2 * sqrt(15/pi) * cos(theta2) * cos(phi) * sin(theta2)
 dx2y2_2 = 1/4 * sqrt(15/pi) * cos(2 * phi) * sin(theta2)**2
 
-"""complex"""
-p1_comp = 1/2 * sqrt(3/(2*pi)) * exp(- I * phi) * sin(theta1)
-p2_comp = 1/2 * sqrt(3/pi) * cos(theta1) 
-p3_comp = -1/2 * sqrt(3/(2*pi)) * exp(I * phi) * sin(theta1)
-
-d1_comp = 1/4 * sqrt(15/(2*pi)) * exp(-2* I * phi) * sin(theta1)**2
-d2_comp = 1/2 * sqrt(15/(2*pi)) * exp(-I * phi) * sin(theta1) * cos(theta1)
-d3_comp = 1/4 * sqrt(5/pi) * (3*cos(theta1)**2-1)
-d4_comp = -1/2 * sqrt(15/(2*pi)) * exp(I * phi) * sin(theta1) * cos(theta1)
-d5_comp = 1/4 * sqrt(15/(2*pi)) * exp(2* I * phi) * sin(theta1)**2
-
-
+f1_2 = simplify(I/sqrt(2) * (f1_comp_2 + f7_comp_2))
+f2_2 = simplify(I/sqrt(2) * (f2_comp_2 - f6_comp_2))
+f3_2 = simplify(I/sqrt(2) * (f3_comp_2 + f5_comp_2))
+f4_2 = f4_comp_2
+f5_2 = simplify(1/sqrt(2) * (f3_comp_2 - f5_comp_2))
+f6_2 = simplify(1/sqrt(2) * (f2_comp_2 + f6_comp_2))
+f7_2 = simplify(1/sqrt(2) * (f1_comp_2 - f7_comp_2))
 
 first_center = {
-    "ss": (s_1, 0,0),
+    "ss": (ss_1, 0,0),
     "py": (py_1, 1,-1),
     "pz": (pz_1, 1,0),
     "px": (px_1,1,1),
@@ -57,23 +104,37 @@ first_center = {
     "d3": (dz2_1,2,0),
     "d4": (dzx_1,2,1),
     "d5": (dx2y2_1,2,2),
+    "f1": (f1_1, 3, -3),
+    "f2": (f2_1, 3, -2),
+    "f3": (f3_1, 3, -1),
+    "f4": (f4_1, 3, 0),
+    "f5": (f5_1, 3, 1),
+    "f6": (f6_1, 3, 2),
+    "f7": (f7_1, 3, 3)
 }
 
 first_center_complex = {
-    "ss": (s_1, 0,0),
-    "py": (p1_comp, 1,-1),
-    "pz": (p2_comp, 1,0),
-    "px": (p3_comp,1,1),
-    "d1": (d1_comp,2,-2),
-    "d2": (d2_comp,2,-1),
-    "d3": (d3_comp,2,0),
-    "d4": (d4_comp,2,1),
-    "d5": (d5_comp,2,2),
+    "ss": (s_1_comp_1, 0,0),
+    "py": (p1_comp_1, 1,-1),
+    "pz": (p2_comp_1, 1,0),
+    "px": (p3_comp_1,1,1),
+    "d1": (d1_comp_1,2,-2),
+    "d2": (d2_comp_1,2,-1),
+    "d3": (d3_comp_1,2,0),
+    "d4": (d4_comp_1,2,1),
+    "d5": (d5_comp_1,2,2),
+    "f1": (f1_comp_1, 3,-3),
+    "f2": (f2_comp_1, 3,-2),
+    "f3": (f3_comp_1, 3,-1),
+    "f4": (f4_comp_1, 3,0),
+    "f5": (f5_comp_1, 3,1),
+    "f6": (f6_comp_1, 3,2),
+    "f7": (f7_comp_1, 3,3)
 }
 
 
 second_center = {
-    "ss": (s_2,0,0),
+    "ss": (ss_2,0,0),
     "py": (py_2,1,-1),
     "pz": (pz_2,1,0),
     "px": (px_2,1,1),
@@ -82,6 +143,13 @@ second_center = {
     "d3": (dz2_2,2,0),
     "d4": (dzx_2,2,1),
     "d5": (dx2y2_2,2,2),
+    "f1": (f1_2, 3, -3),
+    "f2": (f2_2, 3, -2),
+    "f3": (f3_2, 3, -1),
+    "f4": (f4_2, 3, 0),
+    "f5": (f5_2, 3, 1),
+    "f6": (f6_2, 3, 2),
+    "f7": (f7_2, 3, 3)
 }
 
 operator = {
@@ -125,7 +193,9 @@ if __name__ == "__main__":
     unique_integrals = []
     zero_indices = []
     identifier = []
-    print("INTEGRALS = {")
+    f= open("phi3_expr.txt", 'w')
+    print("INTEGRALS = {", file=f)
+    time_start = time.time()
     for name_i, i in first_center.items():
         for name_j, j in operator.items():
             for name_k, k in second_center.items():
@@ -141,6 +211,8 @@ if __name__ == "__main__":
                         txt = txt.replace('cos(theta1)', 'c1')
                         txt = txt.replace('sin(theta1)', 's1')
                         txt = txt.replace('pi', 'np.pi')
-                        print(f'\t{tuple}: lambda c1, c2, s1, s2: '+ txt + ',') 
-    print('}')
+                        print(f'\t{tuple}: lambda c1, c2, s1, s2: '+ txt + ',', file=f)
+    time_end = time.time()
+    print('}', file=f)
+    print(f"finished integrals in {time_end-time_start} s")
 

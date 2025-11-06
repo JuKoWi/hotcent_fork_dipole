@@ -35,6 +35,14 @@ dxz_1 = sp.sqrt(15/(4* sp.pi)) * x*z/r**2
 dx2y2_1 = sp.sqrt(15/(16*sp.pi)) * (x**2-y**2)/r**2
 dz2_1 = sp.sqrt(5 / (16 * sp.pi)) * (3*z**2 -r**2)/r**2
 
+f1_1 = 1/4 * sp.sqrt(35/(2*sp.pi)) * y*(3*x**2 - y**2)/r**3
+f2_1 = 1/2 * sp.sqrt(105/sp.pi) * x*y*z/r**3
+f3_1 = 1/4 * sp.sqrt(21/(2*sp.pi)) * y * (5*z**2 - r**2)/r**3
+f4_1 = 1/4 * sp.sqrt(7/sp.pi) * (5*z**3 - 3* z * r**2)/r**3
+f5_1 = 1/4 * sp.sqrt(21/(2*sp.pi)) * x * (5*z**2 - r**2)/r**3
+f6_1 = 1/4 * sp.sqrt(105/sp.pi) * (x**2 - y**2) * z /r**3
+f7_1 = 1/4 * sp.sqrt(35/(2*sp.pi)) * x * (x**2 - 3* y**2) /r**3
+
 x0, y0, z0 = sp.symbols("x0, y0, z0")
 r_2 = sp.sqrt((x-x0)**2 + (y-y0)**2 + (z-z0)**2)
 
@@ -49,6 +57,14 @@ dyz_2 = sp.sqrt(15 / (4 * sp.pi)) * (y-y0)*(z-z0)/r_2**2
 dxz_2 = sp.sqrt(15 / (4 * sp.pi)) * (x-x0)*(z-z0)/r_2**2
 dx2y2_2 = sp.sqrt(15 / (16*sp.pi)) * ((x-x0)**2-(y-y0)**2)/r_2**2
 dz2_2 = sp.sqrt(5 / (16 * sp.pi)) * (3 * (z-z0)**2 - r_2**2)/r_2**2
+
+f1_2 = 1/4 * sp.sqrt(35/(2*sp.pi)) * (y-y0)*(3*(x-x0)**2 - (y-y0)**2)/r_2**3
+f2_2 = 1/2 * sp.sqrt(105/sp.pi) * (x-x0)*(y-y0)*(z-z0)/r_2**3
+f3_2 = 1/4 * sp.sqrt(21/(2*sp.pi)) * (y-y0) * (5*(z-z0)**2 - r_2**2)/r_2**3
+f4_2 = 1/4 * sp.sqrt(7/sp.pi) * (5*(z-z0)**3 - 3* (z-z0) * r_2**2)/r_2**3
+f5_2 = 1/4 * sp.sqrt(21/(2*sp.pi)) * (x-x0) * (5*(z-z0)**2 - r_2**2)/r_2**3
+f6_2 = 1/4 * sp.sqrt(105/sp.pi) * ((x-x0)**2 - (y-y0)**2) * (z-z0) /r_2**3
+f7_2 = 1/4 * sp.sqrt(35/(2*sp.pi)) * (x-x0) * ((x-x0)**2 - 3* (y-y0)**2) /r_2**3
 
 rx_1 = x
 ry_1 = y 
@@ -69,6 +85,13 @@ first_center_real = {
     "d3": (dz2_1,2,0),
     "d4": (dxz_1,2,1),
     "d5": (dx2y2_1,2,2),
+    "f1": (f1_1, 3, -3),
+    "f2": (f2_1, 3, -2),
+    "f3": (f3_1, 3, -1),
+    "f4": (f4_1, 3, 0),
+    "f5": (f5_1, 3, 1),
+    "f6": (f6_1, 3, 2),
+    "f7": (f7_1, 3, 3)
 }
 
 second_center = {
@@ -81,6 +104,13 @@ second_center = {
     "d3": (dz2_2,2,0),
     "d4": (dxz_2,2,1),
     "d5": (dx2y2_2,2,2),
+    "f1": (f1_2, 3, -3),
+    "f2": (f2_2, 3, -2),
+    "f3": (f3_2, 3, -1),
+    "f4": (f4_2, 3, 0),
+    "f5": (f5_2, 3, 1),
+    "f6": (f6_2, 3, 2),
+    "f7": (f7_2, 3, 3)
 }
 
 operator = {
@@ -138,7 +168,7 @@ def get_analytic_2c_integrals(pos_at1, zeta1, zeta2, comparison):
 
 
 def compare_matrix_elements(zeta1):
-    USE_EXISTING_SKF = True 
+    USE_EXISTING_SKF = False
 
     if not USE_EXISTING_SKF:
         #set up atomic system with skf files
@@ -155,25 +185,25 @@ def compare_matrix_elements(zeta1):
                           'See hotcent.slako.run for more information.')
         opt, args = p.parse_args()
 
-        element = 'Ge'
+        element = 'Eu'
         r0 = 1.85 * covalent_radii[atomic_numbers[element]] / Bohr
         atom = AtomicDFT(element,
                          xc=opt.functional,
                          confinement=PowerConfinement(r0=r0, s=2),
                          perturbative_confinement=False,
-                         configuration='[Ar] 4s2 3d10 4p2',
-                         valence=['4s', '4p', '3d'],
+                         configuration='[Xe] 4f7 6s2 6p0 5d0',
+                         valence=['5d', '6s', '6p', '4f'],
                          timing=True,
                          )
         atom.run()
 
         # Compute Slater-Koster integrals:
-        zeta_dict = {'4s': (zeta1[0], 0), '4p': (zeta1[1],1), '3d': (zeta1[2], 2)}
+        zeta_dict = {'4f': (zeta1[0], 3), '5d': (zeta1[1],2), '6s': (zeta1[2], 0), '6p': (zeta1[3], 1)}
         rmin, dr, N = 0.0, 0.05, 250
         off2c = Offsite2cTableDipole(atom, atom, timing=True)
         off2c.run(rmin, dr, N, superposition=opt.superposition,
                   xc=opt.functional, stride=opt.stride, zeta_dict=zeta_dict, 
-                  nr=200, ntheta=500
+                #   nr=200, ntheta=500
                   )
         off2c.write()
         off2c.plot_minimal()
@@ -181,18 +211,18 @@ def compare_matrix_elements(zeta1):
     vec = np.random.normal(size=3)
     vec = vec/np.linalg.norm(vec)
 
-    atoms = Atoms('Ge2', positions=[
+    atoms = Atoms('Eu2', positions=[
         [0.0, 0.0, 0.0],
         [vec[0], vec[1], vec[2]]
     ])
 
     #assemble actual matrix elements
-    write('Ge2.xyz', atoms)
-    method1 = SK_Integral('Ge', 'Ge')
-    method1.load_atom_pair('Ge2.xyz')
+    write('Eu2.xyz', atoms)
+    method1 = SK_Integral('Eu', 'Eu')
+    method1.load_atom_pair('Eu2.xyz')
     method1.set_euler_angles()
     method1.choose_relevant_matrix()
-    method1.load_SK_dipole_file('Ge-Ge_offsite2c-dipole.skf')
+    method1.load_SK_dipole_file('Eu-Eu_offsite2c-dipole.skf')
     res1 = method1.calculate_dipole()
     method1.check_rotation_implementation()
     

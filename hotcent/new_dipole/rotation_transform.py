@@ -25,6 +25,14 @@ dxz_1 = sp.sqrt(15/(4* sp.pi)) * x*z/r**2
 dx2y2_1 = sp.sqrt(15/(16*sp.pi)) * (x**2-y**2)/r**2
 dz2_1 = sp.sqrt(5 / (16 * sp.pi)) * (3*z**2 -r**2)/r**2
 
+f1 = 1/4 * sp.sqrt(35/(2*sp.pi)) * y*(3*x**2 - y**2)/r**3
+f2 = 1/2 * sp.sqrt(105/sp.pi) * x*y*z/r**3
+f3 = 1/4 * sp.sqrt(21/(2*sp.pi)) * y * (5*z**2 - r**2)/r**3
+f4 = 1/4 * sp.sqrt(7/sp.pi) * (5*z**3 - 3* z * r**2)/r**3
+f5 = 1/4 * sp.sqrt(21/(2*sp.pi)) * x * (5*z**2 - r**2)/r**3
+f6 = 1/4 * sp.sqrt(105/sp.pi) * (x**2 - y**2) * z /r**3
+f7 = 1/4 * sp.sqrt(35/(2*sp.pi)) * x * (x**2 - 3* y**2) /r**3
+
 first_center_real = {
     "ss": (s_1, 0,0),
     "py": (py_1, 1,-1),
@@ -35,6 +43,13 @@ first_center_real = {
     "d3": (dz2_1,2,0),
     "d4": (dxz_1,2,1),
     "d5": (dx2y2_1,2,2),
+    "f1": (f1, 3, -3),
+    "f2": (f2, 3, -2),
+    "f3": (f3, 3, -1),
+    "f4": (f4, 3, 0),
+    "f5": (f5, 3, 1),
+    "f6": (f6, 3, 2),
+    "f7": (f7, 3, 3)
 }
 
 def to_spherical(R):
@@ -56,11 +71,11 @@ def d_mat_elem(l, m, n, theta):
 
 def d_mat(theta):
     """small-d Wigner matrix for the angle beta (up to d orbitals). 
-    Returns a block-diagonal 9×9 symbolic matrix with j=0,1,2 blocks."""
-    d = sp.zeros(9, 9)
+    Returns a block-diagonal 16×16 symbolic matrix with j=0,1,2,3 blocks."""
+    d = sp.zeros(16,16)
     row_start = 0
 
-    for j in range(3):  # j = 0, 1, 2
+    for j in range(4):  # j = 0, 1, 2, 3
         size = 2*j + 1
         block = sp.zeros(size, size)
         for mi, m in enumerate(range(-j, j+1)):
@@ -71,12 +86,14 @@ def d_mat(theta):
     return d
 
 def z_rot_mat(phi):
-    Dz = sp.zeros(9,9)
+    Dz = sp.zeros(16,16)
     count = 0
-    for l in range(3): # l=0,1,2
+    for l in range(4): # l=0,1,2,3
         for m in range(-l, l+1):
             Dz[count, count] = sp.exp(-sp.I*m*phi)
             count += 1
+    # print('Dz-matrix')
+    # print(Dz)
     return Dz
         
 def Wigner_D_complex(euler_phi, euler_theta, euler_gamma):
@@ -87,7 +104,7 @@ def Wigner_D_complex(euler_phi, euler_theta, euler_gamma):
     return total
     
 def Wigner_D_real(euler_phi, euler_theta, euler_gamma):
-    transform_to_real = sp.zeros(9,9)
+    transform_to_real = sp.zeros(16, 16)
 
     #s
     transform_to_real[0,0] = 1
@@ -110,20 +127,35 @@ def Wigner_D_real(euler_phi, euler_theta, euler_gamma):
     transform_to_real[7,7] = -1/sp.sqrt(2)
     transform_to_real[8,4] = 1 / sp.sqrt(2)
     transform_to_real[8,8] = 1 / sp.sqrt(2)
+
+    #f
+    transform_to_real[9,9] = sp.I / sp.sqrt(2)
+    transform_to_real[9, 15] = sp.I/sp.sqrt(2)
+    transform_to_real[10,10] = sp.I/sp.sqrt(2)
+    transform_to_real[10, 14] = -sp.I/sp.sqrt(2)
+    transform_to_real[11, 11] = sp.I/sp.sqrt(2)
+    transform_to_real[11, 13] = sp.I/sp.sqrt(2)
+    transform_to_real[12, 12] = 1
+    transform_to_real[13, 11] = 1/sp.sqrt(2)
+    transform_to_real[13, 13] = -1/sp.sqrt(2)
+    transform_to_real[14, 10] = 1/ sp.sqrt(2)
+    transform_to_real[14, 14] = 1/sp.sqrt(2)
+    transform_to_real[15, 9] = 1/sp.sqrt(2)
+    transform_to_real[15, 15] = -1/sp.sqrt(2)
+
+    # print('basis transform')
+    # print(transform_to_real)
     
-
-
     transform_to_comp = transform_to_real.H
     D_total = transform_to_real * Wigner_D_complex(euler_phi=euler_phi, euler_theta=euler_theta, euler_gamma=euler_gamma) * transform_to_comp
-    print('check for identity of transform to real harmonics')
-    print(transform_to_comp * transform_to_real)
+    # print('check for identity of transform to real harmonics')
+    # print(transform_to_comp * transform_to_real)
     with open("symbolic_D_matrix.pkl", "wb") as f:
         pickle.dump(D_total, f)
     return D_total
 
 
 """some tests"""
-
 def evaluate_spherical(key, unit_vec):
     theta_val, phi_val = to_spherical(R=unit_vec)[1:]
     sh_func = first_center[key][0]
@@ -148,12 +180,14 @@ def evaluate_spherical_operator(key, unit_vec):
 def check_rotation_complex():
     unit_vec1 = np.random.rand(3)
     random_phi = np.random.uniform(0, 2*np.pi, size=1)[0]
+    random_phi = 0
     random_theta = np.random.uniform(0, np.pi, size=1)[0]
+    random_theta = 0
     Ry = np.array([[np.cos(random_theta), 0, np.sin(random_theta)], [0,1,0], [-np.sin(random_theta), 0, np.cos(random_theta)]])
     Rz = np.array([[np.cos(random_phi), - np.sin(random_phi), 0],[np.sin(random_phi), np.cos(random_phi), 0],[0,0,1]])
     unit_vec2 = Rz @ Ry @ unit_vec1
     theta1_val, phi1_val = to_spherical(unit_vec1)[1:]
-    func_vec = np.zeros((9,), 'complex')
+    func_vec = np.zeros((16,), 'complex')
     for i, (key, item) in enumerate(first_center_complex.items()):
         func = item[0]
         func_val = func.subs({phi:phi1_val, theta1: theta1_val})
@@ -161,42 +195,45 @@ def check_rotation_complex():
         func_vec[i] = func_val
     D_func = sp.lambdify((PHI, THETA, GAMMA), Wigner_D_complex(euler_gamma=GAMMA, euler_phi=PHI, euler_theta=THETA), 'numpy')
     D = D_func(-random_phi, -random_theta, 0)
-    print(D)
+    # print(D)
     result_vec = D @ func_vec
-    val1_vec = np.zeros((9,), 'complex')
+    val1_vec = np.zeros((16,), 'complex')
     for i, (key, item) in enumerate(first_center_complex.items()):
         val1 = evaluate_spherical_complex(key=key, unit_vec=unit_vec2)
         val1_vec[i] = val1
-    print(val1_vec)
-    print(result_vec)
+    # print(val1_vec)
+    # print(result_vec)
     print(np.isclose(val1_vec, result_vec))
 
 
 def check_rotation():
     unit_vec1 = np.random.rand(3)
     random_phi = np.random.uniform(0, 2*np.pi, size=1)[0]
+    # random_phi = 0
     random_theta = np.random.uniform(0, np.pi, size=1)[0]
+    # random_theta = 0
     Ry = np.array([[np.cos(random_theta), 0, np.sin(random_theta)], [0,1,0], [-np.sin(random_theta), 0, np.cos(random_theta)]])
     Rz = np.array([[np.cos(random_phi), - np.sin(random_phi), 0],[np.sin(random_phi), np.cos(random_phi), 0],[0,0,1]])
     unit_vec2 = Rz @ Ry @ unit_vec1
     theta1_val, phi1_val = to_spherical(unit_vec1)[1:]
-    func_vec = np.zeros((9,))
+    func_vec = np.zeros((16,))
     for i, (key, item) in enumerate(first_center.items()):
         func = item[0]
+        # print(func)
         func_val = func.subs({phi:phi1_val, theta1: theta1_val})
         func_val = func_val.evalf()
         func_vec[i] = func_val
     D_sym = Wigner_D_real(euler_phi=PHI, euler_gamma=GAMMA, euler_theta=THETA)
     D = sp.lambdify((PHI, GAMMA, THETA), D_sym, 'numpy')
     D = np.real(D(-random_phi, 0, -random_theta))
-    print(D)
+    # print(np.max(D))
     result_vec = D @ func_vec
-    val1_vec = np.zeros((9,))
+    val1_vec = np.zeros((16,))
     for i, (key, item) in enumerate(first_center.items()):
         val1 = evaluate_spherical(key=key, unit_vec=unit_vec2)
         val1_vec[i] = val1
-    print(val1_vec)
-    print(result_vec)
+    # print(val1_vec)
+    # print(result_vec)
     print(np.isclose(val1_vec, result_vec))
 
 
@@ -208,7 +245,7 @@ def check_rotation_prod():
     Rz = np.array([[np.cos(random_phi), - np.sin(random_phi), 0],[np.sin(random_phi), np.cos(random_phi), 0],[0,0,1]])
     unit_vec2 = Rz @ Ry @ unit_vec1
     theta1_val, phi1_val = to_spherical(unit_vec1)[1:]
-    func_vec = np.zeros((81,))
+    func_vec = np.zeros((256,))
     count = 0
     for i, (key, item) in enumerate(first_center.items()):
         for j, (key2, item2) in enumerate(first_center.items()):
@@ -226,7 +263,7 @@ def check_rotation_prod():
     D = np.real(D(-random_phi, -random_theta, 0))
     D_tot = np.kron(D, D)
     result_vec = D_tot @ func_vec
-    val1_vec = np.zeros((81,))
+    val1_vec = np.zeros((256,))
     count=0
     for i, (key, item) in enumerate(first_center.items()):
         for j, (key2, item2) in enumerate(first_center.items()):
@@ -244,7 +281,7 @@ def check_rot_triple():
     Rz = np.array([[np.cos(random_phi), - np.sin(random_phi), 0],[np.sin(random_phi), np.cos(random_phi), 0],[0,0,1]])
     unit_vec2 = Rz @ Ry @ unit_vec1
     theta1_val, phi1_val = to_spherical(unit_vec1)[1:]
-    func_vec = np.zeros((243,))
+    func_vec = np.zeros((768,))
     count = 0
     for i, (key, item) in enumerate(first_center.items()):
         for k, (key3, item3) in enumerate(operator.items()):
@@ -266,7 +303,7 @@ def check_rot_triple():
     D_op = D[1:4, 1:4]
     D_tot = np.kron(D, np.kron(D_op, D))
     result_vec = D_tot @ func_vec
-    val1_vec = np.zeros((243,))
+    val1_vec = np.zeros((768,))
     count=0
     for i, (key, item) in enumerate(first_center.items()):
         for k, (key3, item3) in enumerate(operator.items()):
@@ -282,8 +319,8 @@ def check_harmonics_equal():
     unit_vec = np.random.normal(size=3)
     unit_vec = unit_vec/np.linalg.norm(unit_vec)
     theta1_val, phi1_val = to_spherical(unit_vec)[1:]
-    complex_sh = np.zeros((9,))
-    real_sh = np.zeros((9,))
+    complex_sh = np.zeros((16,))
+    real_sh = np.zeros((16,))
     for i, (key, item) in enumerate(first_center.items()):
         func = item[0]
         func = func.subs({phi: phi1_val, theta1: theta1_val})
@@ -302,7 +339,7 @@ def check_vec_rotation():
     theta_val, phi_val= to_spherical(unit_vec)[1:]
     theta1_val = -theta_val 
     phi1_val = -phi_val
-    print(unit_vec)
+    # print(unit_vec)
     Ry = np.array([[np.cos(theta1_val), 0, np.sin(theta1_val)], [0,1,0], [-np.sin(theta1_val), 0, np.cos(theta1_val)]])
     Rz = np.array([[np.cos(phi1_val), - np.sin(phi1_val), 0],[np.sin(phi1_val), np.cos(phi1_val), 0],[0,0,1]])
     z_vector = Ry @ Rz @ unit_vec
