@@ -1,2 +1,0 @@
-coordinate: [np.float64(0.5896990261622518), np.float64(-0.37860750180332275), np.float64(0.7133802759549347)]
-sk-value 	 analytic

@@ -185,10 +185,7 @@ def get_index_list():
     
     return identifier, nonzeros 
 
-    
-
-
-if __name__ == "__main__":
+def print_dipole_integrals():
     counter = 0
     unique_integrals = []
     zero_indices = []
@@ -215,4 +212,34 @@ if __name__ == "__main__":
     time_end = time.time()
     print('}', file=f)
     print(f"finished integrals in {time_end-time_start} s")
+
+def print_overlap_integrals():
+    counter = 0
+    f= open("phi2_expr.txt", 'w')
+    print("INTEGRALS = {", file=f)
+    time_start = time.time()
+    for name_i, i in first_center.items():
+            for name_k, k in second_center.items():
+                tuple = (counter, i[1], i[2], k[1], k[2])
+                integral = integrate(i[0] * k[0], (phi, 0, 2 * pi))
+                counter += 1
+                if integral != 0:
+                    if CODE:
+                        txt = f"{integral}"
+                        txt = txt.replace('sqrt', 'np.sqrt')
+                        txt = txt.replace('sin(theta2)', 's2')
+                        txt = txt.replace('cos(theta2)', 'c2')
+                        txt = txt.replace('cos(theta1)', 'c1')
+                        txt = txt.replace('sin(theta1)', 's1')
+                        txt = txt.replace('pi', 'np.pi')
+                        print(f'\t{tuple}: lambda c1, c2, s1, s2: '+ txt + ',', file=f)
+    time_end = time.time()
+    print('}', file=f)
+    print(f"finished integrals in {time_end-time_start} s")
+    
+
+
+if __name__ == "__main__":
+    print_dipole_integrals()
+    print_overlap_integrals()
 

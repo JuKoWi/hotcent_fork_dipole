@@ -38,11 +38,11 @@ def get_analytic_2c_integrals(pos_at1, zeta1, zeta2):
                 R2 = N2*radial_2.subs({b: zeta2_val})
                 integrand = i[0] * R1 * j[0] * k[0] * R2 * r**i[1] * r_2**k[1] # eliminate poles by multiplying with r as if it was part of the radial part
                 # print(integrand)
-
                 integrand = integrand.subs({x0: pos_at1[0], y0: pos_at1[1], z0: pos_at1[2]})
                 analyt_int = sp.integrate(sp.integrate(sp.integrate(integrand, (x, -sp.oo, sp.oo)), (y, -sp.oo, sp.oo)), (z, -sp.oo, sp.oo))
                 analyt_int_value = analyt_int.evalf()
-
+                print(f"Testing integral {name_i}-{name_j}-{name_k}", file=file)
+                print(f"analytical value{count}: {analyt_int_value}")
                 results[count] = analyt_int_value 
 
                 count += 1
@@ -55,10 +55,11 @@ def get_analytic_2c_integrals(pos_at1, zeta1, zeta2):
 def create_grid_error_chart():
     t_total_1 = time.time()
     # exponents for exponentials
-    zeta1 = [1,1,1,1]
+    zeta1 = [0.27,0.27,0.27,0.27]
     #set up random atom position
-    VEC = np.random.normal(size=3)
-    VEC = VEC/np.linalg.norm(VEC)
+    # VEC = np.random.normal(size=3)
+    # VEC = VEC/np.linalg.norm(VEC)
+    VEC = [0.3, -0.7, 0.54]
     atoms = Atoms('Eu2', positions=[
         [0.0, 0.0, 0.0],
         [VEC[0], VEC[1], VEC[2]]
