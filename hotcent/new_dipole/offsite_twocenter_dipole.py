@@ -4,7 +4,7 @@ from ase.data import atomic_numbers, atomic_masses, covalent_radii
 from hotcent.multiatom_integrator import MultiAtomIntegrator
 from hotcent.orbitals import ANGULAR_MOMENTUM
 from hotcent.interpolation import CubicSplineFunction
-from hotcent.new_dipole.slako_dipole import (INTEGRALS, print_integral_overview, select_integrals, NUMSK, phi3, tail_smoothening, write_skf)
+from hotcent.new_dipole.slako_dipole import (INTEGRALS_DIPOLE, print_integral_overview, select_integrals, NUMSK, phi3, tail_smoothening, write_skf)
 import matplotlib.pyplot as plt
 import sympy as sp
 from hotcent.new_dipole.integrals import first_center, second_center, operator, pick_quantum_number, phi, theta1, theta2
@@ -14,8 +14,8 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
     def __init__(self, *args, **kwargs):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
 
-    def run(self, rmin=0.02, dr=0.02, N=None, superposition='density', xc='LDA', nr=50, stride=1, wflimit=1e-7, ntheta=150, smoothen_tails=True, zeta_dict=None):
-        """zeta_dict: overwrite atom functions radial parts for test reasons"""
+    def run(self, rmin=0.4, dr=0.02, N=None, superposition='density', xc='LDA', nr=50, stride=1, wflimit=1e-7, ntheta=150, smoothen_tails=True, zeta_dict=None):
+        """zeta_dict: overwrite atom functions radial parts for testing"""
         # self.print_header()
 
         assert N is not None, 'Need to set number of grid points N!'
@@ -110,32 +110,15 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
 
                 N1 = (2 * zeta_dict[nl1][0]/np.pi)**(3/4)
                 N2 = (2 * zeta_dict[nl2][0]/np.pi)**(3/4)
-                if R == 0:
-                    Y1 = pick_quantum_number(first_center, (integral[1], integral[2]))[0]
-                    Yr = pick_quantum_number(operator, (integral[3], integral[4]))[0]
-                    Y2 = pick_quantum_number(second_center,(integral[5], integral[6]))[0]
-                    Y2 = Y2.subs(theta2, theta1)
-                    angle_integral = sp.integrate(sp.integrate(Y1*Yr*Y2*sp.sin(theta1), (phi, 0, 2*sp.pi)), (theta1, 0, sp.pi))
+                gphi = phi3(c1, c2, s1, s2, integral)
+                aux = gphi * area * x * r1
 
-                    dr = 0.001
-                    r = np.arange(start=0, stop=self.wf_range, step=dr)
-                    Rnl1 = e1.Rnl(r, nl1)
-                    Rnl1 = N1*r**zeta_dict[nl1][1] * np.exp(-zeta_dict[nl1][0]*r**2) #overwrite with gaussian for testing
-                    Rnl2 = e2.Rnl(r, nl2)
-                    Rnl2 = N2*r**zeta_dict[nl2][1] * np.exp(-zeta_dict[nl2][0]*r**2) #overwrite with gaussian for testing
-                    radial_integral = trapezoid(y=Rnl1 * Rnl2* r**2 * r, x=r, dx=dr)
+                Rnl1 = e1.Rnl(r1, nl1)
+                Rnl1 = N1*r1**zeta_dict[nl1][1] * np.exp(-zeta_dict[nl1][0]*r1**2) #overwrite with gaussian for testing
+                Rnl2 = e2.Rnl(r2, nl2)
+                Rnl2 = N2*r2**zeta_dict[nl2][1] * np.exp(-zeta_dict[nl2][0]*r2**2) #overwrite with gaussian for testing
 
-                    D = np.sqrt(4*np.pi/3) * radial_integral * angle_integral.evalf()
-                else:
-                    gphi = phi3(c1, c2, s1, s2, integral)
-                    aux = gphi * area * x * r1
-
-                    Rnl1 = e1.Rnl(r1, nl1)
-                    Rnl1 = N1*r1**zeta_dict[nl1][1] * np.exp(-zeta_dict[nl1][0]*r1**2) #overwrite with gaussian for testing
-                    Rnl2 = e2.Rnl(r2, nl2)
-                    Rnl2 = N2*r2**zeta_dict[nl2][1] * np.exp(-zeta_dict[nl2][0]*r2**2) #overwrite with gaussian for testing
-
-                    D = np.sqrt(4*np.pi/3) * np.sum(Rnl1 * Rnl2 * aux)
+                D = np.sqrt(4*np.pi/3) * np.sum(Rnl1 * Rnl2 * aux)
                 Dl[key] = D
         else:
             for key in selected:
@@ -286,7 +269,7 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
             ymax = max(ymax, self.tables[(1, bas1, bas2)].max())
 
         for i in range(NUMSK):
-            name = INTEGRALS[i]
+            name = INTEGRALS_DIPOLE[i]
             ax = plt.subplot(NUMSK//2 +1, 2, i + 1)
 
             for p, (e1, e2) in enumerate(self.pairs):
@@ -364,7 +347,7 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
         nonzero_col = np.where(np.any(np.abs(table) > threshold, axis=0))[0]
 
         for i, col in enumerate(nonzero_col): 
-            name = sorted(INTEGRALS.items(), key=lambda x: x[0][0])[col]
+            name = sorted(INTEGRALS_DIPOLE.items(), key=lambda x: x[0][0])[col]
             ax = plt.subplot(len(nonzero_col)//2 +1, 2, i + 1)
 
             for p, (e1, e2) in enumerate(self.pairs):

@@ -2,7 +2,7 @@
 import numpy as np
 from ase.data import atomic_numbers, atomic_masses
 from hotcent.multiatom_integrator import MultiAtomIntegrator
-from hotcent.new_dipole.slako_dipole import (phi3, INTEGRALS, NUMSK,
+from hotcent.new_dipole.slako_dipole import (phi3, INTEGRALS_DIPOLE, NUMSK,
                            print_integral_overview, select_integrals,
                            tail_smoothening, write_skf)
 from hotcent.xc import XC_PW92, LibXC
@@ -62,7 +62,7 @@ class Onsite2cTable(MultiAtomIntegrator):
                     integral, nl1a, nl1b = key
                     bas1a = e1.get_basis_set_index(nl1a)
                     bas1b = e1.get_basis_set_index(nl1b)
-                    index = INTEGRALS.index(integral)
+                    index = INTEGRALS_DIPOLE.index(integral)
                     self.tables[(bas1a, bas1b)][i, index] = D[key]
 
         for key in self.tables:

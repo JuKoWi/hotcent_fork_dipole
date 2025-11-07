@@ -1,22 +1,24 @@
+import pickle
+import sys
+import time
+from pathlib import Path
+from optparse import OptionParser
+from scipy.integrate import nquad
+import sympy as sp
 import numpy as np
 import os
 from ase import Atoms
 from ase.io import write
-import pickle
-import time
-from scipy.integrate import nquad
-import sympy as sp
-from hotcent.new_dipole.dipole import SK_Integral
-from hotcent.new_dipole.rotation_transform import to_spherical
-
-from hotcent.new_dipole.offsite_twocenter_dipole import Offsite2cTableDipole
-from optparse import OptionParser
 from ase.units import Bohr
 from ase.data import covalent_radii, atomic_numbers
+from hotcent.new_dipole.assemble_integrals import SK_Integral_Dipole, SK_Integral_Overlap
+from hotcent.new_dipole.rotation_transform import to_spherical
+from hotcent.new_dipole.offsite_twocenter_new import Offsite2cTable
+from hotcent.new_dipole.offsite_twocenter_dipole import Offsite2cTableDipole
+from hotcent.new_dipole.utils import angstrom_to_bohr, bohr_to_angstrom
 from hotcent.confinement import PowerConfinement
 from hotcent.atomic_dft import AtomicDFT
-import sys
-from pathlib import Path
+
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 x, y, z = sp.symbols("x, y, z")
@@ -120,8 +122,8 @@ operator = {
 }
 
 
-def get_analytic_2c_integrals(pos_at1, zeta1, zeta2, comparison):
-    file = open("comparison.txt", 'w')
+def get_analytic_2c_dipole(pos_at1, zeta1, zeta2, comparison):
+    file = open("comparison_dipole.txt", 'w')
     print(f'coordinate: {pos_at1}', file=file)
     print("sk-value \t analytic", file=file)
     t_start = time.time()
@@ -161,14 +163,51 @@ def get_analytic_2c_integrals(pos_at1, zeta1, zeta2, comparison):
                 count += 1
     t_end = time.time()
     print(f"integration took {t_end-t_start}")
-    with open("analytical_integrals_list.pkl", "wb") as f:
+    with open("analytical_dipole_list.pkl", "wb") as f:
         pickle.dump(results, f)
     file.close()
     return results
 
 
-def compare_matrix_elements(zeta1):
-    USE_EXISTING_SKF = False
+def get_analytic_2c_overlap(pos_at1, zeta1, zeta2, comparison):
+    file = open("comparison_overlap.txt", 'w')
+    print(f'coordinate: {pos_at1}', file=file)
+    print("sk-value \t analytic", file=file)
+    t_start = time.time()
+    count = 0
+    results = np.zeros((len(first_center_real) * len(second_center)))
+
+    
+    for name_i, i in first_center_real.items():
+        for name_k, k in second_center.items():
+            # if (i[1]<2 and k[1]<2):
+            zeta1_val = zeta1[i[1]]
+            zeta2_val = zeta2[k[1]]
+            R1 = radial_1.subs({b: zeta1_val})
+            R2 = radial_2.subs({b: zeta2_val})
+            integrand = i[0] * R1 * k[0] * R2 * r**i[1] * r_2**k[1] # eliminate poles by multiplying with r as if it was part of the radial part
+            integrand = integrand.subs({x0: pos_at1[0], y0: pos_at1[1], z0: pos_at1[2]})
+            analyt_int = sp.integrate(sp.integrate(sp.integrate(integrand, (x, -sp.oo, sp.oo)), (y, -sp.oo, sp.oo)), (z, -sp.oo, sp.oo))
+            analyt_int_value = analyt_int.evalf()
+            
+            print(f"Testing integral {name_i}-{name_k}", file=file)
+            results[count] = analyt_int_value 
+            print(f"Testing integral {name_i}-{name_k}")
+            print(f"sk value:{comparison[count]}")
+            print(f"analytical: {analyt_int_value}")
+            print(f'{comparison[count]} \t{analyt_int_value}',file=file)
+
+            count += 1
+    t_end = time.time()
+    print(f"integration took {t_end-t_start}")
+    with open("analytical_overlap_list.pkl", "wb") as f:
+        pickle.dump(results, f)
+    file.close()
+    return results
+
+
+def compare_dipole_elements(zeta1):
+    USE_EXISTING_SKF = True
 
     if not USE_EXISTING_SKF:
         #set up atomic system with skf files
@@ -199,7 +238,7 @@ def compare_matrix_elements(zeta1):
 
         # Compute Slater-Koster integrals:
         zeta_dict = {'4f': (zeta1[0], 3), '5d': (zeta1[1],2), '6s': (zeta1[2], 0), '6p': (zeta1[3], 1)}
-        rmin, dr, N = 0.0, 0.05, 250
+        rmin, dr, N = 0.4, 0.02, 250
         off2c = Offsite2cTableDipole(atom, atom, timing=True)
         off2c.run(rmin, dr, N, superposition=opt.superposition,
                   xc=opt.functional, stride=opt.stride, zeta_dict=zeta_dict, 
@@ -218,7 +257,7 @@ def compare_matrix_elements(zeta1):
 
     #assemble actual matrix elements
     write('Eu2.xyz', atoms)
-    method1 = SK_Integral('Eu', 'Eu')
+    method1 = SK_Integral_Dipole()
     method1.load_atom_pair('Eu2.xyz')
     method1.set_euler_angles()
     method1.choose_relevant_matrix()
@@ -227,9 +266,65 @@ def compare_matrix_elements(zeta1):
     method1.check_rotation_implementation()
     
     #calculate directly brute force
-    res2 = get_analytic_2c_integrals(pos_at1=method1.R_vec, zeta1=zeta1, zeta2=zeta1, comparison=res1)
+    res2 = get_analytic_2c_dipole(pos_at1=method1.R_vec, zeta1=zeta1, zeta2=zeta1, comparison=res1)
     
 
+def compare_overlap_elements(zeta1):
+    USE_EXISTING_SKF = True 
 
+    if not USE_EXISTING_SKF:
+        #set up atomic system with skf files
+        p = OptionParser(usage='%prog')
+        p.add_option('-f', '--functional', default='LDA',
+                     help='Which density functional to apply? '
+                          'E.g. LDA (default), GGA_X_PBE+GGA_C_PBE, ...')
+        p.add_option('-s', '--superposition',
+                     default='potential',
+                     help='Which superposition scheme? '
+                          'Choose "potential" (default) or "density"')
+        p.add_option('-t', '--stride', default=1, type=int,
+                     help='Which SK-table stride length? Default = 1. '
+                          'See hotcent.slako.run for more information.')
+        opt, args = p.parse_args()
+
+        element = 'Eu'
+        r0 = 1.85 * covalent_radii[atomic_numbers[element]] / Bohr
+        atom = AtomicDFT(element,
+                         xc=opt.functional,
+                         confinement=PowerConfinement(r0=r0, s=2),
+                         perturbative_confinement=False,
+                         configuration='[Xe] 4f7 6s2 6p0 5d0',
+                         valence=['5d', '6s', '6p', '4f'],
+                         timing=True,
+                         )
+        atom.run()
+
+        # Compute Slater-Koster integrals:
+        zeta_dict = {'4f': (zeta1[0], 3), '5d': (zeta1[1],2), '6s': (zeta1[2], 0), '6p': (zeta1[3], 1)}
+        rmin, dr, N = 0.4, 0.02, 250
+        off2c = Offsite2cTable(atom, atom, timing=True)
+        off2c.run(rmin, dr, N, superposition=opt.superposition,
+                  xc=opt.functional, stride=opt.stride, zeta_dict=zeta_dict, 
+                #   nr=200, ntheta=500
+                  )
+        off2c.write()
+
+    vec = np.random.normal(size=3)
+    vec = vec/np.linalg.norm(vec)
+
+    atoms = Atoms('Eu2', positions=[
+        [0.0, 0.0, 0.0],
+        [vec[0], vec[1], vec[2]]
+    ])
+
+    #assemble actual matrix elements
+    write('Eu2.xyz', atoms)
+    method1 = SK_Integral_Overlap()
+    method1.load_atom_pair('Eu2.xyz')
+    method1.set_euler_angles()
+    method1.choose_relevant_matrix()
+    method1.load_SK_file('Eu-Eu_offsite2c.skf')
+    res1 = method1.calculate_overlap()
     
-
+    #calculate directly brute force
+    res2 = get_analytic_2c_overlap(pos_at1=method1.R_vec, zeta1=zeta1, zeta2=zeta1, comparison=res1)

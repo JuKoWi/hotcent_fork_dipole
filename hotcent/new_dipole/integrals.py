@@ -8,6 +8,8 @@ phi, theta1 = symbols('phi theta1')
 
 
 theta2 = symbols('theta2')
+s1, s2, c1, c2 = symbols('s1 s2 c1 c2')
+
 
 
 """complex, first atom"""
@@ -165,7 +167,7 @@ def pick_quantum_number(dictionary, lm):
     raise ValueError("Element missing: No spherical harmonic for this quantum number combination")
         
 
-def get_index_list():
+def get_index_list_dipole():
     count = 0
     identifier = []
     nonzeros = []
@@ -179,11 +181,29 @@ def get_index_list():
                 identifier.append(tuple)
                 count += 1
 
-    with open("identifier_nonzeros.pkl", "wb") as f:
+    with open("identifier_nonzeros_dipole.pkl", "wb") as f:
         pickle.dump(identifier, f)
         pickle.dump(nonzeros, f)
-    
     return identifier, nonzeros 
+
+def get_index_list_overlap():
+    count = 0
+    identifier = []
+    nonzeros = []
+    for name_i, i in first_center.items():
+        for name_k, k in second_center.items():
+            integral = integrate(i[0] * k[0], (phi, 0, 2 * pi))
+            if integral != 0:
+                nonzeros.append(count)
+            tuple = (count, i[1], i[2], k[1], k[2])
+            identifier.append(tuple)
+            count += 1
+
+    with open("identifier_nonzeros_overlap.pkl", "wb") as f:
+        pickle.dump(identifier, f)
+        pickle.dump(nonzeros, f)
+    return identifier, nonzeros 
+
 
 def print_dipole_integrals():
     counter = 0
@@ -236,10 +256,41 @@ def print_overlap_integrals():
     time_end = time.time()
     print('}', file=f)
     print(f"finished integrals in {time_end-time_start} s")
+
+def print_overlap_derivatives():
+    counter = 0
+    f= open("deriv-phi2_expr.txt", 'w')
+    print("INTEGRAL_DERIVATIVE = {", file=f)
+    time_start = time.time()
+    for name_i, i in first_center.items():
+            for name_k, k in second_center.items():
+                tuple = (counter, i[1], i[2], k[1], k[2])
+                integral = integrate(i[0] * k[0], (phi, 0, 2 * pi))
+                integral = integral.subs({sin(theta1): s1, sin(theta2): s2, cos(theta1): c1, cos(theta2): c2})
+                ds1 = diff(integral, s1)
+                ds2 = diff(integral, s2)
+                dc1 = diff(integral, c1)
+                dc2 = diff(integral, c2)
+                counter += 1
+                if integral != 0:
+                    print(ds1)
+                    print(ds2)
+                    print(dc1)
+                    print(dc2)
+                    if CODE:
+                        txt = f"[{dc1}, {dc2}, {ds1}, {ds2}],"
+                        txt = txt.replace('sqrt', 'np.sqrt')
+                        txt = txt.replace('pi', 'np.pi')
+                        print(f'\t{tuple}: lambda c1, c2, s1, s2: '+ txt , file=f)
+    time_end = time.time()
+    print('}', file=f)
+    print(f"finished integrals in {time_end-time_start} s")
+    
     
 
 
 if __name__ == "__main__":
-    print_dipole_integrals()
-    print_overlap_integrals()
+    # print_dipole_integrals()
+    # print_overlap_integrals()
+    print_overlap_derivatives()
 

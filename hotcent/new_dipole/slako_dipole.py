@@ -6,7 +6,7 @@ unified format for the label: 1., 3. and 5. letter give nl, others just for dist
 (x,y,z) for p, (1,2,3,4,5) for d
 """
 
-INTEGRALS = {
+INTEGRALS_DIPOLE = {
 	(1, 0, 0, 1, -1, 1, -1): lambda c1, c2, s1, s2: 0.375*s1*s2/np.sqrt(np.pi),
 	(5, 0, 0, 1, -1, 2, -1): lambda c1, c2, s1, s2: 0.375*np.sqrt(5)*s1*s2*c2/np.sqrt(np.pi),
 	(11, 0, 0, 1, -1, 3, -1): lambda c1, c2, s1, s2: 0.09375*np.sqrt(14)*(5*c2**2 - 1)*s1*s2/np.sqrt(np.pi),
@@ -166,7 +166,7 @@ INTEGRALS = {
 }
 
 
-NUMSK = len(INTEGRALS)
+NUMSK = len(INTEGRALS_DIPOLE)
 
 def convert_quant_num(l):
         if l == 0:
@@ -226,7 +226,7 @@ def phi3(c1, c2, s1, s2, sk_label):
     for the atom at origin (atom at z=Rz). These expressions are obtained
     by integrating analytically over phi.
     """
-    return INTEGRALS[sk_label](c1,c2,s1,s2)
+    return INTEGRALS_DIPOLE[sk_label](c1,c2,s1,s2)
 
 def select_integrals(e1, e2):
     """ Return list of integrals (integral, nl1, nl2)
@@ -234,7 +234,7 @@ def select_integrals(e1, e2):
     selected = []
     for ival1, valence1 in enumerate(e1.basis_sets):
         for ival2, valence2 in enumerate(e2.basis_sets):
-            for sk_label, func in INTEGRALS.items():
+            for sk_label, func in INTEGRALS_DIPOLE.items():
                 nl1, nl2 = select_subshells(valence1, valence2, sk_label)
                 if nl1 is not None and nl2 is not None:
                     selected.append((sk_label, nl1, nl2))
@@ -376,9 +376,12 @@ def write_skf(handle, Rgrid, table, has_diagonal_data, is_extended, eigval,
     grid_dist = Rgrid[1] - Rgrid[0]
     grid_npts, numint = np.shape(table)
     assert (numint % NUMSK) == 0
-#     nzeros = int(np.round(Rgrid[0] / grid_dist)) - 1
-#     assert nzeros >= 0
-    print("%.12f, %d" % (grid_dist, grid_npts ), file=handle)
+    nzeros = int(np.round(Rgrid[0] / grid_dist)) - 1
+    print(grid_dist)
+    print(Rgrid[0])
+    print(nzeros)
+    assert nzeros >= 0
+    print("%.12f, %d" % (grid_dist, grid_npts + nzeros), file=handle)
 
     if has_diagonal_data or has_offdiagonal_data:
         if has_diagonal_data:
@@ -416,6 +419,11 @@ def write_skf(handle, Rgrid, table, has_diagonal_data, is_extended, eigval,
     assert numtab > 0
     
     indices = np.shape(table)[1]
+    for i in range(nzeros):
+        line = ''
+        for j in range(indices):
+                line += '{0: 1.12e}  '.format(0) 
+        print(line, file=handle)
     for i in range(grid_npts):
         line = ''
         for j in range(indices):

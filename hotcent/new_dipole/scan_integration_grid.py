@@ -6,7 +6,7 @@ import pickle
 import time
 from scipy.integrate import nquad
 import sympy as sp
-from hotcent.new_dipole.dipole import SK_Integral
+from hotcent.new_dipole.assemble_integrals import SK_Integral_Dipole
 from hotcent.new_dipole.compare_integration_methods import first_center_real, second_center, operator, radial_1, radial_2, r, r_2, b, x, y, z, x0, y0, z0
 
 from hotcent.new_dipole.offsite_twocenter_dipole import Offsite2cTableDipole
@@ -109,7 +109,7 @@ def create_grid_error_chart():
             #assemble actual matrix elements
             print("start sk-transformation")
             time1 = time.time()
-            method1 = SK_Integral('Eu', 'Eu')
+            method1 = SK_Integral_Dipole()
             method1.load_atom_pair('Eu2.xyz')
             method1.set_euler_angles()
             method1.choose_relevant_matrix()

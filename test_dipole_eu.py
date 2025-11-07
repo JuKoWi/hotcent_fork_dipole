@@ -30,12 +30,9 @@ atom = AtomicDFT(element,
                  txt='-',
                  )
 atom.run()
-atom.plot_Rnl()
-atom.plot_density()
 
 # Compute Slater-Koster integrals:
 rmin, dr, N = 0.56, 0.04, 420
 off2c = Offsite2cTableDipole(atom, atom, timing=True)
 off2c.run(rmin, dr, N, superposition='potential', xc=xc)
 off2c.write()
-off2c.plot_minimal()

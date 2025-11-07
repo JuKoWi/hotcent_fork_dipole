@@ -10,7 +10,7 @@ from hotcent.interpolation import CubicSplineFunction
 from hotcent.multiatom_integrator import MultiAtomIntegrator
 from hotcent.orbitals import ANGULAR_MOMENTUM
 from hotcent.xc import XC_PW92, LibXC
-from hotcent.new_dipole.slako_new import INTEGRALS, NUMSK, phi2
+from hotcent.new_dipole.slako_new import INTEGRALS, NUMSK, phi2, dphi2, select_integrals, print_integral_overview, tail_smoothening, write_skf, get_hotcent_style_index
 try:
     import matplotlib.pyplot as plt
 except ImportError:
@@ -22,7 +22,7 @@ class Offsite2cTable(MultiAtomIntegrator):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
 
     def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
-            superposition='density', xc='LDA', stride=1, smoothen_tails=True):
+            superposition='density', xc='LDA', stride=1, smoothen_tails=True, zeta_dict=None):
 
         self.print_header()
 
@@ -60,14 +60,13 @@ class Offsite2cTable(MultiAtomIntegrator):
                 selected = select_integrals(e1, e2)
                 if len(grid) > 0:
                     S, H, H2 = self.calculate(selected, e1, e2, R, grid, area,
-                                             xc=xc, superposition=superposition)
-                    for key in selected:
-                        integral, nl1, nl2 = key
+                                             xc=xc, superposition=superposition, zeta_dict=zeta_dict)
+                    for j,key in enumerate(sorted(selected, key=lambda x: x[0][0])):
+                        sk_label, nl1, nl2 = key
                         bas1 = e1.get_basis_set_index(nl1)
                         bas2 = e2.get_basis_set_index(nl2)
-                        index = INTEGRALS.index(integral)
-                        tables[(p, bas1, bas2)][i, index] = H[key]
-                        tables[(p, bas1, bas2)][i, NUMSK+index] = S[key]
+                        tables[(p, bas1, bas2)][i, j] = H[key]
+                        tables[(p, bas1, bas2)][i, NUMSK+j] = S[key]
 
         self.Rgrid = rmin + dr * np.arange(N)
 
@@ -90,7 +89,7 @@ class Offsite2cTable(MultiAtomIntegrator):
 
         self.timer.stop('run_offsite2c')
 
-    def calculate(self, selected, e1, e2, R, grid, area,
+    def calculate(self, selected, e1, e2, R, grid, area, zeta_dict=None,
                   superposition='density', xc='LDA', only_overlap=False,
                   symmetrize_kinetic=True):
 
@@ -153,70 +152,64 @@ class Offsite2cTable(MultiAtomIntegrator):
         Sl, Hl, H2l = {}, {}, {}
         sym1, sym2 = e1.get_symbol(), e2.get_symbol()
 
-        if zeta_dict != None:
-            for key in selected:
-                integral, nl1, nl2 = key
-
-                gphi = phi2(c1, c2, s1, s2, integral)
-                aux = gphi * area * x
-
-                Rnl1 = e1.Rnl(r1, nl1)
-                Rnl2 = e2.Rnl(r2, nl2)
-                S = np.sum(Rnl1 * Rnl2 * aux)
-                Sl[key] = S
-
-                if not only_overlap:
-                    l2 = ANGULAR_MOMENTUM[nl2[1]]
-                    ddunl2 = e2.unl(r2, nl2, der=2)
-
-                    H = np.sum(Rnl1 * (-0.5 * ddunl2 / r2 + (veff + \
-                               l2 * (l2 + 1) / (2 * r2**2)) * Rnl2) * aux)
-
-                    if symmetrize_kinetic:
-                        l1 = ANGULAR_MOMENTUM[nl1[1]]
-                        ddunl1 = e1.unl(r1, nl1, der=2)
-                        H += np.sum(Rnl2 * (-0.5 * ddunl1 / r1 + (veff + \
-                                    l1 * (l1 + 1) / (2 * r1**2)) * Rnl1) * aux)
-                        H /= 2.
-
-                    lm1, lm2 = INTEGRAL_PAIRS[integral]
-                    H += e1.pp.get_nonlocal_integral(sym1, sym2, sym1, 0., 0., R,
-                                                     nl1, nl2, lm1, lm2)
-                    H += e2.pp.get_nonlocal_integral(sym1, sym2, sym2, 0., R, R,
-                                                     nl1, nl2, lm1, lm2)
-
-                    if superposition == 'potential':
-                        H2 = np.sum(Rnl1 * Rnl2 * aux * (v2 - e1.confinement(r1)))
-                        H2 += e1.get_epsilon(nl1) * S
-                    elif superposition == 'density':
-                        H2 = 0
-
-                    if superposition == 'density' and xc.add_gradient_corrections:
-                        self.timer.start('vsigma')
-                        dRnl1 = e1.Rnl(r1, nl1, der=1)
-                        dRnl2 = e2.Rnl(r2, nl2, der=1)
-                        dgphi = dg(c1, c2, s1, s2, integral)
-                        dgphidx = dgphi[0]*dc1dx + dgphi[1]*dc2dx \
-                                  + dgphi[2]*ds1dx + dgphi[3]*ds2dx
-                        dgphidy = dgphi[0]*dc1dy + dgphi[1]*dc2dy \
-                                  + dgphi[2]*ds1dy + dgphi[3]*ds2dy
-                        grad_phi_x = (dRnl1 * s1 * Rnl2 + Rnl1 * dRnl2 * s2) * gphi
-                        grad_phi_x += Rnl1 * Rnl2 * dgphidx
-                        grad_phi_y = (dRnl1 * c1 * Rnl2 + Rnl1 * dRnl2 * c2) * gphi
-                        grad_phi_y += Rnl1 * Rnl2 * dgphidy
-                        grad_rho_grad_phi = grad_rho_x * grad_phi_x \
-                                            + grad_rho_y * grad_phi_y
-                        H += 2. * np.sum(vsigma * grad_rho_grad_phi * area * x)
-                        self.timer.stop('vsigma')
-
-                    Hl[key] = H
-                    H2l[key] = H2
-
-            self.timer.stop('calculate_offsite2c')
-            if only_overlap:
-                return Sl
-            else:
-                return Sl, Hl, H2l
+        for key in selected:
+            sk_label, nl1, nl2 = key
+            gphi = phi2(c1, c2, s1, s2, sk_label)
+            aux = gphi * area * x
+            Rnl1 = e1.Rnl(r1, nl1)
+            Rnl2 = e2.Rnl(r2, nl2)
+            if zeta_dict != None:
+                N1 = (2 * zeta_dict[nl1][0]/np.pi)**(3/4)
+                N2 = (2 * zeta_dict[nl2][0]/np.pi)**(3/4)
+                Rnl1 = N1*r1**zeta_dict[nl1][1] * np.exp(-zeta_dict[nl1][0]*r1**2) #overwrite with gaussian for testing
+                Rnl2 = N2*r2**zeta_dict[nl2][1] * np.exp(-zeta_dict[nl2][0]*r2**2) #overwrite with gaussian for testing
+            S = np.sum(Rnl1 * Rnl2 * aux)
+            Sl[key] = S
+            if not only_overlap:
+                l2 = sk_label[3]
+                ddunl2 = e2.unl(r2, nl2, der=2)
+                H = np.sum(Rnl1 * (-0.5 * ddunl2 / r2 + (veff + \
+                           l2 * (l2 + 1) / (2 * r2**2)) * Rnl2) * aux)
+                if symmetrize_kinetic:
+                    l1 = sk_label[1]
+                    ddunl1 = e1.unl(r1, nl1, der=2)
+                    H += np.sum(Rnl2 * (-0.5 * ddunl1 / r1 + (veff + \
+                                l1 * (l1 + 1) / (2 * r1**2)) * Rnl1) * aux)
+                    H /= 2.
+                lm1, lm2 = get_hotcent_style_index(sk_label) #new function to get the hotcent style function labels from integral label 
+                H += e1.pp.get_nonlocal_integral(sym1, sym2, sym1, 0., 0., R,
+                                                 nl1, nl2, lm1, lm2)
+                H += e2.pp.get_nonlocal_integral(sym1, sym2, sym2, 0., R, R,
+                                                 nl1, nl2, lm1, lm2)
+                if superposition == 'potential':
+                    H2 = np.sum(Rnl1 * Rnl2 * aux * (v2 - e1.confinement(r1)))
+                    H2 += e1.get_epsilon(nl1) * S
+                elif superposition == 'density':
+                    H2 = 0
+                if superposition == 'density' and xc.add_gradient_corrections:
+                    self.timer.start('vsigma')
+                    dRnl1 = e1.Rnl(r1, nl1, der=1)
+                    dRnl2 = e2.Rnl(r2, nl2, der=1)
+                    dgphi = dphi2(c1, c2, s1, s2, sk_label)
+                    dgphidx = dgphi[0]*dc1dx + dgphi[1]*dc2dx \
+                              + dgphi[2]*ds1dx + dgphi[3]*ds2dx
+                    dgphidy = dgphi[0]*dc1dy + dgphi[1]*dc2dy \
+                              + dgphi[2]*ds1dy + dgphi[3]*ds2dy
+                    grad_phi_x = (dRnl1 * s1 * Rnl2 + Rnl1 * dRnl2 * s2) * gphi
+                    grad_phi_x += Rnl1 * Rnl2 * dgphidx
+                    grad_phi_y = (dRnl1 * c1 * Rnl2 + Rnl1 * dRnl2 * c2) * gphi
+                    grad_phi_y += Rnl1 * Rnl2 * dgphidy
+                    grad_rho_grad_phi = grad_rho_x * grad_phi_x \
+                                        + grad_rho_y * grad_phi_y
+                    H += 2. * np.sum(vsigma * grad_rho_grad_phi * area * x)
+                    self.timer.stop('vsigma')
+                Hl[key] = H
+                H2l[key] = H2
+        self.timer.stop('calculate_offsite2c')
+        if only_overlap:
+            return Sl
+        else:
+            return Sl, Hl, H2l
 
     def write(self, eigenvalues=None, hubbardvalues=None, occupations=None,
               spe=None, offdiagonal_H=None, offdiagonal_S=None,
