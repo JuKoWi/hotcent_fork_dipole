@@ -47,6 +47,7 @@ def get_analytic_2c_integrals(pos_at1, zeta1, zeta2):
                 if count % 10 == 0:
                     np.save("analytical-integrals.npy", results)
                 count += 1
+    np.save("analytical-integrals.npy", results)
     t_end = time.time()
     print(f"analytical integration took {t_end-t_start}")
     file.close()

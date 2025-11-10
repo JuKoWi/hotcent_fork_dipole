@@ -236,10 +236,12 @@ class SK_With_Shift(SK_Integral):
     def load_atom_pair(self, path):
         """load position and basis functions to compute the integrals for"""
         atoms = ase.io.read(path)
-        atom1 = atoms.get_positions()[0]
+        atom1 = angstrom_to_bohr(atoms.get_positions()[0])
         self.R_vec = angstrom_to_bohr(atoms.get_distance(0, 1, vector=True))
         self.r = angstrom_to_bohr(atoms.get_distance(0,1, vector=False))
-        self.atom1_pos = atom1
+        self.atom1_pos = np.array([atom1[1], atom1[2], atom1[0]])
+        print(self.atom1_pos)
+        print(angstrom_to_bohr(atoms.get_positions()[1]))
 
     def calculate_dipole_elements(self):
         R_grid = self.delta_R + self.delta_R * np.arange(self.n_points) 
@@ -248,7 +250,7 @@ class SK_With_Shift(SK_Integral):
         for i, key in enumerate(sorted(INTEGRALS, key= lambda x: x[0])):
             integral_vec[key[0]] = cs(self.r)[i]
         overlap_elements = self.Wigner_D_full @ integral_vec
-        shift_term = np.kron(overlap_elements, self.atom1_pos) 
+        # shift_term = np.kron(overlap_elements, self.atom1_pos) 
 
         R_grid_dipole = self.delta_R_dipole + self.delta_R_dipole * np.arange(self.n_points_dipole) 
         cs_dipole = CubicSpline(R_grid_dipole, self.sk_table_dipole) 
@@ -257,5 +259,9 @@ class SK_With_Shift(SK_Integral):
             integral_vec_dipole[key[0]] = cs_dipole(self.r)[i]
         dipole_elements = self.Wigner_D_full_dipole @ integral_vec_dipole
 
+        shift_term = np.zeros_like(dipole_elements)
+        for i in range(16):
+            first_same = overlap_elements[i*16:(i+1)*16]
+            shift_term[i*48: (i+1)*48] = np.kron(first_same, self.atom1_pos)
         shifted_dipole = dipole_elements + shift_term
         return shifted_dipole
