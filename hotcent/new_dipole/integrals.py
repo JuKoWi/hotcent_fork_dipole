@@ -4,9 +4,8 @@ import pickle
 CODE = True
 init_printing(use_unicode=True)
 
-phi, theta1 = symbols('phi theta1')
-
-
+phi = symbols('phi')
+theta1 = symbols('theta1')
 theta2 = symbols('theta2')
 s1, s2, c1, c2 = symbols('s1 s2 c1 c2')
 
@@ -168,6 +167,7 @@ def pick_quantum_number(dictionary, lm):
         
 
 def get_index_list_dipole():
+    """list of nonzero phi3 integrals"""
     count = 0
     identifier = []
     nonzeros = []
@@ -180,13 +180,13 @@ def get_index_list_dipole():
                 tuple = (count, i[1], i[2], j[1], j[2], k[1], k[2])
                 identifier.append(tuple)
                 count += 1
-
     with open("identifier_nonzeros_dipole.pkl", "wb") as f:
         pickle.dump(identifier, f)
         pickle.dump(nonzeros, f)
     return identifier, nonzeros 
 
 def get_index_list_overlap():
+    """list of nonzero phi2 integrals """
     count = 0
     identifier = []
     nonzeros = []
@@ -198,7 +198,6 @@ def get_index_list_overlap():
             tuple = (count, i[1], i[2], k[1], k[2])
             identifier.append(tuple)
             count += 1
-
     with open("identifier_nonzeros_overlap.pkl", "wb") as f:
         pickle.dump(identifier, f)
         pickle.dump(nonzeros, f)
@@ -207,9 +206,6 @@ def get_index_list_overlap():
 
 def print_dipole_integrals():
     counter = 0
-    unique_integrals = []
-    zero_indices = []
-    identifier = []
     f= open("phi3_expr.txt", 'w')
     print("INTEGRALS = {", file=f)
     time_start = time.time()
@@ -234,6 +230,7 @@ def print_dipole_integrals():
     print(f"finished integrals in {time_end-time_start} s")
 
 def print_overlap_integrals():
+    """print python code for numerical phi2 integrals to file"""
     counter = 0
     f= open("phi2_expr.txt", 'w')
     print("INTEGRALS = {", file=f)
@@ -258,6 +255,7 @@ def print_overlap_integrals():
     print(f"finished integrals in {time_end-time_start} s")
 
 def print_overlap_derivatives():
+    """print python code for derivatives of phi2 integrals to file"""
     counter = 0
     f= open("deriv-phi2_expr.txt", 'w')
     print("INTEGRAL_DERIVATIVE = {", file=f)

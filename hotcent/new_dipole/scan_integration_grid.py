@@ -113,7 +113,7 @@ def create_grid_error_chart():
             method1 = SK_Integral_Dipole()
             method1.load_atom_pair('Eu2.xyz')
             method1.set_euler_angles()
-            method1.choose_relevant_matrix()
+            method1.set_rotation_matrix()
             method1.load_SK_dipole_file('Eu-Eu_offsite2c-dipole.skf')
             res1 = method1.calculate_dipole()
             time2 = time.time()

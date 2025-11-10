@@ -205,7 +205,7 @@ def get_analytic_2c_dipole(pos_at1, pos_at2, zeta1, zeta2, comparison):
 
 
 def compare_dipole_shifted(zeta1):
-    USE_EXISTING_SKF = True 
+    USE_EXISTING_SKF = False 
 
     if not USE_EXISTING_SKF:
         #set up atomic system with skf files
@@ -236,17 +236,17 @@ def compare_dipole_shifted(zeta1):
 
         # Compute Slater-Koster integrals:
         zeta_dict = {'4f': (zeta1[0], 3), '5d': (zeta1[1],2), '6s': (zeta1[2], 0), '6p': (zeta1[3], 1)}
-        rmin, dr, N = 0.4, 0.02, 250
+        rmin, dr, N = 0.4, 0.02, 500
         off2c = Offsite2cTable(atom, atom, timing=True)
         off2c.run(rmin, dr, N, superposition=opt.superposition,
                   xc=opt.functional, stride=opt.stride, zeta_dict=zeta_dict, 
-                #   nr=200, ntheta=500
+                  nr=200, ntheta=500
                   )
         off2c.write()
 
     # vec = np.random.normal(size=3)
     # vec = vec/np.linalg.norm(vec)
-    shift_vec = bohr_to_angstrom(np.array([0, 1, 0]))
+    shift_vec = bohr_to_angstrom(np.array([0.3, 0.5, -0.7]))
     inter_vec = bohr_to_angstrom(np.array([1, 2, 1.5]))
 
     atoms = Atoms('Eu2', positions=[

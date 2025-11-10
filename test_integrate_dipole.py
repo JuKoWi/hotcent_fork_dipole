@@ -12,6 +12,6 @@ basis = ['2s', '2p']
 
 integral = SK_Integral_Dipole('C', 'C')
 integral.load_atom_pair('C2.xyz')
-integral.choose_relevant_matrix()
+integral.set_rotation_matrix()
 integral.load_SK_dipole_file('C-C_offsite2c-dipole.skf')
 print(integral.calculate_dipole())
