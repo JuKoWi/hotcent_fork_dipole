@@ -1,8 +1,0 @@
-coordinate: [0.3, -0.7, 0.54]
-sk-value 	 analytic
-Testing integral ss-ry-ss
-Testing integral ss-ry-py
-Testing integral ss-ry-pz
-Testing integral ss-ry-px
-Testing integral ss-ry-d1
-Testing integral ss-ry-d2

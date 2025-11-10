@@ -44,12 +44,12 @@ def get_analytic_2c_integrals(pos_at1, zeta1, zeta2):
                 print(f"Testing integral {name_i}-{name_j}-{name_k}", file=file)
                 print(f"analytical value{count}: {analyt_int_value}")
                 results[count] = analyt_int_value 
-
+                if count % 10 == 0:
+                    np.save("analytical-integrals.npy", results)
                 count += 1
     t_end = time.time()
     print(f"analytical integration took {t_end-t_start}")
     file.close()
-    np.save("analytical-integrals.npy", results)
     return results
 
 def create_grid_error_chart():
