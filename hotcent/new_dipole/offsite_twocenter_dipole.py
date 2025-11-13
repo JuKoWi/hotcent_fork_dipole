@@ -6,16 +6,63 @@ from hotcent.orbitals import ANGULAR_MOMENTUM
 from hotcent.interpolation import CubicSplineFunction
 from hotcent.new_dipole.slako_dipole import (INTEGRALS_DIPOLE, select_integrals, NUMSK, phi3, tail_smoothening, write_skf)
 import matplotlib.pyplot as plt
-import sympy as sp
-from hotcent.new_dipole.integrals import first_center, second_center, operator, pick_quantum_number, phi, theta1, theta2
-from scipy.integrate import trapezoid
 
 class Offsite2cTableDipole(MultiAtomIntegrator):
     def __init__(self, *args, **kwargs):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
 
     def run(self, rmin=0.4, dr=0.02, N=None, superposition='density', nr=50, stride=1, wflimit=1e-7, ntheta=150, smoothen_tails=True, zeta_dict=None):
-        """zeta_dict: overwrite atom functions radial parts for testing"""
+        """
+        Calculates off-site two-center Hamiltonian and overlap integrals.
+
+        Parameters
+        ----------
+        rmin : float, optional
+            Shortest interatomic separation to consider. All .skf entries for lower 
+            r are set to 0.
+        dr : float, optional
+            Grid spacing for the interatomic separations. Also smallest distance
+            appearing in .skf
+        N : int
+            Number of grid points for the interatomic separations.
+        ntheta : int, optional
+            Number of angular divisions in polar grid (more dense towards
+            the bonding region).
+        nr : int, optional
+            Number of radial divisions in polar grid (more dense towards
+            the atomic centers). With p=q=2 (default powers in polar grid)
+            ntheta ~ 3*nr is optimal (for a given grid size).
+            With ntheta=150, nr=50 you get ~1e-4 accuracy for H integrals
+            (beyond that, gain is slow with increasing grid size).
+        wflimit : float, optional
+            Value below which the radial wave functions are considered
+            to be negligible. This determines how far the polar grids
+            around the atomic centers extend in space.
+        superposition : str, optional
+            Whether to use the density superposition ('density', default)
+            or potential superposition ('potential') scheme for the
+            Hamiltonian integrals.
+        xc : str, optional
+            Name of the exchange-correlation functional to be used
+            in calculating the effective potential in the density
+            superposition scheme (default: 'LDA').
+            If the pylibxc module is available, any LDA or GGA (but not
+            hybrid or MGGA) functional available via Libxc can be specified.
+            To e.g. use the N12 functional, set 'XC_GGA_X_N12+XC_GGA_C_N12'.
+            If pylibxc is not available, only the local density approximation
+            xc='LDA' (alias: 'PW92') can be chosen.
+        stride : int, optional
+            The desired Skater-Koster table typically has quite a large
+            number of points (N=500-1000), even though the integrals
+            themselves are comparatively smooth. To speed up the
+            construction of the SK-table, one can therefore restrict the
+            expensive integrations to a subset N' = N // stride and map
+            the resulting curves on the N-grid afterwards. The default
+            stride (1) means that N' = N (no shortcut).
+        smoothen_tails : bool, optional
+            Whether to modify the 'tails' of the Slater-Koster integrals
+            so that they smoothly decay to zero (default: True).
+        """
         # self.print_header()
 
         assert N is not None, 'Need to set number of grid points N!'
@@ -123,27 +170,13 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
         else:
             for key in selected:
                 integral, nl1, nl2 = key
-                if R == 0:
-                    Y1 = pick_quantum_number(first_center, (integral[1], integral[2]))[0]
-                    Yr = pick_quantum_number(operator, (integral[3], integral[4]))[0]
-                    Y2 = pick_quantum_number(second_center,(integral[5], integral[6]))[0]
-                    Y2 = Y2.subs(theta2, theta1)
-                    angle_integral = sp.integrate(sp.integrate(Y1*Yr*Y2*sp.sin(theta1), (phi, 0, 2*sp.pi)), (theta1, 0, sp.pi))
+                gphi = phi3(c1, c2, s1, s2, integral)
+                aux = gphi * area * x * r1
 
-                    dr = 0.001
-                    r = np.arange(start=0, stop=self.wf_range, step=dr)
-                    Rnl1 = e1.Rnl(r, nl1)
-                    Rnl2 = e2.Rnl(r, nl2)
-                    radial_integral = trapezoid(y=Rnl1 * Rnl2* r**2 * r, x=r, dx=dr)
-                    D = np.sqrt(4*np.pi/3) * radial_integral * angle_integral.evalf()
-                else:
-                    gphi = phi3(c1, c2, s1, s2, integral)
-                    aux = gphi * area * x * r1
+                Rnl1 = e1.Rnl(r1, nl1)
+                Rnl2 = e2.Rnl(r2, nl2)
 
-                    Rnl1 = e1.Rnl(r1, nl1)
-                    Rnl2 = e2.Rnl(r2, nl2)
-
-                    D = np.sqrt(4*np.pi/3) * np.sum(Rnl1 * Rnl2 * aux)
+                D = np.sqrt(4*np.pi/3) * np.sum(Rnl1 * Rnl2 * aux)
                 Dl[key] = D
         
 

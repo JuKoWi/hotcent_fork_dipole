@@ -160,6 +160,7 @@ operator = {
 }
 
 def pick_quantum_number(dictionary, lm):
+    """map from quantum numbers to respective (function, l,m) """
     for key, value in dictionary.items():
         if value[1] == lm[0] and value[2] == lm[1]:
             return value

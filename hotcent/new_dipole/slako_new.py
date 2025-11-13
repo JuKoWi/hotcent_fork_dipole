@@ -196,8 +196,6 @@ def phi2(c1, c2, s1, s2, sk_label):
 def dphi2(c1, c2, s1, s2, sk_label):
     return INTEGRAL_DERIVATIVE[sk_label](c1, c2, s1, s2)
 
-
-
 def select_integrals(e1, e2):
     """ Return list of integrals (integral, nl1, nl2)
     to be done for element pair e1, e2. """
