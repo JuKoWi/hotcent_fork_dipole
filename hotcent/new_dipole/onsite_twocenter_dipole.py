@@ -5,7 +5,6 @@ from hotcent.multiatom_integrator import MultiAtomIntegrator
 from hotcent.new_dipole.slako_dipole import (phi3, INTEGRALS_DIPOLE, NUMSK,
                            print_integral_overview, select_integrals,
                            tail_smoothening, write_skf)
-from hotcent.xc import XC_PW92, LibXC
 
 
 class Onsite2cTable(MultiAtomIntegrator):

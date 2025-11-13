@@ -1,14 +1,13 @@
 from sympy import *
 import time
 import pickle
-CODE = True
+CODE = True #print python code to file
 init_printing(use_unicode=True)
 
 phi = symbols('phi')
 theta1 = symbols('theta1')
 theta2 = symbols('theta2')
 s1, s2, c1, c2 = symbols('s1 s2 c1 c2')
-
 
 
 """complex, first atom"""
@@ -32,6 +31,7 @@ f5_comp_1 = -1/8 * sqrt(21/pi) * exp(I * phi) * sin(theta1) * (5*cos(theta1)**2 
 f6_comp_1 = 1/4 * sqrt(105/(2*pi)) * exp(2*I*phi) * sin(theta1)**2 * cos(theta1)
 f7_comp_1 = -1/8 * sqrt(35/pi) * exp(3* I * phi) * sin(theta1)**3
 
+
 """complex, second atom"""
 s_2_comp_2 = 1/(2 * sqrt(pi))
 
@@ -52,6 +52,7 @@ f4_comp_2 = 1/4 * sqrt(7/pi) * (5*cos(theta2)**3 - 3* cos(theta2))
 f5_comp_2 = -1/8 * sqrt(21/pi) * exp(I * phi) * sin(theta2) * (5*cos(theta2)**2 -1)
 f6_comp_2 = 1/4 * sqrt(105/(2*pi)) * exp(2*I*phi) * sin(theta2)**2 * cos(theta2)
 f7_comp_2 = -1/8 * sqrt(35/pi) * exp(3* I * phi) * sin(theta2)**3
+
 
 """real centered at first atom"""
 ss_1 = s_1_comp_1
@@ -133,7 +134,6 @@ first_center_complex = {
     "f7": (f7_comp_1, 3,3)
 }
 
-
 second_center = {
     "ss": (ss_2,0,0),
     "py": (py_2,1,-1),
@@ -165,7 +165,6 @@ def pick_quantum_number(dictionary, lm):
         if value[1] == lm[0] and value[2] == lm[1]:
             return value
     raise ValueError("Element missing: No spherical harmonic for this quantum number combination")
-        
 
 def get_index_list_dipole():
     """list of nonzero phi3 integrals"""

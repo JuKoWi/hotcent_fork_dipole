@@ -98,7 +98,7 @@ def create_grid_error_chart():
             rmin, dr, N = 0.4, 0.05, 250
             off2c = Offsite2cTableDipole(atom, atom, timing=True)
             off2c.run(rmin, dr, N, 
-                      zeta_dict=zeta_dict, 
+                      zeta=zeta_dict, 
                       nr=nr, ntheta=ntheta
                       )
             off2c.write()
@@ -174,7 +174,7 @@ def create_quick_error_chart():
             rmin, dr, N = 0.4, 0.05, 250
             off2c = Offsite2cTableDipole(atom, atom, timing=True)
             off2c.run(rmin, dr, N, 
-                      zeta_dict=zeta_dict, 
+                      zeta=zeta_dict, 
                       nr=nr, ntheta=ntheta
                       )
             off2c.write()

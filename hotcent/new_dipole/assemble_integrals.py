@@ -10,9 +10,23 @@ from hotcent.new_dipole.rotation_transform import Wigner_D_real, to_spherical, P
 from hotcent.new_dipole.slako_dipole import INTEGRALS_DIPOLE
 from hotcent.new_dipole.slako_new import INTEGRALS
 
+"""one single class with methods for all relevant quantities"""
+
 class SK_Integral:
     """calculate S,H or d matrix elements between two atoms 
-    only needs position and SK-table 
+    based on position and SK-table 
+    usage for hamiltonian, overlap:
+        Integrals = SK_Integral()
+        Integrals.load_atom_pair(path)
+        Integrals.load_sk_file(path)
+        Integrals.calculate(hamilton->bool)
+    usage for dipole:
+        Integrals = SK_Integral()
+        Integrals.load_integral_list()
+        Integrals.load_atom_pair(path)
+        Integrals.load_sk_file_dipole(path)
+        Integrals.calculate_dipole()
+
     """
     def __init__(self):
         if os.path.exists("symbolic_D_matrix.pkl"):
@@ -22,15 +36,38 @@ class SK_Integral:
             Wigner_D_real(euler_phi=PHI, euler_theta=THETA, euler_gamma=GAMMA)
         with open("symbolic_D_matrix.pkl", "rb") as f:
             M = pickle.load(f)
-        self.Wigner_D_symb = sp.lambdify((THETA, PHI, GAMMA), M, 'numpy') 
+        self.D_symb = sp.lambdify((THETA, PHI, GAMMA), M, 'numpy') 
+
+        if os.path.exists("identifier_nonzeros_overlap.pkl"):
+            with open("identifier_nonzeros_overlap.pkl", 'rb') as f:
+                quant_num_list = pickle.load(f)
+                nonzeros = pickle.load(f)
+        else:
+            quant_num_list, nonzeros = get_index_list_overlap()
+        self.quant_nums = quant_num_list
+        self.sk_int_idx = nonzeros
+    
+    def load_integral_list(self):
+        """additional list for nonvanishing dipole phi3 integrals"""
+        if os.path.exists("identifier_nonzeros_dipole.pkl"):
+            with open("identifier_nonzeros_dipole.pkl", 'rb') as f:
+                quant_num_list = pickle.load(f)
+                nonzeros = pickle.load(f)
+        else:
+            quant_num_list, nonzeros = get_index_list_dipole()
+        self.quant_nums_dipole = quant_num_list
+        self.sk_int_idx_dipole = nonzeros
 
     def load_atom_pair(self, path):
         """load position and basis functions to compute the integrals for"""
         atoms = ase.io.read(path)
         self.R_vec = angstrom_to_bohr(atoms.get_distance(0, 1, vector=True)) 
         self.R = angstrom_to_bohr(atoms.get_distance(0,1, vector=False))
+        atom1 = angstrom_to_bohr(atoms.get_positions()[0])
+        self.atom1_pos = np.array([atom1[1], atom1[2], atom1[0]]) # order consistent with quantum numbers
+        self._set_euler_angles()
 
-    def set_euler_angles(self):
+    def _set_euler_angles(self):
         """use only two rotations of three possible"""
         if np.all(self.R_vec == 0):
             self.euler_theta = 0
@@ -42,193 +79,83 @@ class SK_Integral:
             self.euler_phi =  - R_spherical[2] # rotate back on z-axis
             self.euler_gamma = 0
 
-class SK_Integral_Dipole(SK_Integral):
-    """subclass for d elements"""
-    def __init__(self):
-        super().__init__()
-        if os.path.exists("identifier_nonzeros_dipole.pkl"):
-            with open("identifier_nonzeros_dipole.pkl", 'rb') as f:
-                quant_num_list = pickle.load(f)
-                nonzeros = pickle.load(f)
-        else:
-            quant_num_list, nonzeros = get_index_list_dipole()
-        self.quant_num_list_dipole = quant_num_list
-        self.nonzero_idx_dipole = nonzeros
-
-
-    def load_SK_dipole_file(self, path):
+    def load_sk_file(self, path):
+        """.skf file for H and S"""
         with open(path, "r") as f:
             first_line = f.readline().strip()
             extended = 1 if first_line.startswith('@') else 0
-        with open(path, 'r') as f:
-            for i,line in enumerate(f):
+            for i,line in enumerate(f, start=1):
+                if i - extended == 0:
+                    line1 = line.strip()
+                    parts = [p.strip() for p in line1.split(', ')]
+                    delta_R, n_points = float(parts[0]), int(parts[1])
+                    break
+        data = np.loadtxt(path, skiprows=3+extended)
+        self.delta_R = delta_R
+        self.n_points = n_points 
+        self.sk_table_S = data[:, len(self.sk_int_idx):] 
+        self.sk_table_H = data[:, :len(self.sk_int_idx)]
+
+    def load_sk_file_dipole(self, path):
+        """.skf file for dipole elements"""
+        with open(path, "r") as f:
+            first_line = f.readline().strip()
+            extended = 1 if first_line.startswith('@') else 0
+            for i,line in enumerate(f, start=1):
                 if i-extended == 0:
                     line1 = line.strip()
                     parts = [p.strip() for p in line1.split(', ')]
                     delta_R, n_points = float(parts[0]), int(parts[1])
+                    break
         data = np.loadtxt(path, skiprows=3+extended)
-        self.delta_R = delta_R
-        self.n_points = n_points 
-        self.sk_table = data 
+        self.delta_R_dipole = delta_R
+        self.n_points_dipole = n_points 
+        self.sk_table_dipole = data 
 
-
-    def set_rotation_matrix(self):
+    def _set_rotation_matrix(self):
         print(f"euler angles: phi={self.euler_phi}, theta={self.euler_theta}, gamma={self.euler_gamma}") 
-        self.Wigner_D_single = np.array(self.Wigner_D_symb(self.euler_theta, self.euler_phi, self.euler_gamma), dtype=complex)
+        self.D_single = np.array(self.D_symb(self.euler_theta, self.euler_phi, self.euler_gamma), dtype=complex)
+        D1 = self.D_single
+        D2 = self.D_single
+        D = np.kron(D1, D2)
+        self.D_full = np.real(D)
+
+    def _set_rotation_matrix_dipole(self):
+        print(f"euler angles: phi={self.euler_phi}, theta={self.euler_theta}, gamma={self.euler_gamma}") 
+        self.D_single = np.array(self.D_symb(self.euler_theta, self.euler_phi, self.euler_gamma), dtype=complex)
         idx_pstart = 1
         idx_pend = 3
-        D1 = self.Wigner_D_single
-        D2 = self.Wigner_D_single
-        D_r = self.Wigner_D_single[idx_pstart:idx_pend+1, idx_pstart:idx_pend+1] # only take p for operator
+        D1 = self.D_single
+        D2 = self.D_single
+        D_r = self.D_single[idx_pstart:idx_pend+1, idx_pstart:idx_pend+1] # only take p for operator
         D = np.kron(D1, np.kron(D_r, D2))
-        self.Wigner_D_full = np.real(D)
+        self.D_full_dipole = np.real(D)
+
+    def calculate(self, hamilton=False):
+        """hamilton decides if hamiltonian is computed instead of overlap"""
+        self._set_rotation_matrix()
+        R_grid = self.delta_R + self.delta_R * np.arange(self.n_points) 
+        if hamilton:
+            cs = CubicSpline(R_grid, self.sk_table_H) 
+        else:
+            cs = CubicSpline(R_grid, self.sk_table_S) 
+        integral_vec = np.zeros((len(self.quant_nums)))
+        for i, key in enumerate(sorted(INTEGRALS, key= lambda x: x[0])):
+            integral_vec[key[0]] = cs(self.R)[i]
+        dipole_elements = self.D_full @ integral_vec
+        return dipole_elements
 
     def calculate_dipole(self):
-        """vector of all possible integrals up to f-orbitals. Ordered by quantum number with last number increasing the fastest"""
-        R_grid = self.delta_R + self.delta_R * np.arange(self.n_points) 
-        cs = CubicSpline(R_grid, self.sk_table) 
-        integral_vec = np.zeros((len(self.quant_num_list_dipole)))
-        for i, key in enumerate(sorted(INTEGRALS_DIPOLE, key= lambda x: x[0])):
-            integral_vec[key[0]] = cs(self.R)[i]
-        dipole_elements = self.Wigner_D_full @ integral_vec
-        return dipole_elements
-    
-class SK_Integral_Overlap(SK_Integral):
-    """subclass for S or H mat elements"""
-    def __init__(self):
-        super().__init__()
-        if os.path.exists("identifier_nonzeros_overlap.pkl"):
-            with open("identifier_nonzeros_overlap.pkl", 'rb') as f:
-                quant_num_list = pickle.load(f)
-                nonzeros = pickle.load(f)
-        else:
-            quant_num_list, nonzeros = get_index_list_overlap()
-        self.quant_num_list = quant_num_list
-        self.nonzero_idx = nonzeros
-
-    def load_SK_file(self, path):
-        with open(path, "r") as f:
-            first_line = f.readline().strip()
-            extended = 1 if first_line.startswith('@') else 0
-        with open(path, 'r') as f:
-            for i,line in enumerate(f):
-                if i - extended == 0:
-                    line1 = line.strip()
-                    parts = [p.strip() for p in line1.split(', ')]
-                    delta_R, n_points = float(parts[0]), int(parts[1])
-        data = np.loadtxt(path, skiprows=3+extended)
-        self.delta_R = delta_R
-        self.n_points = n_points 
-        self.sk_table_S = data[:, len(self.nonzero_idx):] 
-        self.sk_table_H = data[:, :len(self.nonzero_idx)]
-
-    def set_rotation_matrix(self):
-        print(f"euler angles: phi={self.euler_phi}, theta={self.euler_theta}, gamma={self.euler_gamma}") 
-        self.Wigner_D_single = np.array(self.Wigner_D_symb(self.euler_theta, self.euler_phi, self.euler_gamma), dtype=complex)
-        D1 = self.Wigner_D_single
-        D2 = self.Wigner_D_single
-        D = np.kron(D1, D2)
-        self.Wigner_D_full = np.real(D)
-
-    def calculate_overlap(self):
-        R_grid = self.delta_R + self.delta_R * np.arange(self.n_points) 
-        cs = CubicSpline(R_grid, self.sk_table_S) 
-        integral_vec = np.zeros((len(self.quant_num_list)))
-        for i, key in enumerate(sorted(INTEGRALS, key= lambda x: x[0])):
-            integral_vec[key[0]] = cs(self.R)[i]
-        dipole_elements = self.Wigner_D_full @ integral_vec
-        return dipole_elements
-
-class SK_With_Shift(SK_Integral):
-    def __init__(self):
-        super().__init__()
-        if os.path.exists("identifier_nonzeros_dipole.pkl"):
-            with open("identifier_nonzeros_dipole.pkl", 'rb') as f:
-                quant_num_list_dipole = pickle.load(f)
-                nonzeros_dipole = pickle.load(f)
-        else:
-            quant_num_list_dipole, nonzeros_dipole= get_index_list_dipole()
-        self.quant_num_list_dipole = quant_num_list_dipole
-        self.nonzero_idx_dipole = nonzeros_dipole
-        if os.path.exists("identifier_nonzeros_overlap.pkl"):
-            with open("identifier_nonzeros_overlap.pkl", 'rb') as f:
-                quant_num_list = pickle.load(f)
-                nonzeros = pickle.load(f)
-        else:
-            quant_num_list, nonzeros = get_index_list_overlap()
-        self.quant_num_list = quant_num_list
-        self.nonzero_idx = nonzeros
-
-    def load_sk_files(self, path, path_dp):
-        with open(path_dp, "r") as f:
-            first_line = f.readline().strip()
-            extended = 1 if first_line.startswith('@') else 0
-            for i,line in enumerate(f, start=1):
-                if i-extended == 0:
-                    line1 = line.strip()
-                    parts = [p.strip() for p in line1.split(', ')]
-                    delta_R_dipole, n_points_dipole = float(parts[0]), int(parts[1])
-                    break
-        data_dipole = np.loadtxt(path_dp, skiprows=3+extended)
-        self.delta_R_dipole = delta_R_dipole
-        self.n_points_dipole = n_points_dipole
-        self.sk_table_dipole = data_dipole
-        with open(path, "r") as f:
-            first_line = f.readline().strip()
-            extended = 1 if first_line.startswith('@') else 0
-            for i,line in enumerate(f, start=1):
-                if i - extended == 0:
-                    line1 = line.strip()
-                    parts = [p.strip() for p in line1.split(', ')]
-                    delta_R, n_points = float(parts[0]), int(parts[1])
-                    break
-        data = np.loadtxt(path, skiprows=3+extended)
-        self.delta_R = delta_R
-        self.n_points = n_points 
-        self.sk_table_S = data[:, len(self.nonzero_idx):] 
-        self.sk_table_H = data[:, :len(self.nonzero_idx)]
-
-    def choose_relevant_matrix(self):
-        print(f"euler angles: phi={self.euler_phi}, theta={self.euler_theta}, gamma={self.euler_gamma}") 
-        self.Wigner_D_single = np.array(self.Wigner_D_symb(self.euler_theta, self.euler_phi, self.euler_gamma), dtype=complex)
-        # self.Wigner_D_single = np.where(np.abs(self.Wigner_D_single) < 1e-15, 0, self.Wigner_D_single) 
-        idx_pstart = 1
-        idx_pend = 3
-        D1 = self.Wigner_D_single
-        D2 = self.Wigner_D_single
-        D_r = self.Wigner_D_single[idx_pstart:idx_pend+1, idx_pstart:idx_pend+1] # only take p for operator
-        D_dipole = np.kron(D1, np.kron(D_r, D2))
-        self.Wigner_D_full_dipole = np.real(D_dipole)
-        D = np.kron(D1, D2)
-        self.Wigner_D_full = np.real(D)
-
-    def load_atom_pair(self, path):
-        """load position and basis functions to compute the integrals for"""
-        atoms = ase.io.read(path)
-        atom1 = angstrom_to_bohr(atoms.get_positions()[0])
-        self.R_vec = angstrom_to_bohr(atoms.get_distance(0, 1, vector=True))
-        self.r = angstrom_to_bohr(atoms.get_distance(0,1, vector=False))
-        self.atom1_pos = np.array([atom1[1], atom1[2], atom1[0]]) # order consistent with quantum numbers
-
-    def calculate_dipole_elements(self):
-        R_grid = self.delta_R + self.delta_R * np.arange(self.n_points) 
-        cs = CubicSpline(R_grid, self.sk_table_S) 
-        integral_vec = np.zeros((len(self.quant_num_list)))
-        for i, key in enumerate(sorted(INTEGRALS, key= lambda x: x[0])):
-            integral_vec[key[0]] = cs(self.r)[i]
-        overlap_elements = self.Wigner_D_full @ integral_vec
+        self._set_rotation_matrix_dipole()
+        overlap_elements = self.calculate(hamilton=False)
 
         R_grid_dipole = self.delta_R_dipole + self.delta_R_dipole * np.arange(self.n_points_dipole) 
         cs_dipole = CubicSpline(R_grid_dipole, self.sk_table_dipole) 
-        integral_vec_dipole = np.zeros((len(self.quant_num_list_dipole)))
+        integral_vec_dipole = np.zeros((len(self.quant_nums_dipole)))
         for i, key in enumerate(sorted(INTEGRALS_DIPOLE, key= lambda x: x[0])):
-            integral_vec_dipole[key[0]] = cs_dipole(self.r)[i]
-        dipole_elements = self.Wigner_D_full_dipole @ integral_vec_dipole
+            integral_vec_dipole[key[0]] = cs_dipole(self.R)[i]
+        dipole_elements = self.D_full_dipole @ integral_vec_dipole
 
-        shift_term = np.zeros_like(dipole_elements)
-        # for i in range(16):
-        #     first_same = overlap_elements[i*16:(i+1)*16]
-        #     shift_term[i*48:(i+1)*48] = np.tile(first_same, 3)
         overlap_blocks = overlap_elements.reshape(16,16)
         shift_term = np.tile(overlap_blocks, (1,3)).reshape(-1)
         space_factor = np.tile(np.repeat(self.atom1_pos, 16), 16)

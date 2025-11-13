@@ -1,12 +1,12 @@
 import numpy as np
 
-"""nonvanishing SlaKo integrals for dipole elements named in the form
-Y1*Y1*Y2
-unified format for the label: 1., 3. and 5. letter give nl, others just for distinguishing
-(x,y,z) for p, (1,2,3,4,5) for d
+
+"""nonvanishing SlaKo integrals over phi for H or S elements named in the form
+Y1*Y2
+sk_label: tuple
+   (idx, l, m, l, m) with idx:unique number of integral according to increasing quantum numbers 
+   l,m: quantum numbers of the respective harmonics 
 """
-
-
 INTEGRALS = {
 	(0, 0, 0, 0, 0): lambda c1, c2, s1, s2: 1/2,
 	(2, 0, 0, 1, 0): lambda c1, c2, s1, s2: 0.5*np.sqrt(3)*c2,
@@ -54,6 +54,10 @@ INTEGRALS = {
 	(255, 3, 3, 3, 3): lambda c1, c2, s1, s2: 1.09375*s1**3*s2**3,
 }
 
+"""
+derivatives of phi2-integrals w.r.t. cos(theta) and sin(theta), used for Hamiltonian
+when creating .skf file
+"""
 INTEGRAL_DERIVATIVE = {
 	(0, 0, 0, 0, 0): lambda c1, c2, s1, s2: [0, 0, 0, 0],
 	(2, 0, 0, 1, 0): lambda c1, c2, s1, s2: [0, 0.5*np.sqrt(3), 0, 0],
@@ -101,22 +105,22 @@ INTEGRAL_DERIVATIVE = {
 	(255, 3, 3, 3, 3): lambda c1, c2, s1, s2: [0, 0, 3.28125*s1**2*s2**3, 3.28125*s1**3*s2**2],
 }
 
-
-
 NUMSK = len(INTEGRALS)
 
 def convert_quant_num(l):
-        if l == 0:
-                return 's'
-        elif l == 1:
-                return 'p'
-        elif l == 2:
-                return 'd'
-        elif l ==3:
-             return 'f'
-        else:
-              raise ValueError("invalid quantum number for angular momentum")
+    """convert quantum number l to letter for string matching in select_subshells"""
+    if l == 0:
+        return 's'
+    elif l == 1:
+        return 'p'
+    elif l == 2:
+        return 'd'
+    elif l ==3:
+        return 'f'
+    else:
+        raise ValueError("invalid quantum number for angular momentum")
 
+"""hotcent native labels for orbitals of certain ml combination"""
 HOTCENT_LABELS = {
     (0,0): 's',
     (1,-1): 'py',
@@ -146,47 +150,47 @@ def get_hotcent_style_index(sklabel):
     return str1, str2
         
 def convert_sk_index(lm_tuple):
-        """
-        Convert (l1, m1, l2, m2, l3, m3) into a string like 'sspxd1'.
-        """
-        if (len(lm_tuple)-1) % 2 != 0:
-            raise ValueError("Tuple must have pairs of (l, m) quantum numbers.")
+    """
+    Convert (l1, m1, l2, m2, l3, m3) into a string like 'sspxd1'.
+    """
+    if (len(lm_tuple)-1) % 2 != 0:
+        raise ValueError("Tuple must have pairs of (l, m) quantum numbers.")
     
-        # mapping from l to orbital letter
-        l_map = {0: 's', 1: 'p', 2: 'd', 3: 'f', 4: 'g'}
-        # mapping for p orbitals
-        p_map = {-1: 'y', 0: 'z', 1: 'x'}
-        # mapping for d orbitals (numbered)
-        d_map = {-2: '1', -1: '2', 0: '3', 1: '4', 2: '5'}
-        # mapping for f orbitals (numbered)
-        f_map = {-3: '1', -2: '2', -1: '3', 0: '4', 1: '5', 2: '6', 3: '7'}
+    # mapping from l to orbital letter
+    l_map = {0: 's', 1: 'p', 2: 'd', 3: 'f', 4: 'g'}
+    # mapping for p orbitals
+    p_map = {-1: 'y', 0: 'z', 1: 'x'}
+    # mapping for d orbitals (numbered)
+    d_map = {-2: '1', -1: '2', 0: '3', 1: '4', 2: '5'}
+    # mapping for f orbitals (numbered)
+    f_map = {-3: '1', -2: '2', -1: '3', 0: '4', 1: '5', 2: '6', 3: '7'}
     
-        out = []
-        for i in range(0, len(lm_tuple)-1, 2):
-            l, m = lm_tuple[i+1], lm_tuple[i+2]
-            if l not in l_map:
-                raise ValueError(f"Unsupported l={l}")
-            l_char = l_map[l]
+    out = []
+    for i in range(0, len(lm_tuple)-1, 2):
+        l, m = lm_tuple[i+1], lm_tuple[i+2]
+        if l not in l_map:
+            raise ValueError(f"Unsupported l={l}")
+        l_char = l_map[l]
         
-            if l == 0:
-                part = 's' + 's'  # always "ss"
-            elif l == 1:
-                part = 'p' + p_map.get(m, '?')
-            elif l == 2:
-                part = 'd' + d_map.get(m, '?')
-            elif l == 3:
-                part = 'f' + f_map.get(m, '?')
-            else:
-                part = l_char  # fallback
-            out.append(part)
+        if l == 0:
+            part = 's' + 's'  # always "ss"
+        elif l == 1:
+            part = 'p' + p_map.get(m, '?')
+        elif l == 2:
+            part = 'd' + d_map.get(m, '?')
+        elif l == 3:
+            part = 'f' + f_map.get(m, '?')
+        else:
+            part = l_char  # fallback
+        out.append(part)
     
-        return ''.join(out)
+    return ''.join(out)
 
 
         
 
 def phi2(c1, c2, s1, s2, sk_label): 
-    """ Returns the angle-dependent part of the given two-center dipole-integral,
+    """ Returns the angle-dependent part of the given two-center H/S integral,
     with c1 and s1 (c2 and s2) the sine and cosine of theta_1 (theta_2)
     for the atom at origin (atom at z=Rz). These expressions are obtained
     by integrating analytically over phi.
@@ -194,6 +198,7 @@ def phi2(c1, c2, s1, s2, sk_label):
     return INTEGRALS[sk_label](c1,c2,s1,s2)
 
 def dphi2(c1, c2, s1, s2, sk_label):
+    """derivatives of phi2"""
     return INTEGRAL_DERIVATIVE[sk_label](c1, c2, s1, s2)
 
 def select_integrals(e1, e2):
@@ -319,7 +324,8 @@ def write_skf(handle, Rgrid, table, has_diagonal_data, is_extended, eigval,
               hubval, occup, spe, mass, has_offdiagonal_data, offdiag_H,
               offdiag_S):
     """
-    Writes a parameter file in '.skf' format.
+    Writes a parameter file in '.skf' format starting at grid_dist 
+    and giving nonzero values from R_grid[0] on.
 
     Parameters
     ----------

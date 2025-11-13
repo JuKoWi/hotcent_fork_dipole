@@ -11,7 +11,7 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
     def __init__(self, *args, **kwargs):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
 
-    def run(self, rmin=0.4, dr=0.02, N=None, superposition='density', nr=50, stride=1, wflimit=1e-7, ntheta=150, smoothen_tails=True, zeta_dict=None):
+    def run(self, rmin=0.4, dr=0.02, N=None, superposition='density', nr=50, stride=1, wflimit=1e-7, ntheta=150, smoothen_tails=True, zeta=None):
         """
         Calculates off-site two-center Hamiltonian and overlap integrals.
 
@@ -38,19 +38,6 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
             Value below which the radial wave functions are considered
             to be negligible. This determines how far the polar grids
             around the atomic centers extend in space.
-        superposition : str, optional
-            Whether to use the density superposition ('density', default)
-            or potential superposition ('potential') scheme for the
-            Hamiltonian integrals.
-        xc : str, optional
-            Name of the exchange-correlation functional to be used
-            in calculating the effective potential in the density
-            superposition scheme (default: 'LDA').
-            If the pylibxc module is available, any LDA or GGA (but not
-            hybrid or MGGA) functional available via Libxc can be specified.
-            To e.g. use the N12 functional, set 'XC_GGA_X_N12+XC_GGA_C_N12'.
-            If pylibxc is not available, only the local density approximation
-            xc='LDA' (alias: 'PW92') can be chosen.
         stride : int, optional
             The desired Skater-Koster table typically has quite a large
             number of points (N=500-1000), even though the integrals
@@ -62,6 +49,10 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
         smoothen_tails : bool, optional
             Whether to modify the 'tails' of the Slater-Koster integrals
             so that they smoothly decay to zero (default: True).
+        zeta : list
+            for testing. Override radial parts with functions with width zeta that make integrals
+            analytically feasible. zeta gives exponents for artificial radial parts
+            
         """
         # self.print_header()
 
@@ -81,14 +72,12 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
 
         for p, (e1, e2) in enumerate(self.pairs): # iterate over ordered element pairs
             selected = select_integrals(e1, e2)
-            # print_integral_overview(e1, e2, selected, file=self.txt)
 
             for bas1 in range(len(e1.basis_sets)):
                 for bas2 in range(len(e2.basis_sets)):
                     tables[(p, bas1, bas2)] = np.zeros((Nsub, NUMSK))
 
         for i, R in enumerate(Rgrid):
-            # print(R)
             if R > 2 * wf_range:
                 break
 
@@ -101,10 +90,9 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
             for p, (e1, e2) in enumerate(self.pairs):
                 selected = select_integrals(e1, e2) #tripel (label, nl, nl)
                 if len(grid) > 0:
-                    D = self.calculate(selected, e1, e2, R, grid, area, zeta_dict=zeta_dict)
+                    D = self.calculate(selected, e1, e2, R, grid, area, zeta=zeta)
                     for j,key in enumerate(sorted(selected, key=lambda x: x[0][0])):
                         sk_label, nl1, nl2 = key
-                        # print(sk_label)
                         bas1 = e1.get_basis_set_index(nl1)
                         bas2 = e2.get_basis_set_index(nl2)
                         tables[(p, bas1, bas2)][i, j] = D[key]  #determines the order of sk-columns listed in sk-file?
@@ -122,16 +110,37 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
             self.tables = tables
 
         if smoothen_tails:
-            # Smooth the curves near the cutoff
+            # Smoothen the curves near the cutoff
             for key in self.tables:
                 for i in range(NUMSK):
                     self.tables[key][:, i] = \
                             tail_smoothening(self.Rgrid, self.tables[key][:, i])
 
         self.timer.stop('run_offsite2c')
-        #TODO: do I have to worry about pseudopotentials, probably not
 
-    def calculate(self, selected, e1, e2, R, grid, area, zeta_dict):
+    def calculate(self, selected, e1, e2, R, grid, area, zeta):
+        """
+        Calculates the selected position operator elements
+
+        Parameters
+        ----------
+        selected : list of (sk_label, nl1, nl2) tuples
+            Selected integrals to evaluate (for example
+            [(5, 0, 0, 1, -1, 2, -1), '3d', '4d'), (...)]).
+        e1 : AtomicBase-like object
+            <bra| element.
+        e2 : AtomicBase-like object
+            |ket> element.
+        R : float
+            Interatomic distance (e1 is at the origin, e2 at z=R).
+        grid : np.ndarray
+            2D arrray of grid points in the (x, z)-plane.
+        area : np.ndarray
+            1D array of areas associated with the grid points.
+        zeta: list
+            what values to use in exponent of artificial radial part
+
+        """
 
         self.timer.start('calculate_offsite2c')
 
@@ -151,19 +160,19 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
         Dl= {}
         sym1, sym2 = e1.get_symbol(), e2.get_symbol()
 
-        if zeta_dict != None:
+        if zeta != None:
             for key in selected:
                 integral, nl1, nl2 = key
 
-                N1 = (2 * zeta_dict[nl1][0]/np.pi)**(3/4)
-                N2 = (2 * zeta_dict[nl2][0]/np.pi)**(3/4)
+                N1 = (2 * zeta[nl1][0]/np.pi)**(3/4)
+                N2 = (2 * zeta[nl2][0]/np.pi)**(3/4)
                 gphi = phi3(c1, c2, s1, s2, integral)
                 aux = gphi * area * x * r1
 
                 Rnl1 = e1.Rnl(r1, nl1)
-                Rnl1 = N1*r1**zeta_dict[nl1][1] * np.exp(-zeta_dict[nl1][0]*r1**2) #overwrite with gaussian for testing
+                Rnl1 = N1*r1**zeta[nl1][1] * np.exp(-zeta[nl1][0]*r1**2) #overwrite with gaussian for testing
                 Rnl2 = e2.Rnl(r2, nl2)
-                Rnl2 = N2*r2**zeta_dict[nl2][1] * np.exp(-zeta_dict[nl2][0]*r2**2) #overwrite with gaussian for testing
+                Rnl2 = N2*r2**zeta[nl2][1] * np.exp(-zeta[nl2][0]*r2**2) #overwrite with gaussian for testing
 
                 D = np.sqrt(4*np.pi/3) * np.sum(Rnl1 * Rnl2 * aux)
                 Dl[key] = D
@@ -435,14 +444,3 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
         plt.clf()
         self.timer.stop('plotting')
         
-    def get_twocenter_directly(self):
-        direct_table = np.zeros(np.shape(self.tables[(0,0,0)]))
-        table = self.tables[(0,0,0)]
-        threshold = 1e-10
-        nonzero_col = np.where(np.any(np.abs(table) > threshold, axis=0))[0]
-        for i, sk_label in enumerate(nonzero_col):
-            for R in self.Rgrid:
-                pass
-                """ function needs: name of first spherical, name of second spherical, name of third spherical
-                    for radial parts: subshell of first, subshell of third
-                """

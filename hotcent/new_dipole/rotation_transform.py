@@ -1,7 +1,6 @@
 import numpy as np
 import sympy as sp
 import pickle
-from sympy.physics.quantum.dagger import Dagger
 from hotcent.new_dipole.integrals import first_center, phi, theta1, first_center_complex, operator
 
 
@@ -9,9 +8,116 @@ PHI = sp.symbols('phi')
 THETA = sp.symbols('theta')
 GAMMA = sp.symbols('gamma')
 
+def d_mat_elem(l, m, n, theta):
+    """single element for small Wigner matrix d"""
+    expr = 0
+    k_min = max(0, m-n)
+    k_max = min(l+m, l-n)
+    for k in range(k_min, k_max+1):
+        prefac = (-1)**(k-m+n) * sp.sqrt(sp.factorial(l+m) * sp.factorial(l-m) * sp.factorial(l+n) * sp.factorial(l-n)) / (sp.factorial(l+m-k) * sp.factorial(k) * sp.factorial(l-k-n) * sp.factorial(k-m+n))
+        angle_part = (sp.cos(theta/2)**(2*l-2*k+m-n) * sp.sin(theta / 2)**(2*k-m+n))
+        expr += prefac * angle_part 
+    return expr
+
+
+def d_mat(theta):
+    """ 
+    Assemble small-d Wigner matrix (rotation of spherical harmonics in Condon-Shortley convention around y-axis) up to f orbitals. 
+    Returns a block-diagonal 16×16 symbolic matrix with j=0,1,2,3 blocks.
+    """
+    d = sp.zeros(16,16)
+    row_start = 0
+
+    for j in range(4):  # j = 0, 1, 2, 3
+        size = 2*j + 1
+        block = sp.zeros(size, size)
+        for mi, m in enumerate(range(-j, j+1)):
+            for ni, n in enumerate(range(-j, j+1)):
+                block[mi, ni] = d_mat_elem(j, m, n, theta)
+        d[row_start:row_start+size, row_start:row_start+size] = block
+        row_start += size
+    return d
+
+def z_rot_mat(phi):
+    """
+    Diagonal matrix for rotation of Condon-Shortley spherical harmonics 
+    around z-axis
+    """
+    Dz = sp.zeros(16,16)
+    count = 0
+    for l in range(4): # l=0,1,2,3
+        for m in range(-l, l+1):
+            Dz[count, count] = sp.exp(-sp.I*m*phi)
+            count += 1
+    # print('Dz-matrix')
+    # print(Dz)
+    return Dz
+        
+def Wigner_D_complex(euler_phi, euler_theta, euler_gamma):
+    """
+    rotation matrix for complex harmonics for rotation sequence
+    Rz(phi)Ry(theta)Rz(gamma)
+    """
+    Dz = z_rot_mat(phi=euler_phi)
+    dy = d_mat(theta=euler_theta)
+    Dz2 = z_rot_mat(phi=euler_gamma) #last rotation around z-axis
+    total = Dz* dy * Dz2
+    return total
+    
+def Wigner_D_real(euler_phi, euler_theta, euler_gamma):
+    """
+    Rotation matrix for real spherical harmonics for rotation sequence
+    Rz(phi)Ry(theta)Rz(gamma)
+    """
+    transform_to_real = sp.zeros(16, 16)
+
+    #s
+    transform_to_real[0,0] = 1
+
+    #p
+    transform_to_real[1,1] = sp.I / sp.sqrt(2)
+    transform_to_real[1,3] = sp.I / sp.sqrt(2)
+    transform_to_real[2,2] = 1
+    transform_to_real[3,1] = 1/sp.sqrt(2)
+    transform_to_real[3,3] = -1/sp.sqrt(2)
+
+
+    #d
+    transform_to_real[4,4] =  sp.I / sp.sqrt(2)
+    transform_to_real[4,8] = -sp.I / sp.sqrt(2)
+    transform_to_real[5,5] = sp.I / sp.sqrt(2)
+    transform_to_real[5,7] = sp.I / sp.sqrt(2)
+    transform_to_real[6,6] = 1
+    transform_to_real[7,5] = 1/sp.sqrt(2)
+    transform_to_real[7,7] = -1/sp.sqrt(2)
+    transform_to_real[8,4] = 1 / sp.sqrt(2)
+    transform_to_real[8,8] = 1 / sp.sqrt(2)
+
+    #f
+    transform_to_real[9,9] = sp.I / sp.sqrt(2)
+    transform_to_real[9, 15] = sp.I/sp.sqrt(2)
+    transform_to_real[10,10] = sp.I/sp.sqrt(2)
+    transform_to_real[10, 14] = -sp.I/sp.sqrt(2)
+    transform_to_real[11, 11] = sp.I/sp.sqrt(2)
+    transform_to_real[11, 13] = sp.I/sp.sqrt(2)
+    transform_to_real[12, 12] = 1
+    transform_to_real[13, 11] = 1/sp.sqrt(2)
+    transform_to_real[13, 13] = -1/sp.sqrt(2)
+    transform_to_real[14, 10] = 1/ sp.sqrt(2)
+    transform_to_real[14, 14] = 1/sp.sqrt(2)
+    transform_to_real[15, 9] = 1/sp.sqrt(2)
+    transform_to_real[15, 15] = -1/sp.sqrt(2)
+
+    transform_to_comp = transform_to_real.H
+    D_total = transform_to_real * Wigner_D_complex(euler_phi=euler_phi, euler_theta=euler_theta, euler_gamma=euler_gamma) * transform_to_comp
+    with open("symbolic_D_matrix.pkl", "wb") as f:
+        pickle.dump(D_total, f)
+    return D_total
+
+
+"""some tests"""
 x, y, z = sp.symbols("x, y, z")
 r = sp.sqrt(x**2 + y**2 + z**2)
-
 
 s_1 = 1 / (2 * sp.sqrt(sp.pi))
 
@@ -53,109 +159,12 @@ first_center_real = {
 }
 
 def to_spherical(R):
+    """spherical coordinates of vector"""
     r = np.sqrt(np.sum(R**2))
     theta = np.arccos(R[2] / r)
     phi = np.arctan2(R[1], R[0])
     return np.array([r, theta, phi])
 
-def d_mat_elem(l, m, n, theta):
-    expr = 0
-    k_min = max(0, m-n)
-    k_max = min(l+m, l-n)
-    for k in range(k_min, k_max+1):
-        prefac = (-1)**(k-m+n) * sp.sqrt(sp.factorial(l+m) * sp.factorial(l-m) * sp.factorial(l+n) * sp.factorial(l-n)) / (sp.factorial(l+m-k) * sp.factorial(k) * sp.factorial(l-k-n) * sp.factorial(k-m+n))
-        angle_part = (sp.cos(theta/2)**(2*l-2*k+m-n) * sp.sin(theta / 2)**(2*k-m+n))
-        expr += prefac * angle_part 
-    return expr
-
-
-def d_mat(theta):
-    """small-d Wigner matrix for the angle beta (up to d orbitals). 
-    Returns a block-diagonal 16×16 symbolic matrix with j=0,1,2,3 blocks."""
-    d = sp.zeros(16,16)
-    row_start = 0
-
-    for j in range(4):  # j = 0, 1, 2, 3
-        size = 2*j + 1
-        block = sp.zeros(size, size)
-        for mi, m in enumerate(range(-j, j+1)):
-            for ni, n in enumerate(range(-j, j+1)):
-                block[mi, ni] = d_mat_elem(j, m, n, theta)
-        d[row_start:row_start+size, row_start:row_start+size] = block
-        row_start += size
-    return d
-
-def z_rot_mat(phi):
-    Dz = sp.zeros(16,16)
-    count = 0
-    for l in range(4): # l=0,1,2,3
-        for m in range(-l, l+1):
-            Dz[count, count] = sp.exp(-sp.I*m*phi)
-            count += 1
-    # print('Dz-matrix')
-    # print(Dz)
-    return Dz
-        
-def Wigner_D_complex(euler_phi, euler_theta, euler_gamma):
-    Dz = z_rot_mat(phi=euler_phi)
-    dy = d_mat(theta=euler_theta)
-    Dz2 = z_rot_mat(phi=euler_gamma) #last rotation around z-axis
-    total = Dz* dy * Dz2
-    return total
-    
-def Wigner_D_real(euler_phi, euler_theta, euler_gamma):
-    transform_to_real = sp.zeros(16, 16)
-
-    #s
-    transform_to_real[0,0] = 1
-
-    #p
-    transform_to_real[1,1] = sp.I / sp.sqrt(2)
-    transform_to_real[1,3] = sp.I / sp.sqrt(2)
-    transform_to_real[2,2] = 1
-    transform_to_real[3,1] = 1/sp.sqrt(2)
-    transform_to_real[3,3] = -1/sp.sqrt(2)
-
-
-    #d
-    transform_to_real[4,4] =  sp.I / sp.sqrt(2)
-    transform_to_real[4,8] = -sp.I / sp.sqrt(2)
-    transform_to_real[5,5] = sp.I / sp.sqrt(2)
-    transform_to_real[5,7] = sp.I / sp.sqrt(2)
-    transform_to_real[6,6] = 1
-    transform_to_real[7,5] = 1/sp.sqrt(2)
-    transform_to_real[7,7] = -1/sp.sqrt(2)
-    transform_to_real[8,4] = 1 / sp.sqrt(2)
-    transform_to_real[8,8] = 1 / sp.sqrt(2)
-
-    #f
-    transform_to_real[9,9] = sp.I / sp.sqrt(2)
-    transform_to_real[9, 15] = sp.I/sp.sqrt(2)
-    transform_to_real[10,10] = sp.I/sp.sqrt(2)
-    transform_to_real[10, 14] = -sp.I/sp.sqrt(2)
-    transform_to_real[11, 11] = sp.I/sp.sqrt(2)
-    transform_to_real[11, 13] = sp.I/sp.sqrt(2)
-    transform_to_real[12, 12] = 1
-    transform_to_real[13, 11] = 1/sp.sqrt(2)
-    transform_to_real[13, 13] = -1/sp.sqrt(2)
-    transform_to_real[14, 10] = 1/ sp.sqrt(2)
-    transform_to_real[14, 14] = 1/sp.sqrt(2)
-    transform_to_real[15, 9] = 1/sp.sqrt(2)
-    transform_to_real[15, 15] = -1/sp.sqrt(2)
-
-    # print('basis transform')
-    # print(transform_to_real)
-    
-    transform_to_comp = transform_to_real.H
-    D_total = transform_to_real * Wigner_D_complex(euler_phi=euler_phi, euler_theta=euler_theta, euler_gamma=euler_gamma) * transform_to_comp
-    # print('check for identity of transform to real harmonics')
-    # print(transform_to_comp * transform_to_real)
-    with open("symbolic_D_matrix.pkl", "wb") as f:
-        pickle.dump(D_total, f)
-    return D_total
-
-
-"""some tests"""
 def evaluate_spherical(key, unit_vec):
     theta_val, phi_val = to_spherical(R=unit_vec)[1:]
     sh_func = first_center[key][0]
@@ -195,14 +204,11 @@ def check_rotation_complex():
         func_vec[i] = func_val
     D_func = sp.lambdify((PHI, THETA, GAMMA), Wigner_D_complex(euler_gamma=GAMMA, euler_phi=PHI, euler_theta=THETA), 'numpy')
     D = D_func(-random_phi, -random_theta, 0)
-    # print(D)
     result_vec = D @ func_vec
     val1_vec = np.zeros((16,), 'complex')
     for i, (key, item) in enumerate(first_center_complex.items()):
         val1 = evaluate_spherical_complex(key=key, unit_vec=unit_vec2)
         val1_vec[i] = val1
-    # print(val1_vec)
-    # print(result_vec)
     print(np.isclose(val1_vec, result_vec))
 
 
@@ -226,16 +232,12 @@ def check_rotation():
     D_sym = Wigner_D_real(euler_phi=PHI, euler_gamma=GAMMA, euler_theta=THETA)
     D = sp.lambdify((PHI, GAMMA, THETA), D_sym, 'numpy')
     D = np.real(D(-random_phi, 0, -random_theta))
-    # print(np.max(D))
     result_vec = D @ func_vec
     val1_vec = np.zeros((16,))
     for i, (key, item) in enumerate(first_center.items()):
         val1 = evaluate_spherical(key=key, unit_vec=unit_vec2)
         val1_vec[i] = val1
-    # print(val1_vec)
-    # print(result_vec)
     print(np.isclose(val1_vec, result_vec))
-
 
 def check_rotation_prod():
     unit_vec1 = np.random.rand(3)
@@ -339,7 +341,6 @@ def check_vec_rotation():
     theta_val, phi_val= to_spherical(unit_vec)[1:]
     theta1_val = -theta_val 
     phi1_val = -phi_val
-    # print(unit_vec)
     Ry = np.array([[np.cos(theta1_val), 0, np.sin(theta1_val)], [0,1,0], [-np.sin(theta1_val), 0, np.cos(theta1_val)]])
     Rz = np.array([[np.cos(phi1_val), - np.sin(phi1_val), 0],[np.sin(phi1_val), np.cos(phi1_val), 0],[0,0,1]])
     z_vector = Ry @ Rz @ unit_vec

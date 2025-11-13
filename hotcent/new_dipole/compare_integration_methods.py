@@ -241,7 +241,7 @@ def compare_dipole_elements(zeta1):
         rmin, dr, N = 0.4, 0.02, 250
         off2c = Offsite2cTableDipole(atom, atom, timing=True)
         off2c.run(rmin, dr, N, superposition=opt.superposition,
-                  xc=opt.functional, stride=opt.stride, zeta_dict=zeta_dict, 
+                  xc=opt.functional, stride=opt.stride, zeta=zeta_dict, 
                 #   nr=200, ntheta=500
                   )
         off2c.write()
