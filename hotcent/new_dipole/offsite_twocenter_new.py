@@ -24,7 +24,7 @@ class Offsite2cTable(MultiAtomIntegrator):
     def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
             superposition='density', xc='LDA', stride=1, smoothen_tails=True, zeta=None):
 
-        self.print_header()
+        # self.print_header()
 
         assert N is not None, 'Need to set number of grid points N!'
         assert rmin >= 1e-3, 'For stability, please set rmin >= 1e-3'
@@ -40,7 +40,7 @@ class Offsite2cTable(MultiAtomIntegrator):
 
         for p, (e1, e2) in enumerate(self.pairs):
             selected = select_integrals(e1, e2) # list of integrals to be done for each subshell
-            print_integral_overview(e1, e2, selected, file=self.txt)
+            # print_integral_overview(e1, e2, selected, file=self.txt)
 
             for bas1 in range(len(e1.basis_sets)):
                 for bas2 in range(len(e2.basis_sets)):

@@ -1,2 +1,0 @@
-from hotcent.new_dipole.scan_integration_grid import create_quick_error_chart
-create_quick_error_chart()

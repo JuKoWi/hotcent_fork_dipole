@@ -122,7 +122,6 @@ class SK_Integral:
         self.D_full = np.real(D)
 
     def _set_rotation_matrix_dipole(self):
-        print(f"euler angles: phi={self.euler_phi}, theta={self.euler_theta}, gamma={self.euler_gamma}") 
         self.D_single = np.array(self.D_symb(self.euler_theta, self.euler_phi, self.euler_gamma), dtype=complex)
         idx_pstart = 1
         idx_pend = 3

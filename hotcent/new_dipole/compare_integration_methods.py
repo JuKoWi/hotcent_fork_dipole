@@ -2,6 +2,7 @@ import pickle
 import time
 import sympy as sp
 import numpy as np
+import matplotlib.pyplot as plt
 from ase import Atoms
 from ase.io import write
 from ase.units import Bohr
@@ -131,13 +132,14 @@ def analytic_2c_dipole(pos_at1, pos_at2, zeta1, zeta2, comparison=None, idx_list
     t_start = time.time()
     count = 0
     results = np.zeros((len(operator) * len(first_center_real) * len(second_center)))
-    print(f"first atom:{pos_at1}")
-    print(f"second atom:{pos_at2}")
+    pos_at1 = angstrom_to_bohr(pos_at1)
+    pos_at2 = angstrom_to_bohr(pos_at2)
     
     for name_i, i in first_center_real.items():
         for name_j, j in operator.items():
             for name_k, k in second_center.items():
                 if count in idx_list:
+                    print(count)
                     zeta1_val = zeta1[i[1]]
                     zeta2_val = zeta2[k[1]]
                     R1 = radial_1.subs({b: zeta1_val})
@@ -175,9 +177,12 @@ def analytic_2c(pos_at1, pos_at2, zeta1, zeta2, comparison=None, idx_list=np.ara
     t_start = time.time()
     count = 0
     results = np.zeros((len(first_center_real) * len(second_center)))
+    pos_at1 = angstrom_to_bohr(pos_at1)
+    pos_at2 = angstrom_to_bohr(pos_at2)
     for name_i, i in first_center_real.items():
         for name_k, k in second_center.items():
             if count in idx_list:
+                print(count)
                 zeta1_val = zeta1[i[1]]
                 zeta2_val = zeta2[k[1]]
                 R1 = radial_1.subs({b: zeta1_val})
@@ -251,19 +256,14 @@ def compare_integrals(zeta1, use_existing_skf=False, dipole=True):
         method1.get_list_dipole()
         method1.load_sk_file_dipole(path='Eu-Eu_offsite2c.skf', path_dipole='Eu-Eu_offsite2c-dipole.skf')
         res1 = method1.calculate_dipole()
-        res2 = analytic_2c_dipole(pos_at1=angstrom_to_bohr(shift_vec), pos_at2=angstrom_to_bohr(inter_vec+shift_vec), zeta1=zeta1, zeta2=zeta1, comparison=res1)
+        res2 = analytic_2c_dipole(pos_at1=shift_vec, pos_at2=inter_vec+shift_vec, zeta1=zeta1, zeta2=zeta1, comparison=res1)
     else:
         method1.load_sk_file(path='Eu-Eu_offsite2c.skf')
         res1 = method1.calculate()
-        res2 = analytic_2c(pos_at1=angstrom_to_bohr(shift_vec), pos_at2=angstrom_to_bohr(inter_vec+shift_vec), zeta1=zeta1, zeta2=zeta1, comparison=res1)
+        res2 = analytic_2c(pos_at1=shift_vec, pos_at2=inter_vec+shift_vec, zeta1=zeta1, zeta2=zeta1, comparison=res1)
 
-def scan_grid_error(pos, index_set, dipole=False):
+def scan_grid_error(pos, index, dipole=False, plot=False, from_file=False):
     t_total_1 = time.time()
-    if dipole:
-        idx = np.arange(768)
-    else:
-        idx = np.arange(256)
-    zero_idx = np.setdiff1d(idx, index_set)
 
     # exponents for exponentials
     zeta1 = [0.27,0.27,0.27,0.27]
@@ -272,53 +272,182 @@ def scan_grid_error(pos, index_set, dipole=False):
     write('Eu2.xyz', atoms)
 
     #dtheta and dr values to scan
-    ntheta_list = np.arange(50, 500, 50)
-    nr_list = np.arange(10, 150, 20)
+    ntheta_list = np.arange(50, 200, 20)
+    nr_list = np.arange(10, 100, 20)
 
     #initialize arrays
-    mae_array = np.zeros((np.shape(ntheta_list)[0], np.shape(nr_list)[0]))
-    mse_array = np.zeros((np.shape(ntheta_list)[0], np.shape(nr_list)[0]))
+    error_array = np.zeros((np.shape(ntheta_list)[0], np.shape(nr_list)[0]))
+    rel_error_array = np.zeros((np.shape(ntheta_list)[0], np.shape(nr_list)[0]))
+    file_error = f"error_grid_scan-{index}.npy"
+    file_rel_error = f"rel_error_grid_scan-{index}.npy"
 
-    #calculate directly brute force
-    print('start analytical integrals')
-    if dipole:
-        res2 = analytic_2c_dipole(pos_at1=pos[0], pos_at2=pos[1], zeta1=zeta1, zeta2=zeta1, idx_list=index_set)
+    if not from_file:
+        #calculate directly brute force
+        print('start analytical integrals')
+        if dipole:
+            res2 = analytic_2c_dipole(pos_at1=pos[0], pos_at2=pos[1], zeta1=zeta1, zeta2=zeta1, idx_list=[index])[index]
+        else:
+            res2 = analytic_2c(pos_at1=pos[0], pos_at2=pos[1], zeta1=zeta1, zeta2=zeta1, idx_list=[index])[index]
+        print('finished analytical integrals')
+
+        #set up atoms
+        element = 'Eu'
+        r0 = 1.85 * covalent_radii[atomic_numbers[element]] / Bohr
+        atom = AtomicDFT(element,
+                         confinement=PowerConfinement(r0=r0, s=2),
+                         perturbative_confinement=False,
+                         configuration='[Xe] 4f7 6s2 6p0 5d0',
+                         valence=['5d', '6s', '6p', '4f'],
+                         timing=True,
+                         )
+        atom.run()
+
+        for i, ntheta in enumerate(ntheta_list):
+            for j, nr in enumerate(nr_list):
+                print(f'start calculation sk-tables with nr = {nr}, ntheta = {ntheta}')
+                time1 = time.time()
+
+                # Compute Slater-Koster integrals:
+                zeta_dict = {'4f': (zeta1[0], 3), '5d': (zeta1[1],2), '6s': (zeta1[2], 0), '6p': (zeta1[3], 1)}
+                rmin, dr, N = 0.4, 0.05, 250
+                if dipole:
+                    off2c = Offsite2cTableDipole(atom, atom, timing=True)
+                else:
+                    off2c = Offsite2cTable(atom, atom, timing=True)
+                off2c.run(rmin, dr, N, 
+                          zeta=zeta_dict, 
+                          nr=nr, ntheta=ntheta
+                          )
+                off2c.write()
+                time2 = time.time()
+                print(f'finished after {time2-time1}')
+
+                #assemble actual matrix elements
+                print("start sk-transformation")
+                time1 = time.time()
+                method1 = SK_Integral()
+                method1.load_atom_pair('Eu2.xyz')
+                if dipole:
+                    method1.get_list_dipole()
+                    method1.load_sk_file_dipole(path='Eu-Eu_offsite2c.skf', path_dipole='Eu-Eu_offsite2c-dipole.skf')
+                    res1 = method1.calculate_dipole()
+                else:
+                    method1.load_sk_file(path='Eu-Eu_offsite2c.skf')
+                    res1 = method1.calculate()
+
+                time2 = time.time()
+                print(f'finished transformation after {time2-time1}')
+
+                #calculate errors
+                res1 = res1[index]
+                error_array[i,j] = res1 - res2
+                if res2 != 0:
+                    rel_error_array[i,j] = (res1 - res2) /res2
+                else:
+                    rel_error_array[i,j] = 0
+
+        np.save(file_error, error_array)
+        np.save(file_rel_error, rel_error_array)
     else:
-        res2 = analytic_2c(pos_at1=pos[0], pos_at2=pos[1], zeta1=zeta1, zeta2=zeta1, idx_list=index_set)
-    print('finished analytical integrals')
+        error_array = np.load(file_error) 
+        rel_error_array = np.load(file_rel_error) 
 
-    #set up atoms
-    element = 'Eu'
-    r0 = 1.85 * covalent_radii[atomic_numbers[element]] / Bohr
-    atom = AtomicDFT(element,
-                     confinement=PowerConfinement(r0=r0, s=2),
-                     perturbative_confinement=False,
-                     configuration='[Xe] 4f7 6s2 6p0 5d0',
-                     valence=['5d', '6s', '6p', '4f'],
-                     timing=True,
-                     )
-    atom.run()
+    t_total_2 = time.time()
+    print(f"finished scan after total of {t_total_2 -t_total_1}")
+    if plot:
+        fig, axs = plt.subplots(nrows=1, ncols=2, sharey=True)
+        ny, nx = error_array.shape
+        xvals = nr_list
+        yvals = ntheta_list
 
-    for i, ntheta in enumerate(ntheta_list):
-        for j, nr in enumerate(nr_list):
-            print('start calculation sk-tables with nr = {nr}, ntheta = {ntheta}')
-            time1 = time.time()
+        # Extent boundaries
+        xmin, xmax = xvals.min(), xvals.max()
+        ymin, ymax = yvals.min(), yvals.max()
 
-            # Compute Slater-Koster integrals:
-            zeta_dict = {'4f': (zeta1[0], 3), '5d': (zeta1[1],2), '6s': (zeta1[2], 0), '6p': (zeta1[3], 1)}
-            rmin, dr, N = 0.4, 0.05, 250
+        # Cell widths in continuous extent
+        dx = (xmax - xmin) / nx
+        dy = (ymax - ymin) / ny
+
+        # Centers of each cell in extent coordinates
+        xcenters = xmin + (np.arange(nx) + 0.5) * dx
+        ycenters = ymin + (np.arange(ny) + 0.5) * dy
+        err = axs[0].imshow(np.abs(error_array), extent=[nr_list.min(), nr_list.max(), ntheta_list.min(), ntheta_list.max()], origin='lower', aspect='auto')
+        rel_err = axs[1].imshow(np.abs(rel_error_array), extent=[nr_list.min(), nr_list.max(), ntheta_list.min(), ntheta_list.max()], origin='lower', aspect='auto')
+        axs[0].set_xticks(xcenters)
+        axs[0].set_xticklabels(nr_list)
+        axs[0].set_xlabel(r"$n(r)$")
+        axs[0].set_ylabel(r"$n(\theta)$")
+        axs[0].set_yticks(ycenters)
+        axs[0].set_yticklabels(ntheta_list)
+        axs[0].set_title(f"Error for integral {index}")
+
+        axs[1].set_xticks(xcenters)
+        axs[1].set_xticklabels(nr_list)
+        axs[0].set_yticks(ycenters)
+        axs[0].set_yticklabels(ntheta_list)
+        axs[1].set_title(f"Relative error for integral {index}")
+        
+        fig.colorbar(err, ax=axs[0])
+        fig.colorbar(rel_err, ax=axs[1])
+        fig.suptitle("Error for chosen integrals for different grid discretizations while creating .skf file")
+        plt.savefig("error_grid-plot.pdf")
+        plt.show()
+
+def scan_distance(direction, index, dipole=False, n_dist=20, min_dist_angst=0.4, max_dist_angst=4, from_file=False, plot=False):
+    t_total_1 = time.time()
+
+    # exponents for exponentials
+    zeta1 = [0.27,0.27,0.27,0.27]
+
+    #initialize arrays
+    direction = direction/np.linalg.norm(direction)
+    distance_factors = np.linspace(min_dist_angst, max_dist_angst, n_dist)
+    error_array = np.zeros((len(distance_factors)))
+    rel_error_array = np.zeros((len(distance_factors)))
+    file_error = f'error_distance_scan-{index}.npy'
+    file_rel_error = f"rel_error_distance_scan-{index}.npy"
+
+    if not from_file:
+        #set up atoms
+        element = 'Eu'
+        r0 = 1.85 * covalent_radii[atomic_numbers[element]] / Bohr
+        atom = AtomicDFT(element,
+                         confinement=PowerConfinement(r0=r0, s=2),
+                         perturbative_confinement=False,
+                         configuration='[Xe] 4f7 6s2 6p0 5d0',
+                         valence=['5d', '6s', '6p', '4f'],
+                         timing=True,
+                         )
+        atom.run()
+
+        # Compute Slater-Koster integrals:
+        time1 = time.time()
+        zeta_dict = {'4f': (zeta1[0], 3), '5d': (zeta1[1],2), '6s': (zeta1[2], 0), '6p': (zeta1[3], 1)}
+        rmin, dr, N = 0.1, 0.05, 250
+        if dipole:
+            off2c = Offsite2cTableDipole(atom, atom, timing=True)
+        else:
+            off2c = Offsite2cTable(atom, atom, timing=True)
+        off2c.run(rmin, dr, N, 
+                  zeta=zeta_dict, 
+                #   nr=100, ntheta=200
+                  )
+        off2c.write()
+        time2 = time.time()
+        print(f'finished after {time2-time1}')
+
+        for i, dist in enumerate(distance_factors):
+            pos = np.array([[0,0,0], direction * dist])
+            atoms = Atoms('Eu2', positions=pos)
+            write('Eu2.xyz', atoms)
+
+            print('start analytical integrals')
             if dipole:
-                off2c = Offsite2cTableDipole(atom, atom, timing=True)
+                res2 = analytic_2c_dipole(pos_at1=pos[0], pos_at2=pos[1], zeta1=zeta1, zeta2=zeta1, idx_list=[index])[index]
             else:
-                off2c = Offsite2cTable(atom, atom, timing=True)
-            off2c.run(rmin, dr, N, 
-                      zeta=zeta_dict, 
-                      nr=nr, ntheta=ntheta
-                      )
-            off2c.write()
-            time2 = time.time()
-            print(f'finished after {time2-time1}')
-
+                res2 = analytic_2c(pos_at1=pos[0], pos_at2=pos[1], zeta1=zeta1, zeta2=zeta1, idx_list=[index])[index]
+            print('finished analytical integrals')
+    
             #assemble actual matrix elements
             print("start sk-transformation")
             time1 = time.time()
@@ -331,16 +460,36 @@ def scan_grid_error(pos, index_set, dipole=False):
             else:
                 method1.load_sk_file(path='Eu-Eu_offsite2c.skf')
                 res1 = method1.calculate()
-            
+
             time2 = time.time()
             print(f'finished transformation after {time2-time1}')
-            
-            #calculate errors
-            res1[zero_idx] = 0            
-            mae_array[i,j] = np.sum(np.abs(res1-res2))
-            mse_array[i,j] = np.sum((res1-res2)**2)
 
-    np.save('mae_grid_scan', mae_array)
-    np.save("mse_grid_scan", mse_array)
+            #calculate errors
+            res1 = res1[index]
+            error_array[i] = res1 - res2
+            if res2 != 0:
+                rel_error_array[i] = (res1 -res2) / res2
+            else:
+                rel_error_array[i] = 0
+        np.save(file_error, error_array)
+        np.save(file_rel_error, rel_error_array)
+    else:
+        error_array = np.load(file_error) 
+        rel_error_array = np.load(file_rel_error)
+
     t_total_2 = time.time()
     print(f"finished scan after total of {t_total_2 -t_total_1}")
+    if plot:
+        fig, axs = plt.subplots(ncols=2)
+        axs[0].scatter(distance_factors, error_array, label="error")
+        axs[1].scatter(distance_factors, rel_error_array, label="relative error")
+        axs[0].set_xlabel(r"R / $\AA$")
+        axs[0].set_xlabel(r"R / $\AA$")
+        axs[0].set_ylabel(r"integral error")
+        axs[0].legend()
+        axs[1].set_ylabel(r"relative integral error")
+        axs[0].set_xlabel(r"R / $\AA$")
+        axs[0].set_xlabel(r"R / $\AA$")
+        axs[1].legend()
+        plt.show()
+        

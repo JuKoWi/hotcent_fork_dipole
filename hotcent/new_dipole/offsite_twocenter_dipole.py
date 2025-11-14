@@ -72,7 +72,6 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
 
         for p, (e1, e2) in enumerate(self.pairs): # iterate over ordered element pairs
             selected = select_integrals(e1, e2)
-
             for bas1 in range(len(e1.basis_sets)):
                 for bas2 in range(len(e2.basis_sets)):
                     tables[(p, bas1, bas2)] = np.zeros((Nsub, NUMSK))
