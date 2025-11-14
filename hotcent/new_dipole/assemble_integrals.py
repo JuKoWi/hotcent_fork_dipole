@@ -22,7 +22,7 @@ class SK_Integral:
         Integrals.calculate(hamilton->bool)
     usage for dipole:
         Integrals = SK_Integral()
-        Integrals.load_integral_list()
+        Integrals.get_list_dipole()
         Integrals.load_atom_pair(path)
         Integrals.load_sk_file_dipole(path)
         Integrals.calculate_dipole()
@@ -47,7 +47,7 @@ class SK_Integral:
         self.quant_nums = quant_num_list
         self.sk_int_idx = nonzeros
     
-    def load_integral_list(self):
+    def get_list_dipole(self):
         """additional list for nonvanishing dipole phi3 integrals"""
         if os.path.exists("identifier_nonzeros_dipole.pkl"):
             with open("identifier_nonzeros_dipole.pkl", 'rb') as f:
@@ -96,9 +96,10 @@ class SK_Integral:
         self.sk_table_S = data[:, len(self.sk_int_idx):] 
         self.sk_table_H = data[:, :len(self.sk_int_idx)]
 
-    def load_sk_file_dipole(self, path):
+    def load_sk_file_dipole(self, path, path_dipole):
         """.skf file for dipole elements"""
-        with open(path, "r") as f:
+        self.load_sk_file(path=path)
+        with open(path_dipole, "r") as f:
             first_line = f.readline().strip()
             extended = 1 if first_line.startswith('@') else 0
             for i,line in enumerate(f, start=1):
@@ -107,7 +108,7 @@ class SK_Integral:
                     parts = [p.strip() for p in line1.split(', ')]
                     delta_R, n_points = float(parts[0]), int(parts[1])
                     break
-        data = np.loadtxt(path, skiprows=3+extended)
+        data = np.loadtxt(path_dipole, skiprows=3+extended)
         self.delta_R_dipole = delta_R
         self.n_points_dipole = n_points 
         self.sk_table_dipole = data 

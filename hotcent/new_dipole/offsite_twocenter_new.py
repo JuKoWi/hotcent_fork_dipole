@@ -22,7 +22,7 @@ class Offsite2cTable(MultiAtomIntegrator):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
 
     def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
-            superposition='density', xc='LDA', stride=1, smoothen_tails=True, zeta_dict=None):
+            superposition='density', xc='LDA', stride=1, smoothen_tails=True, zeta=None):
 
         self.print_header()
 
@@ -60,7 +60,7 @@ class Offsite2cTable(MultiAtomIntegrator):
                 selected = select_integrals(e1, e2)
                 if len(grid) > 0:
                     S, H, H2 = self.calculate(selected, e1, e2, R, grid, area,
-                                             xc=xc, superposition=superposition, zeta_dict=zeta_dict)
+                                             xc=xc, superposition=superposition, zeta=zeta)
                     for j,key in enumerate(sorted(selected, key=lambda x: x[0][0])):
                         sk_label, nl1, nl2 = key
                         bas1 = e1.get_basis_set_index(nl1)
@@ -89,7 +89,7 @@ class Offsite2cTable(MultiAtomIntegrator):
 
         self.timer.stop('run_offsite2c')
 
-    def calculate(self, selected, e1, e2, R, grid, area, zeta_dict=None,
+    def calculate(self, selected, e1, e2, R, grid, area, zeta=None,
                   superposition='density', xc='LDA', only_overlap=False,
                   symmetrize_kinetic=True):
 
@@ -158,11 +158,11 @@ class Offsite2cTable(MultiAtomIntegrator):
             aux = gphi * area * x
             Rnl1 = e1.Rnl(r1, nl1)
             Rnl2 = e2.Rnl(r2, nl2)
-            if zeta_dict != None:
-                N1 = (2 * zeta_dict[nl1][0]/np.pi)**(3/4)
-                N2 = (2 * zeta_dict[nl2][0]/np.pi)**(3/4)
-                Rnl1 = N1*r1**zeta_dict[nl1][1] * np.exp(-zeta_dict[nl1][0]*r1**2) #overwrite with gaussian for testing
-                Rnl2 = N2*r2**zeta_dict[nl2][1] * np.exp(-zeta_dict[nl2][0]*r2**2) #overwrite with gaussian for testing
+            if zeta != None:
+                N1 = (2 * zeta[nl1][0]/np.pi)**(3/4)
+                N2 = (2 * zeta[nl2][0]/np.pi)**(3/4)
+                Rnl1 = N1*r1**zeta[nl1][1] * np.exp(-zeta[nl1][0]*r1**2) #overwrite with gaussian for testing
+                Rnl2 = N2*r2**zeta[nl2][1] * np.exp(-zeta[nl2][0]*r2**2) #overwrite with gaussian for testing
             S = np.sum(Rnl1 * Rnl2 * aux)
             Sl[key] = S
             if not only_overlap:
