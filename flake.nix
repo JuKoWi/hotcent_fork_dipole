@@ -42,6 +42,7 @@
       {
         devShells.default = pkgs.mkShell {
           buildInputs = [ hotcent ];
+#        PYTHONPATH = "${self}/.";  # or "PYTHONPATH=./" if using mkShell rec
         };
         packages.default = python.withPackages (p: [ hotcent ]);
         formatter = pkgs.nixpkgs-fmt;

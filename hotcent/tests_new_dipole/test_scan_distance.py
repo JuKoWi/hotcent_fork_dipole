@@ -1,7 +1,4 @@
 import numpy as np
-import sys
-from pathlib import Path
-sys.path.append(str(Path(__file__).resolve().parents[1]))
 from hotcent.new_dipole.compare_integration_methods import scan_distance
 
 direction = np.random.rand(3)
