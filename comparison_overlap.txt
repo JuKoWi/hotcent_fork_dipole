@@ -1,3 +1,3 @@
 coordinate: [0. 0. 0.]
-coordinate2: [0.17371082 0.09732719 0.01876081]
+coordinate2: [0.01802879 0.0464698  0.00393956]
 sk-value 	 analytic

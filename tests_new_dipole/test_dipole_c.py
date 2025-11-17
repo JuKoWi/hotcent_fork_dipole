@@ -1,3 +1,6 @@
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parents[1]))
 from hotcent.new_dipole.offsite_twocenter_dipole import Offsite2cTableDipole
 from hotcent.new_dipole.onsite_twocenter_dipole import Onsite2cTable
 from optparse import OptionParser
@@ -6,9 +9,6 @@ from ase.data import covalent_radii, atomic_numbers
 from hotcent.offsite_twocenter import Offsite2cTable
 from hotcent.confinement import PowerConfinement
 from hotcent.atomic_dft import AtomicDFT
-import sys
-from pathlib import Path
-sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 
 # Run script with --help to see the options
@@ -40,18 +40,13 @@ atom = AtomicDFT(element,
 atom.run()
 atom.plot_Rnl(only_valence=False)
 atom.plot_density()
-print('atom orbitals:')
-print(atom.Rnlg['1s'])
 
 # Compute Slater-Koster integrals:
 rmin, dr, N = 0.1, 0.05, 250
 off2c = Offsite2cTableDipole(atom, atom, timing=True)
-off2c.run(rmin, dr, N, superposition=opt.superposition,
-          xc=opt.functional, stride=opt.stride)
+off2c.run(rmin, dr, N, stride=opt.stride)
 off2c.write()
 off2c.plot_minimal()
-on2c = Onsite2cTable(atom, atom, timing=True)
-on2c.run(rmin=rmin, dr=dr, N=N)
-on2c.write()
-print(f'Basis = {atom.basis_sets}')
-off2c.get_twocenter_directly()
+# on2c = Onsite2cTable(atom, atom, timing=True)
+# on2c.run(rmin=rmin, dr=dr, N=N)
+# on2c.write()

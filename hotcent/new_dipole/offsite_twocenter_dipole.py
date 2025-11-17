@@ -2,7 +2,6 @@ import numpy as np
 from ase.units import Bohr
 from ase.data import atomic_numbers, atomic_masses, covalent_radii
 from hotcent.multiatom_integrator import MultiAtomIntegrator
-from hotcent.orbitals import ANGULAR_MOMENTUM
 from hotcent.interpolation import CubicSplineFunction
 from hotcent.new_dipole.slako_dipole import (INTEGRALS_DIPOLE, select_integrals, NUMSK, phi3, tail_smoothening, write_skf)
 import matplotlib.pyplot as plt
@@ -385,13 +384,18 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
         table = self.tables[(0,0,0)]
         # print(np.shape(table))
         threshold = 1e-10
-        nonzero_col = np.where(np.any(np.abs(table) > threshold, axis=0))[0]
+        nonzero_col = np.where(np.any(np.abs(table) > threshold, axis=0))[0] #nonzero in skf file
 
         for i, col in enumerate(nonzero_col): 
             name = sorted(INTEGRALS_DIPOLE.items(), key=lambda x: x[0][0])[col]
             ax = plt.subplot(len(nonzero_col)//2 +1, 2, i + 1)
 
             for p, (e1, e2) in enumerate(self.pairs):
+                selected = select_integrals(e1, e2)
+                sk_labels = [i[0] for i in selected]
+                name = sorted(sk_labels, key= lambda x: x[0])[col]
+                
+                
                 s1, s2 = e1.get_symbol(), e2.get_symbol()
                 key = (p, bas1, bas2)
 
@@ -417,7 +421,7 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
                     plt.plot(self.Rgrid, self.tables[key][:, col] , c='r',
                              ls=s, lw=lw, alpha=alpha)
                     plt.axhline(0, c='k', ls='--')
-                    ax.text(0.8, 0.1 + p * 0.15, name, size=10,
+                    ax.text(0.5, 0.1 + p * 0.15, name[1:], size=10,
                             transform=ax.transAxes)
 
                     if ax.get_subplotspec().is_last_row():
@@ -433,8 +437,8 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
         plt.figtext(0.3, 0.95, 'D', color='r', size=20)
         plt.figtext(0.38, 0.95, ' Slater-Koster tables', size=20)
         sym1, sym2 = self.ela.get_symbol(), self.elb.get_symbol()
-        plt.figtext(0.3, 0.92, '(thin solid: <%s|%s>, wide dashed: <%s|%s>)' \
-                    % (sym1, sym2, sym2, sym1), size=10)
+        # plt.figtext(0.3, 0.92, '(thin solid: <%s|%s>, wide dashed: <%s|%s>)' \
+        #             % (sym1, sym2, sym2, sym1), size=10)
         # plt.show()
 
         if filename is None:

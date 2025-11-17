@@ -13,6 +13,8 @@ from hotcent.new_dipole.offsite_twocenter_dipole import Offsite2cTableDipole
 from hotcent.new_dipole.utils import angstrom_to_bohr, bohr_to_angstrom
 from hotcent.confinement import PowerConfinement
 from hotcent.atomic_dft import AtomicDFT
+plt.rcParams['savefig.bbox'] = 'tight'                                                                                                                                                    
+plt.rcParams.update({'font.size':19})
 
 x, y, z = sp.symbols("x, y, z")
 x1, y1, z1 = sp.symbols("x1, y1, z1")
@@ -390,7 +392,7 @@ def scan_grid_error(pos, index, dipole=False, plot=False, from_file=False):
         fig.colorbar(err, ax=axs[0])
         fig.colorbar(rel_err, ax=axs[1])
         fig.suptitle("Error for chosen integrals for different grid discretizations while creating .skf file")
-        plt.savefig("error_grid-plot.pdf")
+        plt.savefig(f"error_grid-plot{index}.pdf")
         plt.show()
 
 def scan_distance(direction, index, dipole=False, n_dist=20, min_dist_angst=0.4, max_dist_angst=4, from_file=False, plot=False):
@@ -489,7 +491,8 @@ def scan_distance(direction, index, dipole=False, n_dist=20, min_dist_angst=0.4,
         axs[0].legend()
         axs[1].set_ylabel(r"relative integral error")
         axs[0].set_xlabel(r"R / $\AA$")
-        axs[0].set_xlabel(r"R / $\AA$")
+        axs[1].set_xlabel(r"R / $\AA$")
         axs[1].legend()
+        plt.savefig(f"distance_error_range{index}.png")
         plt.show()
         
