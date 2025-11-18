@@ -13,8 +13,8 @@ from hotcent.new_dipole.offsite_twocenter_dipole import Offsite2cTableDipole
 from hotcent.new_dipole.utils import angstrom_to_bohr, bohr_to_angstrom
 from hotcent.confinement import PowerConfinement
 from hotcent.atomic_dft import AtomicDFT
-# plt.rcParams['savefig.bbox'] = 'tight'                                                                                                                                                    
-# plt.rcParams.update({'font.size':9})
+plt.rcParams['savefig.bbox'] = 'tight'                                                                                                                                                    
+plt.rcParams.update({'font.size':19})
 
 x, y, z = sp.symbols("x, y, z")
 x1, y1, z1 = sp.symbols("x1, y1, z1")
@@ -154,7 +154,7 @@ def analytic_2c_dipole(pos_at1, pos_at2, zeta1, zeta2, comparison=None, idx_list
                     analyt_int_value = analyt_int.evalf()
                     results[count] = analyt_int_value 
                 
-                    if comparison != None:
+                    if not(comparison is None):
                         print(f"Testing integral {name_i}-{name_j}-{name_k}", file=file)
                         print(f"Testing integral {name_i}-{name_j}-{name_k}")
                         print(f"sk value:\t{comparison[count]}")
@@ -243,8 +243,8 @@ def compare_integrals(zeta1, use_existing_skf=False, dipole=True):
     # set atom positions
     # vec = np.random.normal(size=3)
     # vec = vec/np.linalg.norm(vec)
-    shift_vec = bohr_to_angstrom(np.array([0.3, 0.5, -0.7]))
-    inter_vec = bohr_to_angstrom(np.array([1, 2, 1.5]))
+    shift_vec = bohr_to_angstrom(np.array([0, 0, 0]))
+    inter_vec = bohr_to_angstrom(np.array([0, 0, 0.4]))
     atoms = Atoms('Eu2', positions=[
         shift_vec,
         inter_vec + shift_vec
@@ -395,7 +395,7 @@ def scan_grid_error(pos, index, dipole=False, plot=False, from_file=False):
         plt.savefig(f"error_grid-plot{index}.pdf")
         plt.show()
 
-def scan_distance(direction, index, dipole=False, n_dist=20, min_dist_angst=0.4, max_dist_angst=4, from_file=False, plot=False):
+def scan_distance(direction, index, dipole=False, n_dist=20, min_dist_angst=0.4, d_dist_angst=4, from_file=False, plot=False):
     """scan the dependence of the error of selected matrix elements on the internuclear distance"""
     t_total_1 = time.time()
 
@@ -404,7 +404,7 @@ def scan_distance(direction, index, dipole=False, n_dist=20, min_dist_angst=0.4,
 
     #initialize arrays
     direction = direction/np.linalg.norm(direction)
-    distance_factors = np.linspace(min_dist_angst, max_dist_angst, n_dist)
+    distance_factors = min_dist_angst + np.arange(n_dist) * d_dist_angst 
     error_array = np.zeros((len(distance_factors)))
     rel_error_array = np.zeros((len(distance_factors)))
     file_error = f'error_distance_scan-{index}.npy'
@@ -438,7 +438,8 @@ def scan_distance(direction, index, dipole=False, n_dist=20, min_dist_angst=0.4,
         off2c.write()
         time2 = time.time()
         print(f'finished after {time2-time1}')
-
+        list_res1 = []
+        list_res2 = []
         for i, dist in enumerate(distance_factors):
             pos = np.array([[0,0,0], direction * dist])
             atoms = Atoms('Eu2', positions=pos)
@@ -449,6 +450,7 @@ def scan_distance(direction, index, dipole=False, n_dist=20, min_dist_angst=0.4,
                 res2 = analytic_2c_dipole(pos_at1=pos[0], pos_at2=pos[1], zeta1=zeta1, zeta2=zeta1, idx_list=[index])[index]
             else:
                 res2 = analytic_2c(pos_at1=pos[0], pos_at2=pos[1], zeta1=zeta1, zeta2=zeta1, idx_list=[index])[index]
+            list_res2.append(res2)
             print('finished analytical integrals')
     
             #assemble actual matrix elements
@@ -469,6 +471,7 @@ def scan_distance(direction, index, dipole=False, n_dist=20, min_dist_angst=0.4,
 
             #calculate errors
             res1 = res1[index]
+            list_res1.append(res1)
             error_array[i] = res1 - res2
             if res2 != 0:
                 rel_error_array[i] = (res1 -res2) / res2
@@ -483,17 +486,24 @@ def scan_distance(direction, index, dipole=False, n_dist=20, min_dist_angst=0.4,
     t_total_2 = time.time()
     print(f"finished scan after total of {t_total_2 -t_total_1}")
     if plot:
-        fig, axs = plt.subplots(ncols=2, figsize=(10,9))
-        axs[0].scatter(distance_factors, error_array, label="error")
-        axs[1].scatter(distance_factors, rel_error_array, label="relative error")
-        axs[0].set_xlabel(r"R / $\AA$")
-        axs[0].set_xlabel(r"R / $\AA$")
-        axs[0].set_ylabel(r"integral error")
+        fig, axs = plt.subplots(ncols=3, figsize=(16,9))
+        axs[0].scatter(distance_factors, list_res2, label="analytical value")
         axs[0].legend()
-        axs[1].set_ylabel(r"relative integral error")
         axs[0].set_xlabel(r"R / $\AA$")
+        axs[0].set_ylabel('E / a.u.')
+        axs[1].scatter(distance_factors, error_array, label="error")
+        axs[2].scatter(distance_factors, rel_error_array, label="relative error")
         axs[1].set_xlabel(r"R / $\AA$")
+        axs[1].set_xlabel(r"R / $\AA$")
+        axs[1].set_ylabel(r"integral error")
         axs[1].legend()
+        axs[2].set_ylabel(r"relative integral error")
+        axs[1].set_xlabel(r"R / $\AA$")
+        axs[2].set_xlabel(r"R / $\AA$")
+        axs[2].legend()
         plt.savefig(f"distance_error_range{index}.png")
         plt.show()
+    print(list_res1)
+    print(angstrom_to_bohr(distance_factors))
+
         

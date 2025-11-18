@@ -5,7 +5,7 @@ from ase.neighborlist import *
 from ase.visualize import view
 
 def write_overreal(structure, orb_list):
-    cutoffs = np.ones((len(structure))) * 1 
+    cutoffs = np.ones((len(structure))) * 10
     nl = NeighborList(cutoffs=cutoffs, self_interaction=True, bothways=True)
     nl.update(structure)
     for i, pos in enumerate(structure.get_positions()):

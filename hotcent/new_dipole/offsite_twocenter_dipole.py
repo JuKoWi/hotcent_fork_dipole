@@ -18,10 +18,10 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
         ----------
         rmin : float, optional
             Shortest interatomic separation to consider. All .skf entries for lower 
-            r are set to 0.
+            r are set to 0. In atomic units
         dr : float, optional
             Grid spacing for the interatomic separations. Also smallest distance
-            appearing in .skf
+            appearing in .skf. In atomic units
         N : int
             Number of grid points for the interatomic separations.
         ntheta : int, optional
