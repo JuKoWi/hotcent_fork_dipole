@@ -13,8 +13,8 @@ from hotcent.new_dipole.offsite_twocenter_dipole import Offsite2cTableDipole
 from hotcent.new_dipole.utils import angstrom_to_bohr, bohr_to_angstrom
 from hotcent.confinement import PowerConfinement
 from hotcent.atomic_dft import AtomicDFT
-plt.rcParams['savefig.bbox'] = 'tight'                                                                                                                                                    
-plt.rcParams.update({'font.size':19})
+# plt.rcParams['savefig.bbox'] = 'tight'                                                                                                                                                    
+# plt.rcParams.update({'font.size':9})
 
 x, y, z = sp.symbols("x, y, z")
 x1, y1, z1 = sp.symbols("x1, y1, z1")
@@ -357,7 +357,7 @@ def scan_grid_error(pos, index, dipole=False, plot=False, from_file=False):
     t_total_2 = time.time()
     print(f"finished scan after total of {t_total_2 -t_total_1}")
     if plot:
-        fig, axs = plt.subplots(nrows=1, ncols=2, sharey=True)
+        fig, axs = plt.subplots(nrows=1, ncols=2, sharey=True) 
         ny, nx = error_array.shape
         xvals = nr_list
         yvals = ntheta_list
@@ -396,6 +396,7 @@ def scan_grid_error(pos, index, dipole=False, plot=False, from_file=False):
         plt.show()
 
 def scan_distance(direction, index, dipole=False, n_dist=20, min_dist_angst=0.4, max_dist_angst=4, from_file=False, plot=False):
+    """scan the dependence of the error of selected matrix elements on the internuclear distance"""
     t_total_1 = time.time()
 
     # exponents for exponentials
@@ -482,7 +483,7 @@ def scan_distance(direction, index, dipole=False, n_dist=20, min_dist_angst=0.4,
     t_total_2 = time.time()
     print(f"finished scan after total of {t_total_2 -t_total_1}")
     if plot:
-        fig, axs = plt.subplots(ncols=2)
+        fig, axs = plt.subplots(ncols=2, figsize=(10,9))
         axs[0].scatter(distance_factors, error_array, label="error")
         axs[1].scatter(distance_factors, rel_error_array, label="relative error")
         axs[0].set_xlabel(r"R / $\AA$")
