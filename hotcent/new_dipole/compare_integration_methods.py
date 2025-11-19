@@ -357,7 +357,7 @@ def scan_grid_error(pos, index, dipole=False, plot=False, from_file=False):
     t_total_2 = time.time()
     print(f"finished scan after total of {t_total_2 -t_total_1}")
     if plot:
-        fig, axs = plt.subplots(nrows=1, ncols=2, sharey=True) 
+        fig, axs = plt.subplots(nrows=1, ncols=2, sharey=True, figsize=(16,9)) 
         ny, nx = error_array.shape
         xvals = nr_list
         yvals = ntheta_list
@@ -384,6 +384,7 @@ def scan_grid_error(pos, index, dipole=False, plot=False, from_file=False):
         axs[0].set_title(f"Error for integral {index}")
 
         axs[1].set_xticks(xcenters)
+        axs[1].set_xlabel(r"$n(r)$")
         axs[1].set_xticklabels(nr_list)
         axs[0].set_yticks(ycenters)
         axs[0].set_yticklabels(ntheta_list)
@@ -391,7 +392,7 @@ def scan_grid_error(pos, index, dipole=False, plot=False, from_file=False):
         
         fig.colorbar(err, ax=axs[0])
         fig.colorbar(rel_err, ax=axs[1])
-        fig.suptitle("Error for chosen integrals for different grid discretizations while creating .skf file")
+        # fig.suptitle("Error for chosen integrals for different grid discretizations while creating .skf file")
         plt.savefig(f"error_grid-plot{index}.pdf")
         plt.show()
 

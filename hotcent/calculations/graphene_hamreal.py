@@ -1,16 +1,41 @@
 import numpy as np
-from ase import Atom
+from ase import atoms
 from ase.build import graphene
 from ase.neighborlist import *
 from ase.visualize import view
+
+def write_hamsquare(structure):
+    
 
 def write_overreal(structure, orb_list):
     cutoffs = np.ones((len(structure))) * 10
     nl = NeighborList(cutoffs=cutoffs, self_interaction=True, bothways=True)
     nl.update(structure)
-    for i, pos in enumerate(structure.get_positions()):
-        Nneighbors = len(nl.get_neighbors(i)[0])
-        print(f"{i}\t{Nneighbors}")
+    iatom2f = find_central_equivaltens(structure)
+    for iatom in range(len(structure)):
+        neighbor_idx, offsets = nl.get_neighbors(iatom)
+        nneigh = len(neighbor_idx)
+        print(f"{iatom}\t{nneigh}\t{orb_list[iatom]}")
+    for iatom in range(len(structure)):
+        neighbor_idx, offsets = nl.get_neighbors(iatom)
+        for ineigh, offset in zip(neighbor_idx, offsets):
+            image_ucell = iatom2f[ineigh]
+            print(f"{iatom}\t{ineigh}\t{image_ucell}")
+
+def find_central_equivaltens(atoms, tol=1e-12):
+    frac = atoms.get_scaled_positions()
+    wrapped = frac % 1
+    central_index = []
+    for i in range(len(atoms)):
+        target = wrapped[i]
+        diff = np.abs(wrapped-target)
+        diff = np.min(diff, 1-diff)
+        j = np.where(np.all(diff < tol, axis=1))[0][0]
+        central_index.append(j)
+    return central_index
+        
+    
+
 
 n_basis_atom = 4
 

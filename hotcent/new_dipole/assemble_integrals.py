@@ -156,6 +156,7 @@ class SK_Integral:
         for i, key in enumerate(sorted(INTEGRALS_DIPOLE, key= lambda x: x[0])):
             integral_vec_dipole[key[0]] = cs_dipole(self.R)[i]
         dipole_elements = self.D_full_dipole @ integral_vec_dipole
+        print(self.R)
 
         overlap_blocks = overlap_elements.reshape(16,16)
         shift_term = np.tile(overlap_blocks, (1,3)).reshape(-1)
