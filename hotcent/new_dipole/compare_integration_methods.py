@@ -125,7 +125,8 @@ radial_2 = (2* b/sp.pi)**(3/4) * sp.exp(-b* ((x-x2)**2 + (y-y2)**2 + (z-z2)**2))
 
 def analytic_2c_dipole(pos_at1, pos_at2, zeta1, zeta2, comparison=None, idx_list=np.arange(len(first_center_real) * len(second_center) * len(operator))):
     """
-    Calculate dipole elements analytically, print reuslt to terminal, and to file
+    Calculate dipole elements analytically, print reuslt to terminal, and to file.
+    Positions in angstrom
     """
     file = open("comparison_dipole.txt", 'w')
     print(f'coordinate1: {pos_at1}', file=file)
@@ -171,7 +172,9 @@ def analytic_2c_dipole(pos_at1, pos_at2, zeta1, zeta2, comparison=None, idx_list
 
 
 def analytic_2c(pos_at1, pos_at2, zeta1, zeta2, comparison=None, idx_list=np.arange(len(first_center_real) * len(second_center))):
-    """calculate overlap integrals analytically, print to terminal and file"""
+    """calculate overlap integrals analytically, print to terminal and file. 
+        positions in angstrom
+    """
     file = open("comparison_overlap.txt", 'w')
     print(f'coordinate: {pos_at1}', file=file)
     print(f'coordinate2: {pos_at2}', file=file)

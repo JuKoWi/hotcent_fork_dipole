@@ -1,26 +1,19 @@
 import numpy as np
-from ase import atoms
+from ase import Atoms 
 from ase.build import graphene
 from ase.neighborlist import *
 from ase.visualize import view
 
-def write_hamsquare(structure):
-    
 
-def write_overreal(structure, orb_list):
-    cutoffs = np.ones((len(structure))) * 10
-    nl = NeighborList(cutoffs=cutoffs, self_interaction=True, bothways=True)
-    nl.update(structure)
-    iatom2f = find_central_equivaltens(structure)
-    for iatom in range(len(structure)):
-        neighbor_idx, offsets = nl.get_neighbors(iatom)
-        nneigh = len(neighbor_idx)
-        print(f"{iatom}\t{nneigh}\t{orb_list[iatom]}")
-    for iatom in range(len(structure)):
-        neighbor_idx, offsets = nl.get_neighbors(iatom)
-        for ineigh, offset in zip(neighbor_idx, offsets):
-            image_ucell = iatom2f[ineigh]
-            print(f"{iatom}\t{ineigh}\t{image_ucell}")
+def write_overreal(structure, orbdict):
+    idx1, idx2 = neighbor_list(quantities='ij', a=structure, self_interaction=True, cutoff=10)
+    atomtypes =structure.get_chemical_symbols()
+    orbnumbers = [orbdict[key] for key in atomtypes]
+    total_orbs = np.sum(orbnumbers)
+    table = np.zeros((total_orbs, total_orbs))
+    for i, firstatom in enumerate(idx1):
+        for j, firstatom in enumerate(idx2):
+            pass
 
 def find_central_equivaltens(atoms, tol=1e-12):
     frac = atoms.get_scaled_positions()
@@ -37,16 +30,13 @@ def find_central_equivaltens(atoms, tol=1e-12):
     
 
 
-n_basis_atom = 4
-
 g = graphene(size=(2,2,1), vacuum=10.0)
-orb_list = np.zeros((len(g),))
-for i, pos in enumerate(g.get_positions()):
-    orb_list[i] = n_basis_atom
+orbdict = {'C':4}
 g.pbc = [False, False, False]
 # cutoffs = natural_cutoffs(structure)
 # print(neighbor_list(quantities='ijD', a=g, cutoff=3))
-write_overreal(structure=g, orb_list=orb_list)
+atoms = Atoms('C2', positions=[[0,0,0], [1,0,0]])
+write_overreal(structure=atoms, orbdict=orbdict)
 
 
 

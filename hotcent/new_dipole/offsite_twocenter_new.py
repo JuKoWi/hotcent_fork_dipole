@@ -10,7 +10,7 @@ from hotcent.interpolation import CubicSplineFunction
 from hotcent.multiatom_integrator import MultiAtomIntegrator
 from hotcent.orbitals import ANGULAR_MOMENTUM
 from hotcent.xc import XC_PW92, LibXC
-from hotcent.new_dipole.slako_new import INTEGRALS, NUMSK, phi2, dphi2, select_integrals, print_integral_overview, tail_smoothening, write_skf, get_hotcent_style_index
+from hotcent.new_dipole.slako_new import INTEGRALS, NUMSK, phi2, dphi2, select_integrals, print_integral_overview, tail_smoothening, write_skf, get_hotcent_style_index, convert_table_dftbplus
 try:
     import matplotlib.pyplot as plt
 except ImportError:
@@ -23,7 +23,9 @@ class Offsite2cTable(MultiAtomIntegrator):
 
     def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
             superposition='density', xc='LDA', stride=1, smoothen_tails=True, zeta=None):
-
+        """"
+            TODO: also included extended format for DFTB+ style skf-file
+        """
         # self.print_header()
 
         assert N is not None, 'Need to set number of grid points N!'
@@ -58,15 +60,18 @@ class Offsite2cTable(MultiAtomIntegrator):
 
             for p, (e1, e2) in enumerate(self.pairs):
                 selected = select_integrals(e1, e2)
+                label_list = sorted(INTEGRALS.keys(), key=lambda x: x[0])
+                print(label_list)
                 if len(grid) > 0:
                     S, H, H2 = self.calculate(selected, e1, e2, R, grid, area,
                                              xc=xc, superposition=superposition, zeta=zeta)
-                    for j,key in enumerate(sorted(selected, key=lambda x: x[0][0])):
+                    for key in sorted(selected, key=lambda x: x[0][0]):
                         sk_label, nl1, nl2 = key
+                        idx = label_list.index(sk_label)
                         bas1 = e1.get_basis_set_index(nl1)
                         bas2 = e2.get_basis_set_index(nl2)
-                        tables[(p, bas1, bas2)][i, j] = H[key]
-                        tables[(p, bas1, bas2)][i, NUMSK+j] = S[key]
+                        tables[(p, bas1, bas2)][i, idx] = H[key]
+                        tables[(p, bas1, bas2)][i, NUMSK+idx] = S[key]
 
         self.Rgrid = rmin + dr * np.arange(N)
 
@@ -211,7 +216,7 @@ class Offsite2cTable(MultiAtomIntegrator):
         else:
             return Sl, Hl, H2l
 
-    def write(self, eigenvalues=None, hubbardvalues=None, occupations=None,
+    def write(self, eigenvalues=None, dftbplus_format=False, hubbardvalues=None, occupations=None,
               spe=None, offdiagonal_H=None, offdiagonal_S=None,
               filename_template='{el1}-{el2}_offsite2c.skf'):
         """
@@ -297,10 +302,17 @@ class Offsite2cTable(MultiAtomIntegrator):
                         copy_dict2(offdiagonal_S, offdiag_S, valence1, valence2)
 
                     table = self.tables[(p, bas1, bas2)]
+                    if dftbplus_format:
+                        table1 = convert_table_dftbplus(table[:,:NUMSK])
+                        print(np.shape(table1))
+                        table2 = convert_table_dftbplus(table[:,NUMSK:])
+                        print(np.shape(table2))
+                        table = np.concatenate((table1, table2), axis=1)
+                    print(np.shape(table))
                     with open(filename, 'w') as f:
                         write_skf(f, self.Rgrid, table, has_diagonal_data,
                                   is_extended, eigval, hubval, occup, SPE, mass,
-                                  has_offdiagonal_data, offdiag_H, offdiag_S)
+                                  has_offdiagonal_data, offdiag_H, offdiag_S, dftbplus_format=dftbplus_format)
 
     def plot(self, filename=None, bas1=0, bas2=0):
         """

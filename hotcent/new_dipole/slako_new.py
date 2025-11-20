@@ -106,6 +106,30 @@ INTEGRAL_DERIVATIVE = {
 }
 
 NUMSK = len(INTEGRALS)
+DFTBPLUS_SIMPLE = [102, 85, 68, 38, 21, 34, 17, 6, 32, 0]
+NUMSK_DFTBPLUS = len(DFTBPLUS_SIMPLE)
+DFTBPLUS_EXTENDED = [] #TODO write mapping from quantum numbered ordering to DFTB+ style ordering
+
+
+def convert_table_dftbplus(table):
+    """
+    DFTB+ format only considers up to d orbitals. Also some of the remaining integrals have the same values
+    or the centers interchanges and these duplicates are omitted in the DFTB+ format.
+    """
+    new_table = np.zeros((np.shape(table)[0], len(DFTBPLUS_SIMPLE)))
+    for i, index in enumerate(DFTBPLUS_SIMPLE):
+        for j, label in enumerate(INTEGRALS.keys()):
+            if label[0] == index:
+                new_table[:,i] = table[:,j]
+    return new_table
+
+
+
+
+
+table = np.zeros((10, NUMSK))
+convert_table_dftbplus(table=table)
+
 
 def convert_quant_num(l):
     """convert quantum number l to letter for string matching in select_subshells"""
@@ -322,7 +346,7 @@ def tail_smoothening(x, y_in, eps_inner=1e-8, eps_outer=1e-16, window_size=5):
 
 def write_skf(handle, Rgrid, table, has_diagonal_data, is_extended, eigval,
               hubval, occup, spe, mass, has_offdiagonal_data, offdiag_H,
-              offdiag_S):
+              offdiag_S, dftbplus_format=False):
     """
     Writes a parameter file in '.skf' format starting at grid_dist 
     and giving nonzero values from R_grid[0] on.
@@ -349,7 +373,10 @@ def write_skf(handle, Rgrid, table, has_diagonal_data, is_extended, eigval,
 
     grid_dist = Rgrid[1] - Rgrid[0]
     grid_npts, numint = np.shape(table)
-    assert (numint % NUMSK) == 0
+    if dftbplus_format:
+        assert (numint % NUMSK_DFTBPLUS) == 0
+    else:
+        assert (numint % NUMSK) == 0
     nzeros = int(np.round(Rgrid[0] / grid_dist)) - 1
     assert nzeros >= 0
     print("%.12f, %d" % (grid_dist, grid_npts + nzeros), file=handle)
@@ -383,10 +410,19 @@ def write_skf(handle, Rgrid, table, has_diagonal_data, is_extended, eigval,
 
         print(line, file=handle)
 
-    print("%.3f, 19*0.0" % mass, file=handle) # TODO change number of columns
+
+    zeros = np.zeros((19,))
+    string = '' 
+    for i in zeros:
+        string += '\t 0.0'
+    print(f"{mass:.3f}{string}", file=handle) 
+
 
     # Table containing the Slater-Koster integrals
-    numtab = numint // NUMSK
+    if DFTBPLUS_SIMPLE:
+        numtab = numint // NUMSK_DFTBPLUS
+    else:
+        numtab = numint // NUMSK
     assert numtab > 0
     
     indices = np.shape(table)[1]

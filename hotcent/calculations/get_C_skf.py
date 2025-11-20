@@ -1,15 +1,10 @@
-import sys
-from pathlib import Path
-sys.path.append(str(Path(__file__).resolve().parents[1]))
-from hotcent.new_dipole.offsite_twocenter_dipole import Offsite2cTableDipole
-from hotcent.new_dipole.onsite_twocenter_dipole import Onsite2cTable
 from optparse import OptionParser
 from ase.units import Bohr
 from ase.data import covalent_radii, atomic_numbers
 from hotcent.offsite_twocenter import Offsite2cTable
 from hotcent.confinement import PowerConfinement
 from hotcent.atomic_dft import AtomicDFT
-
+from hotcent.new_dipole.offsite_twocenter_new import Offsite2cTable
 
 # Run script with --help to see the options
 p = OptionParser(usage='%prog')
@@ -25,7 +20,6 @@ p.add_option('-t', '--stride', default=1, type=int,
                   'See hotcent.slako.run for more information.')
 opt, args = p.parse_args()
 
-
 # Get KS all-electron ground state of confined atom:
 element = 'C'
 r0 = 1.85 * covalent_radii[atomic_numbers[element]] / Bohr
@@ -38,17 +32,15 @@ atom = AtomicDFT(element,
                  timing=True,
                  )
 atom.run()
+print(atom.enl)
 atom.plot_Rnl(only_valence=False)
 atom.plot_density()
 
 # Compute Slater-Koster integrals:
-rmin, dr, N = 0.1, 0.05, 250
-off2c = Offsite2cTableDipole(atom, atom, timing=True)
-off2c.run(rmin, dr, N, stride=opt.stride)
-off2c.write()
-off2c.plot_minimal()
+rmin, dr, N = 0.5, 0.05, 250
+off2c = Offsite2cTable(atom, atom, timing=True)
+off2c.run(rmin, dr, N, superposition=opt.superposition,
+          xc=opt.functional, stride=opt.stride)
+off2c.write(dftbplus_format=True, eigenvalues=atom.enl)  # writes to default C-C_offsite2c.skf filename
 
-off2c = Offsite2cTable(atom, atom)
-off2c.run(rmin, dr, N, stride=opt.stride )
-off2c.write()
 
