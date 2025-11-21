@@ -256,7 +256,7 @@ def compare_integrals(zeta1, use_existing_skf=False, dipole=True):
 
     #assemble actual matrix elements
     method1 = SK_Integral()
-    method1.load_atom_pair('Eu2.xyz')
+    method1.load_atom_file('Eu2.xyz')
     if dipole:
         method1.get_list_dipole()
         method1.load_sk_file_dipole(path='Eu-Eu_offsite2c.skf', path_dipole='Eu-Eu_offsite2c-dipole.skf')
@@ -331,7 +331,7 @@ def scan_grid_error(pos, index, dipole=False, plot=False, from_file=False):
                 print("start sk-transformation")
                 time1 = time.time()
                 method1 = SK_Integral()
-                method1.load_atom_pair('Eu2.xyz')
+                method1.load_atom_file('Eu2.xyz')
                 if dipole:
                     method1.get_list_dipole()
                     method1.load_sk_file_dipole(path='Eu-Eu_offsite2c.skf', path_dipole='Eu-Eu_offsite2c-dipole.skf')
@@ -461,7 +461,7 @@ def scan_distance(direction, index, dipole=False, n_dist=20, min_dist_angst=0.4,
             print("start sk-transformation")
             time1 = time.time()
             method1 = SK_Integral()
-            method1.load_atom_pair('Eu2.xyz')
+            method1.load_atom_file('Eu2.xyz')
             if dipole:
                 method1.get_list_dipole()
                 method1.load_sk_file_dipole(path='Eu-Eu_offsite2c.skf', path_dipole='Eu-Eu_offsite2c-dipole.skf')

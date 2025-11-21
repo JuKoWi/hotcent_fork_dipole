@@ -106,7 +106,7 @@ INTEGRAL_DERIVATIVE = {
 }
 
 NUMSK = len(INTEGRALS)
-DFTBPLUS_SIMPLE = [102, 85, 68, 38, 21, 34, 17, 6, 32, 0]
+DFTBPLUS_SIMPLE = [102, 85, 68, 38, 21, 34, 17, 6, 2, 0]
 NUMSK_DFTBPLUS = len(DFTBPLUS_SIMPLE)
 DFTBPLUS_EXTENDED = [] #TODO write mapping from quantum numbered ordering to DFTB+ style ordering
 

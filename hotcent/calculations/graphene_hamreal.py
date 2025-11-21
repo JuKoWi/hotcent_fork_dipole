@@ -3,40 +3,65 @@ from ase import Atoms
 from ase.build import graphene
 from ase.neighborlist import *
 from ase.visualize import view
+from hotcent.new_dipole.assemble_integrals import SK_Integral
+from hotcent.new_dipole.utils import *
 
 
-def write_overreal(structure, orbdict):
+def write_overreal(structure, maxl_dict, skdir):
     idx1, idx2 = neighbor_list(quantities='ij', a=structure, self_interaction=True, cutoff=10)
     atomtypes =structure.get_chemical_symbols()
-    orbnumbers = [orbdict[key] for key in atomtypes]
+    orbnumbers = [get_norbs(maxl_dict[key]) for key in atomtypes]
     total_orbs = np.sum(orbnumbers)
     table = np.zeros((total_orbs, total_orbs))
-    for i, firstatom in enumerate(idx1):
-        for j, firstatom in enumerate(idx2):
-            pass
+    block_starts = []
 
-def find_central_equivaltens(atoms, tol=1e-12):
-    frac = atoms.get_scaled_positions()
-    wrapped = frac % 1
-    central_index = []
-    for i in range(len(atoms)):
-        target = wrapped[i]
-        diff = np.abs(wrapped-target)
-        diff = np.min(diff, 1-diff)
-        j = np.where(np.all(diff < tol, axis=1))[0][0]
-        central_index.append(j)
-    return central_index
+    count = 0
+    for type in structure.get_chemical_symbols():
+        block_starts.append(count)
+        count += get_norbs(maxl_dict[type])
+
+    for i, firstatom in enumerate(idx1): # iteration over pairs, not first atom
+        secondatom = idx2[i]
+        typeA = structure.symbols[firstatom]
+        typeB = structure.symbols[secondatom]
+        posA = structure.positions[firstatom]
+        posB = structure.positions[secondatom]
+        max_lA = maxl_dict[typeA]
+        max_lB = maxl_dict[typeB]
+        pair = Atoms(f'{typeA}{typeB}', positions=[posA, posB])
+        skpath = skdir + f'/{typeA}-{typeB}.skf'
         
+        pair_integral = SK_Integral()
+        pair_integral.load_atom_pair(atoms=pair)
+        pair_integral.load_sk_file(path=skpath)
+        S_vec = pair_integral.calculate(hamilton=False)
+
+        start_row = block_starts[firstatom]
+        stop_row = start_row + get_norbs(max_lA)
+        start_col = block_starts[secondatom]
+        stop_col = start_col + get_norbs(max_lB) 
+        if secondatom == firstatom:
+            assert typeA == typeB
+            table[start_row:stop_row, start_col:stop_col] = np.eye(get_norbs(max_lA))
+        else:
+            table[start_row:stop_row, start_col:stop_col] = pair_integral.select_overlap_elements(max_lA=max_lA, max_lB=max_lB)
     
+    header1 = f"#\tREAL\tNALLORB\tNKPOINT\n"
+    header2 = f"\tT\t{total_orbs}\t1\n" 
+    header3 = "#IKPOINT\n"
+    header4 = "\t1\n"
+    header5 = "#MATRIX"
+    header = header1 + header2 + header3 + header4 + header5
+    np.savetxt(fname='oversqr.dat', X=table, header=header, comments='')
 
 
-g = graphene(size=(2,2,1), vacuum=10.0)
-orbdict = {'C':4}
-g.pbc = [False, False, False]
+# g = graphene(size=(2,2,1), vacuum=10.0)
+max_l_dict = {'C':1}
+# g.pbc = [False, False, False]
 # cutoffs = natural_cutoffs(structure)
 # print(neighbor_list(quantities='ijD', a=g, cutoff=3))
-atoms = Atoms('C2', positions=[[0,0,0], [1,0,0]])
-write_overreal(structure=atoms, orbdict=orbdict)
+atoms = Atoms('C2', positions=[[0,0,0], [0,0,1]])
+write_overreal(structure=atoms, maxl_dict=max_l_dict, skdir="./skfiles")
 
 
 

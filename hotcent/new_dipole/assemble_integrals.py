@@ -3,6 +3,7 @@ import ase as ase
 import pickle
 import os
 import sys
+from pathlib import Path
 import sympy as sp
 from scipy.interpolate import CubicSpline
 from hotcent.new_dipole.utils import *
@@ -59,7 +60,7 @@ class SK_Integral:
         self.quant_nums_dipole = quant_num_list
         self.sk_int_idx_dipole = nonzeros
 
-    def load_atom_pair(self, path):
+    def load_atom_file(self, path):
         """load position and basis functions to compute the integrals for"""
         atoms = ase.io.read(path)
         self.R_vec = angstrom_to_bohr(atoms.get_distance(0, 1, vector=True)) 
@@ -67,6 +68,15 @@ class SK_Integral:
         atom1 = angstrom_to_bohr(atoms.get_positions()[0])
         self.atom1_pos = np.array([atom1[1], atom1[2], atom1[0]]) # order consistent with quantum numbers
         self._set_euler_angles()
+    
+    def load_atom_pair(self, atoms):
+        """load a single pair as an ase.atoms object"""
+        self.R_vec = angstrom_to_bohr(atoms.get_distance(0, 1, vector=True)) 
+        self.R = angstrom_to_bohr(atoms.get_distance(0,1, vector=False))
+        atom1 = angstrom_to_bohr(atoms.get_positions()[0])
+        self.atom1_pos = np.array([atom1[1], atom1[2], atom1[0]]) # order consistent with quantum numbers
+        self._set_euler_angles()
+        
 
     def _set_euler_angles(self):
         """use only two rotations of three possible"""
@@ -82,15 +92,18 @@ class SK_Integral:
 
     def load_sk_file(self, path):
         """.skf file for H and S"""
+        myfile = Path(path)
+        assert myfile.is_file()
         with open(path, "r") as f:
+            print('opened file')
             first_line = f.readline().strip()
             extended = 1 if first_line.startswith('@') else 0
-            for i,line in enumerate(f, start=1):
-                if i - extended == 0:
-                    line1 = line.strip()
-                    parts = [p.strip() for p in line1.split(', ')]
-                    delta_R, n_points = float(parts[0]), int(parts[1])
-                    break
+            if extended == 0:
+                parts = [p.strip() for p in first_line.split(', ')]
+            if extended == 1:
+                line2 = f.readline().strip()
+                parts = [p.strip() for p in line2.split(',')]
+            delta_R, n_points = float(parts[0]), int(parts[1])
         data = np.loadtxt(path, skiprows=3+extended)
         self.delta_R = delta_R
         self.n_points = n_points 
@@ -143,24 +156,61 @@ class SK_Integral:
         integral_vec = np.zeros((len(self.quant_nums)))
         for i, key in enumerate(sorted(INTEGRALS, key= lambda x: x[0])):
             integral_vec[key[0]] = cs(self.R)[i]
-        dipole_elements = self.D_full @ integral_vec
-        return dipole_elements
+        integrals = self.D_full @ integral_vec
+        if hamilton:
+            self.H_vec = integrals
+            H_dict = {}
+            for label in self.quant_nums:
+                H_dict[(label[1], label[2, label[3], label[4]])] = integrals[label[0]]
+            self.H_dict = H_dict
+        else:
+            self.S_vec = integrals
+            S_dict = {}
+            for label in self.quant_nums:
+                S_dict[(label[1],label[2],label[3],label[4])] = integrals[label[0]]
+            self.S_dict = S_dict
+        return integrals
 
     def calculate_dipole(self):
         self._set_rotation_matrix_dipole()
         overlap_elements = self.calculate(hamilton=False)
-
+        self.S_vec = overlap_elements
         R_grid_dipole = self.delta_R_dipole + self.delta_R_dipole * np.arange(self.n_points_dipole) 
         cs_dipole = CubicSpline(R_grid_dipole, self.sk_table_dipole) 
         integral_vec_dipole = np.zeros((len(self.quant_nums_dipole)))
         for i, key in enumerate(sorted(INTEGRALS_DIPOLE, key= lambda x: x[0])):
             integral_vec_dipole[key[0]] = cs_dipole(self.R)[i]
         dipole_elements = self.D_full_dipole @ integral_vec_dipole
-        print(self.R)
 
         overlap_blocks = overlap_elements.reshape(16,16)
         shift_term = np.tile(overlap_blocks, (1,3)).reshape(-1)
         space_factor = np.tile(np.repeat(self.atom1_pos, 16), 16)
         shift_term = shift_term * space_factor
         shifted_dipole = dipole_elements + shift_term
+        self.d_vec = shifted_dipole
         return shifted_dipole
+    
+    def select_overlap_elements(self, max_lA, max_lB):
+        """returns 2D array of matrix elements"""
+        pair_overlap_matrix = np.zeros((get_norbs(max_lA), get_norbs(max_lB)))        
+        row_start = 0
+        col_start = 0
+        for l1 in range(max_lA + 1):
+            size_row = 2 * l1 +1
+            for l2 in range(max_lB + 1):
+                size_col = 2 * l2 +1
+                block = np.zeros((size_row, size_col))
+                for mi, m in enumerate(range(-l1, l1 + 1)):
+                    for ni, n in enumerate(range(-l2, l2 + 1)):
+                        block[mi, ni] = self.S_dict[(l1, m, l2, n)]
+                pair_overlap_matrix[row_start:row_start+size_row, col_start:col_start+size_col] = block
+                col_start += size_col
+            col_start = 0
+            row_start += size_row
+        return pair_overlap_matrix
+        
+
+
+
+
+        

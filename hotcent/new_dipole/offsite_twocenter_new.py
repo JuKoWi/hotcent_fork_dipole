@@ -61,7 +61,6 @@ class Offsite2cTable(MultiAtomIntegrator):
             for p, (e1, e2) in enumerate(self.pairs):
                 selected = select_integrals(e1, e2)
                 label_list = sorted(INTEGRALS.keys(), key=lambda x: x[0])
-                print(label_list)
                 if len(grid) > 0:
                     S, H, H2 = self.calculate(selected, e1, e2, R, grid, area,
                                              xc=xc, superposition=superposition, zeta=zeta)
@@ -218,7 +217,7 @@ class Offsite2cTable(MultiAtomIntegrator):
 
     def write(self, eigenvalues=None, dftbplus_format=False, hubbardvalues=None, occupations=None,
               spe=None, offdiagonal_H=None, offdiagonal_S=None,
-              filename_template='{el1}-{el2}_offsite2c.skf'):
+              filename_template='{el1}-{el2}.skf'):
         """
         Writes all Slater-Koster integral tables to file.
         By default the 'simple' SKF format is chosen, and the 'extended'
@@ -304,11 +303,8 @@ class Offsite2cTable(MultiAtomIntegrator):
                     table = self.tables[(p, bas1, bas2)]
                     if dftbplus_format:
                         table1 = convert_table_dftbplus(table[:,:NUMSK])
-                        print(np.shape(table1))
                         table2 = convert_table_dftbplus(table[:,NUMSK:])
-                        print(np.shape(table2))
                         table = np.concatenate((table1, table2), axis=1)
-                    print(np.shape(table))
                     with open(filename, 'w') as f:
                         write_skf(f, self.Rgrid, table, has_diagonal_data,
                                   is_extended, eigval, hubval, occup, SPE, mass,
