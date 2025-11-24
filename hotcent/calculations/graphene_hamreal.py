@@ -34,7 +34,7 @@ def write_overreal(structure, maxl_dict, skdir):
         pair_integral = SK_Integral()
         pair_integral.load_atom_pair(atoms=pair)
         pair_integral.load_sk_file(path=skpath)
-        S_vec = pair_integral.calculate(hamilton=False)
+        S_vec = pair_integral.calculate(hamilton=True)
 
         start_row = block_starts[firstatom]
         stop_row = start_row + get_norbs(max_lA)
@@ -44,7 +44,7 @@ def write_overreal(structure, maxl_dict, skdir):
             assert typeA == typeB
             table[start_row:stop_row, start_col:stop_col] = np.eye(get_norbs(max_lA))
         else:
-            table[start_row:stop_row, start_col:stop_col] = pair_integral.select_overlap_elements(max_lA=max_lA, max_lB=max_lB)
+            table[start_row:stop_row, start_col:stop_col] = pair_integral.select_hamiltonian_elements(max_lA=max_lA, max_lB=max_lB)
     
     header1 = f"#\tREAL\tNALLORB\tNKPOINT\n"
     header2 = f"\tT\t{total_orbs}\t1\n" 

@@ -144,6 +144,7 @@ class SK_Integral:
         D_r = self.D_single[idx_pstart:idx_pend+1, idx_pstart:idx_pend+1] # only take p for operator
         D = np.kron(D1, np.kron(D_r, D2))
         self.D_full_dipole = np.real(D)
+        # print(np.all(np.isclose(self.D_full_dipole, np.eye(np.shape(self.D_full_dipole)[0]))))
 
     def calculate(self, hamilton=False):
         """hamilton decides if hamiltonian is computed instead of overlap"""
@@ -161,7 +162,7 @@ class SK_Integral:
             self.H_vec = integrals
             H_dict = {}
             for label in self.quant_nums:
-                H_dict[(label[1], label[2, label[3], label[4]])] = integrals[label[0]]
+                H_dict[(label[1], label[2], label[3], label[4])] = integrals[label[0]]
             self.H_dict = H_dict
         else:
             self.S_vec = integrals
@@ -190,7 +191,7 @@ class SK_Integral:
         self.d_vec = shifted_dipole
         return shifted_dipole
     
-    def select_overlap_elements(self, max_lA, max_lB):
+    def select_hamiltonian_elements(self, max_lA, max_lB):
         """returns 2D array of matrix elements"""
         pair_overlap_matrix = np.zeros((get_norbs(max_lA), get_norbs(max_lB)))        
         row_start = 0
@@ -202,7 +203,7 @@ class SK_Integral:
                 block = np.zeros((size_row, size_col))
                 for mi, m in enumerate(range(-l1, l1 + 1)):
                     for ni, n in enumerate(range(-l2, l2 + 1)):
-                        block[mi, ni] = self.S_dict[(l1, m, l2, n)]
+                        block[mi, ni] = self.H_dict[(l1, m, l2, n)]
                 pair_overlap_matrix[row_start:row_start+size_row, col_start:col_start+size_col] = block
                 col_start += size_col
             col_start = 0

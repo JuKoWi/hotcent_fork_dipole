@@ -87,13 +87,15 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
 
             for p, (e1, e2) in enumerate(self.pairs):
                 selected = select_integrals(e1, e2) #tripel (label, nl, nl)
+                label_list = sorted(INTEGRALS_DIPOLE.keys(), key=lambda x: x[0])
                 if len(grid) > 0:
                     D = self.calculate(selected, e1, e2, R, grid, area, zeta=zeta)
                     for j,key in enumerate(sorted(selected, key=lambda x: x[0][0])):
                         sk_label, nl1, nl2 = key
+                        idx = label_list.index(sk_label)
                         bas1 = e1.get_basis_set_index(nl1)
                         bas2 = e2.get_basis_set_index(nl2)
-                        tables[(p, bas1, bas2)][i, j] = D[key]  #determines the order of sk-columns listed in sk-file?
+                        tables[(p, bas1, bas2)][i, idx] = D[key]  #determines the order of sk-columns listed in sk-file?
         
         self.Rgrid = rmin + dr * np.arange(N)
 

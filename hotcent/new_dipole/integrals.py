@@ -288,7 +288,7 @@ def print_overlap_derivatives():
 
 
 if __name__ == "__main__":
-    # print_dipole_integrals()
+    print_dipole_integrals()
     # print_overlap_integrals()
-    print_overlap_derivatives()
+    # print_overlap_derivatives()
 

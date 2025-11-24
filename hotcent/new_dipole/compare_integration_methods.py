@@ -1,4 +1,5 @@
 import pickle
+import sys
 import time
 import sympy as sp
 import numpy as np
@@ -8,6 +9,7 @@ from ase.io import write
 from ase.units import Bohr
 from ase.data import covalent_radii, atomic_numbers
 from hotcent.new_dipole.assemble_integrals import SK_Integral
+from hotcent.new_dipole.integrals import first_center, second_center, theta2, theta1, phi
 from hotcent.new_dipole.offsite_twocenter_new import Offsite2cTable
 from hotcent.new_dipole.offsite_twocenter_dipole import Offsite2cTableDipole
 from hotcent.new_dipole.utils import angstrom_to_bohr, bohr_to_angstrom
@@ -85,7 +87,7 @@ f5_2 = 1/4 * sp.sqrt(21/(2*sp.pi)) * (x-x2) * (5*(z-z2)**2 - r_2**2)/r_2**3
 f6_2 = 1/4 * sp.sqrt(105/sp.pi) * ((x-x2)**2 - (y-y2)**2) * (z-z2) /r_2**3
 f7_2 = 1/4 * sp.sqrt(35/(2*sp.pi)) * (x-x2) * ((x-x2)**2 - 3* (y-y2)**2) /r_2**3
 
-second_center = {
+second_center_real = {
     "ss": (s_2,0,0),
     "py": (py_2,1,-1),
     "pz": (pz_2,1,0),
@@ -122,8 +124,26 @@ a, b, c = sp.symbols("a, b, c")
 radial_1 = (2 * b/sp.pi)**(3/4) * sp.exp(-b* ((x-x1)**2 + (y-y1)**2 + (z-z1)**2))
 radial_2 = (2* b/sp.pi)**(3/4) * sp.exp(-b* ((x-x2)**2 + (y-y2)**2 + (z-z2)**2))
 
+def compare_sphericals():
+    for i, integral in enumerate(second_center.values()):
+        expr1 = integral[0]
+        for j, integral2 in enumerate(second_center_real.values()):
+            bool1 = (integral2[1] == integral[1])
+            bool2 = (integral2[2] == integral[2])
+            if bool1 and bool2:
+                expr2 = integral2[0]
+                expr2 = expr2.subs({
+                    x2: 0,
+                    y2: 0,
+                    z2: 0,
+                    x: sp.sin(theta2)*sp.cos(phi),
+                    y:sp.sin(theta2)*sp.sin(phi),
+                    z: sp.cos(theta2)
+                })
+                print(sp.simplify(expr1 -expr2))
 
-def analytic_2c_dipole(pos_at1, pos_at2, zeta1, zeta2, comparison=None, idx_list=np.arange(len(first_center_real) * len(second_center) * len(operator))):
+
+def analytic_2c_dipole(pos_at1, pos_at2, zeta1, zeta2, comparison=None, idx_list=np.arange(len(first_center_real) * len(second_center_real) * len(operator))):
     """
     Calculate dipole elements analytically, print reuslt to terminal, and to file.
     Positions in angstrom
@@ -134,13 +154,13 @@ def analytic_2c_dipole(pos_at1, pos_at2, zeta1, zeta2, comparison=None, idx_list
     print("sk-value \t analytic", file=file)
     t_start = time.time()
     count = 0
-    results = np.zeros((len(operator) * len(first_center_real) * len(second_center)))
+    results = np.zeros((len(operator) * len(first_center_real) * len(second_center_real)))
     pos_at1 = angstrom_to_bohr(pos_at1)
     pos_at2 = angstrom_to_bohr(pos_at2)
     
     for name_i, i in first_center_real.items():
         for name_j, j in operator.items():
-            for name_k, k in second_center.items():
+            for name_k, k in second_center_real.items():
                 if count in idx_list:
                     print(count)
                     zeta1_val = zeta1[i[1]]
@@ -171,7 +191,7 @@ def analytic_2c_dipole(pos_at1, pos_at2, zeta1, zeta2, comparison=None, idx_list
     return results
 
 
-def analytic_2c(pos_at1, pos_at2, zeta1, zeta2, comparison=None, idx_list=np.arange(len(first_center_real) * len(second_center))):
+def analytic_2c(pos_at1, pos_at2, zeta1, zeta2, comparison=None, idx_list=np.arange(len(first_center_real) * len(second_center_real))):
     """calculate overlap integrals analytically, print to terminal and file. 
         positions in angstrom
     """
@@ -181,11 +201,11 @@ def analytic_2c(pos_at1, pos_at2, zeta1, zeta2, comparison=None, idx_list=np.ara
     print("sk-value \t analytic", file=file)
     t_start = time.time()
     count = 0
-    results = np.zeros((len(first_center_real) * len(second_center)))
+    results = np.zeros((len(first_center_real) * len(second_center_real)))
     pos_at1 = angstrom_to_bohr(pos_at1)
     pos_at2 = angstrom_to_bohr(pos_at2)
     for name_i, i in first_center_real.items():
-        for name_k, k in second_center.items():
+        for name_k, k in second_center_real.items():
             if count in idx_list:
                 print(count)
                 zeta1_val = zeta1[i[1]]
@@ -242,12 +262,11 @@ def compare_integrals(zeta1, use_existing_skf=False, dipole=True):
                 #   nr=200, ntheta=500
                   )
         off2c.write()
-
     # set atom positions
     # vec = np.random.normal(size=3)
     # vec = vec/np.linalg.norm(vec)
     shift_vec = bohr_to_angstrom(np.array([0, 0, 0]))
-    inter_vec = bohr_to_angstrom(np.array([0, 0, 0.4]))
+    inter_vec = bohr_to_angstrom(np.array([0, 0, 0.8]))
     atoms = Atoms('Eu2', positions=[
         shift_vec,
         inter_vec + shift_vec
@@ -376,8 +395,8 @@ def scan_grid_error(pos, index, dipole=False, plot=False, from_file=False):
         # Centers of each cell in extent coordinates
         xcenters = xmin + (np.arange(nx) + 0.5) * dx
         ycenters = ymin + (np.arange(ny) + 0.5) * dy
-        err = axs[0].imshow(np.abs(error_array), extent=[nr_list.min(), nr_list.max(), ntheta_list.min(), ntheta_list.max()], origin='lower', aspect='auto')
-        rel_err = axs[1].imshow(np.abs(rel_error_array), extent=[nr_list.min(), nr_list.max(), ntheta_list.min(), ntheta_list.max()], origin='lower', aspect='auto')
+        err = axs[0].imshow(np.abs(error_array), extent=[nr_list.min(), nr_list.max(), ntheta_list.min(), ntheta_list.max()], norm='log', origin='lower', aspect='auto')
+        rel_err = axs[1].imshow(np.abs(rel_error_array), extent=[nr_list.min(), nr_list.max(), ntheta_list.min(), ntheta_list.max()], norm='log', origin='lower', aspect='auto')
         axs[0].set_xticks(xcenters)
         axs[0].set_xticklabels(nr_list)
         axs[0].set_xlabel(r"$n(r)$")
