@@ -1,6 +1,7 @@
 from sympy import *
 import time
 import pickle
+from hotcent.new_dipole.slako_new import DFTBPLUS_SIMPLE
 CODE = True #print python code to file
 init_printing(use_unicode=True)
 
@@ -159,6 +160,38 @@ operator = {
     "px": (px_1,1,1),
 }
 
+def convert_dftb_table():
+    tmp1, tmp2 = symbols('tmp1 tmp2')
+    integrals_DFTB = {} 
+    identical_integrals = {}
+    for i in DFTBPLUS_SIMPLE:
+        identical_integrals[i] = []
+
+    count = 0
+    for name_i, i in first_center.items():
+            for name_k, k in second_center.items():
+                if count in DFTBPLUS_SIMPLE:
+                    integral = integrate(i[0] * k[0], (phi, 0, 2 * pi))
+                    integrals_DFTB[count] = integral
+                count += 1
+
+    count = 0
+    for name_i, i in first_center.items():
+            for name_k, k in second_center.items():
+                integral = integrate(i[0] * k[0], (phi, 0, 2 * pi))
+                for dftb in DFTBPLUS_SIMPLE:
+                    plus = simplify(integral-integrals_DFTB[dftb])
+                    integral_swapped = integral.subs({theta1: tmp1, theta2: tmp2})
+                    integral_swapped = integral_swapped.subs({tmp1: theta2, tmp2: theta1})
+                    minus = simplify(integral_swapped- integrals_DFTB[dftb])
+                    if plus == 0:
+                        identical_integrals[dftb].append(count)
+                    elif minus == 0:
+                        identical_integrals[dftb].append(-count)
+                count += 1
+
+    print(identical_integrals)
+
 def pick_quantum_number(dictionary, lm):
     """map from quantum numbers to respective (function, l,m) """
     for key, value in dictionary.items():
@@ -288,7 +321,8 @@ def print_overlap_derivatives():
 
 
 if __name__ == "__main__":
-    print_dipole_integrals()
+    # print_dipole_integrals()
     # print_overlap_integrals()
     # print_overlap_derivatives()
+    convert_dftb_table()
 

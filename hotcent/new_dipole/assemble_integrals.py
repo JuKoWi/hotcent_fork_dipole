@@ -3,6 +3,7 @@ import ase as ase
 import pickle
 import os
 import sys
+import matplotlib.pyplot as plt
 from pathlib import Path
 import sympy as sp
 from scipy.interpolate import CubicSpline
@@ -99,10 +100,12 @@ class SK_Integral:
             first_line = f.readline().strip()
             extended = 1 if first_line.startswith('@') else 0
             if extended == 0:
-                parts = [p.strip() for p in first_line.split(', ')]
+                first_line = first_line.replace(',', ' ')
+                parts = [p.strip() for p in first_line.split()]
             if extended == 1:
-                line2 = f.readline().strip()
-                parts = [p.strip() for p in line2.split(',')]
+                line2 = f.readline()
+                line2 = line2.replace(',', ' ')
+                parts = [p.strip() for p in line2.split()]
             delta_R, n_points = float(parts[0]), int(parts[1])
         data = np.loadtxt(path, skiprows=3+extended)
         self.delta_R = delta_R
@@ -158,6 +161,16 @@ class SK_Integral:
         for i, key in enumerate(sorted(INTEGRALS, key= lambda x: x[0])):
             integral_vec[key[0]] = cs(self.R)[i]
         integrals = self.D_full @ integral_vec
+
+        # x = np.arange(stop=np.max(R_grid), step=0.01)
+        # plt.plot(x, cs(x)[:,1])
+        # if hamilton:
+        #     plt.scatter(R_grid, self.sk_table_H[:,1])
+        # else:
+        #     plt.scatter(R_grid, self.sk_table_S[:,1])
+        # plt.show()
+
+
         if hamilton:
             self.H_vec = integrals
             H_dict = {}
@@ -191,24 +204,28 @@ class SK_Integral:
         self.d_vec = shifted_dipole
         return shifted_dipole
     
-    def select_hamiltonian_elements(self, max_lA, max_lB):
+    def select_matrix_elements(self, max_lA, max_lB):
         """returns 2D array of matrix elements"""
         pair_overlap_matrix = np.zeros((get_norbs(max_lA), get_norbs(max_lB)))        
+        pair_hamiltonian_matrix = np.zeros((get_norbs(max_lA), get_norbs(max_lB)))        
         row_start = 0
         col_start = 0
         for l1 in range(max_lA + 1):
             size_row = 2 * l1 +1
             for l2 in range(max_lB + 1):
                 size_col = 2 * l2 +1
-                block = np.zeros((size_row, size_col))
+                block_overlap = np.zeros((size_row, size_col))
+                block_hamiltonian = np.zeros((size_row, size_col))
                 for mi, m in enumerate(range(-l1, l1 + 1)):
                     for ni, n in enumerate(range(-l2, l2 + 1)):
-                        block[mi, ni] = self.H_dict[(l1, m, l2, n)]
-                pair_overlap_matrix[row_start:row_start+size_row, col_start:col_start+size_col] = block
+                        block_overlap[mi, ni] = self.S_dict[(l1, m, l2, n)]
+                        block_hamiltonian[mi, ni] = self.H_dict[(l1, m, l2, n)]
+                pair_overlap_matrix[row_start:row_start+size_row, col_start:col_start+size_col] = block_overlap
+                pair_hamiltonian_matrix[row_start:row_start+size_row, col_start:col_start+size_col] = block_hamiltonian 
                 col_start += size_col
             col_start = 0
             row_start += size_row
-        return pair_overlap_matrix
+        return pair_overlap_matrix, pair_hamiltonian_matrix
         
 
 

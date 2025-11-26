@@ -438,3 +438,56 @@ def write_skf(handle, Rgrid, table, has_diagonal_data, is_extended, eigval,
         print(line, file=handle)
     
     
+def parse_dftb_file(path):
+    data = []
+
+    with open(path, 'r') as f:
+        lines = f.readlines()[3:]
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        tokens = line.replace(',', ' ').split()
+        row = []
+        for tok in tokens:
+            if '*' in tok:
+                n, val = tok.split('*')
+                n = int(n)
+                val = float(val)
+                row.extend([val]*n)
+            else:
+                row.append(float(tok))
+        data.append(row)
+    array = np.array(data, dtype=float)
+    return array
+
+def convert_sk_table(path):
+    table = parse_dftb_file(path)
+    tableH = table[:,:10]
+    tableS = table[:,10:]
+    big_table = np.zeros((np.shape(table)[0], 2*NUMSK))
+    dict_identical = {102: [102], 85: [85, 119], 68: [68, 136], 38: [38, -98], 21: [21, 55, -81, -115], 34: [34], 17: [17, 51], 6: [6, -96], 2: [2, -32], 0: [0]} 
+    all_integrals = [i[0] for i in INTEGRALS.keys()]
+    all_integrals_sorted = sorted(all_integrals)
+    for i, idx_short in enumerate(DFTBPLUS_SIMPLE):
+        for j in dict_identical[idx_short]:
+            if j < 0:
+                idx_long = all_integrals_sorted.index(-j) 
+                big_table[:,idx_long] = -tableH[:,i]
+                big_table[:,NUMSK+idx_long] = -tableS[:,i]
+            if j >= 0:
+                idx_long = all_integrals_sorted.index(j) 
+                big_table[:,idx_long] = tableH[:,i]
+                big_table[:,NUMSK+idx_long] = tableS[:,i]
+    with open(path, 'r') as f:
+        lines = f.readlines()[:3]
+    header = ''
+    for i in lines:
+        header += f'{i}'
+    header = header.rstrip()
+    title = path.split('.')[0]
+    np.savetxt(fname=f'{title}_long.skf', X=big_table, header=header, comments='')
+    
+    
+    
+

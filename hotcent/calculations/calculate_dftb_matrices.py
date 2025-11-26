@@ -1,6 +1,7 @@
 import numpy as np
 from ase import Atoms 
 from ase.build import graphene
+from ase.build import molecule
 from ase.neighborlist import *
 from ase.visualize import view
 from hotcent.new_dipole.assemble_integrals import SK_Integral
@@ -12,7 +13,8 @@ def write_overreal(structure, maxl_dict, skdir):
     atomtypes =structure.get_chemical_symbols()
     orbnumbers = [get_norbs(maxl_dict[key]) for key in atomtypes]
     total_orbs = np.sum(orbnumbers)
-    table = np.zeros((total_orbs, total_orbs))
+    table_overlap = np.zeros((total_orbs, total_orbs))
+    table_hamiltonian = np.zeros((total_orbs, total_orbs))
     block_starts = []
 
     count = 0
@@ -34,7 +36,8 @@ def write_overreal(structure, maxl_dict, skdir):
         pair_integral = SK_Integral()
         pair_integral.load_atom_pair(atoms=pair)
         pair_integral.load_sk_file(path=skpath)
-        S_vec = pair_integral.calculate(hamilton=True)
+        pair_integral.calculate(hamilton=True)
+        pair_integral.calculate(hamilton=False)
 
         start_row = block_starts[firstatom]
         stop_row = start_row + get_norbs(max_lA)
@@ -42,9 +45,11 @@ def write_overreal(structure, maxl_dict, skdir):
         stop_col = start_col + get_norbs(max_lB) 
         if secondatom == firstatom:
             assert typeA == typeB
-            table[start_row:stop_row, start_col:stop_col] = np.eye(get_norbs(max_lA))
+            table_overlap[start_row:stop_row, start_col:stop_col] = np.eye(get_norbs(max_lA))
         else:
-            table[start_row:stop_row, start_col:stop_col] = pair_integral.select_hamiltonian_elements(max_lA=max_lA, max_lB=max_lB)
+            overlap, hamiltonian = pair_integral.select_matrix_elements(max_lA=max_lA, max_lB=max_lB)
+            table_overlap[start_row:stop_row, start_col:stop_col] = overlap
+            table_hamiltonian[start_row:stop_row, start_col:stop_col] = hamiltonian
     
     header1 = f"#\tREAL\tNALLORB\tNKPOINT\n"
     header2 = f"\tT\t{total_orbs}\t1\n" 
@@ -52,16 +57,18 @@ def write_overreal(structure, maxl_dict, skdir):
     header4 = "\t1\n"
     header5 = "#MATRIX"
     header = header1 + header2 + header3 + header4 + header5
-    np.savetxt(fname='oversqr.dat', X=table, header=header, comments='')
+    np.savetxt(fname='oversqr_hotcent.dat', X=table_overlap, header=header, comments='')
+    np.savetxt(fname='hamsqr1.dat', X=table_hamiltonian, header=header, comments='')
 
 
 # g = graphene(size=(2,2,1), vacuum=10.0)
-max_l_dict = {'C':1}
+max_l_dict = {'H':0, 'C':1, 'Fe':2}
 # g.pbc = [False, False, False]
 # cutoffs = natural_cutoffs(structure)
 # print(neighbor_list(quantities='ijD', a=g, cutoff=3))
-atoms = Atoms('C2', positions=[[0,0,0], [0,0,1]])
-write_overreal(structure=atoms, maxl_dict=max_l_dict, skdir="./skfiles")
+# atoms = Atoms('Fe3', positions=[[0,0,0], [0,1,0.3], [1,0,0]])
+atoms = molecule('C6H6')
+write_overreal(structure=atoms, maxl_dict=max_l_dict, skdir="./skfiles_pbc")
 
 
 
