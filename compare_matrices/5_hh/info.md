@@ -1,0 +1,1 @@
+# H-H on z-axis with maximal distance 10.38 a.u.

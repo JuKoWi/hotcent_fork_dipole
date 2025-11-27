@@ -1,0 +1,1 @@
+# C-C on z-axis and with distance 0.4 a.u. (minimal distance in sk-table)

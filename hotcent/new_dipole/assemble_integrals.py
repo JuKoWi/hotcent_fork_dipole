@@ -33,9 +33,10 @@ class SK_Integral:
     """
     def __init__(self):
         if os.path.exists("symbolic_D_matrix.pkl"):
-            print('Symbolic D matrix exists')
+            pass
+            # print('Symbolic D matrix exists')
         else: 
-            print('Calculate symbolic D-Matrix')            
+            # print('Calculate symbolic D-Matrix')            
             Wigner_D_real(euler_phi=PHI, euler_theta=THETA, euler_gamma=GAMMA)
         with open("symbolic_D_matrix.pkl", "rb") as f:
             M = pickle.load(f)
@@ -91,12 +92,12 @@ class SK_Integral:
             self.euler_phi =  - R_spherical[2] # rotate back on z-axis
             self.euler_gamma = 0
 
-    def load_sk_file(self, path):
+    def load_sk_file(self, path, homonuclear):
         """.skf file for H and S"""
         myfile = Path(path)
         assert myfile.is_file()
         with open(path, "r") as f:
-            print('opened file')
+            # print('opened file')
             first_line = f.readline().strip()
             extended = 1 if first_line.startswith('@') else 0
             if extended == 0:
@@ -107,6 +108,8 @@ class SK_Integral:
                 line2 = line2.replace(',', ' ')
                 parts = [p.strip() for p in line2.split()]
             delta_R, n_points = float(parts[0]), int(parts[1])
+        if not homonuclear:
+            extended -= 1
         data = np.loadtxt(path, skiprows=3+extended)
         self.delta_R = delta_R
         self.n_points = n_points 
@@ -131,7 +134,7 @@ class SK_Integral:
         self.sk_table_dipole = data 
 
     def _set_rotation_matrix(self):
-        print(f"euler angles: phi={self.euler_phi}, theta={self.euler_theta}, gamma={self.euler_gamma}") 
+        # print(f"euler angles: phi={self.euler_phi}, theta={self.euler_theta}, gamma={self.euler_gamma}") 
         self.D_single = np.array(self.D_symb(self.euler_theta, self.euler_phi, self.euler_gamma), dtype=complex)
         D1 = self.D_single
         D2 = self.D_single

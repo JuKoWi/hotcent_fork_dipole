@@ -1,0 +1,1 @@
+# C-C on z-axis and with distance 10.38 a.u. (maximal distance in sk-table)

@@ -1,0 +1,1 @@
+# H-C on z-axis with minimal distance (0.4 a.u.)

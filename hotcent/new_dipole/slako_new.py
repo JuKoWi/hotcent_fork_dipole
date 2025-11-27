@@ -438,11 +438,14 @@ def write_skf(handle, Rgrid, table, has_diagonal_data, is_extended, eigval,
         print(line, file=handle)
     
     
-def parse_dftb_file(path):
+def parse_dftb_file(path, homonuclear):
     data = []
 
     with open(path, 'r') as f:
-        lines = f.readlines()[3:]
+        if homonuclear:
+            lines = f.readlines()[3:]
+        else:
+            lines = f.readlines()[2:]
     for line in lines:
         line = line.strip()
         if not line:
@@ -461,8 +464,8 @@ def parse_dftb_file(path):
     array = np.array(data, dtype=float)
     return array
 
-def convert_sk_table(path):
-    table = parse_dftb_file(path)
+def convert_sk_table(path, homonuclear):
+    table = parse_dftb_file(path, homonuclear=homonuclear)
     tableH = table[:,:10]
     tableS = table[:,10:]
     big_table = np.zeros((np.shape(table)[0], 2*NUMSK))
@@ -480,7 +483,10 @@ def convert_sk_table(path):
                 big_table[:,idx_long] = tableH[:,i]
                 big_table[:,NUMSK+idx_long] = tableS[:,i]
     with open(path, 'r') as f:
-        lines = f.readlines()[:3]
+        if homonuclear:
+            lines = f.readlines()[:3]
+        else:
+            lines = f.readlines()[:2]
     header = ''
     for i in lines:
         header += f'{i}'
