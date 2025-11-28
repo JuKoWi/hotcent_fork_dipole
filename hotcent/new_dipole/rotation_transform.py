@@ -110,6 +110,7 @@ def Wigner_D_real(euler_phi, euler_theta, euler_gamma):
 
     transform_to_comp = transform_to_real.H
     D_total = transform_to_real * Wigner_D_complex(euler_phi=euler_phi, euler_theta=euler_theta, euler_gamma=euler_gamma) * transform_to_comp
+    # D_total = D_total.as_mutable()
     with open("symbolic_D_matrix.pkl", "wb") as f:
         pickle.dump(D_total, f)
     return D_total
