@@ -1,6 +1,6 @@
 import numpy as np
 
-dirpath = "./compare_matrices/7_benz"
+dirpath = "./compare_matrices/8_benz"
 
 hotcent_o = np.loadtxt(fname=dirpath+'/oversqr_hotcent.dat', skiprows=5)
 hotcent_h = np.loadtxt(fname=dirpath+'/hamsqr1_hotcent.dat', skiprows=5)

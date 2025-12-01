@@ -5,6 +5,7 @@ from hotcent.offsite_twocenter import Offsite2cTable
 from hotcent.confinement import PowerConfinement
 from hotcent.atomic_dft import AtomicDFT
 from hotcent.new_dipole.offsite_twocenter_new import Offsite2cTable
+from hotcent.new_dipole.offsite_twocenter_dipole import Offsite2cTableDipole
 
 # Run script with --help to see the options
 p = OptionParser(usage='%prog')
@@ -41,6 +42,13 @@ rmin, dr, N = 0.5, 0.05, 250
 off2c = Offsite2cTable(atom, atom, timing=True)
 off2c.run(rmin, dr, N, superposition=opt.superposition,
           xc=opt.functional, stride=opt.stride)
-off2c.write(dftbplus_format=True, eigenvalues=atom.enl)  # writes to default C-C_offsite2c.skf filename
+off2c.write(dftbplus_format=False, eigenvalues=atom.enl)  # writes to default C-C_offsite2c.skf filename
+
+# Compute Integrals for dipole
+rmin, dr, N = 0.5, 0.05, 250
+off2c = Offsite2cTableDipole(atom, atom, timing=True)
+off2c.run(rmin, dr, N)
+off2c.write_dipole()
+
 
 

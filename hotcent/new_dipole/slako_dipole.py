@@ -350,9 +350,7 @@ def tail_smoothening(x, y_in, eps_inner=1e-8, eps_outer=1e-16, window_size=5):
     return y_out
     
 
-def write_skf(handle, Rgrid, table, has_diagonal_data, is_extended, eigval,
-              hubval, occup, spe, mass, has_offdiagonal_data, offdiag_H,
-              offdiag_S):
+def write_skf(handle, Rgrid, table, atom_transitions, mass):
     """
     Writes a parameter file in '.skf' format starting at grid_dist 
     and giving nonzero values from R_grid[0] on.
@@ -371,10 +369,6 @@ def write_skf(handle, Rgrid, table, has_diagonal_data, is_extended, eigval,
     See Offsite2cTable.write()
     """
     # TODO find out what all the other quantities are, that do not come from table
-    assert not (has_diagonal_data and has_offdiagonal_data)
-
-    if is_extended:
-        print('@', file=handle)
 
     grid_dist = Rgrid[1] - Rgrid[0]
     grid_npts, numint = np.shape(table)
@@ -383,34 +377,9 @@ def write_skf(handle, Rgrid, table, has_diagonal_data, is_extended, eigval,
     assert nzeros >= 0
     print("%.12f, %d" % (grid_dist, grid_npts + nzeros), file=handle)
 
-    if has_diagonal_data or has_offdiagonal_data:
-        if has_diagonal_data:
-            prefixes, dicts = ['E', 'U', 'f'], [eigval, hubval, occup]
-            fields = ['E_f', 'E_d', 'E_p', 'E_s', 'SPE', 'U_f', 'U_d',
-                      'U_p', 'U_s', 'f_f', 'f_d', 'f_p', 'f_s']
-            labels = {'SPE': spe}
-        elif has_offdiagonal_data:
-            prefixes, dicts = ['H', 'S'], [offdiag_H, offdiag_S]
-            fields = ['H_f', 'H_d', 'H_p', 'H_s',
-                      'S_f', 'S_d', 'S_p', 'S_s']
-            labels = {}
-
-        if not is_extended:
-            fields = [field for field in fields if field[-1] != 'f']
-
-        for prefix, d in zip(prefixes, dicts):
-            for l in ['s', 'p', 'd', 'f']:
-                if l in d:
-                    key = '%s_%s' % (prefix, l)
-                    labels[key] = d[l]
-
-        line = ' '.join(fields)
-        for field in fields:
-            val = labels[field] if field in labels else 0
-            s = '%d' % val if isinstance(val, int) else '%.6f' % val
-            line = line.replace(field, s)
-
-        print(line, file=handle)
+    keys_sorted = sorted(INTEGRALS_DIPOLE.keys(), key= lambda x: x[0])
+    atom_integrals = [atom_transitions[i] for i in keys_sorted]
+    print(" ".join(f"{x:.6f}" for x in atom_integrals), file=handle)
 
     print("%.3f, 19*0.0" % mass, file=handle) # TODO change number of columns
 

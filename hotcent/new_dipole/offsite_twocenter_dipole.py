@@ -1,16 +1,19 @@
 import numpy as np
+import sympy as sym
 from ase.units import Bohr
 from ase.data import atomic_numbers, atomic_masses, covalent_radii
 from hotcent.multiatom_integrator import MultiAtomIntegrator
+from hotcent.new_dipole.integrals import first_center, second_center, operator, pick_quantum_number, phi, theta1, theta2
 from hotcent.interpolation import CubicSplineFunction
 from hotcent.new_dipole.slako_dipole import (INTEGRALS_DIPOLE, select_integrals, NUMSK, phi3, tail_smoothening, write_skf)
 import matplotlib.pyplot as plt
+from scipy.integrate import trapezoid
 
 class Offsite2cTableDipole(MultiAtomIntegrator):
     def __init__(self, *args, **kwargs):
         MultiAtomIntegrator.__init__(self, *args, grid_type='bipolar', **kwargs)
 
-    def run(self, rmin=0.4, dr=0.02, N=None, superposition='density', nr=50, stride=1, wflimit=1e-7, ntheta=150, smoothen_tails=True, zeta=None):
+    def run(self, rmin=0.4, dr=0.02, N=None, nr=50, stride=1, wflimit=1e-7, ntheta=150, smoothen_tails=True, zeta=None):
         """
         Calculates off-site two-center Hamiltonian and overlap integrals.
 
@@ -59,7 +62,6 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
         assert dr >= 1e-3, 'For stability, please set rmin >= 1e-3'
         assert np.isclose(rmin / dr, np.round(rmin / dr)), \
                'rmin must be a multiple of dr'
-        assert superposition in ['density', 'potential']
 
         self.r_min = rmin
         self.timer.start('run_offsite2c') # TODO check what this does
@@ -115,8 +117,40 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
                 for i in range(NUMSK):
                     self.tables[key][:, i] = \
                             tail_smoothening(self.Rgrid, self.tables[key][:, i])
+        
+        for p, (e1, e2) in enumerate(self.pairs):
+            if e1 == e2:
+                selected = select_integrals(e1, e2)
+                print(selected)
+                self.atom_transition_dipole = self.calculate_atom_transitions(selected=selected, e1=e1, e2=e2)
+                print(self.atom_transition_dipole)
 
         self.timer.stop('run_offsite2c')
+    
+    def calculate_atom_transitions(self, selected, e1, e2):
+        position_op_dict = {}
+        sym1, sym2 = e1.get_symbol(), e2.get_symbol()
+        assert sym1 == sym2
+        dr = 0.001
+        r = np.arange(start=0, stop=self.wf_range, step=dr)
+        for label in INTEGRALS_DIPOLE.keys(): 
+            match = next((key for key in selected if key[0] == label), None)
+            if match != None:
+                integral, nl1, nl2 = match
+                Rnl1 = e1.Rnl(r, nl1)
+                Rnl2 = e2.Rnl(r, nl2)
+                Y1 = pick_quantum_number(first_center, (integral[1], integral[2]))[0]
+                Yr = pick_quantum_number(operator, (integral[3], integral[4]))[0]
+                Y2 = pick_quantum_number(second_center,(integral[5], integral[6]))[0]
+                Y2 = Y2.subs(theta2, theta1)
+                angle_integral = sym.integrate(sym.integrate(Y1*Yr*Y2*sym.sin(theta1), (phi, 0, 2*sym.pi)), (theta1, 0, sym.pi))
+                radial_integral = trapezoid(y=Rnl1 * Rnl2* r**2 * r, x=r, dx=dr)
+                r_int = np.sqrt(4*np.pi/3) * radial_integral * angle_integral.evalf()
+                position_op_dict[label] = r_int
+            else:
+                position_op_dict[label] = 0
+        return position_op_dict    
+        
 
     def calculate(self, selected, e1, e2, R, grid, area, zeta):
         """
@@ -188,7 +222,6 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
                 D = np.sqrt(4*np.pi/3) * np.sum(Rnl1 * Rnl2 * aux)
                 Dl[key] = D
         
-
         self.timer.stop('calculate_offsite2c')
         return Dl
 
@@ -283,6 +316,19 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
                         write_skf(f, self.Rgrid, table, has_diagonal_data,
                                   is_extended, eigval, hubval, occup, SPE, mass,
                                   has_offdiagonal_data, offdiag_H, offdiag_S)
+
+    def write_dipole(self, filename_template='{el1}-{el2}_dipole.skf'):
+        for p, (e1, e2) in enumerate(self.pairs):
+            sym1, sym2 = e1.get_symbol(), e2.get_symbol()
+            for bas1, valence1 in enumerate(e1.basis_sets):
+                for bas2, valence2 in enumerate(e2.basis_sets):
+                    filename = filename_template.format(el1=sym1 + '+'*bas1,
+                                                        el2=sym2 + '+'*bas2)
+                    mass = atomic_masses[atomic_numbers[sym1]]
+                    is_extended = any([nl[1]=='f' for nl in valence1+valence2])
+                    table = self.tables[(p, bas1, bas2)]
+                    with open(filename, 'w') as f:
+                        write_skf(handle=f, Rgrid=self.Rgrid, table=table, mass=mass, atom_transitions=self.atom_transition_dipole)
 
     def plot(self, filename=None, bas1=0, bas2=0):
         """
