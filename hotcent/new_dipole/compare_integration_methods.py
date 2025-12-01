@@ -1,7 +1,7 @@
 import pickle
 import sys
 import time
-import sympy as sp
+import sympy as sym
 import numpy as np
 import matplotlib.pyplot as plt
 from ase import Atoms
@@ -18,33 +18,33 @@ from hotcent.atomic_dft import AtomicDFT
 plt.rcParams['savefig.bbox'] = 'tight'                                                                                                                                                    
 plt.rcParams.update({'font.size':19})
 
-x, y, z = sp.symbols("x, y, z")
-x1, y1, z1 = sp.symbols("x1, y1, z1")
-r_1 = sp.sqrt((x-x1)**2 + (y-y1)**2 + (z-z1)**2)
-x2, y2, z2 = sp.symbols("x2, y2, z2")
-r_2 = sp.sqrt((x-x2)**2 + (y-y2)**2 + (z-z2)**2)
+x, y, z = sym.symbols("x, y, z")
+x1, y1, z1 = sym.symbols("x1, y1, z1")
+r_1 = sym.sqrt((x-x1)**2 + (y-y1)**2 + (z-z1)**2)
+x2, y2, z2 = sym.symbols("x2, y2, z2")
+r_2 = sym.sqrt((x-x2)**2 + (y-y2)**2 + (z-z2)**2)
 
 
 """first atom"""
-s_1 = 1 / (2 * sp.sqrt(sp.pi))
+s_1 = 1 / (2 * sym.sqrt(sym.pi))
 
-px_1 = sp.sqrt(3 / (4 * sp.pi)) * (x-x1)/r_1
-py_1 = sp.sqrt(3 / (4 * sp.pi)) * (y-y1)/r_1
-pz_1 = sp.sqrt(3 / (4 * sp.pi)) * (z-z1)/r_1
+px_1 = sym.sqrt(3 / (4 * sym.pi)) * (x-x1)/r_1
+py_1 = sym.sqrt(3 / (4 * sym.pi)) * (y-y1)/r_1
+pz_1 = sym.sqrt(3 / (4 * sym.pi)) * (z-z1)/r_1
 
-dxy_1 = sp.sqrt(15/(4 * sp.pi)) *(x-x1)*(y-y1)/r_1**2
-dyz_1 = sp.sqrt(15 / (4*sp.pi)) * (y-y1)*(z-z1)/r_1**2
-dxz_1 = sp.sqrt(15/(4* sp.pi)) * (x-x1)*(z-z1)/r_1**2
-dx2y2_1 = sp.sqrt(15/(16*sp.pi)) * ((x-x1)**2-(y-y1)**2)/r_1**2
-dz2_1 = sp.sqrt(5 / (16 * sp.pi)) * (3*(z-z1)**2 -r_1**2)/r_1**2
+dxy_1 = sym.sqrt(15/(4 * sym.pi)) *(x-x1)*(y-y1)/r_1**2
+dyz_1 = sym.sqrt(15 / (4*sym.pi)) * (y-y1)*(z-z1)/r_1**2
+dxz_1 = sym.sqrt(15/(4* sym.pi)) * (x-x1)*(z-z1)/r_1**2
+dx2y2_1 = sym.sqrt(15/(16*sym.pi)) * ((x-x1)**2-(y-y1)**2)/r_1**2
+dz2_1 = sym.sqrt(5 / (16 * sym.pi)) * (3*(z-z1)**2 -r_1**2)/r_1**2
 
-f1_1 = 1/4 * sp.sqrt(35/(2*sp.pi)) * (y-y1)*(3*(x-x1)**2 - (y-y1)**2)/r_1**3
-f2_1 = 1/2 * sp.sqrt(105/sp.pi) * (x-x1)*(y-y1)*(z-z1)/r_1**3
-f3_1 = 1/4 * sp.sqrt(21/(2*sp.pi)) * (y-y1) * (5*(z-z1)**2 - r_1**2)/r_1**3
-f4_1 = 1/4 * sp.sqrt(7/sp.pi) * (5*(z-z1)**3 - 3* (z-z1) * r_1**2)/r_1**3
-f5_1 = 1/4 * sp.sqrt(21/(2*sp.pi)) * (x-x1) * (5*(z-z1)**2 - r_1**2)/r_1**3
-f6_1 = 1/4 * sp.sqrt(105/sp.pi) * ((x-x1)**2 - (y-y1)**2) * (z-z1) /r_1**3
-f7_1 = 1/4 * sp.sqrt(35/(2*sp.pi)) * (x-x1) * ((x-x1)**2 - 3* (y-y1)**2) /r_1**3
+f1_1 = 1/4 * sym.sqrt(35/(2*sym.pi)) * (y-y1)*(3*(x-x1)**2 - (y-y1)**2)/r_1**3
+f2_1 = 1/2 * sym.sqrt(105/sym.pi) * (x-x1)*(y-y1)*(z-z1)/r_1**3
+f3_1 = 1/4 * sym.sqrt(21/(2*sym.pi)) * (y-y1) * (5*(z-z1)**2 - r_1**2)/r_1**3
+f4_1 = 1/4 * sym.sqrt(7/sym.pi) * (5*(z-z1)**3 - 3* (z-z1) * r_1**2)/r_1**3
+f5_1 = 1/4 * sym.sqrt(21/(2*sym.pi)) * (x-x1) * (5*(z-z1)**2 - r_1**2)/r_1**3
+f6_1 = 1/4 * sym.sqrt(105/sym.pi) * ((x-x1)**2 - (y-y1)**2) * (z-z1) /r_1**3
+f7_1 = 1/4 * sym.sqrt(35/(2*sym.pi)) * (x-x1) * ((x-x1)**2 - 3* (y-y1)**2) /r_1**3
 
 first_center_real = {
     "ss": (s_1, 0,0),
@@ -69,23 +69,23 @@ first_center_real = {
 """second atom"""
 s_2 = s_1
 
-px_2 = sp.sqrt(3 / (4 * sp.pi)) * (x-x2)/r_2
-py_2 = sp.sqrt(3 / (4 * sp.pi)) * (y-y2)/r_2
-pz_2 = sp.sqrt(3 / (4 * sp.pi)) * (z-z2)/r_2 
+px_2 = sym.sqrt(3 / (4 * sym.pi)) * (x-x2)/r_2
+py_2 = sym.sqrt(3 / (4 * sym.pi)) * (y-y2)/r_2
+pz_2 = sym.sqrt(3 / (4 * sym.pi)) * (z-z2)/r_2 
 
-dxy_2 = sp.sqrt(15 / (4 * sp.pi)) * (x-x2)*(y-y2)/r_2**2
-dyz_2 = sp.sqrt(15 / (4 * sp.pi)) * (y-y2)*(z-z2)/r_2**2
-dxz_2 = sp.sqrt(15 / (4 * sp.pi)) * (x-x2)*(z-z2)/r_2**2
-dx2y2_2 = sp.sqrt(15 / (16*sp.pi)) * ((x-x2)**2-(y-y2)**2)/r_2**2
-dz2_2 = sp.sqrt(5 / (16 * sp.pi)) * (3 * (z-z2)**2 - r_2**2)/r_2**2
+dxy_2 = sym.sqrt(15 / (4 * sym.pi)) * (x-x2)*(y-y2)/r_2**2
+dyz_2 = sym.sqrt(15 / (4 * sym.pi)) * (y-y2)*(z-z2)/r_2**2
+dxz_2 = sym.sqrt(15 / (4 * sym.pi)) * (x-x2)*(z-z2)/r_2**2
+dx2y2_2 = sym.sqrt(15 / (16*sym.pi)) * ((x-x2)**2-(y-y2)**2)/r_2**2
+dz2_2 = sym.sqrt(5 / (16 * sym.pi)) * (3 * (z-z2)**2 - r_2**2)/r_2**2
 
-f1_2 = 1/4 * sp.sqrt(35/(2*sp.pi)) * (y-y2)*(3*(x-x2)**2 - (y-y2)**2)/r_2**3
-f2_2 = 1/2 * sp.sqrt(105/sp.pi) * (x-x2)*(y-y2)*(z-z2)/r_2**3
-f3_2 = 1/4 * sp.sqrt(21/(2*sp.pi)) * (y-y2) * (5*(z-z2)**2 - r_2**2)/r_2**3
-f4_2 = 1/4 * sp.sqrt(7/sp.pi) * (5*(z-z2)**3 - 3* (z-z2) * r_2**2)/r_2**3
-f5_2 = 1/4 * sp.sqrt(21/(2*sp.pi)) * (x-x2) * (5*(z-z2)**2 - r_2**2)/r_2**3
-f6_2 = 1/4 * sp.sqrt(105/sp.pi) * ((x-x2)**2 - (y-y2)**2) * (z-z2) /r_2**3
-f7_2 = 1/4 * sp.sqrt(35/(2*sp.pi)) * (x-x2) * ((x-x2)**2 - 3* (y-y2)**2) /r_2**3
+f1_2 = 1/4 * sym.sqrt(35/(2*sym.pi)) * (y-y2)*(3*(x-x2)**2 - (y-y2)**2)/r_2**3
+f2_2 = 1/2 * sym.sqrt(105/sym.pi) * (x-x2)*(y-y2)*(z-z2)/r_2**3
+f3_2 = 1/4 * sym.sqrt(21/(2*sym.pi)) * (y-y2) * (5*(z-z2)**2 - r_2**2)/r_2**3
+f4_2 = 1/4 * sym.sqrt(7/sym.pi) * (5*(z-z2)**3 - 3* (z-z2) * r_2**2)/r_2**3
+f5_2 = 1/4 * sym.sqrt(21/(2*sym.pi)) * (x-x2) * (5*(z-z2)**2 - r_2**2)/r_2**3
+f6_2 = 1/4 * sym.sqrt(105/sym.pi) * ((x-x2)**2 - (y-y2)**2) * (z-z2) /r_2**3
+f7_2 = 1/4 * sym.sqrt(35/(2*sym.pi)) * (x-x2) * ((x-x2)**2 - 3* (y-y2)**2) /r_2**3
 
 second_center_real = {
     "ss": (s_2,0,0),
@@ -120,9 +120,9 @@ operator = {
 
 
 """radial part"""
-a, b, c = sp.symbols("a, b, c")
-radial_1 = (2 * b/sp.pi)**(3/4) * sp.exp(-b* ((x-x1)**2 + (y-y1)**2 + (z-z1)**2))
-radial_2 = (2* b/sp.pi)**(3/4) * sp.exp(-b* ((x-x2)**2 + (y-y2)**2 + (z-z2)**2))
+a, b, c = sym.symbols("a, b, c")
+radial_1 = (2 * b/sym.pi)**(3/4) * sym.exp(-b* ((x-x1)**2 + (y-y1)**2 + (z-z1)**2))
+radial_2 = (2* b/sym.pi)**(3/4) * sym.exp(-b* ((x-x2)**2 + (y-y2)**2 + (z-z2)**2))
 
 def compare_sphericals():
     for i, integral in enumerate(second_center.values()):
@@ -136,11 +136,11 @@ def compare_sphericals():
                     x2: 0,
                     y2: 0,
                     z2: 0,
-                    x: sp.sin(theta2)*sp.cos(phi),
-                    y:sp.sin(theta2)*sp.sin(phi),
-                    z: sp.cos(theta2)
+                    x: sym.sin(theta2)*sym.cos(phi),
+                    y:sym.sin(theta2)*sym.sin(phi),
+                    z: sym.cos(theta2)
                 })
-                print(sp.simplify(expr1 -expr2))
+                print(sym.simplify(expr1 -expr2))
 
 
 def analytic_2c_dipole(pos_at1, pos_at2, zeta1, zeta2, comparison=None, idx_list=np.arange(len(first_center_real) * len(second_center_real) * len(operator))):
@@ -171,7 +171,7 @@ def analytic_2c_dipole(pos_at1, pos_at2, zeta1, zeta2, comparison=None, idx_list
                     integrand = integrand.subs({x1: pos_at1[0], y1: pos_at1[1], z1: pos_at1[2]})
                     integrand = integrand.subs({x2: pos_at2[0], y2: pos_at2[1], z2: pos_at2[2]})
                 
-                    analyt_int = sp.integrate(sp.integrate(sp.integrate(integrand, (x, -sp.oo, sp.oo)), (y, -sp.oo, sp.oo)), (z, -sp.oo, sp.oo))
+                    analyt_int = sym.integrate(sym.integrate(sym.integrate(integrand, (x, -sym.oo, sym.oo)), (y, -sym.oo, sym.oo)), (z, -sym.oo, sym.oo))
                     analyt_int_value = analyt_int.evalf()
                     results[count] = analyt_int_value 
                 
@@ -216,7 +216,7 @@ def analytic_2c(pos_at1, pos_at2, zeta1, zeta2, comparison=None, idx_list=np.ara
                 integrand = integrand.subs({x1: pos_at1[0], y1: pos_at1[1], z1: pos_at1[2]})
                 integrand = integrand.subs({x2: pos_at2[0], y2: pos_at2[1], z2: pos_at2[2]})
 
-                analyt_int = sp.integrate(sp.integrate(sp.integrate(integrand, (x, -sp.oo, sp.oo)), (y, -sp.oo, sp.oo)), (z, -sp.oo, sp.oo))
+                analyt_int = sym.integrate(sym.integrate(sym.integrate(integrand, (x, -sym.oo, sym.oo)), (y, -sym.oo, sym.oo)), (z, -sym.oo, sym.oo))
                 analyt_int_value = analyt_int.evalf()
                 results[count] = analyt_int_value 
 

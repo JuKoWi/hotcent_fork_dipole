@@ -1,4 +1,6 @@
 import numpy as np
+import sys
+sys.path.append("/home/julius/university/uni_jena/master_thesis/hotcent_fork_dipole")
 from ase import Atoms 
 from ase.build import graphene
 from ase.build import molecule

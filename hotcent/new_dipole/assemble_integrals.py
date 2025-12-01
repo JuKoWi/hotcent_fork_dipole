@@ -5,7 +5,7 @@ import os
 import sys
 import matplotlib.pyplot as plt
 from pathlib import Path
-import sympy as sp
+import sympy as sym
 from scipy.interpolate import CubicSpline
 from hotcent.new_dipole.utils import *
 from hotcent.new_dipole.integrals import get_index_list_dipole, get_index_list_overlap
@@ -40,7 +40,7 @@ class SK_Integral:
             Wigner_D_real(euler_phi=PHI, euler_theta=THETA, euler_gamma=GAMMA)
         with open("symbolic_D_matrix.pkl", "rb") as f:
             M = pickle.load(f)
-        self.D_symb = sp.lambdify((THETA, PHI, GAMMA), M, 'numpy') 
+        self.D_symb = sym.lambdify((THETA, PHI, GAMMA), M, 'numpy') 
 
         if os.path.exists("identifier_nonzeros_overlap.pkl"):
             with open("identifier_nonzeros_overlap.pkl", 'rb') as f:
