@@ -17,6 +17,28 @@ from hotcent.new_dipole.utils import *
 from hotcent.new_dipole.integrals import get_index_list_dipole, get_index_list_overlap
 from hotcent.new_dipole.slako_dipole import INTEGRALS_DIPOLE
 from hotcent.new_dipole.slako_new import INTEGRALS
+from hotcent.new_dipole.assemble_integrals import SK_Integral
+
+cutoffs = {('C','C'): 1.85, ('H', 'C'): 1, 
+           ('C', 'H'): 5,
+             ('H', 'H'): 1}
+max_l = {'C':1, 'H':0}
+graphene = graphene('CC', size=(1,1,1), vacuum=10)
+benzene = molecule('C6H6')
+
+posA = angstrom_to_bohr(graphene.positions[0])
+posB = angstrom_to_bohr(graphene.positions[1])
+second = SK_Integral()
+second.get_list_dipole()
+second.load_atom_pair(atoms=graphene)
+second.load_sk_file_dipole(path="./skfiles/self_made/C-C.skf", path_dipole="./skfiles/self_made_dipole/C-C.skf")
+SHIFTED = second.calculate_dipole()
+second.calculate(hamilton=True)
+second.calculate(hamilton=False)
+r_dict = second.r_dict
+S_dict = second.S_dict
+H_dict = second.H_dict
+TABLE_DIPOLE = second.sk_table_dipole
 
 class Seedname_TB:
     def __init__(self, unit_cell, skpath, skpath_dipole, maxl_dict):
@@ -165,18 +187,19 @@ class Seedname_TB:
         R = np.linalg.norm(R_vec)
         euler_theta, euler_phi, euler_gamma= self._set_euler_angles(vec1=posA, vec2=posB)
         D_single = np.array(self.D_symb(euler_theta, euler_phi, euler_gamma), dtype=complex)
+
         D = np.kron(D_single, D_single)
         D = np.real(D)
         deltaR = sk_table.deltaR
         table = sk_table.table
         n_points = sk_table.n_points
-
         R_grid = deltaR + deltaR * np.arange(n_points)
         cs = CubicSpline(R_grid, table)
-        integral_vec = np.zeros((len(self.quant_nums))) # TODO: for dipole moment create if statement
+        integral_vec = np.zeros((len(self.quant_nums))) 
         for i, key in enumerate(sorted(INTEGRALS, key= lambda x: x[0])):
             integral_vec[key[0]] = cs(R)[i]
         integrals = D @ integral_vec
+
         if operator == 'r':
             deltaR_dipole = sk_table_dipole.deltaR
             table_dipole = sk_table_dipole.table
@@ -184,7 +207,7 @@ class Seedname_TB:
 
             idx_pstart = 1
             idx_pend = 3
-            D_r = D[idx_pstart:idx_pend+1, idx_pstart:idx_pend+1]
+            D_r = D_single[idx_pstart:idx_pend+1, idx_pstart:idx_pend+1]
             D_dipole = np.kron(D_single, np.kron(D_r, D_single))
             D_dipole = np.real(D_dipole)
 
@@ -198,6 +221,7 @@ class Seedname_TB:
             #consider origin shift
             overlap_blocks = integrals.reshape(16,16)
             shift_term = np.tile(overlap_blocks, (1,3)).reshape(-1)
+            posA = np.array([posA[1], posA[2], posA[0]]) #reorder component according to quantum numbers
             space_factor = np.tile(np.repeat(posA, 16), 16)
             shift_term = shift_term * space_factor
             shifted_dipole = dipole_elements + shift_term
@@ -376,8 +400,6 @@ class Seedname_TB:
                         j = n+1
                         print(f"{i} {j}\t{xre[m,n]:.18e}\t{xim[m,n]:.18e}\t{yre[m,n]:.18e}\t{yim[m,n]:.18e}\t{zre[m,n]:.18e}\t{zim[m,n]:.18e}", file=f)
                 
-                
-    
     def write_hamoversqr(self):
         matrix = self._calculate_lattice_dict(operator='S')[(0,0,0)]
         matrixH = self._calculate_lattice_dict(operator='H')[(0,0,0)]
@@ -401,27 +423,30 @@ class SKTable:
         self.same_atom_vals = same_atom #list for S and H, dict for r
 
 
-cutoffs = {('C','C'): 1.85, ('H', 'C'): 1, 
-           ('C', 'H'): 5,
-             ('H', 'H'): 1}
-max_l = {'C':1, 'H':0}
-graphene = graphene('CC', size=(1,1,1), vacuum=10)
-benzene = molecule('C6H6')
-
-posA = graphene.positions[0]
-posB = graphene.positions[1]
 lcao_graphene = Seedname_TB(graphene, skpath="skfiles/self_made", maxl_dict=max_l, skpath_dipole="skfiles/self_made_dipole")
 # block = lcao_graphene._calculate_atom_block(types=('C','C'), posA=posA, posB=posB, max_lA=1, max_lB=1, operator='r')
-# lcao_graphene.write_seedname()
-# print(lcao_graphene._calculate_lattice_dict('r')[(0,0,0)])
-# sk_table = lcao_graphene.S_sk_tables[('C','C')]
-# sk_table_dipole = lcao_graphene.r_sk_tables[('C','C')]
-# dipoles = lcao_graphene._create_integral_dict(sk_table=sk_table, posA=posA, posB=posB, operator='r', sk_table_dipole=sk_table_dipole)
-# pair_matrix = lcao_graphene._select_dipole_matrix_elements(max_lA=1, max_lB=1, integral_dict=dipoles)
-# lcao_graphene._calculate_lattice_dict(operator='S')
-# lcao_graphene._calculate_lattice_dict(operator='H')
-# lcao_graphene._calculate_lattice_dict(operator='r')
+sk_table = lcao_graphene.S_sk_tables[('C','C')]
+sk_table_dipole = lcao_graphene.r_sk_tables[('C','C')]
+sk_H_table = lcao_graphene.H_sk_tables[('C','C')]
+r_dict_new = lcao_graphene._create_integral_dict(sk_table=sk_table, posA=posA, posB=posB, operator='r', sk_table_dipole=sk_table_dipole)
+S_dict_new = lcao_graphene._create_integral_dict(sk_table=sk_table, posA=posA, posB=posB, operator='S')
+H_dict_new = lcao_graphene._create_integral_dict(sk_table=sk_H_table, posA=posA, posB=posB, operator='H')
 
-
-# lattice_dict_S = lcao_graphene._calculate_lattice_dict(operator='S')
-lcao_graphene.write_seedname()
+for key in r_dict.keys():
+    # if r_dict[key] != 0:
+    #     print(r_dict[key])
+    #     print(r_dict_new[key])
+    if not np.isclose(r_dict[key], r_dict_new[key]):
+        print(key)
+for key in S_dict.keys():
+    # if S_dict[key] != 0:
+    #     print(S_dict[key])
+    #     print(S_dict_new[key])
+    if not np.isclose(S_dict[key], S_dict_new[key]):
+        print(key)
+for key in H_dict.keys():
+    # if H_dict[key] != 0:
+    #     print(H_dict[key])
+    #     print(H_dict_new[key])
+    if not np.isclose(H_dict[key], H_dict_new[key]):
+        print(key)

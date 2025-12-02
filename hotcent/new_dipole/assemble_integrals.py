@@ -92,7 +92,7 @@ class SK_Integral:
             self.euler_phi =  - R_spherical[2] # rotate back on z-axis
             self.euler_gamma = 0
 
-    def load_sk_file(self, path, homonuclear):
+    def load_sk_file(self, path, homonuclear=True):
         """.skf file for H and S"""
         myfile = Path(path)
         assert myfile.is_file()
@@ -122,12 +122,13 @@ class SK_Integral:
         with open(path_dipole, "r") as f:
             first_line = f.readline().strip()
             extended = 1 if first_line.startswith('@') else 0
-            for i,line in enumerate(f, start=1):
-                if i-extended == 0:
-                    line1 = line.strip()
-                    parts = [p.strip() for p in line1.split(', ')]
-                    delta_R, n_points = float(parts[0]), int(parts[1])
-                    break
+            if extended == 0:
+                line1 = first_line.strip()
+                parts = [p.strip() for p in line1.split(', ')]
+            if extended == 1:
+                line2 = f.readline().replace(',', ' ')
+                parts = [p.strip() for p in line2.split()]
+        delta_R, n_points = float(parts[0]), int(parts[1])
         data = np.loadtxt(path_dipole, skiprows=3+extended)
         self.delta_R_dipole = delta_R
         self.n_points_dipole = n_points 
@@ -173,7 +174,6 @@ class SK_Integral:
         #     plt.scatter(R_grid, self.sk_table_S[:,1])
         # plt.show()
 
-
         if hamilton:
             self.H_vec = integrals
             H_dict = {}
@@ -205,6 +205,10 @@ class SK_Integral:
         shift_term = shift_term * space_factor
         shifted_dipole = dipole_elements + shift_term
         self.d_vec = shifted_dipole
+        r_dict = {}
+        for label in self.quant_nums_dipole:
+            r_dict[(label[1], label[2], label[3], label[4], label[5], label[6])] = shifted_dipole[label[0]]
+        self.r_dict = r_dict
         return shifted_dipole
     
     def select_matrix_elements(self, max_lA, max_lB):
