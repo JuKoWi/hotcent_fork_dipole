@@ -465,6 +465,7 @@ def parse_dftb_file(path, homonuclear):
     return array
 
 def convert_sk_table(path, homonuclear):
+    """convert dftb-syle file to long, partwise redundant format"""
     table = parse_dftb_file(path, homonuclear=homonuclear)
     tableH = table[:,:10]
     tableS = table[:,10:]

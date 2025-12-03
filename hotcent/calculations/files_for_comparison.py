@@ -17,28 +17,6 @@ from hotcent.new_dipole.utils import *
 from hotcent.new_dipole.integrals import get_index_list_dipole, get_index_list_overlap
 from hotcent.new_dipole.slako_dipole import INTEGRALS_DIPOLE
 from hotcent.new_dipole.slako_new import INTEGRALS
-from hotcent.new_dipole.assemble_integrals import SK_Integral
-
-cutoffs = {('C','C'): 1.85, ('H', 'C'): 1, 
-           ('C', 'H'): 5,
-             ('H', 'H'): 1}
-max_l = {'C':1, 'H':0}
-graphene = graphene('CC', size=(1,1,1), vacuum=10)
-benzene = molecule('C6H6')
-
-posA = angstrom_to_bohr(graphene.positions[0])
-posB = angstrom_to_bohr(graphene.positions[1])
-second = SK_Integral()
-second.get_list_dipole()
-second.load_atom_pair(atoms=graphene)
-second.load_sk_file_dipole(path="./skfiles/self_made/C-C.skf", path_dipole="./skfiles/self_made_dipole/C-C.skf")
-SHIFTED = second.calculate_dipole()
-second.calculate(hamilton=True)
-second.calculate(hamilton=False)
-r_dict = second.r_dict
-S_dict = second.S_dict
-H_dict = second.H_dict
-TABLE_DIPOLE = second.sk_table_dipole
 
 class Seedname_TB:
     def __init__(self, unit_cell, skpath, skpath_dipole, maxl_dict):
@@ -350,6 +328,10 @@ class Seedname_TB:
             else:
                 matrix[start_rows:start_rows+n_rows, start_cols:start_cols+n_cols] = block
             lattice_dict[R_triple] = matrix
+            if idxA == 0:
+                if idxB == 0:
+                    if R_triple == (0, -1, 0):
+                        print(block)
         assert np.shape(np.unique(R, axis=0))[0] == len(lattice_dict)
         return lattice_dict
     
@@ -358,10 +340,14 @@ class Seedname_TB:
         return int(orb_previous)
     
     def write_seedname(self):
+        """write to file in style of seedname_tb.dat form w90 program
+        hamiltonian elements in eV, lengths in angstrom"""
         filename = 'seedname_tb.dat'
         lattice_dict_S = self._calculate_lattice_dict(operator='S')
         lattice_dict_H = self._calculate_lattice_dict(operator='H')
         lattice_dict_r = self._calculate_lattice_dict(operator='r')
+        assert len(lattice_dict_H.keys()) == len(lattice_dict_r.keys())
+        assert len(lattice_dict_S.keys()) == len(lattice_dict_r.keys())
         with open(filename, 'w') as f:
             f.write("Date\n")
             np.savetxt(f, self.abc)
@@ -383,7 +369,7 @@ class Seedname_TB:
                 D = np.imag(S_array)
                 for i in range(np.shape(S_array)[0]):
                     for j in range(np.shape(S_array)[1]):
-                        print(f"{i} {j}\t{A[i,j]:.18e}\t{B[i,j]:.18e}\t{C[i,j]:.18e}\t{D[i,j]:.18e}", file=f)
+                        print(f"{i+1} {j+1}\t{A[i,j]:.18e}\t{B[i,j]:.18e}\t{C[i,j]:.18e}\t{D[i,j]:.18e}", file=f)
             for point in lattice_dict_r.keys():
                 f.write('\n')
                 f.write(str(point[0]) + ' ' + str(point[1]) + ' ' + str(point[2]) + '\n')
@@ -394,8 +380,8 @@ class Seedname_TB:
                 yim = np.imag(r_array[1])
                 zre = np.real(r_array[2])
                 zim = np.imag(r_array[2])
-                for m in range(np.shape(r_array)[0]):
-                    for n in range(np.shape(r_array)[1]):
+                for m in range(np.shape(r_array)[1]):
+                    for n in range(np.shape(r_array)[2]):
                         i = m+1
                         j = n+1
                         print(f"{i} {j}\t{xre[m,n]:.18e}\t{xim[m,n]:.18e}\t{yre[m,n]:.18e}\t{yim[m,n]:.18e}\t{zre[m,n]:.18e}\t{zim[m,n]:.18e}", file=f)
@@ -422,31 +408,14 @@ class SKTable:
         self.n_points = n_points
         self.same_atom_vals = same_atom #list for S and H, dict for r
 
+cutoffs = {('C','C'): 1.85, ('H', 'C'): 1, 
+           ('C', 'H'): 5,
+             ('H', 'H'): 1}
+max_l = {'C':1, 'H':0}
+graphene = graphene('CC', size=(1,1,1), vacuum=10)
+benzene = molecule('C6H6')
+posA = angstrom_to_bohr(graphene.positions[0])
+posB = angstrom_to_bohr(graphene.positions[1])
 
-lcao_graphene = Seedname_TB(graphene, skpath="skfiles/self_made", maxl_dict=max_l, skpath_dipole="skfiles/self_made_dipole")
-# block = lcao_graphene._calculate_atom_block(types=('C','C'), posA=posA, posB=posB, max_lA=1, max_lB=1, operator='r')
-sk_table = lcao_graphene.S_sk_tables[('C','C')]
-sk_table_dipole = lcao_graphene.r_sk_tables[('C','C')]
-sk_H_table = lcao_graphene.H_sk_tables[('C','C')]
-r_dict_new = lcao_graphene._create_integral_dict(sk_table=sk_table, posA=posA, posB=posB, operator='r', sk_table_dipole=sk_table_dipole)
-S_dict_new = lcao_graphene._create_integral_dict(sk_table=sk_table, posA=posA, posB=posB, operator='S')
-H_dict_new = lcao_graphene._create_integral_dict(sk_table=sk_H_table, posA=posA, posB=posB, operator='H')
-
-for key in r_dict.keys():
-    # if r_dict[key] != 0:
-    #     print(r_dict[key])
-    #     print(r_dict_new[key])
-    if not np.isclose(r_dict[key], r_dict_new[key]):
-        print(key)
-for key in S_dict.keys():
-    # if S_dict[key] != 0:
-    #     print(S_dict[key])
-    #     print(S_dict_new[key])
-    if not np.isclose(S_dict[key], S_dict_new[key]):
-        print(key)
-for key in H_dict.keys():
-    # if H_dict[key] != 0:
-    #     print(H_dict[key])
-    #     print(H_dict_new[key])
-    if not np.isclose(H_dict[key], H_dict_new[key]):
-        print(key)
+lcao_graphene = Seedname_TB(graphene, skpath="skfiles/skfiles_pbc", maxl_dict=max_l, skpath_dipole="skfiles/self_made_dipole")
+lcao_graphene.write_hamoversqr()

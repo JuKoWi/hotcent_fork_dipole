@@ -4,7 +4,7 @@ from ase.data import covalent_radii, atomic_numbers
 from hotcent.offsite_twocenter import Offsite2cTable
 from hotcent.confinement import PowerConfinement
 from hotcent.atomic_dft import AtomicDFT
-from hotcent.offsite_twocenter_dipole import Offsite2cTableDipole
+from hotcent.offsite_twocenter import Offsite2cTable
 
 # Run script with --help to see the options
 p = OptionParser(usage='%prog')
@@ -34,6 +34,7 @@ atom = AtomicDFT(element,
 atom.run()
 atom.plot_Rnl(only_valence=False)
 atom.plot_density()
+print(atom.enl)
 
 # Compute Slater-Koster integrals:
 rmin, dr, N = 0.5, 0.05, 250

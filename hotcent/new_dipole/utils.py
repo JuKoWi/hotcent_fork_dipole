@@ -15,3 +15,11 @@ def get_norbs(maxl):
     for l in range(maxl+1):
         count += 2*l +1
     return count
+
+def hartree_to_eV(hartree):
+    return hartree * sc.physical_constants['hartree-electron volt relationship'][0]
+
+def eV_to_hartree(eV):
+    if eV == 0:
+        return 0
+    return eV/sc.physical_constants['hartree-electron volt relationship'][0]
