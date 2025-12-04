@@ -76,7 +76,7 @@ class Seedname_TB:
                 line1 = line1.split()
                 dr, Nr = float(line1[0]), int(line1[1])
             max_r = dr * Nr
-            cutoff_dict[pair] = max_r
+            cutoff_dict[pair] = max_r #ATTENTION: DFTB+ somehow uses different cutoff
         self.cutoff_dict = cutoff_dict
 
     def _read_sk_file(self, elem_pair, dipole=False):
@@ -292,6 +292,7 @@ class Seedname_TB:
             else: 
                 integral_dict = self._create_integral_dict(sk_table=sk_table, posA=posA, posB=posB, operator='r', sk_table_dipole=sk_table_dipole)
                 block = self._select_dipole_matrix_elements(max_lA=max_lA, max_lB=max_lB, integral_dict=integral_dict)
+        block = np.where(np.abs(block) < 1e-15, 0, block)
         return block
 
     def _calculate_lattice_dict(self, operator):
@@ -317,7 +318,7 @@ class Seedname_TB:
             maxlA = self.maxl_dict[typeA]
             maxlB = self.maxl_dict[typeB]
             posA = angstrom_to_bohr(atoms.positions[idxA])
-            posB = angstrom_to_bohr(atoms.positions[idxB] + np.dot(self.abc, R[i]))
+            posB = angstrom_to_bohr(atoms.positions[idxB] + np.dot(self.abc.T, R[i]))
             block = self._calculate_atom_block(types=(typeA, typeB), posA=posA, posB=posB, max_lA=maxlA, max_lB=maxlB, operator=operator)
             n_rows = get_norbs(maxl=maxlA)
             n_cols = get_norbs(maxl=maxlB)
@@ -328,10 +329,6 @@ class Seedname_TB:
             else:
                 matrix[start_rows:start_rows+n_rows, start_cols:start_cols+n_cols] = block
             lattice_dict[R_triple] = matrix
-            if idxA == 0:
-                if idxB == 0:
-                    if R_triple == (0, -1, 0):
-                        print(block)
         assert np.shape(np.unique(R, axis=0))[0] == len(lattice_dict)
         return lattice_dict
     
@@ -362,7 +359,7 @@ class Seedname_TB:
                 f.write('\n')
                 f.write(str(point[0]) + ' ' + str(point[1]) + ' ' + str(point[2]) + '\n')
                 S_array = lattice_dict_S[point]
-                H_array = lattice_dict_H[point]
+                H_array = hartree_to_eV(lattice_dict_H[point])
                 A = np.real(H_array)
                 B = np.imag(H_array)
                 C = np.real(S_array)
@@ -414,8 +411,15 @@ cutoffs = {('C','C'): 1.85, ('H', 'C'): 1,
 max_l = {'C':1, 'H':0}
 graphene = graphene('CC', size=(1,1,1), vacuum=10)
 benzene = molecule('C6H6')
-posA = angstrom_to_bohr(graphene.positions[0])
-posB = angstrom_to_bohr(graphene.positions[1])
+posA = graphene.positions[0]
+posB = graphene.positions[1]
+lattice = graphene.get_cell()
+
+lattice_shift = [-1,0, 0]
+posB_shifted = angstrom_to_bohr(posB + np.dot(lattice.T, lattice_shift))
 
 lcao_graphene = Seedname_TB(graphene, skpath="skfiles/skfiles_pbc", maxl_dict=max_l, skpath_dipole="skfiles/self_made_dipole")
-lcao_graphene.write_hamoversqr()
+lcao_graphene.write_seedname()
+print(lcao_graphene._calculate_atom_block(types=('C', 'C'), posA=angstrom_to_bohr(posA), posB=posB_shifted, max_lA=1, max_lB=1, operator='H'))
+
+
