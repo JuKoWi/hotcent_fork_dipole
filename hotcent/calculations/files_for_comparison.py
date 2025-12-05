@@ -76,7 +76,7 @@ class Seedname_TB:
                 line1 = line1.split()
                 dr, Nr = float(line1[0]), int(line1[1])
             max_r = dr * Nr
-            cutoff_dict[pair] = max_r #ATTENTION: DFTB+ somehow uses different cutoff
+            cutoff_dict[pair] = max_r*0.6 #ATTENTION: DFTB+ somehow uses different cutoff
         self.cutoff_dict = cutoff_dict
 
     def _read_sk_file(self, elem_pair, dipole=False):
