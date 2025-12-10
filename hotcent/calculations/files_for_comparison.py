@@ -8,6 +8,7 @@ from pathlib import Path
 import itertools
 import sympy as sym 
 from scipy.interpolate import CubicSpline
+from scipy.linalg import ishermitian
 from ase import Atoms
 from ase.build import graphene
 from ase.visualize import view
@@ -17,6 +18,7 @@ from hotcent.new_dipole.utils import *
 from hotcent.new_dipole.integrals import get_index_list_dipole, get_index_list_overlap
 from hotcent.new_dipole.slako_dipole import INTEGRALS_DIPOLE
 from hotcent.new_dipole.slako_new import INTEGRALS
+# np.set_printoptions(precision=6, linewidth=100)
 
 class Seedname_TB:
     def __init__(self, unit_cell, skpath, skpath_dipole, maxl_dict):
@@ -44,11 +46,11 @@ class Seedname_TB:
 
         if os.path.exists("identifier_nonzeros_dipole.pkl"):
             with open("identifier_nonzeros_dipole.pkl", 'rb') as f:
-                quant_num_list = pickle.load(f)
+                quant_num_list_dipole = pickle.load(f)
                 nonzeros_dipole = pickle.load(f)
         else:
             quant_num_list, nonzeros_dipole = get_index_list_dipole()
-        self.quant_nums_dipole = quant_num_list
+        self.quant_nums_dipole = quant_num_list_dipole
         self.sk_int_idx_dipole = nonzeros_dipole
 
         if os.path.exists("symbolic_D_matrix.pkl"):
@@ -76,7 +78,7 @@ class Seedname_TB:
                 line1 = line1.split()
                 dr, Nr = float(line1[0]), int(line1[1])
             max_r = dr * Nr
-            cutoff_dict[pair] = max_r*0.6 #ATTENTION: DFTB+ somehow uses different cutoff
+            cutoff_dict[pair] = bohr_to_angstrom(max_r) #*0.6 #ATTENTION: DFTB+ somehow uses different cutoff
         self.cutoff_dict = cutoff_dict
 
     def _read_sk_file(self, elem_pair, dipole=False):
@@ -162,6 +164,7 @@ class Seedname_TB:
         if operator == 'r':
             assert sk_table_dipole != None
         R_vec = posB - posA
+        # print(R_vec)
         R = np.linalg.norm(R_vec)
         euler_theta, euler_phi, euler_gamma= self._set_euler_angles(vec1=posA, vec2=posB)
         D_single = np.array(self.D_symb(euler_theta, euler_phi, euler_gamma), dtype=complex)
@@ -197,14 +200,16 @@ class Seedname_TB:
             dipole_elements = D_dipole @ integral_vec_dipole
 
             #consider origin shift
-            overlap_blocks = integrals.reshape(16,16)
+            orbitals_overall = 16
+            overlap_blocks = integrals.reshape(orbitals_overall, orbitals_overall)
             shift_term = np.tile(overlap_blocks, (1,3)).reshape(-1)
+            # posA = -0.5* (posB -posA) # just for comparison
             posA = np.array([posA[1], posA[2], posA[0]]) #reorder component according to quantum numbers
-            space_factor = np.tile(np.repeat(posA, 16), 16)
+            space_factor = np.tile(np.repeat(posA, orbitals_overall), orbitals_overall)
             shift_term = shift_term * space_factor
             shifted_dipole = dipole_elements + shift_term
             integral_dict = {}
-            for label in self.quant_nums_dipole:
+            for label in self.quant_nums_dipole: #
                 integral_dict[(label[1], label[2], label[3], label[4], label[5], label[6])] = shifted_dipole[label[0]]
         else:
             integral_dict = {}
@@ -245,8 +250,7 @@ class Seedname_TB:
                     for mi, m in enumerate(range(-l1, l1 + 1)):
                         for ni, n in enumerate(range(-l2, l2 + 1)):
                             quant_nums = (l1, m, tup[0], tup[1], l2, n)
-                            if any(quant_nums == item[1:] for item in INTEGRALS_DIPOLE.keys()):
-                                # match = [item for item in INTEGRALS_DIPOLE.keys() if item[1:] == quant_nums][0]
+                            if any(quant_nums == item for item in integral_dict.keys()): #compare with integral_dict or INTEGRALS_DIPOLE?
                                 block[mi, ni] = integral_dict[quant_nums]
                             else:
                                 block[mi, ni] = 0
@@ -303,8 +307,10 @@ class Seedname_TB:
         """
         atoms = self.ucell
         lattice_dict = {}
-        pairA, pairB, R = neighbor_list('ijS', a=atoms, cutoff=self.cutoff_dict, self_interaction=True) 
+        pairA, pairB, R, d = neighbor_list('ijSd', a=atoms, cutoff=self.cutoff_dict, self_interaction=True) 
         self.n_lattice = np.shape(np.unique(R, axis=0))[0]
+
+        #create real space matrix
         for i, pair in enumerate(pairA):
             R_triple = (int(R[i,0]), int(R[i,1]), int(R[i,2]))
             if operator == 'r':
@@ -319,6 +325,7 @@ class Seedname_TB:
             maxlB = self.maxl_dict[typeB]
             posA = angstrom_to_bohr(atoms.positions[idxA])
             posB = angstrom_to_bohr(atoms.positions[idxB] + np.dot(self.abc.T, R[i]))
+            assert np.linalg.norm(bohr_to_angstrom(posB - posA)) <= self.cutoff_dict[(typeA, typeB)]
             block = self._calculate_atom_block(types=(typeA, typeB), posA=posA, posB=posB, max_lA=maxlA, max_lB=maxlB, operator=operator)
             n_rows = get_norbs(maxl=maxlA)
             n_cols = get_norbs(maxl=maxlB)
@@ -329,7 +336,13 @@ class Seedname_TB:
             else:
                 matrix[start_rows:start_rows+n_rows, start_cols:start_cols+n_cols] = block
             lattice_dict[R_triple] = matrix
+
         assert np.shape(np.unique(R, axis=0))[0] == len(lattice_dict)
+        # for lat_vec in np.unique(R, axis=0): 
+        #     mat1 = lattice_dict[*lat_vec] 
+        #     mat2 = lattice_dict[*(-lat_vec)]
+        #     symmetry_requirement = np.allclose(mat1, np.linalg.matrix_transpose(mat2), atol=1e-6)
+        #     assert symmetry_requirement #just for testing
         return lattice_dict
     
     def _find_block_pos(self, idx):
@@ -409,17 +422,143 @@ cutoffs = {('C','C'): 1.85, ('H', 'C'): 1,
            ('C', 'H'): 5,
              ('H', 'H'): 1}
 max_l = {'C':1, 'H':0}
+
 graphene = graphene('CC', size=(1,1,1), vacuum=10)
-benzene = molecule('C6H6')
-posA = graphene.positions[0]
-posB = graphene.positions[1]
+graphene.positions[0] += np.array([-0.1,0.3,0.0])
+
+lattice_shift = np.array([6, 5, 0])
+pos1 = graphene.positions[0]
+pos2 = graphene.positions[1]
+# pos1 = np.array([0,0,0])
+# pos2 = np.array([0,0,0])
 lattice = graphene.get_cell()
+posA1 = angstrom_to_bohr(pos2)
+posB1 = angstrom_to_bohr(pos1 + np.dot(lattice.T, lattice_shift))
+posA2 = angstrom_to_bohr(pos1)
+posB2 = angstrom_to_bohr(pos2 + np.dot(lattice.T, -lattice_shift))
+R1 = posB1 - posA1
+R2 = posB2 - posA2
 
-lattice_shift = [-1,0, 0]
-posB_shifted = angstrom_to_bohr(posB + np.dot(lattice.T, lattice_shift))
+lcao_graphene = Seedname_TB(graphene, skpath="skfiles/self_made", maxl_dict=max_l, skpath_dipole="skfiles/self_made_dipole")
+# S1 = lcao_graphene._calculate_atom_block(types=('C','C'), posA=posA1, posB=posB1, operator='S', max_lA=1, max_lB=1)
+# S2 = lcao_graphene._calculate_atom_block(types=('C','C'), posA=posA2, posB=posB2, operator='S', max_lA=1, max_lB=1)
+# r01 = lcao_graphene._calculate_atom_block(types=('C','C'), posA=posA1, posB=posB1, operator='r', max_lA=1, max_lB=1)
+# r02 = lcao_graphene._calculate_atom_block(types=('C','C'), posA=posA2, posB=posB2, operator='r', max_lA=1, max_lB=1)
+# print(R1)
+# print(R2)
+# print("Difference")
+# print((r01-np.linalg.matrix_transpose(r02))[0])
+# print("Matrix1")
+# print(r01[0])
+# print("Matrix2")
+# print(np.linalg.matrix_transpose(r02)[0])
+# sktable = lcao_graphene.S_sk_tables[('C','C')]
+# integral_dict = lcao_graphene._create_integral_dict(sk_table=sktable, posA=posA1, posB=posB1, operator='S')
+# block = lcao_graphene._select_matrix_elements(max_lA=1, max_lB=1, integral_dict=integral_dict)
+# integral_dict = lcao_graphene._create_integral_dict(sk_table=sktable, posA=posA2, posB=posB2, operator='S')
+# block2 = lcao_graphene._select_matrix_elements(max_lA=1, max_lB=1, integral_dict=integral_dict)
+# print(f'Lattice shift {lattice_shift}')
+# print(block)
+# print(f'Lattice shift {-lattice_shift}')
+# print(block2.T)
+# sktable_r = lcao_graphene.r_sk_tables[('C','C')]
+# integrals_r = lcao_graphene._create_integral_dict(sk_table=sktable, posA=posA1, posB=posB1, operator='r', sk_table_dipole=sktable_r)
+# block_r = lcao_graphene._select_dipole_matrix_elements(max_lA=1, max_lB=1, integral_dict=integrals_r)
+# integrals_r = lcao_graphene._create_integral_dict(sk_table=sktable, posA=posA2, posB=posB2, operator='r', sk_table_dipole=sktable_r)
+# block_r2 = lcao_graphene._select_dipole_matrix_elements(max_lA=1, max_lB=1, integral_dict=integrals_r)
+# print(f'Lattice shift {lattice_shift}')
+# print(r01[0])
+# print(f'Lattice shift {-lattice_shift}')
+# print(r02[0].T)
+# R1 = pos2 - pos1
+# R2 = pos1 - pos2
+# print("Overlap blocks")
+# print(S1)
+# print(S2.T)
+# shift1 = R1[0] * S1
+# print(R1[0])
+# shift2 = R2[0] * S2
+# print("Shift terms")
+# print(shift1)
+# print(shift2.T)
+# comparison1 = r01[0] - 0.5 * shift1
+# comparison2 = r02[0] - 0.5 * shift2
+# print(f'Lattice shift {lattice_shift}')
+# print(comparison1)
+# print(f'Lattice shift {-lattice_shift}')
+# print(comparison2.T)
+# print(np.allclose(comparison1, comparison2.T, atol=1e-6))
+# print(comparison1- comparison2.T)
+# print((r01[0] - R1[0] * S1).T-r02[0])
+# print((r01[0] - 0.5*R1[0] * S1).T -0.5 *(R1[0] * S1).T -r02[0])
+# print((r01[0] - 0.5*R1[0] * S1).T - (r02[0] - 0.5 *(R2[0] * S2)))
 
-lcao_graphene = Seedname_TB(graphene, skpath="skfiles/skfiles_pbc", maxl_dict=max_l, skpath_dipole="skfiles/self_made_dipole")
+
+
 lcao_graphene.write_seedname()
-print(lcao_graphene._calculate_atom_block(types=('C', 'C'), posA=angstrom_to_bohr(posA), posB=posB_shifted, max_lA=1, max_lB=1, operator='H'))
+# print(lcao_graphene._calculate_atom_block(types=('C', 'C'), posA=angstrom_to_bohr(posA), posB=posB_shifted, max_lA=1, max_lB=1, operator='H'))
 
 
+
+        # # repair lattice 
+        # newR = R
+        # newpairA = pairA
+        # newpairB = pairB
+        # lattice_symmetric = []
+        # for i, shift in enumerate(R):
+        #     if np.allclose(shift, [0,0,0]):
+        #         continue
+        #     matches = np.all(R == -shift, axis=1)
+        #     if np.all(matches == False):
+        #         lattice_symmetric.append(False)
+        #         newR = np.append(newR, [-shift], axis=0)
+        #         newpairA = np.append(newpairA, pairA[i])
+        #         newpairB = np.append(newpairB, pairB[i])
+        #     else:
+        #         indices = np.where(matches)[0]
+        #         no_repeat = False
+        #         for idx in indices:
+        #             if idx == i:
+        #                 continue
+        #             bool1 = pairA[idx] == pairA[i]
+        #             bool2 = pairB[idx] == pairB[i]
+        #             if bool1 and bool2:
+        #                 no_repeat = True
+        #                 lattice_symmetric.append(no_repeat)
+        #                 break
+        #         if not no_repeat:
+        #             lattice_symmetric.append(no_repeat)
+        #             newR = np.append(newR, [-shift], axis=0)
+        #             newpairA = np.append(newpairA, pairA[i])
+        #             newpairB = np.append(newpairB, pairB[i])
+        #         no_repeat = False
+        # assert np.shape(newR)[0] - np.shape(R)[0] == (len(lattice_symmetric) - sum(lattice_symmetric))
+        # R = newR
+        # pairA = newpairA
+        # pairB = newpairB
+    
+        # lattice_symmetric = []
+        # for i, shift in enumerate(R):
+        #     matches = np.all(R == -shift, axis=1)
+        #     if np.allclose(shift, [0,0,0]):
+        #         lattice_symmetric.append(True)
+        #         continue
+        #     if np.all(matches == False):
+        #         lattice_symmetric.append(False)
+        #     else:
+        #         indices = np.where(matches)[0]
+        #         no_repeat = False
+        #         for idx in indices:
+        #             if idx == i:
+        #                 continue
+        #             bool1 = pairA[idx] == pairA[i]
+        #             bool2 = pairB[idx] == pairB[i]
+        #             if bool1 and bool2:
+        #                 no_repeat = True
+        #                 lattice_symmetric.append(no_repeat)
+        #                 break
+        #         if not no_repeat:
+        #             lattice_symmetric.append(no_repeat)
+        #         no_repeat = False
+        # assert len(lattice_symmetric) == np.shape(R)[0]
+        # assert all(lattice_symmetric)
