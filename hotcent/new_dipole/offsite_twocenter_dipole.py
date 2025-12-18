@@ -121,9 +121,7 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
         for p, (e1, e2) in enumerate(self.pairs):
             if e1 == e2:
                 selected = select_integrals(e1, e2)
-                print(selected)
                 self.atom_transition_dipole = self.calculate_atom_transitions(selected=selected, e1=e1, e2=e2)
-                print(self.atom_transition_dipole)
 
         self.timer.stop('run_offsite2c')
     
@@ -311,7 +309,6 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
                         copy_dict2(offdiagonal_S, offdiag_S, valence1, valence2)
 
                     table = self.tables[(p, bas1, bas2)]
-                    # print(self.tables)
                     with open(filename, 'w') as f:
                         write_skf(f, self.Rgrid, table, has_diagonal_data,
                                   is_extended, eigval, hubval, occup, SPE, mass,
@@ -430,7 +427,6 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
             ymax = max(ymax, self.tables[(1, bas1, bas2)].max())
 
         table = self.tables[(0,0,0)]
-        # print(np.shape(table))
         threshold = 1e-10
         nonzero_col = np.where(np.any(np.abs(table) > threshold, axis=0))[0] #nonzero in skf file
 

@@ -164,7 +164,6 @@ class Seedname_TB:
         if operator == 'r':
             assert sk_table_dipole != None
         R_vec = posB - posA
-        # print(R_vec)
         R = np.linalg.norm(R_vec)
         euler_theta, euler_phi, euler_gamma= self._set_euler_angles(vec1=posA, vec2=posB)
         D_single = np.array(self.D_symb(euler_theta, euler_phi, euler_gamma), dtype=complex)
@@ -343,7 +342,6 @@ class Seedname_TB:
                 mat1 = lattice_dict[*lat_vec] 
                 mat2 = lattice_dict[*(-lat_vec)]
                 symmetry_requirement = np.allclose(mat1, np.linalg.matrix_transpose(mat2), atol=1e-6)
-                print(lat_vec)
                 assert symmetry_requirement 
         return lattice_dict
     
