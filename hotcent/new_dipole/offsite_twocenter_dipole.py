@@ -91,13 +91,13 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
                 selected = select_integrals(e1, e2) #tripel (label, nl, nl)
                 label_list = sorted(INTEGRALS_DIPOLE.keys(), key=lambda x: x[0])
                 if len(grid) > 0:
-                    D = self.calculate(selected, e1, e2, R, grid, area, zeta=zeta)
+                    R_operator = self.calculate(selected, e1, e2, R, grid, area, zeta=zeta)
                     for j,key in enumerate(sorted(selected, key=lambda x: x[0][0])):
                         sk_label, nl1, nl2 = key
                         idx = label_list.index(sk_label)
                         bas1 = e1.get_basis_set_index(nl1)
                         bas2 = e2.get_basis_set_index(nl2)
-                        tables[(p, bas1, bas2)][i, idx] = D[key]  #determines the order of sk-columns listed in sk-file?
+                        tables[(p, bas1, bas2)][i, idx] = R_operator[key]  #determines the order of sk-columns listed in sk-file?
         
         self.Rgrid = rmin + dr * np.arange(N)
 
@@ -189,7 +189,7 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
 
         self.timer.stop('prelude')
         # calculate all selected integrals
-        Dl= {}
+        Rl= {}
         sym1, sym2 = e1.get_symbol(), e2.get_symbol()
 
         if zeta != None:
@@ -206,8 +206,8 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
                 Rnl2 = e2.Rnl(r2, nl2)
                 Rnl2 = N2*r2**zeta[nl2][1] * np.exp(-zeta[nl2][0]*r2**2) #overwrite with gaussian for testing
 
-                D = np.sqrt(4*np.pi/3) * np.sum(Rnl1 * Rnl2 * aux)
-                Dl[key] = D
+                R_operator = np.sqrt(4*np.pi/3) * np.sum(Rnl1 * Rnl2 * aux)
+                Rl[key] = R_operator
         else:
             for key in selected:
                 integral, nl1, nl2 = key
@@ -217,11 +217,11 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
                 Rnl1 = e1.Rnl(r1, nl1)
                 Rnl2 = e2.Rnl(r2, nl2)
 
-                D = np.sqrt(4*np.pi/3) * np.sum(Rnl1 * Rnl2 * aux)
-                Dl[key] = D
+                R_operator = np.sqrt(4*np.pi/3) * np.sum(Rnl1 * Rnl2 * aux)
+                Rl[key] = R_operator
         
         self.timer.stop('calculate_offsite2c')
-        return Dl
+        return Rl
 
     def write(self, eigenvalues=None, hubbardvalues=None, occupations=None,
               spe=None, offdiagonal_H=None, offdiagonal_S=None,
@@ -396,7 +396,7 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
                 plt.xlim([0, rmax])
                 plt.ylim(-ymax, ymax)
 
-        plt.figtext(0.3, 0.95, 'D', color='r', size=20)
+        plt.figtext(0.3, 0.95, 'R', color='r', size=20)
         plt.figtext(0.38, 0.95, ' Slater-Koster tables', size=20)
         sym1, sym2 = self.ela.get_symbol(), self.elb.get_symbol()
         plt.figtext(0.3, 0.92, '(thin solid: <%s|%s>, wide dashed: <%s|%s>)' \
