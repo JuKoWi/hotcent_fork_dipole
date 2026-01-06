@@ -324,8 +324,12 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
                     mass = atomic_masses[atomic_numbers[sym1]]
                     is_extended = any([nl[1]=='f' for nl in valence1+valence2])
                     table = self.tables[(p, bas1, bas2)]
+                    has_atom_transition = sym1 == sym2 and bas1 == bas2
+                    atom_transitions = None
+                    if has_atom_transition:
+                        atom_transitions = self.atom_transition_dipole
                     with open(filename, 'w') as f:
-                        write_skf(handle=f, Rgrid=self.Rgrid, table=table, mass=mass, atom_transitions=self.atom_transition_dipole)
+                        write_skf(handle=f, Rgrid=self.Rgrid, table=table, mass=mass, has_atom_transition=has_atom_transition, atom_transitions=atom_transitions)
 
     def plot(self, filename=None, bas1=0, bas2=0):
         """

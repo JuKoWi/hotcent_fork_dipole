@@ -1,6 +1,6 @@
 {
     inputs = { 
-        nixpkgs.url = "github:nixos/nixpkgs";
+        nixpkgs.url = "nixpkgs/nixos-unstable";
     };
 
     outputs = { self, nixpkgs }:
@@ -18,13 +18,17 @@
 		    pyyaml
 		    scipy
 		    sympy
+		    libxc
              ]);
+
+#	     libxc = pkgs.libxc;
 
         in {
            devShell.x86_64-linux =
                 pkgs.mkShell {
                     buildInputs = [
                            myPython
+#			   libxc
                            # pkgs.gtest
                     ];
 shellHook = ''

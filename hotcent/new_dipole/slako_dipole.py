@@ -350,7 +350,7 @@ def tail_smoothening(x, y_in, eps_inner=1e-8, eps_outer=1e-16, window_size=5):
     return y_out
     
 
-def write_skf(handle, Rgrid, table, atom_transitions, mass):
+def write_skf(handle, Rgrid, table, has_atom_transition, mass, atom_transitions):
     """
     Writes a parameter file in '.skf' format starting at grid_dist 
     and giving nonzero values from R_grid[0] on.
@@ -378,8 +378,9 @@ def write_skf(handle, Rgrid, table, atom_transitions, mass):
     print("%.12f, %d" % (grid_dist, grid_npts + nzeros), file=handle)
 
     keys_sorted = sorted(INTEGRALS_DIPOLE.keys(), key= lambda x: x[0])
-    atom_integrals = [atom_transitions[i] for i in keys_sorted]
-    print(" ".join(f"{x:.6f}" for x in atom_integrals), file=handle)
+    if has_atom_transition:
+        atom_integrals = [atom_transitions[i] for i in keys_sorted]
+        print(" ".join(f"{x:.6f}" for x in atom_integrals), file=handle)
 
     print("%.3f, 19*0.0" % mass, file=handle) # TODO change number of columns
 
