@@ -1,0 +1,512 @@
+[33mcommit 767d9affb37a3c874808cd688a5a64f3843c0f54[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m, [m[1;31morigin/master[m[33m)[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Wed Dec 17 14:23:09 2025 +0100
+
+    changed parameters for carbon file generation
+
+[33mcommit a70d87ff86183724e9f82fb24cdb232243c3ee6c[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Wed Dec 10 14:54:51 2025 +0100
+
+    corrected cutoff radius unit conversion
+
+[33mcommit f1929bc096c55dd79397d74a11f2d6f22b919ca8[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Fri Dec 5 16:54:33 2025 +0100
+
+    sync
+
+[33mcommit 2d989b4b37009f0e25f03be6cd9848686df99424[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Thu Dec 4 17:52:25 2025 +0100
+
+    corrected calculation of lattice shifts
+
+[33mcommit 7695976b841fae17cf20af824d49a1a72e9215ec[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Wed Dec 3 17:02:54 2025 +0100
+
+    small changes
+
+[33mcommit ebcc43b108297fb6cb427e835646a13691355a7c[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Tue Dec 2 11:06:39 2025 +0100
+
+    single-pair dictionaries match with assemble integrals
+
+[33mcommit 326ca7a2335d9d26dfbd21c4785396de4c38eca4[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Mon Dec 1 17:58:04 2025 +0100
+
+    lattice dictionary for dipole moment, new .skf creation routine
+
+[33mcommit 106bd710bf046be52b8074270d525a7b95f48ffa[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Mon Dec 1 09:42:47 2025 +0100
+
+    loop over lattice complete
+
+[33mcommit 795012c349ab6de57e3b7ec5d66ae69d3d4d3e4b[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Fri Nov 28 17:04:30 2025 +0100
+
+    started wannier seedname_tb
+
+[33mcommit 63558bee4ccc4bbaf4d146ebceecb0b53d5017aa[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Thu Nov 27 18:03:29 2025 +0100
+
+    considered heteronuclear skf format, started band calculation
+
+[33mcommit 36df9a6bcf48bb204d68bc20b47eeee198dd0a65[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Wed Nov 26 16:27:57 2025 +0100
+
+    now possible to convert dftb .skf format to longer format (redundant repeats included in quantum number order)
+
+[33mcommit d4760f7159c9aa17bb1326553c58bfec11df0bd0[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Mon Nov 24 18:53:05 2025 +0100
+
+    fix in expressions for INTEGRAL_DIPOLE
+
+[33mcommit 0803424b75d3f0e39eb32dcc1cfbcd5a28d612d6[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Fri Nov 21 15:47:28 2025 +0100
+
+    oversqr.dat almost works, one sign wrong
+
+[33mcommit 845f5d0bdfceaa5dc1985234b90e888d9794a8b3[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Thu Nov 20 17:46:35 2025 +0100
+
+    also create skf for H, S in DFTB+ short format
+
+[33mcommit 1df6bfd8a575a134538c5717b9ab3ec1856f3dab[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Wed Nov 19 14:55:02 2025 +0100
+
+    prettier plots
+
+[33mcommit fba81f4a6d23d12262ed8cb718e024fba4c7a52d[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Tue Nov 18 17:43:20 2025 +0100
+
+    prettier plots
+
+[33mcommit 9720834b7be379e9d526eb901013d7e9eb4273d6[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Tue Nov 18 15:53:08 2025 +0100
+
+    corrected flake
+
+[33mcommit 3d2d15c35325469cd0d5fdc95e50d7dfcc5e54c9[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Mon Nov 17 18:02:55 2025 +0100
+
+    started dftb+ comparison
+
+[33mcommit a3396bae9510e20d9beb9c28633a26f1c5b5eccb[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Mon Nov 17 12:16:13 2025 +0100
+
+    better plots
+
+[33mcommit 6701948450ebcd19fb08d902c2b59364e90e410a[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Fri Nov 14 17:53:16 2025 +0100
+
+    distance and grid scan with plotting
+
+[33mcommit ede93e3019cc1a868964d6275a8e233526d9108b[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Fri Nov 14 09:06:53 2025 +0100
+
+    refactored grid scan
+
+[33mcommit 6b7dfd86aec37f82cf54b3268ed083bbcfbcdb52[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Thu Nov 13 18:36:37 2025 +0100
+
+    refactored assemble integrals, some comments
+
+[33mcommit 5150c8e0768f3583ce57d5658d433b00e8511bf2[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Thu Nov 13 14:27:11 2025 +0100
+
+    minor refactoring
+
+[33mcommit 719b78e255d3cec3eec1b9673bce6de0eaf22073[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Mon Nov 10 21:50:32 2025 +0100
+
+    position shift working
+
+[33mcommit 9b11c190888946db0edd56b29e3c5e558bb15d66[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Mon Nov 10 15:10:58 2025 +0100
+
+    position shift still not working
+
+[33mcommit e38c0a5f12edd08b11c536bf3c48e173d8ac04da[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Mon Nov 10 11:40:38 2025 +0100
+
+    included global position shift
+
+[33mcommit 249304b75bfd4c389004faf1f33922d0ed032345[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Fri Nov 7 17:46:56 2025 +0100
+
+    following skf format with R-grid, include own S and H transformation, tested for S
+
+[33mcommit b1ccc6fa3254df6a8c2a0426756c9d61d5d19d5f[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Fri Nov 7 10:45:19 2025 +0100
+
+    minor corrections in grid spacing scan
+
+[33mcommit dac358fef97b93ac76cad1e7f5cb2f54af7414c7[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Thu Nov 6 16:11:41 2025 +0100
+
+    included normalization for radial
+
+[33mcommit aa2e4c668f998050868dd74130d502e89d3ba0d2[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Thu Nov 6 13:49:52 2025 +0100
+
+    included f orbitals
+
+[33mcommit d4e3ca973f5440037aa60bad670031b98030da43[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Wed Nov 5 17:15:37 2025 +0100
+
+    small code cleanups
+
+[33mcommit 994cd7d7e39879d4715b17b668fd19411377da30[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Wed Nov 5 16:51:59 2025 +0100
+
+    rotations in correct order now
+
+[33mcommit 640815531cf6658a9e38c20725a514ec9693889b[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Tue Nov 4 18:00:38 2025 +0100
+
+    FIX: use np.real instead of np.abs
+
+[33mcommit 8216509e8ca02a958fd8865e54d57c9f3f302d7f[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Thu Oct 30 16:38:17 2025 +0100
+
+    FIX: Missing prefactor inserted for spherical-harmonic representation of position operator in offsite_twocenter
+
+[33mcommit 5b0693976d36608f16c7a19d049eb255c6c05fa1[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Thu Oct 30 15:05:48 2025 +0100
+
+    also calculate sk table for R=0
+
+[33mcommit 370064f3b0ec147dcda05d836e7dbf5bfe4b16d3[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Thu Oct 30 13:55:55 2025 +0100
+
+    include analytical solution for integrals as comparison
+
+[33mcommit 6e31e3e0556a70a30796e3be210c37edbccb5e47[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Thu Oct 30 12:22:45 2025 +0100
+
+    include third euler angle and cover R=0 for rotation
+
+[33mcommit f915b488e4fbbe6ddaa7264190f280fe40a3724c[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Fri Oct 24 08:49:36 2025 +0200
+
+    sanity checks for rotation
+
+[33mcommit 299d09ad1b4bd55175bf5f0af23b98339fbcf924[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Thu Oct 23 14:43:54 2025 +0200
+
+    interpolate sk table as cubic spline
+
+[33mcommit c3314f200668cd870b7c311c14226d5eb7b6f082[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Wed Oct 22 17:34:45 2025 +0200
+
+    simpler scenario for integral comparison, print() for debugging
+
+[33mcommit f3aecaa0850e4c238a0987a2bfea8ae643f5c11d[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Mon Oct 20 17:56:31 2025 +0200
+
+    first integral comparison ready, not same results yet
+
+[33mcommit 69a8cda8097dcc0dbd79f21bb0cda370f354ca37[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Mon Oct 20 17:11:58 2025 +0200
+
+    started including direct numerical evaluation in cartesian
+
+[33mcommit d59e8c20c05198bf07d44696135dec83754a0e8a[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Mon Oct 20 12:04:47 2025 +0200
+
+    restructured project, additions separated now
+
+[33mcommit 10563ade83baa8da56ed989a78d120fffefc8846[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Fri Oct 17 17:10:37 2025 +0200
+
+    can calculate dipole integrals now
+
+[33mcommit d61d0bf71f668bc44f0ba5ef66c7bc01bb4617f0[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Fri Oct 17 09:52:39 2025 +0200
+
+    changed import slightly, added venv
+
+[33mcommit 63b54b68e84c4a5eddf419197c71ba2baea9e8a8[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Thu Oct 16 20:08:29 2025 +0200
+
+    new dipole.py for actual calculation
+
+[33mcommit 4953855f0594cf72c5816622df885d8609c94ead[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Thu Oct 16 13:58:50 2025 +0200
+
+    started rotation transformation for integrals
+
+[33mcommit f04c067e0b7a195dae1b59da5120e6ac9604ddfc[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Tue Oct 14 15:42:53 2025 +0200
+
+    add parentheses in phi3-code generation
+
+[33mcommit 788ee2bf498c442e6303d998c77e2a8d04aeabe3[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Fri Oct 10 16:54:10 2025 +0200
+
+    added selective plot function, d-orbitals for dipole
+
+[33mcommit 219e333bf45f35c5ffe1b9932cf2dfb2174c324a[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Wed Oct 1 14:13:36 2025 +0200
+
+    symbolic integrals added
+
+[33mcommit 2181ea44f43d24c5c686f970768348f78690468f[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Thu Sep 25 16:17:38 2025 +0200
+
+    started oncenter integrals
+
+[33mcommit fa7798ddbb536c636deb373520034dae50c24b18[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Thu Sep 25 12:33:37 2025 +0200
+
+    offsite dipole integrals work now (I guess)
+
+[33mcommit 9e9cbc87bedf22bf9049dce7457008d9d031bdb1[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Wed Sep 24 16:13:37 2025 +0200
+
+    added s and p dipole integrals
+
+[33mcommit cb4e5021c6cf256fa1f8abde0bbb530ef467c651[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Tue Sep 23 15:50:56 2025 +0200
+
+    started writing down dipole-SK integrals
+
+[33mcommit 5b571aa912bd993668e5a7314a5ed12162be2dd7[m
+Author: JuKoWi <julius.willrich@uni-jena.de>
+Date:   Mon Sep 22 16:33:04 2025 +0200
+
+    added flake
+
+[33mcommit a45ccaeb21a91ff3c9bd82d714f652591418f03c[m[33m ([m[1;33mtag: [m[1;33mv2.0.1[m[33m)[m
+Author: mvdb <maxime.cp.vandenbossche@gmail.com>
+Date:   Sun Mar 2 10:08:47 2025 +0000
+
+    REL: bump version to 2.0.1
+
+[33mcommit eb64b25bd820e8f71fbb5c45b108063472c0571b[m
+Author: mvdb <maxime.cp.vandenbossche@gmail.com>
+Date:   Sun Mar 2 09:43:42 2025 +0000
+
+    REL: update SPDX headers for 2025
+
+[33mcommit 605e2ca89f6a3c108f268188e560914b198a466f[m
+Author: mvdb <maxime.cp.vandenbossche@gmail.com>
+Date:   Tue Feb 25 10:01:52 2025 +0000
+
+    BUG: need to evaluate Evxc integrals with valence rho
+    
+    For the total & repulsive energy contribution Evxc,
+    Vxc needs to be calculated from the 'total' density
+    (i.e. including the core density in case of NLCC)
+    but needs to be multiplied with the valence-only density.
+
+[33mcommit 3abaccb4f4ea75a94433e891b6bfa292b5374539[m
+Author: mvdb <maxime.cp.vandenbossche@gmail.com>
+Date:   Tue Feb 25 09:44:15 2025 +0000
+
+    Allow null/None for PP and auxiliary basis
+    
+    This allows the get_atoms() function to be used
+    with e.g. YAML input files for all-electron atoms
+
+[33mcommit 2b2544efc003eaec0f9a1c15c2ed4016a4227890[m
+Author: mvdb <maxime.cp.vandenbossche@gmail.com>
+Date:   Thu Aug 15 12:51:56 2024 +0200
+
+    ENH: add filename template option to off2c writer
+    
+    Fixes #7
+
+[33mcommit fb1e1ae0c97b46fe1add45ae287006b98109dfb7[m
+Author: mvdb <maxime.cp.vandenbossche@gmail.com>
+Date:   Wed Jun 5 19:46:53 2024 +0200
+
+    DOC: mention how to add multiple band structures
+    
+    Fixes #6
+
+[33mcommit 9b454834d4452ec4e8bd81e8335d95d69c4be283[m[33m ([m[1;33mtag: [m[1;33mv2.0.0[m[33m)[m
+Author: mvdb <maxime.cp.vandenbossche@gmail.com>
+Date:   Mon Mar 18 20:44:12 2024 +0100
+
+    REL: bump version to 2.0.0
+
+[33mcommit aafb1c6d4c349e49c9cf6b0c9e3919af027f1cb7[m
+Author: mvdb <maxime.cp.vandenbossche@gmail.com>
+Date:   Mon Mar 18 20:41:07 2024 +0100
+
+    DOC: replace preprint by publication DOI
+
+[33mcommit 3412e9caf5477d35c5d305fd9e96930ce3313965[m
+Author: mvdb <maxime.cp.vandenbossche@gmail.com>
+Date:   Sun Mar 3 10:10:28 2024 +0100
+
+    BUG: need to impose upper bound for PowerConfinement
+    
+    See issue #4 (https://gitlab.com/mvdb/hotcent/-/issues/4).
+
+[33mcommit cffb3bec52b59a445f347f52058fa7bb6673b70a[m
+Author: mvdb <maxime.cp.vandenbossche@gmail.com>
+Date:   Sun Jan 14 21:04:25 2024 +0100
+
+    ENH: catch rare find_cutoff_radii convergence error
+    
+    When called from find_cutoff_radii(), the initial run() call
+    in find_cutoff_radius() may not converge in some exotic cases
+
+[33mcommit 92e59eae4632226142b7c8a9134697ab4f9f255c[m
+Author: mvdb <maxime.cp.vandenbossche@gmail.com>
+Date:   Sun Jan 7 12:14:59 2024 +0100
+
+    REL: update SPDX headers for 2024
+
+[33mcommit 9738efbe52683ddc480119a7b77b027ded1adcbd[m[33m ([m[1;33mtag: [m[1;33mv2.0.0-rc.2[m[33m)[m
+Author: mvdb <maxime.cp.vandenbossche@gmail.com>
+Date:   Sat Dec 16 19:19:01 2023 +0100
+
+    REL: bump version to 2.0.0-rc.2
+
+[33mcommit 9e4e66abd014446c891e46ffcc293191be1fba6a[m
+Author: mvdb <maxime.cp.vandenbossche@gmail.com>
+Date:   Sat Dec 16 13:13:48 2023 +0100
+
+    DOC: switch to 'Libxc' & 'pylibxc' spelling in doc
+
+[33mcommit 547bf1023515ac394549a731231dc5b416f95dd9[m
+Author: mvdb <maxime.cp.vandenbossche@gmail.com>
+Date:   Sat Dec 16 11:30:15 2023 +0100
+
+    MAINT/BUG: use default SingleAtomIntegrator kwargs
+    
+    This makes the on1c tabulators' output to go to stdout
+    by default, as would be expected.
+
+[33mcommit 59b9b6c8bc37306fa3cc19540cd9bd53587e9c26[m
+Author: mvdb <maxime.cp.vandenbossche@gmail.com>
+Date:   Sat Dec 16 11:20:24 2023 +0100
+
+    ENH: let Onsite1cW/UMainTable only run one method
+    
+    And choosing the analytical method by default;
+    also improving the format of the output files.
+
+[33mcommit 4077892817082d94682148341de7d9c0738bc6a4[m
+Author: mvdb <maxime.cp.vandenbossche@gmail.com>
+Date:   Sat Dec 16 09:43:09 2023 +0100
+
+    MAINT: make 2nd subshell optional for get_spin_constant
+
+[33mcommit 5d8e575b22907e7d99d0507c114b4871b9ed828b[m
+Author: mvdb <maxime.cp.vandenbossche@gmail.com>
+Date:   Sat Dec 16 09:23:56 2023 +0100
+
+    BUG: add non-lin core corr in numerical on1cW calc
+
+[33mcommit 452f941ef56cabc79e1557fc0be3832ce499c7dc[m
+Author: mvdb <maxime.cp.vandenbossche@gmail.com>
+Date:   Tue Dec 12 20:27:56 2023 +0100
+
+    MAINT: also default to dens-super in off2c.calculate
+
+[33mcommit 4935c6da569bd8077eacf0578fffc656a1cf4c9a[m
+Author: mvdb <maxime.cp.vandenbossche@gmail.com>
+Date:   Thu Dec 7 19:20:11 2023 +0100
+
+    DOC: mention preprint for citing & features
+
+[33mcommit 10a6f4cfbf99ce1bf8cdf2b5971721270bcd9009[m[33m ([m[1;33mtag: [m[1;33mv2.0.0-rc.1[m[33m)[m
+Author: mvdb <maxime.cp.vandenbossche@gmail.com>
+Date:   Wed Dec 6 20:35:50 2023 +0100
+
+    REL: bump version to 2.0.0-rc.1
+
+[33mcommit 7ca98059aa5e8449a259cb3485eb8f5f19ec99d0[m
+Author: mvdb <maxime.cp.vandenbossche@gmail.com>
+Date:   Wed Dec 6 20:31:29 2023 +0100
+
+    BLD: regenerate C extension
+
+[33mcommit 88d4f4bad3b87cb0e04c2da810b1f1d6a907518d[m
+Merge: 32c35c1 cea1adf
+Author: mvdb <maxime.cp.vandenbossche@gmail.com>
+Date:   Wed Dec 6 20:16:29 2023 +0100
+
+    Merge branch 'threecenter'
+
+[33mcommit cea1adfecf530c1851e340677e00d155689e8ab6[m
+Author: mvdb <maxime.cp.vandenbossche@gmail.com>
+Date:   Mon Dec 4 22:05:14 2023 +0100
+
+    ENH: let cli tools report same version as package
+
+[33mcommit 70efbd709fb2eeb2fb34130fb53f9a89c3c2a0f0[m
+Author: mvdb <maxime.cp.vandenbossche@gmail.com>
+Date:   Mon Dec 4 20:49:26 2023 +0100
+
+    REL: update SPDX and description in headers
+
+[33mcommit d7a69c50dff4689d092790accdd4fc76c972ca96[m
+Author: mvdb <maxime.cp.vandenbossche@gmail.com>
+Date:   Mon Nov 27 22:07:45 2023 +0100
+
+    DOC: add Tutorial 3 on AITB/3cTB-GY
+
+[33mcommit 811c4db332fba743bd45de14cb858767e12ad1a0[m
+Author: mvdb <maxime.cp.vandenbossche@gmail.com>
+Date:   Sun Nov 26 12:29:59 2023 +0100
+
+    ENH: switch to YAML file for grid option control
+
+[33mcommit d617de2d4d0cc45d8f82c47b699fee19720a9c95[m
+Author: mvdb <maxime.cp.vandenbossche@gmail.c
