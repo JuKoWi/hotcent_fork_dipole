@@ -8,6 +8,7 @@ from hotcent.interpolation import CubicSplineFunction
 from hotcent.new_dipole.slako_dipole import (INTEGRALS_DIPOLE, select_integrals, NUMSK, phi3, tail_smoothening, write_skf)
 import matplotlib.pyplot as plt
 from scipy.integrate import trapezoid
+np.set_printoptions(precision=16)
 
 class Offsite2cTableDipole(MultiAtomIntegrator):
     def __init__(self, *args, **kwargs):
@@ -143,8 +144,8 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
                 Y2 = Y2.subs(theta2, theta1)
                 angle_integral = sym.integrate(sym.integrate(Y1*Yr*Y2*sym.sin(theta1), (phi, 0, 2*sym.pi)), (theta1, 0, sym.pi))
                 radial_integral = trapezoid(y=Rnl1 * Rnl2* r**2 * r, x=r, dx=dr)
-                r_int = np.sqrt(4*np.pi/3) * radial_integral * angle_integral.evalf()
-                position_op_dict[label] = r_int
+                r_integral = np.sqrt(4*np.pi/3) * radial_integral * angle_integral.evalf()
+                position_op_dict[label] = r_integral
             else:
                 position_op_dict[label] = 0
         return position_op_dict    

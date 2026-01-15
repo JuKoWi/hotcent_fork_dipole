@@ -94,7 +94,7 @@ class Seedname_TB:
                 line1 = line1.split()
                 dr, Nr = float(line1[0]), int(line1[1])
             max_r = dr * Nr
-            cutoff_dict[pair] = bohr_to_angstrom(max_r) 
+            cutoff_dict[pair] = bohr_to_angstrom(max_r)
         self.cutoff_dict = cutoff_dict
 
     def _read_sk_file(self, elem_pair, dipole=False):
@@ -130,7 +130,7 @@ class Seedname_TB:
             sorted_labels = [l[1:] for l in sorted_labels]
             if homonuclear:
                 assert len(sorted_labels) == len(same_atom)
-                atom_transitions = dict(zip(sorted_labels, bohr_to_angstrom(same_atom)))
+                atom_transitions = dict(zip(sorted_labels, [bohr_to_angstrom(float(i)) for i in same_atom]))
         else:
             sk_table_S = data[:, len(self.sk_int_idx):] 
             sk_table_H = data[:, :len(self.sk_int_idx)]

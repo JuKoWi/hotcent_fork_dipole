@@ -1,4 +1,5 @@
 import numpy as np
+np.set_printoptions(precision=16)
 
 """nonvanishing SlaKo integrals over phi for dipole elements named in the form
 Y1*Y1*Y2
@@ -380,7 +381,7 @@ def write_skf(handle, Rgrid, table, has_atom_transition, mass, atom_transitions)
     keys_sorted = sorted(INTEGRALS_DIPOLE.keys(), key= lambda x: x[0])
     if has_atom_transition:
         atom_integrals = [atom_transitions[i] for i in keys_sorted]
-        print(" ".join(f"{x:.6f}" for x in atom_integrals), file=handle)
+        print(" ".join(f"{x}" for x in atom_integrals), file=handle)
 
     print("%.3f, 19*0.0" % mass, file=handle) # TODO change number of columns
 

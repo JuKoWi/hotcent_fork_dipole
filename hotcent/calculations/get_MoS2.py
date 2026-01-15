@@ -123,33 +123,33 @@ atomMo.run()
 rmin, dr, N = 0.4, 0.02, 600
 
 off2cMoS = Offsite2cTable(atomS, atomMo, timing=True)
-off2cMoS.run(rmin, dr, N, xc=xc)
+off2cMoS.run(rmin, dr, N, xc=xc, nr=200, ntheta=400, wflimit=1e-9)
 off2cMoS.write(dftbplus_format=False) 
 off2cMoS.write(dftbplus_format=True, filename_template='{el1}-{el2}dftb.skf')  
 
 off2cS = Offsite2cTable(atomS, atomS, timing=True)
-off2cS.run(rmin, dr, N, xc=xc)
+off2cS.run(rmin, dr, N, xc=xc, nr=200, ntheta=400, wflimit=1e-9)
 off2cS.write(dftbplus_format=False, eigenvalues=eigenvaluesS) 
 off2cS.write(dftbplus_format=True, eigenvalues=eigenvaluesS, filename_template='{el1}-{el2}dftb.skf')  
 
 
 off2cMo = Offsite2cTable(atomMo, atomMo, timing=True)
-off2cMo.run(rmin, dr, N, xc=xc)
+off2cMo.run(rmin, dr, N, xc=xc, nr=200, ntheta=400, wflimit=1e-9)
 off2cMo.write(dftbplus_format=False, eigenvalues=eigenvaluesMo) 
 off2cMo.write(dftbplus_format=True, eigenvalues=eigenvaluesMo, filename_template='{el1}-{el2}dftb.skf')  
 
 
 # # Compute Integrals for dipole
 off2c_dipoleS = Offsite2cTableDipole(atomS, atomS, timing=False)
-off2c_dipoleS.run(rmin, dr, N)
+off2c_dipoleS.run(rmin, dr, N, nr=200, ntheta=400, wflimit=1e-9)
 off2c_dipoleS.write_dipole()
 
 off2c_dipoleMo = Offsite2cTableDipole(atomMo, atomMo, timing=False)
-off2c_dipoleMo.run(rmin, dr, N)
+off2c_dipoleMo.run(rmin, dr, N, nr=200, ntheta=400, wflimit=1e-9)
 off2c_dipoleMo.write_dipole()
 
 off2c_dipoleMoS = Offsite2cTableDipole(atomMo, atomS, timing=False)
-off2c_dipoleMoS.run(rmin, dr, N)
+off2c_dipoleMoS.run(rmin, dr, N, nr=200, ntheta=400, wflimit=1e-9)
 off2c_dipoleMoS.write_dipole()
 
 
