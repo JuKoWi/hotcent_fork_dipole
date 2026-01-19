@@ -404,7 +404,7 @@ def write_skf(handle, Rgrid, table, has_diagonal_data, is_extended, eigval,
         line = ' '.join(fields)
         for field in fields:
             val = labels[field] if field in labels else 0
-            s = '%d' % val if isinstance(val, int) else '%.10f' % val
+            s = '%d' % val if isinstance(val, int) else '%.6f' % val
             line = line.replace(field, s)
 
         print(line, file=handle)

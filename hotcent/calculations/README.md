@@ -1,1 +1,0 @@
-Calculations using the existing source-code from hotcent/ and hotcent/new_dipole
