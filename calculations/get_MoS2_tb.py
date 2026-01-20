@@ -1,5 +1,6 @@
 from hotcent.new_dipole.files_for_comparison import Seedname_TB 
 from ase.visualize import view
+from ase.build import mx2
 from ase import Atoms
 from ase.io import read
 
@@ -9,6 +10,16 @@ print(MoS2.get_positions())
 print(MoS2.get_cell())
 print(MoS2.get_pbc())
 view(MoS2)
+
+"""Do not use the following geometry"""
+# MoS2 = mx2()
+# MoS2.cell[2] = [0, 0, 16.997803320485414]
+# MoS2.pbc = (True, True, True)
+# print(MoS2.get_chemical_symbols())
+# print(MoS2.get_positions())
+# print(MoS2.get_cell())
+# print(MoS2.get_pbc())
+# view(MoS2)
 
 
 max_l = {'C':1, 'H':0, 'S':2, 'Mo':2}

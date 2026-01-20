@@ -362,7 +362,7 @@ class Seedname_TB:
         assert len(lattice_dict_H.keys()) == len(lattice_dict_r.keys())
         assert len(lattice_dict_S.keys()) == len(lattice_dict_r.keys())
         with open(filename, 'w') as f:
-            f.write("Date\n")
+            f.write(str(np.datetime64('now'))+'\n')
             np.savetxt(f, self.abc)
             f.write(str(self.total_orbs)+'\n')
             f.write(str(self.n_lattice)+'\n')
