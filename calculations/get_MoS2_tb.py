@@ -5,6 +5,7 @@ from ase import Atoms
 from ase.io import read
 
 MoS2 = read(filename="mos2.gen")
+MoS2.pbc = (True, True, False)
 print(MoS2.get_chemical_symbols())
 print(MoS2.get_positions())
 print(MoS2.get_cell())
@@ -13,8 +14,7 @@ view(MoS2)
 
 """Do not use the following geometry"""
 # MoS2 = mx2()
-# MoS2.cell[2] = [0, 0, 16.997803320485414]
-# MoS2.pbc = (True, True, True)
+# MoS2.pbc = (True, True, False)
 # print(MoS2.get_chemical_symbols())
 # print(MoS2.get_positions())
 # print(MoS2.get_cell())

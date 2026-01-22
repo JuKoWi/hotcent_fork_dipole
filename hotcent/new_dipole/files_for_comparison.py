@@ -19,10 +19,28 @@ from hotcent.new_dipole.slako_dipole import INTEGRALS_DIPOLE
 from hotcent.new_dipole.slako_new import INTEGRALS
 
 class Seedname_TB:
-    def __init__(self, unit_cell, skpath, skpath_dipole, maxl_dict):
-        self.ucell = unit_cell
-        self.abc = unit_cell.get_cell()
-        self.atomtypes = unit_cell.get_chemical_symbols()
+    """Takes .skf files in the long (partially redundant) format  used throughout new_dipole/ and calculates the real space matrix elements 
+    ordered w.r.t. the lattice shift vectors and saves them in the format of seedname_tb.org from wannier90
+    Units ase.Atoms objects:
+        geometry: Angstrom
+    Units A-B.skf:
+        grid distances (header): a0 (a.u. of length)
+        H: hartree (a.u. of energy)
+        S: no unit
+        R: a0 (a.u. of length)
+    Units seedname_tb.dat:
+        lattice-vectors: Angstrom
+        H: eV
+        S: no unit
+        R: Angstrom
+    Internally: 
+        atomic units except angstrom
+    """
+
+    def __init__(self, atoms_unit_cell, skpath, skpath_dipole, maxl_dict):
+        self.aseAtoms = atoms_unit_cell
+        self.abc = atoms_unit_cell.get_cell()
+        self.atomtypes = atoms_unit_cell.get_chemical_symbols()
         self.skpath = skpath
         self.skpath_dipole = skpath_dipole
         no_repeats_types = list(set(self.atomtypes))
@@ -76,7 +94,7 @@ class Seedname_TB:
                 line1 = line1.split()
                 dr, Nr = float(line1[0]), int(line1[1])
             max_r = dr * Nr
-            cutoff_dict[pair] = bohr_to_angstrom(max_r) 
+            cutoff_dict[pair] = bohr_to_angstrom(max_r)
         self.cutoff_dict = cutoff_dict
 
     def _read_sk_file(self, elem_pair, dipole=False):
@@ -102,17 +120,17 @@ class Seedname_TB:
                         same_atom = np.flip(same_atom[:3])
             if extended == 1:
                 parts = [p.strip() for p in line2.split()]
-            delta_R, n_points = float(parts[0]), int(parts[1])
+            delta_R, n_points = bohr_to_angstrom(float(parts[0])), int(parts[1])
         if not homonuclear:
             extended -= 1
         data = np.loadtxt(path, skiprows=3+extended)
         if dipole:
-            sk_table_r = data
+            sk_table_r = bohr_to_angstrom(data)
             sorted_labels = sorted(INTEGRALS_DIPOLE.keys(), key=lambda x: x[0])
             sorted_labels = [l[1:] for l in sorted_labels]
             if homonuclear:
                 assert len(sorted_labels) == len(same_atom)
-                atom_transitions = dict(zip(sorted_labels, same_atom))
+                atom_transitions = dict(zip(sorted_labels, [bohr_to_angstrom(float(i)) for i in same_atom]))
         else:
             sk_table_S = data[:, len(self.sk_int_idx):] 
             sk_table_H = data[:, :len(self.sk_int_idx)]
@@ -307,7 +325,7 @@ class Seedname_TB:
             between the orbitals in the unit cell and the orbitals in the unit cell shifted 
             by the respective lattice vector
         """
-        atoms = self.ucell
+        atoms = self.aseAtoms
         lattice_dict = {}
         pairA, pairB, R, d = neighbor_list('ijSd', a=atoms, cutoff=self.cutoff_dict, self_interaction=True) 
         self.n_lattice = np.shape(np.unique(R, axis=0))[0]
@@ -325,9 +343,9 @@ class Seedname_TB:
             typeB = atoms.symbols[idxB]
             maxlA = self.maxl_dict[typeA]
             maxlB = self.maxl_dict[typeB]
-            posA = angstrom_to_bohr(atoms.positions[idxA])
-            posB = angstrom_to_bohr(atoms.positions[idxB] + np.dot(self.abc.T, R[i]))
-            assert np.linalg.norm(bohr_to_angstrom(posB - posA)) <= self.cutoff_dict[(typeA, typeB)]
+            posA = atoms.positions[idxA]
+            posB = atoms.positions[idxB] + np.dot(self.abc.T, R[i])
+            assert np.linalg.norm(posB - posA) <= self.cutoff_dict[(typeA, typeB)]
             block = self._calculate_atom_block(types=(typeA, typeB), posA=posA, posB=posB, max_lA=maxlA, max_lB=maxlB, operator=operator)
             n_rows = get_norbs(maxl=maxlA)
             n_cols = get_norbs(maxl=maxlB)
@@ -362,7 +380,7 @@ class Seedname_TB:
         assert len(lattice_dict_H.keys()) == len(lattice_dict_r.keys())
         assert len(lattice_dict_S.keys()) == len(lattice_dict_r.keys())
         with open(filename, 'w') as f:
-            f.write(str(np.datetime64('now'))+'\n')
+            f.write("Date\n")
             np.savetxt(f, self.abc)
             f.write(str(self.total_orbs)+'\n')
             f.write(str(self.n_lattice)+'\n')
@@ -400,6 +418,7 @@ class Seedname_TB:
                         print(f"{i} {j}\t{xre[m,n]:.18e}\t{xim[m,n]:.18e}\t{yre[m,n]:.18e}\t{yim[m,n]:.18e}\t{zre[m,n]:.18e}\t{zim[m,n]:.18e}", file=f)
                 
     def write_hamoversqr(self):
+        """TODO: Check if units match with conventions of DFTB+"""
         matrix = self._calculate_lattice_dict(operator='S')[(0,0,0)]
         matrixH = self._calculate_lattice_dict(operator='H')[(0,0,0)]
         header1 = f"#\tREAL\tNALLORB\tNKPOINT\n"
