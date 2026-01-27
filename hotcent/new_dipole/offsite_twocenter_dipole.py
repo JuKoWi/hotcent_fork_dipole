@@ -212,7 +212,7 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
             for key in selected:
                 integral, nl1, nl2 = key
                 gphi = phi3(c1, c2, s1, s2, integral)
-                aux = gphi * area * x * r1
+                aux = gphi * area * x * r1 # other terms from formula contained in area
 
                 Rnl1 = e1.Rnl(r1, nl1)
                 Rnl2 = e2.Rnl(r2, nl2)

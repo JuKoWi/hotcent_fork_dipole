@@ -22,7 +22,7 @@ def find_slowest_decay(offsite_obj, num_dipole, threshold, atol=1e-7):
     top_rows = []
 
     for key, table in offsite_obj.tables.items():
-        table = table.T  
+        table = np.abs(table.T)
         mask = table < threshold
         idx = np.where(
             mask.any(axis=1),
@@ -145,5 +145,5 @@ off2c_dipoleMo.write_dipole()
 # off2c.run(rmin, dr, N, nr=200, ntheta=400, wflimit=1e-9)
 # off2c.write_dipole()
 
-plot_dipole_decay(offsite_obj=off2c_dipoleMo, num_dipole=5, threshold=1e-3)
+plot_dipole_decay(offsite_obj=off2c_dipoleMo, num_dipole=5, threshold=1e-5)
 
