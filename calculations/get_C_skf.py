@@ -4,6 +4,7 @@ from hotcent.atomic_dft import AtomicDFT
 from hotcent.new_dipole.offsite_twocenter_new import Offsite2cTable
 from hotcent.new_dipole.offsite_twocenter_dipole import Offsite2cTableDipole
 
+
 # Get KS all-electron ground state of confined atom:
 element = 'C'
 xc = 'GGA_X_PBE+GGA_C_PBE'
@@ -45,7 +46,6 @@ rmin, dr, N = 0.4, 0.02, 900
 off2c = Offsite2cTableDipole(atom, atom, timing=False)
 off2c.run(rmin, dr, N, nr=200, ntheta=400, wflimit=1e-9)
 off2c.write_dipole()
-
 
 
 

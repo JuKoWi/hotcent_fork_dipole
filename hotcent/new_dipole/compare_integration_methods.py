@@ -121,8 +121,8 @@ operator = {
 
 """radial part"""
 a, b, c = sym.symbols("a, b, c")
-radial_1 = (2 * b/sym.pi)**(3/4) * sym.exp(-b* ((x-x1)**2 + (y-y1)**2 + (z-z1)**2))
-radial_2 = (2* b/sym.pi)**(3/4) * sym.exp(-b* ((x-x2)**2 + (y-y2)**2 + (z-z2)**2))
+radial_1 = (2 * b/sym.pi)**(3/4) * 5 *  sym.exp(-b* ((x-x1)**2 + (y-y1)**2 + (z-z1)**2))
+radial_2 = (2* b/sym.pi)**(3/4) * 5 * sym.exp(-b* ((x-x2)**2 + (y-y2)**2 + (z-z2)**2))
 
 def compare_sphericals():
     for i, integral in enumerate(second_center.values()):
@@ -419,7 +419,13 @@ def scan_grid_error(pos, index, dipole=False, plot=False, from_file=False):
         plt.show()
 
 def scan_distance(direction, index, dipole=False, n_dist=20, min_dist_angst=0.4, d_dist_angst=4, from_file=False, plot=False):
-    """scan the dependence of the error of selected matrix elements on the internuclear distance"""
+    """scan the dependence of the error of selected matrix elements on the internuclear distance
+        For a selected matrix element measure how much the numerically integrated value deviates 
+        from the analytical value. Overwrite the radial part of dummy atom Eu with gaussian* r^nl
+        with zeta as gaussian exponent. 
+            index: index of the matrix element
+            direction: unit vector to set internuclear axis 
+    """
     t_total_1 = time.time()
 
     # exponents for exponentials
@@ -432,6 +438,7 @@ def scan_distance(direction, index, dipole=False, n_dist=20, min_dist_angst=0.4,
     rel_error_array = np.zeros((len(distance_factors)))
     file_error = f'error_distance_scan-{index}.npy'
     file_rel_error = f"rel_error_distance_scan-{index}.npy"
+    file_analytical = f"analytical_vals-{index}.npy"
 
     if not from_file:
         #set up atoms
@@ -449,16 +456,19 @@ def scan_distance(direction, index, dipole=False, n_dist=20, min_dist_angst=0.4,
         # Compute Slater-Koster integrals:
         time1 = time.time()
         zeta_dict = {'4f': (zeta1[0], 3), '5d': (zeta1[1],2), '6s': (zeta1[2], 0), '6p': (zeta1[3], 1)}
-        rmin, dr, N = 0.1, 0.05, 250
+        rmin, dr, N = angstrom_to_bohr(min_dist_angst), angstrom_to_bohr(d_dist_angst), n_dist
         if dipole:
             off2c = Offsite2cTableDipole(atom, atom, timing=True)
+            off2c.run(rmin, dr, N, 
+                      zeta=zeta_dict, 
+                      )
+            off2c.write_dipole()
         else:
             off2c = Offsite2cTable(atom, atom, timing=True)
-        off2c.run(rmin, dr, N, 
-                  zeta=zeta_dict, 
-                #   nr=100, ntheta=200
-                  )
-        off2c.write()
+            off2c.run(rmin, dr, N, 
+                      zeta=zeta_dict, 
+                      )
+            off2c.write()
         time2 = time.time()
         print(f'finished after {time2-time1}')
         list_res1 = []
@@ -483,10 +493,10 @@ def scan_distance(direction, index, dipole=False, n_dist=20, min_dist_angst=0.4,
             method1.load_atom_file('Eu2.xyz')
             if dipole:
                 method1.get_list_dipole()
-                method1.load_sk_file_dipole(path='Eu-Eu_offsite2c.skf', path_dipole='Eu-Eu_offsite2c-dipole.skf')
+                method1.load_sk_file_dipole(path='Eu-Eu.skf', path_dipole='Eu-Eu_dipole.skf')
                 res1 = method1.calculate_dipole()
             else:
-                method1.load_sk_file(path='Eu-Eu_offsite2c.skf')
+                method1.load_sk_file(path='Eu-Eu.skf')
                 res1 = method1.calculate()
 
             time2 = time.time()
@@ -502,9 +512,11 @@ def scan_distance(direction, index, dipole=False, n_dist=20, min_dist_angst=0.4,
                 rel_error_array[i] = 0
         np.save(file_error, error_array)
         np.save(file_rel_error, rel_error_array)
+        np.save(file_analytical, np.array(list_res2))
     else:
         error_array = np.load(file_error) 
         rel_error_array = np.load(file_rel_error)
+        list_res2 = np.load(file_analytical)
 
     t_total_2 = time.time()
     print(f"finished scan after total of {t_total_2 -t_total_1}")
@@ -513,7 +525,7 @@ def scan_distance(direction, index, dipole=False, n_dist=20, min_dist_angst=0.4,
         axs[0].scatter(distance_factors, list_res2, label="analytical value")
         axs[0].legend()
         axs[0].set_xlabel(r"R / $\AA$")
-        axs[0].set_ylabel('E / a.u.')
+        axs[0].set_ylabel(r'$\mathrm{|\langle \phi_\mu|\hat{r}_i|\phi_\nu \rangle|}$ / $\mathrm{\AA}$')
         axs[1].scatter(distance_factors, error_array, label="error")
         axs[2].scatter(distance_factors, rel_error_array, label="relative error")
         axs[1].set_xlabel(r"R / $\AA$")

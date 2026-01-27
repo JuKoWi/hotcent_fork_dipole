@@ -196,8 +196,8 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
             for key in selected:
                 integral, nl1, nl2 = key
 
-                N1 = (2 * zeta[nl1][0]/np.pi)**(3/4)
-                N2 = (2 * zeta[nl2][0]/np.pi)**(3/4)
+                N1 = (2 * zeta[nl1][0]/np.pi)**(3/4) * 5
+                N2 = (2 * zeta[nl2][0]/np.pi)**(3/4) * 5
                 gphi = phi3(c1, c2, s1, s2, integral)
                 aux = gphi * area * x * r1
 
@@ -223,97 +223,6 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
         self.timer.stop('calculate_offsite2c')
         return Rl
 
-    def write(self, eigenvalues=None, hubbardvalues=None, occupations=None,
-              spe=None, offdiagonal_H=None, offdiagonal_S=None,
-              filename_template='{el1}-{el2}_offsite2c-dipole.skf'):
-        """
-        Writes all Slater-Koster integral tables to file.
-        By default the 'simple' SKF format is chosen, and the 'extended'
-        SKF format is only used when necessary (i.e. when a basis set
-        includes f-electrons).
-
-        Note that the parameters related to one-center properties
-        ('eigenvalues', 'hubbardvalues', ..., 'offdiagonal_S')
-        are only used in the homonuclear case.
-
-        Parameters
-        ----------
-        eigenvalues : None or dict, optional
-            {nl: value} dictionary with valence subshell eigenvalues
-            (or one-center onsite Hamiltonian integrals, if you will).
-        hubbardvalues : None or dict, optional
-            {nl: value} dictionary with valence subshell Hubbard values.
-        occupations : None or dict, optional
-            {nl: value} dictionary with valence subshell occupations.
-        spe : None or (list of) float, optional
-            Spin-polarization error. Needs to be a list for non-minimal
-            basis sets.
-        offdiagonal_H : None or dict, optional
-            {(nl1, nl2): value} dictionary with the off-diagonal,
-            one-center, onsite Hamiltonian integrals. Only needed for
-            non-minimal basis sets.
-        offdiagonal_S : None or dict, optional
-            {(nl1, nl2): value} dictionary with the off-diagonal,
-            one-center, onsite overlap integrals. Only needed for
-            non-minimal basis sets.
-        filename_template : str, optional
-            Template for the names of the SKF output file(s).
-            Needs to contain '{el1}' and '{el2}' fields, which will be
-            filled in with the element symbols (followed, as usual,
-            with '+' characters in the case of second-or-higher-zeta
-            basis subsets).
-        """
-        def copy_dict1(dict_src, dict_dest, valence):
-            if dict_src is None:
-                return
-            for nl in valence:
-                l = nl[1]
-                assert l not in dict_dest
-                if dict_src is not None and nl in dict_src:
-                    dict_dest[l] = dict_src[nl]
-
-        def copy_dict2(dict_src, dict_dest, valence1, valence2):
-            if dict_src is None:
-                return
-            for nl1 in valence1:
-                l1 = nl1[1]
-                for nl2 in valence2:
-                    l2 = nl2[1]
-                    if l1 == l2 and (nl1, nl2) in dict_src:
-                        assert l1 not in dict_dest
-                        dict_dest[l1] = dict_src[(nl1, nl2)]
-
-        for p, (e1, e2) in enumerate(self.pairs): # for C-C not a true loop, two iterations at most (both directions)
-            sym1, sym2 = e1.get_symbol(), e2.get_symbol()
-
-            for bas1, valence1 in enumerate(e1.basis_sets):
-                for bas2, valence2 in enumerate(e2.basis_sets):
-                    filename = filename_template.format(el1=sym1 + '+'*bas1,
-                                                        el2=sym2 + '+'*bas2)
-                    print('Writing to %s' % filename, file=self.txt, flush=True)
-
-                    is_extended = any([nl[1]=='f' for nl in valence1+valence2])
-                    mass = atomic_masses[atomic_numbers[sym1]]
-
-                    eigval, hubval, occup, SPE = {}, {}, {}, 0.
-                    has_diagonal_data = sym1 == sym2 and bas1 == bas2
-                    if has_diagonal_data:
-                        copy_dict1(eigenvalues, eigval, valence1)
-                        copy_dict1(hubbardvalues, hubval, valence1)
-                        copy_dict1(occupations, occup, valence1)
-
-                    offdiag_H, offdiag_S = {}, {}
-                    has_offdiagonal_data = sym1 == sym2 and bas1 != bas2
-                    if has_offdiagonal_data:
-                        copy_dict2(offdiagonal_H, offdiag_H, valence1, valence2)
-                        copy_dict2(offdiagonal_S, offdiag_S, valence1, valence2)
-
-                    table = self.tables[(p, bas1, bas2)]
-                    with open(filename, 'w') as f:
-                        write_skf(f, self.Rgrid, table, has_diagonal_data,
-                                  is_extended, eigval, hubval, occup, SPE, mass,
-                                  has_offdiagonal_data, offdiag_H, offdiag_S)
-
     def write_dipole(self, filename_template='{el1}-{el2}_dipole.skf'):
         for p, (e1, e2) in enumerate(self.pairs):
             sym1, sym2 = e1.get_symbol(), e2.get_symbol()
@@ -330,88 +239,6 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
                         atom_transitions = self.atom_transition_dipole
                     with open(filename, 'w') as f:
                         write_skf(handle=f, Rgrid=self.Rgrid, table=table, mass=mass, has_atom_transition=has_atom_transition, atom_transitions=atom_transitions)
-
-    def plot(self, filename=None, bas1=0, bas2=0):
-        """
-        Plot the Slater-Koster tables with matplotlib.
-
-        Parameters
-        ----------
-        filename : str, optional
-            Figure filename (default: '<el1>-<el2>_slako.pdf')
-        bas1, bas2 : int, optional
-            Basis set indices, when dealing with non-minimal
-            basis sets.
-        """
-        self.timer.start('plotting')
-        assert plt is not None, 'Matplotlib could not be imported!'
-
-        fig = plt.figure()
-        fig.subplots_adjust(hspace=1e-4, wspace=1e-4)
-
-        el1 = self.ela.get_symbol()
-        rmax = 6 * covalent_radii[atomic_numbers[el1]] / Bohr
-        ymax = max(1, self.tables[(0, bas1, bas2)].max())
-        if self.nel == 2:
-            el2 = self.elb.get_symbol()
-            rmax = max(rmax, 6 * covalent_radii[atomic_numbers[el2]] / Bohr)
-            ymax = max(ymax, self.tables[(1, bas1, bas2)].max())
-
-        for i in range(NUMSK):
-            name = INTEGRALS_DIPOLE[i]
-            ax = plt.subplot(NUMSK//2 +1, 2, i + 1)
-
-            for p, (e1, e2) in enumerate(self.pairs):
-                s1, s2 = e1.get_symbol(), e2.get_symbol()
-                key = (p, bas1, bas2)
-
-                if p == 0:
-                    s = '-'
-                    lw = 1
-                    alpha = 1.0
-                else:
-                    s = '--'
-                    lw = 4
-                    alpha = 0.2
-
-                if np.all(abs(self.tables[key][:, i]) < 1e-10):
-                    ax.text(0.03, 0.5 + p * 0.15,
-                            'No %s integrals for <%s|%s>' % (name, s1, s2),
-                            transform=ax.transAxes, size=10, va='center')
-
-                    if not ax.get_subplotspec().is_last_row():
-                        plt.xticks([], [])
-                    if not ax.get_subplotspec().is_first_col():
-                        plt.yticks([], [])
-                else:
-                    plt.plot(self.Rgrid, self.tables[key][:, i] , c='r',
-                             ls=s, lw=lw, alpha=alpha)
-                    plt.axhline(0, c='k', ls='--')
-                    ax.text(0.8, 0.1 + p * 0.15, name, size=10,
-                            transform=ax.transAxes)
-
-                    if ax.get_subplotspec().is_last_row():
-                        plt.xlabel('r (Bohr)')
-                    else:
-                        plt.xticks([], [])
-                    if not ax.get_subplotspec().is_first_col():
-                        plt.yticks([],[])
-
-                plt.xlim([0, rmax])
-                plt.ylim(-ymax, ymax)
-
-        plt.figtext(0.3, 0.95, 'R', color='r', size=20)
-        plt.figtext(0.38, 0.95, ' Slater-Koster tables', size=20)
-        sym1, sym2 = self.ela.get_symbol(), self.elb.get_symbol()
-        plt.figtext(0.3, 0.92, '(thin solid: <%s|%s>, wide dashed: <%s|%s>)' \
-                    % (sym1, sym2, sym2, sym1), size=10)
-        plt.show()
-
-        if filename is None:
-            filename = '%s-%s_slako-dipole.pdf' % (sym1 + '+'*bas1, sym2 + '+'*bas2)
-        plt.savefig(filename, bbox_inches='tight')
-        plt.clf()
-        self.timer.stop('plotting')
 
     def plot_minimal(self, filename=None, bas1=0, bas2=0):
         """plot that only shows columns that are nonzero"""
