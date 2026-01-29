@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sys
 
-plt.rcParams.update({'font.size': 19})
+plt.rcParams.update({'font.size': 25})
 plt.rcParams['savefig.bbox'] = 'tight'
 
 import numpy as np
@@ -54,7 +54,7 @@ def plot_dipole_decay(offsite_obj, num_dipole, threshold):
     data = [np.abs(bohr_to_angstrom(d)) for d in data]
     r = offsite_obj.Rgrid
     r_angst = bohr_to_angstrom(r)
-    fig, ax = plt.subplots(figsize=(16,9))
+    fig, ax = plt.subplots(figsize=(20,9))
     typeA = offsite_obj.pairs[0][0].symbol
     typeB = offsite_obj.pairs[0][1].symbol
     for i, key in enumerate(keys):
@@ -62,7 +62,7 @@ def plot_dipole_decay(offsite_obj, num_dipole, threshold):
         orba, comp, orbb = int_label[:2], int_label[3], int_label[4:6]
         ax.semilogy(r_angst, data[i], label=rf"{typeA}-{typeB}: $\langle {orba}|\hat{{r}}_{{{comp}}}|{orbb}\rangle$")
     ax.legend()
-    ax.set_xlim(left=0)
+    ax.set_xlim(left=0, right=6)
     ax.set_xlabel(r'r / $\mathrm{\AA}$')
     ax.set_ylabel(r'$\mathrm{|\langle \phi_\mu|\hat{r}_i|\phi_\nu \rangle|}$ / $\mathrm{\AA}$')
     plt.savefig(f"dipole_distance_decay{typeA}-{typeB}_top{num_dipole}.pdf")

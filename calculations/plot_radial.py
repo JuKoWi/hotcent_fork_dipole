@@ -8,13 +8,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sys
 
-plt.rcParams.update({'font.size': 19})
+plt.rcParams.update({'font.size': 25})
 plt.rcParams['savefig.bbox'] = 'tight'
 
 def plot_radial_parts(atoms:list, orbs:list, rmax_au=4):
     x_bohr = np.linspace(start=0, stop=rmax_au, num=1000)[1:]
     x_angstrom = bohr_to_angstrom(x_bohr)
-    fig, ax = plt.subplots(figsize=(16,9))
+    fig, ax = plt.subplots(figsize=(20,9))
     for i,atom in enumerate(atoms):
         for j,orb in enumerate(orbs[i]):
             R = atom.Rnl(x_bohr, nl=orb)
@@ -30,7 +30,7 @@ def plot_radial_parts(atoms:list, orbs:list, rmax_au=4):
 def find_similar_zeta(zeta, atoms:list, orbs:list, rmax_au=4):
     x_bohr = np.linspace(start=0, stop=rmax_au, num=1000)[1:]
     x_angstrom = bohr_to_angstrom(x_bohr)
-    fig, ax = plt.subplots(figsize=(16,9))
+    fig, ax = plt.subplots(figsize=(20,9))
     for i,atom in enumerate(atoms):
         for j,orb in enumerate(orbs[i]):
             R = atom.Rnl(x_bohr, nl=orb)
@@ -151,10 +151,11 @@ atom_list = [
 orbital_list = [
                 # ['1s', '2s', '2p'], 
                 # ['3s', '3p'], 
-                ['4d', '5s']
+                ['4p', '4d', '5s']
                 ]
     
 # plot_radial_parts(atoms=atom_list, orbs=orbital_list)
 zeta = 1
 zeta = [zeta, zeta, zeta, zeta]
-find_similar_zeta(atoms=atom_list, orbs=orbital_list, zeta=zeta)
+# find_similar_zeta(atoms=atom_list, orbs=orbital_list, zeta=zeta)
+plot_radial_parts(atoms=atom_list, orbs=orbital_list, rmax_au=3)
