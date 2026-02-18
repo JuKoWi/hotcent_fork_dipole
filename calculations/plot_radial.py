@@ -7,20 +7,27 @@ from hotcent.new_dipole.utils import bohr_to_angstrom
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
+import pickle
 
-plt.rcParams.update({'font.size': 25})
+plt.rcParams.update({'font.size': 16})
 plt.rcParams['savefig.bbox'] = 'tight'
 
-def plot_radial_parts(atoms:list, orbs:list, rmax_au=4):
+def plot_radial_parts(atoms:list, orbs:list, log=False, rmax_au=4):
     x_bohr = np.linspace(start=0, stop=rmax_au, num=1000)[1:]
     x_angstrom = bohr_to_angstrom(x_bohr)
-    fig, ax = plt.subplots(figsize=(20,9))
+    fig, ax = plt.subplots(figsize=(6,4.5))
     for i,atom in enumerate(atoms):
         for j,orb in enumerate(orbs[i]):
             R = atom.Rnl(x_bohr, nl=orb)
-            ax.plot(x_angstrom, R, label=f"{atom.symbol}, {orb}")
-    ax.set_xlabel(r'r / $\AA$')
-    ax.set_ylabel('R(r)')
+            if log:
+                ax.semilogy(x_angstrom, np.abs(R), label=f"{atom.symbol}, {orb}")
+            else:
+                ax.plot(x_angstrom, R, label=f"{atom.symbol}, {orb}")
+    ax.set_xlabel(r'r / $\mathrm{\AA}$')
+    if log:
+        ax.set_ylabel(r'|$R_{nl}$|')
+    else:
+        ax.set_ylabel(r'$R_{nl}$')
     ax.set_xlim(left=0)
     ax.axhline(y=0, color='gray', linestyle='--', linewidth=1)
     ax.legend()
@@ -104,7 +111,7 @@ atomMo = AtomicDFT('Mo',
                 perturbative_confinement=False,
                 configuration='[Kr] 4d4 5s2 5p0',
                 valence=['4d', '5s', '5p'],
-                confinement=PowerConfinement(r0=40, s=4),
+                confinement=PowerConfinement(r0=50, s=4),
                 scalarrel=True,
                 maxiter=2500,
                 timing=False,
@@ -150,12 +157,12 @@ atom_list = [
              ]
 orbital_list = [
                 # ['1s', '2s', '2p'], 
-                # ['3s', '3p'], 
+                # ['3s', '3p', '3d'], 
                 ['4p', '4d', '5s']
                 ]
     
 # plot_radial_parts(atoms=atom_list, orbs=orbital_list)
-zeta = 1
-zeta = [zeta, zeta, zeta, zeta]
+# zeta = 1
+# zeta = [zeta, zeta, zeta, zeta]
 # find_similar_zeta(atoms=atom_list, orbs=orbital_list, zeta=zeta)
-plot_radial_parts(atoms=atom_list, orbs=orbital_list, rmax_au=3)
+plot_radial_parts(atoms=atom_list, orbs=orbital_list, log=True, rmax_au=12)

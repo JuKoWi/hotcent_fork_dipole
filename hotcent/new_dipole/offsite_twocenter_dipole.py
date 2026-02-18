@@ -64,7 +64,7 @@ class Offsite2cTableDipole(MultiAtomIntegrator):
                'rmin must be a multiple of dr'
 
         self.r_min = rmin
-        self.timer.start('run_offsite2c') # TODO check what this does
+        self.timer.start('run_offsite2c') 
         wf_range = self.get_range(wflimit)
         self.wf_range = wf_range
         Nsub = N // stride

@@ -5,6 +5,7 @@ import sympy as sym
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
+import matplotlib.ticker as ticker
 from ase import Atoms
 from ase.io import write
 from ase.units import Bohr
@@ -18,7 +19,7 @@ from hotcent.confinement import PowerConfinement
 from hotcent.atomic_dft import AtomicDFT
 plt.rcParams['savefig.bbox'] = 'tight'          
 plt.rcParams["axes.formatter.limits"] = (-2,5)
-plt.rcParams.update({'font.size':25})
+plt.rcParams.update({'font.size':35})
 
 x, y, z = sym.symbols("x, y, z")
 x1, y1, z1 = sym.symbols("x1, y1, z1")
@@ -404,7 +405,7 @@ def scan_grid_error(pos, index, dipole=False, plot=False, from_file=False):
         axs[0].set_xlabel(r"$n(r)$")
         axs[0].set_ylabel(r"$n(\theta)$")
         # axs[0].set_yticks(ycenters)
-        axs[0].set_title(f"Error") 
+        axs[0].set_title(f"Numerical - analytical") 
 
         # axs[1].set_xticks(xcenters)
         axs[1].set_xlabel(r"$n(r)$")
@@ -413,7 +414,14 @@ def scan_grid_error(pos, index, dipole=False, plot=False, from_file=False):
         axs[1].set_title(f"Absolute error logarithmic") 
         
         fig.colorbar(err, ax=axs[0])
-        fig.colorbar(rel_err, ax=axs[1])
+
+        cbar1 = fig.colorbar(rel_err, ax=axs[1])
+        cbar1.ax.yaxis.set_major_locator(ticker.LogLocator(base=10))
+        cbar1.ax.yaxis.set_minor_locator(
+            ticker.LogLocator(base=10, subs=(1,2,3,4,5,6,7,8,9))
+        )
+        cbar1.ax.yaxis.set_minor_formatter(ticker.LogFormatter())
+
         # fig.suptitle("Error for chosen integrals for different grid discretizations while creating .skf file")
         plt.savefig(f"error_grid-plot{index}.pdf")
         plt.show()
@@ -522,19 +530,19 @@ def scan_distance(direction, index, dipole=False, n_dist=20, min_dist_angst=0.4,
     print(f"finished scan after total of {t_total_2 -t_total_1}")
     if plot:
         list_res2 = np.array(list_res2)
-        fig, axs = plt.subplots(ncols=3, figsize=(35,9))
+        fig, axs = plt.subplots(ncols=3, figsize=(45,9))
         axs[0].scatter(distance_factors, bohr_to_angstrom(list_res2))
         axs[0].set_xlabel(r"R / $\AA$")
-        axs[0].set_ylabel(r"$d$ / $\AA$")
+        axs[0].set_ylabel(r"$d_\text{analytical}$ / $\AA$")
         axs[0].set_title('(a)')
         axs[1].scatter(distance_factors, bohr_to_angstrom(error_array)) 
         axs[1].set_xlabel(r"R / $\AA$")
         axs[1].set_xlabel(r"R / $\AA$")
-        axs[1].set_ylabel(r"$\Delta d$ / $\AA$ ")
+        axs[1].set_ylabel(r"$d_\text{numerical}- d_\text{analytical}$ / $\AA$ ")
         axs[1].set_xlabel(r"R / $\AA$")
         axs[1].set_title('(b)')
         axs[2].scatter(distance_factors, rel_error_array)
-        axs[2].set_ylabel(r"relative error")
+        axs[2].set_ylabel(r"$|d_\text{numerical}-d_\text{analytical}|/d_\text{analytical}$")
         axs[2].set_xlabel(r"R / $\AA$")
         axs[2].set_title('(c)')
         plt.savefig(f"distance_error_range{index}.pdf")

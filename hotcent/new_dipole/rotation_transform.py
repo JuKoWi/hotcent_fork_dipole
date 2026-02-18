@@ -61,7 +61,8 @@ def Wigner_D_complex(euler_phi, euler_theta, euler_gamma):
     Dz = z_rot_mat(phi=euler_phi)
     dy = d_mat(theta=euler_theta)
     Dz2 = z_rot_mat(phi=euler_gamma) #last rotation around z-axis
-    total = Dz* dy * Dz2
+    # total = Dz * dy * Dz2 #forgot transpose
+    total = Dz2 * dy.T * Dz 
     return total
     
 def Wigner_D_real(euler_phi, euler_theta, euler_gamma):

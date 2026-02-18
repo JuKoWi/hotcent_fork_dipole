@@ -316,7 +316,10 @@ def print_overlap_derivatives():
     time_end = time.time()
     print('}', file=f)
     print(f"finished integrals in {time_end-time_start} s")
-    
+
+def print_f_orbitals():
+    for orb in first_center.items():
+        print(orb)
     
 
 

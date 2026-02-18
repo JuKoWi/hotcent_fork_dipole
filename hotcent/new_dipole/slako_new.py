@@ -123,14 +123,6 @@ def convert_table_dftbplus(table):
                 new_table[:,i] = table[:,j]
     return new_table
 
-
-
-
-
-table = np.zeros((10, NUMSK))
-convert_table_dftbplus(table=table)
-
-
 def convert_quant_num(l):
     """convert quantum number l to letter for string matching in select_subshells"""
     if l == 0:

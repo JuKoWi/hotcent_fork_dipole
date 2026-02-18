@@ -4,15 +4,13 @@ from hotcent.atomic_dft import AtomicDFT
 from hotcent.new_dipole.offsite_twocenter_new import Offsite2cTable
 from hotcent.new_dipole.offsite_twocenter_dipole import Offsite2cTableDipole
 from hotcent.new_dipole.utils import bohr_to_angstrom
+from hotcent.new_dipole.slako_new import INTEGRALS, get_hotcent_style_index
 from hotcent.new_dipole.slako_dipole import INTEGRALS_DIPOLE, convert_sk_index
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
-
-plt.rcParams.update({'font.size': 25})
+plt.rcParams.update({'font.size': 16})
 plt.rcParams['savefig.bbox'] = 'tight'
-
-import numpy as np
 
 def find_slowest_decay(offsite_obj, num_dipole, threshold, atol=1e-7):
     label_list = sorted(INTEGRALS_DIPOLE.keys(), key=lambda x: x[0])
@@ -60,57 +58,152 @@ def plot_dipole_decay(offsite_obj, num_dipole, threshold):
     for i, key in enumerate(keys):
         int_label = convert_sk_index(key)
         orba, comp, orbb = int_label[:2], int_label[3], int_label[4:6]
-        ax.semilogy(r_angst, data[i], label=rf"{typeA}-{typeB}: $\langle {orba}|\hat{{r}}_{{{comp}}}|{orbb}\rangle$")
+        ax.semilogy(r_angst, data[i], label=rf"$\langle {orba}|\hat{{r}}_{{{comp}}}|{orbb}\rangle$")
     ax.legend()
     ax.set_xlim(left=0, right=6)
     ax.set_xlabel(r'r / $\mathrm{\AA}$')
-    ax.set_ylabel(r'$\mathrm{|\langle \phi_\mu|\hat{r}_i|\phi_\nu \rangle|}$ / $\mathrm{\AA}$')
+    ax.set_ylabel(r'd / $\mathrm{\AA}$')
     plt.savefig(f"dipole_distance_decay{typeA}-{typeB}_top{num_dipole}.pdf")
     plt.show()
 
+def plot_dipole_decay_selected(sk_file, homonuclear, labels, readable_labels, eigvals):
+    with open(sk_file, 'r') as f:
+        line1 = f.readline()
+        line1 = line1.replace(',', ' ')
+        parts = [p.strip() for p in line1.split()]
+        dr, nr = float(parts[0]), int(parts[1])
+    if homonuclear:
+        skiprows = 3
+    else:
+        skiprows = skiprows = 2
+    data = np.loadtxt(fname=sk_file, skiprows=skiprows)
+    sorted_tuple = sorted(INTEGRALS_DIPOLE.keys(), key=lambda k: k[0])
+    sorted_labelnum = [k[0] for k in sorted_tuple]
+    print(sorted_labelnum)
+    fig, ax = plt.subplots(figsize=(6,4.5))
+    x = np.arange(start=dr, stop=(nr)*dr, step=dr)
+    x = np.linspace(start=dr, stop=nr*dr, num=nr, endpoint=True)
+    x_angst = bohr_to_angstrom(x)
+    for i,l in enumerate(labels):
+        column = sorted_labelnum.index(l)
+        dipole = data[:,column]
+        ax.plot(x_angst, dipole, ".", ms=3, label=readable_labels[i])
+    for i, eig in enumerate(list(set(eigvals))):
+        if i == 0:
+            ax.hlines(y=eig, color='black', linestyle='--', xmin=0, xmax=6, label='atomic transition')
+        else:
+            ax.hlines(y=eig, color='black', linestyle='--', xmin=0, xmax=6) 
+    ax.set_xlim(left=0, right=6)
+    ax.set_xlabel(r'r [$\AA$]')
+    ax.set_ylabel(r'd [$a_0$]')
+    ax.legend()
+    element,_ = sk_file.split('.')
+    plotname = "plotskf" + element
+    for l in labels:
+        plotname = plotname + (f"-{l}")
+    plotname = plotname + '.pdf'
+    plt.savefig(plotname)
+    plt.show()
+    
+def find_slowest_overlap_decay(offsite_obj, num_dipole, threshold, atol=1e-7):
+    label_list = sorted(INTEGRALS.keys(), key=lambda x: x[0])
 
-xc='GGA_X_PBE+GGA_C_PBE'
+    top_keys = []
+    top_indices = []
+    top_rows = []
 
-atomMo = AtomicDFT('Mo',
-                xc = xc,
-                perturbative_confinement=False,
-                configuration='[Kr] 4d4 5s2 5p0',
-                valence=['4d', '5s', '5p'],
-                confinement=PowerConfinement(r0=40, s=4),
-                scalarrel=True,
-                maxiter=2500,
-                timing=False,
-                # nodegpts=150,
-                mix=0.2,
-                txt='-',
-                rmax=100,
+    for key, table in offsite_obj.tables.items():
+        table = np.abs(table.T)
+        mask = table < threshold
+        idx = np.where(
+            mask.any(axis=1),
+            table.shape[1] - 1 - mask[:, ::-1].argmax(axis=1),
+            -1
+        ) #compute slowest decay index per row 
+        order = np.argsort(idx)[::-1] # rank by slowest decay
+        for row_idx in order:
+            row = table[row_idx]
+            if len(top_rows) == num_dipole:
+                break
+            if idx[row_idx] < 0:
+                continue
+            if np.allclose(row, np.zeros_like(row)):
+                continue
+            if top_rows:
+                duplicate = np.any(
+                    np.all(np.isclose(np.abs(top_rows), np.abs(row), atol=atol), axis=1)
                 )
-atomMo.run()
+                if duplicate:
+                    continue
+            top_keys.append(label_list[row_idx])
+            top_indices.append(row_idx)
+            top_rows.append(row)
+    return top_keys, top_indices, top_rows
+    
+def plot_overlap_decay(offsite_obj, num_overlap, threshold):
+    keys, idx, data = find_slowest_overlap_decay(offsite_obj=offsite_obj, num_dipole=num_overlap, threshold=threshold)
+    r = offsite_obj.Rgrid
+    r_angst = bohr_to_angstrom(r)
+    fig, ax = plt.subplots(figsize=(20,9))
+    typeA = offsite_obj.pairs[0][0].symbol
+    typeB = offsite_obj.pairs[0][1].symbol
+    for i, key in enumerate(keys):
+        int_label = get_hotcent_style_index(key)
+        orba, comp, orbb = int_label[:2], int_label[3:]
+        ax.semilogy(r_angst, data[i], label=rf"{typeA}-{typeB}: $\langle {orba}|{orbb}\rangle$")
+    ax.legend()
+    ax.set_xlim(left=0, right=6)
+    ax.set_xlabel(r'r / $\mathrm{\AA}$')
+    ax.set_ylabel(r'$\mathrm{|\langle \phi_\mu|\phi_\nu \rangle|}$ / $\mathrm{\AA}$')
+    plt.savefig(f"overlap_distance_decay{typeA}-{typeB}_top{num_overlap}.pdf")
+    plt.show()
 
-rcovS = 3.9
-rcovMo = 4.3
-confS = PowerConfinement(r0=50, s=4)
-confMo = PowerConfinement(r0=50, s=4)
+# xc='GGA_X_PBE+GGA_C_PBE'
 
-wf_confS = {'3s': PowerConfinement(r0=rcovS, s=4.6),
-           '3p': PowerConfinement(r0=rcovS, s=4.6),
-           '3d': PowerConfinement(r0=rcovS, s=4.6),
-           }
+# atomMo = AtomicDFT('Mo',
+#                 xc = xc,
+#                 perturbative_confinement=False,
+#                 configuration='[Kr] 4d4 5s2 5p0',
+#                 valence=['4d', '5s', '5p'],
+#                 confinement=PowerConfinement(r0=40, s=4),
+#                 scalarrel=True,
+#                 maxiter=2500,
+#                 timing=False,
+#                 # nodegpts=150,
+#                 mix=0.2,
+#                 txt='-',
+#                 rmax=100,
+#                 )
+# atomMo.run()
 
-wf_confMo = {'4d': PowerConfinement(r0=rcovMo, s=11.6),
-           '5s': PowerConfinement(r0=rcovMo, s=11.6),
-           '5p': PowerConfinement(r0=rcovMo, s=11.6),
-           }
+# rcovS = 3.9
+# rcovMo = 4.3
+# confS = PowerConfinement(r0=50, s=4)
+# confMo = PowerConfinement(r0=50, s=4)
 
-atomMo.set_confinement(confMo)
-atomMo.set_wf_confinement(wf_confinement=wf_confMo)
-atomMo.run()
+# wf_confS = {'3s': PowerConfinement(r0=rcovS, s=4.6),
+#            '3p': PowerConfinement(r0=rcovS, s=4.6),
+#            '3d': PowerConfinement(r0=rcovS, s=4.6),
+#            }
 
-rmin, dr, N = 0.4, 0.02, 900
+# wf_confMo = {'4d': PowerConfinement(r0=rcovMo, s=11.6),
+#            '5s': PowerConfinement(r0=rcovMo, s=11.6),
+#            '5p': PowerConfinement(r0=rcovMo, s=11.6),
+#            }
 
-off2c_dipoleMo = Offsite2cTableDipole(atomMo, atomMo, timing=False)
-off2c_dipoleMo.run(rmin, dr, N, nr=200, ntheta=400, wflimit=1e-9)
-off2c_dipoleMo.write_dipole()
+# atomMo.set_confinement(confMo)
+# atomMo.set_wf_confinement(wf_confinement=wf_confMo)
+# atomMo.run()
+
+# rmin, dr, N = 0.4, 0.02, 600
+
+# off2c_dipoleMo = Offsite2cTableDipole(atomMo, atomMo, timing=False)
+# off2c_dipoleMo.run(rmin, dr, N, nr=200, ntheta=400, wflimit=1e-10)
+# off2c_dipoleMo.write_dipole()
+
+# off2c_Mo = Offsite2cTable(atomMo, atomMo, timing=False)
+# off2c_Mo.run(rmin, dr, N, nr=200, ntheta=400, wflimit=1e-10)
+# off2c_dipoleMo.write_dipole()
 
 # element = 'C'
 # xc = 'GGA_X_PBE+GGA_C_PBE'
@@ -141,9 +234,19 @@ off2c_dipoleMo.write_dipole()
 # atom.run()
 
 # rmin, dr, N = 0.4, 0.02, 900
-# off2c = Offsite2cTableDipole(atom, atom, timing=False)
+# off2c = Offsite2cTable(atom, atom, timing=False)
 # off2c.run(rmin, dr, N, nr=200, ntheta=400, wflimit=1e-9)
-# off2c.write_dipole()
+# off2c.write()
 
-plot_dipole_decay(offsite_obj=off2c_dipoleMo, num_dipole=5, threshold=1e-5)
+# print(atomMo.configuration)
+# plot_dipole_decay(offsite_obj=off2c, num_dipole=5, threshold=1e-5)
+# plot_overlap_decay(offsite_obj=off2c, num_overlap=5, threshold=1e-5)
 
+labels = [1,5,16]
+readable_labels = [
+    r'$\langle s | \hat{r}_y | p_y \rangle$',
+    r'$\langle s | \hat{r}_y | d_{yz} \rangle$',
+    r'$\langle s | \hat{r}_z | s \rangle$' 
+    ]
+eigvals = [-1.528113,0,0]
+plot_dipole_decay_selected(sk_file='Mo-Mo_dipole.skf', homonuclear=True, labels=labels, readable_labels=readable_labels, eigvals=eigvals)

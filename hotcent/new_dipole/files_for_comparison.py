@@ -77,7 +77,7 @@ class Seedname_TB:
             Wigner_D_real(euler_phi=PHI, euler_theta=THETA, euler_gamma=GAMMA)
         with open("symbolic_D_matrix.pkl", "rb") as f:
             M = pickle.load(f)
-        self.D_symb = sym.lambdify((THETA, PHI, GAMMA), M, 'numpy') 
+        self.D_symb = sym.lambdify((PHI, THETA, GAMMA), M, 'numpy') 
 
         self._create_SH_file_dict()
         self._create_dipole_file_dict()
@@ -144,7 +144,7 @@ class Seedname_TB:
             return delta_R, n_points, sk_table_S, sk_table_H, same_atom
         
     def _create_SH_file_dict(self):
-        """create a dictionary where for every element combiantion there is a custom object,
+        """create a dictionary where for every element combination there is a custom object,
         that contains all the information from the .skf file
         """
         S_sk_dict = {}
@@ -187,7 +187,7 @@ class Seedname_TB:
         R_vec = posB - posA
         R = np.linalg.norm(R_vec)
         euler_theta, euler_phi, euler_gamma= self._set_euler_angles(vec1=posA, vec2=posB)
-        D_single = np.array(self.D_symb(euler_theta, euler_phi, euler_gamma), dtype=complex)
+        D_single = np.array(self.D_symb(euler_phi, euler_theta, euler_gamma), dtype=complex).T
 
         D = np.kron(D_single, D_single)
         D = np.real(D)
