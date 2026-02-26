@@ -37,7 +37,7 @@ class SK_Integral:
             # print('Symbolic D matrix exists')
         else: 
             # print('Calculate symbolic D-Matrix')            
-            Wigner_D_real(euler_phi=PHI, euler_theta=THETA, euler_gamma=GAMMA)
+            Wigner_D_real(euler_alpha=PHI, euler_beta=THETA, euler_gamma=GAMMA)
         with open("symbolic_D_matrix.pkl", "rb") as f:
             M = pickle.load(f)
         self.D_symb = sym.lambdify((THETA, PHI, GAMMA), M, 'numpy') 

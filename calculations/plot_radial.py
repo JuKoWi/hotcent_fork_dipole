@@ -12,45 +12,59 @@ import pickle
 plt.rcParams.update({'font.size': 16})
 plt.rcParams['savefig.bbox'] = 'tight'
 
-def plot_radial_parts(atoms:list, orbs:list, log=False, rmax_au=4):
+def plot_radial_parts(atoms:list, orbs:list, rmax_au=4, rmax_log=8):
     x_bohr = np.linspace(start=0, stop=rmax_au, num=1000)[1:]
+    x_bohr_log = np.linspace(start=0, stop=rmax_log, num=1000)[1:]
     x_angstrom = bohr_to_angstrom(x_bohr)
-    fig, ax = plt.subplots(figsize=(6,4.5))
+    x_angstrom_log = bohr_to_angstrom(x_bohr_log)
+    fig, axs = plt.subplots(ncols=2, nrows=1, figsize=(15.5,4.5))
     for i,atom in enumerate(atoms):
         for j,orb in enumerate(orbs[i]):
             R = atom.Rnl(x_bohr, nl=orb)
-            if log:
-                ax.semilogy(x_angstrom, np.abs(R), label=f"{atom.symbol}, {orb}")
-            else:
-                ax.plot(x_angstrom, R, label=f"{atom.symbol}, {orb}")
-    ax.set_xlabel(r'r / $\mathrm{\AA}$')
-    if log:
-        ax.set_ylabel(r'|$R_{nl}$|')
-    else:
-        ax.set_ylabel(r'$R_{nl}$')
-    ax.set_xlim(left=0)
-    ax.axhline(y=0, color='gray', linestyle='--', linewidth=1)
-    ax.legend()
+            R_log = atom.Rnl(x_bohr_log, nl=orb)
+            axs[1].semilogy(x_angstrom_log, np.abs(R_log), label=f"{atom.symbol}, {orb}")
+            axs[0].plot(x_angstrom, R, label=f"{atom.symbol}, {orb}")
+    axs[0].set_title('a', loc='left', fontweight='bold')
+    axs[1].set_title('b', loc='left', fontweight='bold')
+    axs[0].set_xlabel(r'$r$ $[\mathrm{\AA}]$')
+    axs[1].set_xlabel(r'$r$ $[\mathrm{\AA}]$')
+    axs[0].set_ylabel(r'$R_{nl}$')
+    axs[1].set_ylabel(r'$\left| R_{nl} \right|$')
+    axs[0].set_xlim(left=0)
+    axs[1].set_xlim(left=0)
+    axs[0].axhline(y=0, color='gray', linestyle='--', linewidth=1)
+    axs[0].legend()
+    axs[1].legend()
     plt.savefig('Radial_parts.pdf')
     plt.show()
 
-def find_similar_zeta(zeta, atoms:list, orbs:list, rmax_au=4):
+def find_similar_zeta(zeta, atoms:list, orbs:list,rmax_log, rmax_au=12):
     x_bohr = np.linspace(start=0, stop=rmax_au, num=1000)[1:]
+    x_bohr_log = np.linspace(start=0, stop=rmax_log, num=1000)[1:]
     x_angstrom = bohr_to_angstrom(x_bohr)
-    fig, ax = plt.subplots(figsize=(20,9))
+    x_angstrom_log = bohr_to_angstrom(x_bohr_log)
+    fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(15.5, 4.5))
     for i,atom in enumerate(atoms):
         for j,orb in enumerate(orbs[i]):
             R = atom.Rnl(x_bohr, nl=orb)
-            ax.plot(x_angstrom, R, label=f"{atom.symbol}, {orb}")
+            R_log = atom.Rnl(x_bohr_log, nl=orb)
+            axs[0].plot(x_angstrom, R, label=f"{atom.symbol}, {orb}")
+            axs[1].semilogy(x_angstrom_log, np.abs(R_log), label=f"{atom.symbol}, {orb}")
     for i in range(3):
         N1 = (2 * zeta[i]/np.pi)**(3/4)*5
         R = N1*x_bohr**(i+1) * np.exp(-zeta[i]*x_bohr**2) #overwrite with gaussian for testing
-        ax.plot(x_angstrom, R, label=f"l = {i}, zeta = {zeta[i]}")
-    ax.set_xlabel(r'r / $\AA$')
-    ax.set_ylabel('R(r)')
-    ax.set_xlim(left=0)
-    ax.axhline(y=0, color='gray', linestyle='--', linewidth=1)
-    ax.legend()
+        R_log = N1*x_bohr_log**(i+1) * np.exp(-zeta[i]*x_bohr_log**2) #overwrite with gaussian for testing
+        axs[0].plot(x_angstrom, R, label=f"l = {i}, zeta = {zeta[i]}")
+        axs[1].plot(x_angstrom_log, np.abs(R_log), label=f"l = {i}, zeta = {zeta[i]}")
+    axs[0].set_xlabel(r'r / $\AA$')
+    axs[1].set_xlabel(r'r / $\AA$')
+    axs[0].set_ylabel(r'$R(r)$')
+    axs[1].set_ylabel(r'$|R(r)|$')
+    axs[0].set_xlim(left=0)
+    axs[1].set_xlim(left=0)
+    axs[0].axhline(y=0, color='gray', linestyle='--', linewidth=1)
+    axs[0].legend()
+    axs[1].legend()
     plt.savefig('Radial_parts.pdf')
     plt.show()
 
@@ -162,7 +176,8 @@ orbital_list = [
                 ]
     
 # plot_radial_parts(atoms=atom_list, orbs=orbital_list)
-# zeta = 1
-# zeta = [zeta, zeta, zeta, zeta]
-# find_similar_zeta(atoms=atom_list, orbs=orbital_list, zeta=zeta)
-plot_radial_parts(atoms=atom_list, orbs=orbital_list, log=True, rmax_au=12)
+zeta = 0.5
+zeta = [zeta, zeta, zeta, zeta]
+
+find_similar_zeta(atoms=atom_list, orbs=orbital_list, zeta=zeta, rmax_au=3, rmax_log=7)
+# plot_radial_parts(atoms=atom_list, orbs=orbital_list, rmax_au=4, rmax_log=12)

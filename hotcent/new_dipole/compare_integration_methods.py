@@ -343,14 +343,16 @@ def scan_grid_error(pos, index, dipole=False, plot=False, from_file=False):
                     off2c = Offsite2cTableDipole(atom, atom, timing=True)
                     off2c.run(rmin, dr, N, 
                               zeta=zeta_dict, 
-                              nr=nr, ntheta=ntheta
+                              nr=nr, ntheta=ntheta,
+                              wflimit=1e-8
                               )
                     off2c.write_dipole()
                 else:
                     off2c = Offsite2cTable(atom, atom, timing=True)
                     off2c.run(rmin, dr, N, 
                               zeta=zeta_dict, 
-                              nr=nr, ntheta=ntheta
+                              nr=nr, ntheta=ntheta,
+                              wflimit=1e-8
                               )
                     off2c.write()
                 time2 = time.time()
@@ -468,13 +470,13 @@ def scan_distance(direction, index, dipole=False, n_dist=20, min_dist_angst=0.4,
         if dipole:
             off2c = Offsite2cTableDipole(atom, atom, timing=True)
             off2c.run(rmin, dr, N, 
-                      zeta=zeta_dict, 
+                      zeta=zeta_dict, wflimit=1e-11 
                       )
             off2c.write_dipole()
         else:
             off2c = Offsite2cTable(atom, atom, timing=True)
             off2c.run(rmin, dr, N, 
-                      zeta=zeta_dict, 
+                      zeta=zeta_dict, wflimit=1e-11 
                       )
             off2c.write()
         time2 = time.time()

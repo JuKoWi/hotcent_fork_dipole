@@ -9,8 +9,83 @@ from hotcent.new_dipole.slako_dipole import INTEGRALS_DIPOLE, convert_sk_index
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
+from pathlib import Path
 plt.rcParams.update({'font.size': 16})
 plt.rcParams['savefig.bbox'] = 'tight'
+
+READABLE_LABELS = {
+    "d5": "d_{x^2 - y^2}",
+    "d4": "d_{xz}",
+    "d3": "d_{z^2}",
+    "d1": "d_{xy}",
+    "d2": "d_{yz}",
+    "px": "p_x",
+    "py": "p_y",
+    "pz": "p_z",
+    "ss": "s",
+                   }
+
+"""Plot data from file"""
+def slowest_decay_from_file(filename, num_dipole, threshold, atol=1e-7):
+    table = np.loadtxt(fname=filename, skiprows=3)
+    label_list = sorted(INTEGRALS_DIPOLE.keys(), key=lambda x: x[0])
+
+    top_keys = []
+    top_indices = []
+    top_rows = []
+
+    table = np.abs(table.T)
+    mask = table < threshold
+    idx = np.where(
+        mask.any(axis=1),
+        table.shape[1] - 1 - mask[:, ::-1].argmax(axis=1),
+        -1
+    ) #compute slowest decay index per row 
+    order = np.argsort(idx)[::-1] # rank by slowest decay
+    for row_idx in order:
+        row = table[row_idx]
+        if len(top_rows) == num_dipole:
+            break
+        if idx[row_idx] < 0:
+            continue
+        if np.allclose(row, np.zeros_like(row)):
+            continue
+        if top_rows:
+            duplicate = np.any(
+                np.all(np.isclose(np.abs(top_rows), np.abs(row), atol=atol), axis=1)
+            )
+            if duplicate:
+                continue
+        top_keys.append(label_list[row_idx])
+        top_indices.append(row_idx)
+        top_rows.append(row)
+    return top_keys, top_indices, top_rows
+
+def plot_decay_file(filename, num_dipole, threshold):
+    skf_file = Path(filename) 
+    keys, idx, data = slowest_decay_from_file(filename=filename, num_dipole=num_dipole, threshold=threshold)
+    with open(filename, "r") as f:
+        line1 = f.readline()
+        line1 = line1.replace(",", " ")
+        parameters = line1.split()
+        dr, nr = float(parameters[0]), int(parameters[1])
+    r_au = np.linspace(start=dr, stop=nr*dr, num=nr, endpoint=True)
+    r_angst = bohr_to_angstrom(r_au)
+    symbols = filename.replace("-", "_")
+    symbols = symbols.split("_")
+    typeA = symbols[0]
+    typeB = symbols[1]
+    fig, ax = plt.subplots(figsize=(6,4.5))
+    for i, key in enumerate(keys):
+        int_label = convert_sk_index(key)
+        orba, comp, orbb = int_label[:2], int_label[3], int_label[4:6]
+        ax.semilogy(r_angst, data[i], ".", ms=3, label=rf"$\langle {READABLE_LABELS[orba]}|\hat{{r}}_{{{comp}}}|{READABLE_LABELS[orbb]}\rangle$")
+    ax.legend(markerscale=3)
+    ax.set_xlim(left=bohr_to_angstrom(dr), right=7)
+    ax.set_xlabel(r'$R$ $[\mathrm{\AA}]$')
+    ax.set_ylabel(r'$d$ $[\mathrm{\AA}]$')
+    plt.savefig(f"dipole_distance_decay{typeA}-{typeB}_top{num_dipole}.pdf")
+    plt.show()
 
 def find_slowest_decay(offsite_obj, num_dipole, threshold, atol=1e-7):
     label_list = sorted(INTEGRALS_DIPOLE.keys(), key=lambda x: x[0])
@@ -58,11 +133,11 @@ def plot_dipole_decay(offsite_obj, num_dipole, threshold):
     for i, key in enumerate(keys):
         int_label = convert_sk_index(key)
         orba, comp, orbb = int_label[:2], int_label[3], int_label[4:6]
-        ax.semilogy(r_angst, data[i], label=rf"$\langle {orba}|\hat{{r}}_{{{comp}}}|{orbb}\rangle$")
+        ax.semilogy(r_angst, data[i], label=rf"$\langle {READABLE_LABELS[orba]}|\hat{{r}}_{{{comp}}}|{READABLE_LABELS[orbb]}\rangle$")
     ax.legend()
     ax.set_xlim(left=0, right=6)
-    ax.set_xlabel(r'r / $\mathrm{\AA}$')
-    ax.set_ylabel(r'd / $\mathrm{\AA}$')
+    ax.set_xlabel(r'$R$ $[\mathrm{\AA}]$')
+    ax.set_ylabel(r'$d$ $[\mathrm{\AA}]$')
     plt.savefig(f"dipole_distance_decay{typeA}-{typeB}_top{num_dipole}.pdf")
     plt.show()
 
@@ -94,9 +169,9 @@ def plot_dipole_decay_selected(sk_file, homonuclear, labels, readable_labels, ei
         else:
             ax.hlines(y=eig, color='black', linestyle='--', xmin=0, xmax=6) 
     ax.set_xlim(left=0, right=6)
-    ax.set_xlabel(r'r [$\AA$]')
-    ax.set_ylabel(r'd [$a_0$]')
-    ax.legend()
+    ax.set_xlabel(r'$R$ [$\AA$]')
+    ax.set_ylabel(r'$d$ [$a_0$]')
+    ax.legend(markerscale=2)
     element,_ = sk_file.split('.')
     plotname = "plotskf" + element
     for l in labels:
@@ -158,7 +233,7 @@ def plot_overlap_decay(offsite_obj, num_overlap, threshold):
     plt.savefig(f"overlap_distance_decay{typeA}-{typeB}_top{num_overlap}.pdf")
     plt.show()
 
-# xc='GGA_X_PBE+GGA_C_PBE'
+xc='GGA_X_PBE+GGA_C_PBE'
 
 # atomMo = AtomicDFT('Mo',
 #                 xc = xc,
@@ -176,26 +251,26 @@ def plot_overlap_decay(offsite_obj, num_overlap, threshold):
 #                 )
 # atomMo.run()
 
-# rcovS = 3.9
-# rcovMo = 4.3
-# confS = PowerConfinement(r0=50, s=4)
-# confMo = PowerConfinement(r0=50, s=4)
+rcovS = 3.9
+rcovMo = 4.3
+confS = PowerConfinement(r0=50, s=4)
+confMo = PowerConfinement(r0=50, s=4)
 
-# wf_confS = {'3s': PowerConfinement(r0=rcovS, s=4.6),
-#            '3p': PowerConfinement(r0=rcovS, s=4.6),
-#            '3d': PowerConfinement(r0=rcovS, s=4.6),
-#            }
+wf_confS = {'3s': PowerConfinement(r0=rcovS, s=4.6),
+           '3p': PowerConfinement(r0=rcovS, s=4.6),
+           '3d': PowerConfinement(r0=rcovS, s=4.6),
+           }
 
-# wf_confMo = {'4d': PowerConfinement(r0=rcovMo, s=11.6),
-#            '5s': PowerConfinement(r0=rcovMo, s=11.6),
-#            '5p': PowerConfinement(r0=rcovMo, s=11.6),
-#            }
+wf_confMo = {'4d': PowerConfinement(r0=rcovMo, s=11.6),
+           '5s': PowerConfinement(r0=rcovMo, s=11.6),
+           '5p': PowerConfinement(r0=rcovMo, s=11.6),
+           }
 
 # atomMo.set_confinement(confMo)
 # atomMo.set_wf_confinement(wf_confinement=wf_confMo)
 # atomMo.run()
 
-# rmin, dr, N = 0.4, 0.02, 600
+rmin, dr, N = 0.4, 0.02, 600
 
 # off2c_dipoleMo = Offsite2cTableDipole(atomMo, atomMo, timing=False)
 # off2c_dipoleMo.run(rmin, dr, N, nr=200, ntheta=400, wflimit=1e-10)
@@ -240,7 +315,7 @@ def plot_overlap_decay(offsite_obj, num_overlap, threshold):
 
 # print(atomMo.configuration)
 # plot_dipole_decay(offsite_obj=off2c, num_dipole=5, threshold=1e-5)
-# plot_overlap_decay(offsite_obj=off2c, num_overlap=5, threshold=1e-5)
+# plot_overlap_decay(offsite_obj=off2c_dipoleMo, num_overlap=5, threshold=1e-7)
 
 labels = [1,5,16]
 readable_labels = [
@@ -249,4 +324,6 @@ readable_labels = [
     r'$\langle s | \hat{r}_z | s \rangle$' 
     ]
 eigvals = [-1.528113,0,0]
+
 plot_dipole_decay_selected(sk_file='Mo-Mo_dipole.skf', homonuclear=True, labels=labels, readable_labels=readable_labels, eigvals=eigvals)
+plot_decay_file(filename="Mo-Mo_dipole.skf", num_dipole=5, threshold=1e-7)

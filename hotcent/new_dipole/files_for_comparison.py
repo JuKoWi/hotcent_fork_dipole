@@ -8,6 +8,7 @@ import itertools
 import sympy as sym 
 from scipy.interpolate import CubicSpline
 from scipy.linalg import ishermitian
+from scipy.constants import physical_constants, angstrom
 from ase import Atoms
 from ase.build import graphene
 from ase.visualize import view
@@ -33,6 +34,11 @@ class Seedname_TB:
         H: eV
         S: no unit
         R: Angstrom
+    Units seedname_tb_momentum.dat:
+        lattice-vectors: Angstrom
+        H: eV
+        S: no unit
+        p: a.u.
     Internally: 
         atomic units except angstrom
     """
@@ -74,7 +80,7 @@ class Seedname_TB:
             print('Symbolic D matrix exists')
         else: 
             print('Calculate symbolic D-Matrix')            
-            Wigner_D_real(euler_phi=PHI, euler_theta=THETA, euler_gamma=GAMMA)
+            Wigner_D_real(euler_alpha=PHI, euler_beta=THETA, euler_gamma=GAMMA)
         with open("symbolic_D_matrix.pkl", "rb") as f:
             M = pickle.load(f)
         self.D_symb = sym.lambdify((PHI, THETA, GAMMA), M, 'numpy') 
@@ -187,10 +193,10 @@ class Seedname_TB:
         R_vec = posB - posA
         R = np.linalg.norm(R_vec)
         euler_theta, euler_phi, euler_gamma= self._set_euler_angles(vec1=posA, vec2=posB)
-        D_single = np.array(self.D_symb(euler_phi, euler_theta, euler_gamma), dtype=complex).T
+        D_single = np.array(self.D_symb(euler_phi, euler_theta, euler_gamma), dtype=complex)
 
         D = np.kron(D_single, D_single)
-        D = np.real(D)
+        # D = np.real(D)
         deltaR = sk_table.deltaR
         table = sk_table.table
         n_points = sk_table.n_points
@@ -200,6 +206,8 @@ class Seedname_TB:
         for i, key in enumerate(sorted(INTEGRALS, key= lambda x: x[0])):
             integral_vec[key[0]] = cs(R)[i]
         integrals = D @ integral_vec
+        # print(f"maximal imaginary integral value {np.max(np.abs(np.imag(integrals)))}")
+        integrals = np.real(integrals)
 
         if operator == 'r':
             deltaR_dipole = sk_table_dipole.deltaR
@@ -210,7 +218,7 @@ class Seedname_TB:
             idx_pend = 3
             D_r = D_single[idx_pstart:idx_pend+1, idx_pstart:idx_pend+1]
             D_dipole = np.kron(D_single, np.kron(D_r, D_single))
-            D_dipole = np.real(D_dipole)
+            # D_dipole = np.real(D_dipole)
 
             R_grid_dipole = deltaR_dipole + deltaR_dipole * np.arange(n_points_dipole) 
             cs_dipole = CubicSpline(R_grid_dipole, table_dipole) 
@@ -218,6 +226,8 @@ class Seedname_TB:
             for i, key in enumerate(sorted(INTEGRALS_DIPOLE, key= lambda x: x[0])):
                 integral_vec_dipole[key[0]] = cs_dipole(R)[i]
             dipole_elements = D_dipole @ integral_vec_dipole
+            # print(f"maximal imaginary position integral value {np.max(np.abs(np.imag(dipole_elements)))}")
+            dipole_elements = np.real(dipole_elements)
 
             #consider origin shift
             orbitals_overall = 16
@@ -236,6 +246,39 @@ class Seedname_TB:
             for label in self.quant_nums:
                 integral_dict[(label[1], label[2], label[3], label[4])] = integrals[label[0]]
         return integral_dict
+
+    def _create_integral_dict_nablaR(self, sk_table, posA, posB):
+        same_atom = np.allclose(posA, posB)
+        int_dict_gradR = {}
+        if same_atom:
+            data = sk_table.table
+            zero_rows = np.all(data==0, axis=1)
+            index_nonzero = np.argmax(~zero_rows) +1 if (~zero_rows).any() else data.shape[0] +1
+            rmin_angst = sk_table.deltaR * index_nonzero
+            h = rmin_angst
+        else:
+            h = 1e-4
+        for label in self.quant_nums:
+            int_dict_gradR[label[1], label[2], label[3], label[4]] = np.zeros(3)
+        for i in range(3):
+            unit = np.zeros(3)
+            unit[i] = 1
+            posBp1 = posB + h * unit 
+            posBm1 = posB - h * unit 
+            posBp2 = posB + 2 * h * unit
+            posBm2 = posB - 2 * h * unit
+            int_dictp1 = self._create_integral_dict(sk_table=sk_table, posA=posA, posB=posBp1, operator='S')
+            int_dictm1 = self._create_integral_dict(sk_table=sk_table, posA=posA, posB=posBm1, operator='S')
+            int_dictp2 = self._create_integral_dict(sk_table=sk_table, posA=posA, posB=posBp2, operator='S')
+            int_dictm2 = self._create_integral_dict(sk_table=sk_table, posA=posA, posB=posBm2, operator='S')
+            for label in self.quant_nums:
+                p2 = int_dictp2[label[1], label[2], label[3], label[4]]
+                p1 = int_dictp1[label[1], label[2], label[3], label[4]]
+                m2 = int_dictm2[label[1], label[2], label[3], label[4]]
+                m1 = int_dictm1[label[1], label[2], label[3], label[4]]
+                finite_diff = (-p2 + 8 * p1 - 8 * m1 + m2)/(12 *h)
+                int_dict_gradR[label[1], label[2], label[3], label[4]][i] = -finite_diff
+        return int_dict_gradR
     
     def _select_matrix_elements(self, max_lA, max_lB, integral_dict):
         pair_matrix = np.zeros((get_norbs(max_lA), get_norbs(max_lB)))
@@ -258,7 +301,7 @@ class Seedname_TB:
     def _select_dipole_matrix_elements(self, max_lA, max_lB, integral_dict):
         """For dipole store components in 3rd dimension"""
         pair_matrix = np.zeros((3, get_norbs(max_lA), get_norbs(max_lB)))
-        components = [(1, 1), (1,-1), (1,0)]
+        components = [(1, 1), (1,-1), (1,0)] # vector contains components in quantum number order, not xyz
         for i, tup in enumerate(components):
             row_start = 0
             col_start = 0 
@@ -272,6 +315,29 @@ class Seedname_TB:
                             quant_nums = (l1, m, tup[0], tup[1], l2, n)
                             if any(quant_nums == item for item in integral_dict.keys()): #compare with integral_dict or INTEGRALS_DIPOLE?
                                 block[mi, ni] = integral_dict[quant_nums]
+                            else:
+                                block[mi, ni] = 0
+                    pair_matrix[i, row_start:row_start+size_row, col_start:col_start+size_col] = block
+                    col_start += size_col
+                col_start = 0
+                row_start += size_row
+        return pair_matrix
+
+    def _select_momentum_matrix_elements(self, max_lA, max_lB, integral_dict):
+        pair_matrix = np.zeros((3, get_norbs(max_lA), get_norbs(max_lB)))
+        for i in range(3):
+            row_start = 0
+            col_start = 0 
+            for l1 in range(max_lA + 1):
+                size_row = 2 * l1 +1
+                for l2 in range(max_lB + 1):
+                    size_col = 2 * l2 +1
+                    block = np.zeros((size_row, size_col))
+                    for mi, m in enumerate(range(-l1, l1 + 1)):
+                        for ni, n in enumerate(range(-l2, l2 + 1)):
+                            quant_nums = (l1, m, l2, n)
+                            if any(quant_nums == item for item in integral_dict.keys()): #compare with integral_dict or INTEGRALS_DIPOLE?
+                                block[mi, ni] = integral_dict[quant_nums][i]
                             else:
                                 block[mi, ni] = 0
                     pair_matrix[i, row_start:row_start+size_row, col_start:col_start+size_col] = block
@@ -316,6 +382,11 @@ class Seedname_TB:
             else: 
                 integral_dict = self._create_integral_dict(sk_table=sk_table, posA=posA, posB=posB, operator='r', sk_table_dipole=sk_table_dipole)
                 block = self._select_dipole_matrix_elements(max_lA=max_lA, max_lB=max_lB, integral_dict=integral_dict)
+        elif operator == 'p':
+            sk_table= self.S_sk_tables[types]
+            integral_dict = self._create_integral_dict_nablaR(sk_table=sk_table, posA=posA, posB=posB)
+            block = self._select_momentum_matrix_elements(max_lA=max_lA, max_lB=max_lB, integral_dict=integral_dict)
+
         block = np.where(np.abs(block) < 1e-15, 0, block)
         return block
 
@@ -333,7 +404,7 @@ class Seedname_TB:
         #create real space matrix
         for i, pair in enumerate(pairA):
             R_triple = (int(R[i,0]), int(R[i,1]), int(R[i,2]))
-            if operator == 'r':
+            if operator in ('r', 'p'):
                 matrix = lattice_dict.setdefault(R_triple, np.zeros((3, self.total_orbs, self.total_orbs)))
             else:
                 matrix = lattice_dict.setdefault(R_triple, np.zeros((self.total_orbs, self.total_orbs)))
@@ -351,14 +422,14 @@ class Seedname_TB:
             n_cols = get_norbs(maxl=maxlB)
             start_rows = self._find_block_pos(idx=idxA)
             start_cols = self._find_block_pos(idx=idxB)
-            if operator == 'r':
+            if operator in ('r', 'p'):
                 matrix[:,start_rows:start_rows+n_rows, start_cols:start_cols+n_cols] = block
             else:
                 matrix[start_rows:start_rows+n_rows, start_cols:start_cols+n_cols] = block
             lattice_dict[R_triple] = matrix
 
         assert np.shape(np.unique(R, axis=0))[0] == len(lattice_dict)
-        if operator != 'r':
+        if operator not in ('r', 'p'):
             for lat_vec in np.unique(R, axis=0): 
                 mat1 = lattice_dict[*lat_vec] 
                 mat2 = lattice_dict[*(-lat_vec)]
@@ -370,6 +441,52 @@ class Seedname_TB:
         orb_previous = np.sum(self.orbnumbers[:idx])
         return int(orb_previous)
     
+    def write_seedname_momentum(self):
+        conversion_angstrom_bohr_inv = angstrom / physical_constants['atomic unit of length'][0]
+        filename = 'seedname_tb_momentum.dat'
+        lattice_dict_p = self._calculate_lattice_dict(operator='p')
+        lattice_dict_S = self._calculate_lattice_dict(operator='S')
+        lattice_dict_H = self._calculate_lattice_dict(operator='H')
+        assert len(lattice_dict_H.keys()) == len(lattice_dict_p.keys())
+        assert len(lattice_dict_S.keys()) == len(lattice_dict_p.keys())
+        with open(filename, 'w') as f:
+            f.write(str(np.datetime64('now'))+'\n')
+            np.savetxt(f, self.abc)
+            f.write(str(self.total_orbs)+'\n')
+            f.write(str(self.n_lattice)+'\n')
+            for i in range(self.n_lattice):
+                f.write("1 ")
+                if (i+1) % 15 == 0:
+                    f.write("\n")
+            f.write('\n')
+            for point in lattice_dict_S.keys():
+                f.write('\n')
+                f.write(str(point[0]) + ' ' + str(point[1]) + ' ' + str(point[2]) + '\n')
+                S_array = lattice_dict_S[point]
+                H_array = hartree_to_eV(lattice_dict_H[point])
+                A = np.real(H_array)
+                B = np.imag(H_array)
+                C = np.real(S_array)
+                D = np.imag(S_array)
+                for i in range(np.shape(S_array)[0]):
+                    for j in range(np.shape(S_array)[1]):
+                        print(f"{i+1} {j+1}\t{A[i,j]:.18e}\t{B[i,j]:.18e}\t{C[i,j]:.18e}\t{D[i,j]:.18e}", file=f)
+            for point in lattice_dict_p.keys():
+                f.write('\n')
+                f.write(str(point[0]) + ' ' + str(point[1]) + ' ' + str(point[2]) + '\n')
+                p_array = lattice_dict_p[point] * conversion_angstrom_bohr_inv
+                xre = np.real(p_array[0])
+                xim = np.imag(p_array[0])
+                yre = np.real(p_array[1])
+                yim = np.imag(p_array[1])
+                zre = np.real(p_array[2])
+                zim = np.imag(p_array[2])
+                for m in range(np.shape(p_array)[1]):
+                    for n in range(np.shape(p_array)[2]):
+                        i = m+1
+                        j = n+1
+                        print(f"{i} {j}\t{xre[m,n]:.18e}\t{xim[m,n]:.18e}\t{yre[m,n]:.18e}\t{yim[m,n]:.18e}\t{zre[m,n]:.18e}\t{zim[m,n]:.18e}", file=f)
+
     def write_seedname(self):
         """write to file in style of seedname_tb.dat form w90 program
         hamiltonian elements in eV, lengths in angstrom"""
@@ -380,7 +497,7 @@ class Seedname_TB:
         assert len(lattice_dict_H.keys()) == len(lattice_dict_r.keys())
         assert len(lattice_dict_S.keys()) == len(lattice_dict_r.keys())
         with open(filename, 'w') as f:
-            f.write("Date\n")
+            f.write(str(np.datetime64('now'))+'\n')
             np.savetxt(f, self.abc)
             f.write(str(self.total_orbs)+'\n')
             f.write(str(self.n_lattice)+'\n')
@@ -435,7 +552,7 @@ class SKTable:
         (S, H or r)
     """
     def __init__(self, table, deltaR, n_points, same_atom=None):
-        self.table = table
+        self.table = table #first index distance, second one integral index
         self.deltaR = deltaR
         self.n_points = n_points
         self.same_atom_vals = same_atom #list for S and H, dict for r
