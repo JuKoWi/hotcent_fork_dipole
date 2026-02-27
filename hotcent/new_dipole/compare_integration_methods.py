@@ -197,6 +197,7 @@ def analytic_2c_dipole(pos_at1, pos_at2, zeta1, zeta2, comparison=None, idx_list
 def analytic_2c(pos_at1, pos_at2, zeta1, zeta2, comparison=None, idx_list=np.arange(len(first_center_real) * len(second_center_real))):
     """calculate overlap integrals analytically, print to terminal and file. 
         positions in angstrom
+        idx_list 
     """
     file = open("comparison_overlap.txt", 'w')
     print(f'coordinate: {pos_at1}', file=file)
@@ -258,18 +259,23 @@ def compare_integrals(zeta1, use_existing_skf=False, dipole=True):
         rmin, dr, N = 0.4, 0.02, 500
         if dipole:
             off2c = Offsite2cTableDipole(atom, atom, timing=True)
+            off2c.run(rmin, dr, N, 
+                      zeta=zeta_dict, 
+                    #   nr=200, ntheta=500
+                      )
+            off2c.write_dipole()
         else:
             off2c = Offsite2cTable(atom, atom, timing=True)
-        off2c.run(rmin, dr, N, 
-                  zeta=zeta_dict, 
-                #   nr=200, ntheta=500
-                  )
-        off2c.write()
+            off2c.run(rmin, dr, N, 
+                      zeta=zeta_dict, 
+                    #   nr=200, ntheta=500
+                      )
+            off2c.write()
     # set atom positions
-    # vec = np.random.normal(size=3)
-    # vec = vec/np.linalg.norm(vec)
+    vec = np.random.normal(size=3)
+    vec = vec/np.linalg.norm(vec)
     shift_vec = bohr_to_angstrom(np.array([0, 0, 0]))
-    inter_vec = bohr_to_angstrom(np.array([0, 0, 0.8]))
+    inter_vec = vec * 1.5 #random direction internuclear vector with lenght 1.5 angstrom
     atoms = Atoms('Eu2', positions=[
         shift_vec,
         inter_vec + shift_vec
@@ -281,11 +287,11 @@ def compare_integrals(zeta1, use_existing_skf=False, dipole=True):
     method1.load_atom_file('Eu2.xyz')
     if dipole:
         method1.get_list_dipole()
-        method1.load_sk_file_dipole(path='Eu-Eu_offsite2c.skf', path_dipole='Eu-Eu_offsite2c-dipole.skf')
+        method1.load_sk_file_dipole(path='Eu-Eu.skf', path_dipole='Eu-Eu_dipole.skf')
         res1 = method1.calculate_dipole()
         res2 = analytic_2c_dipole(pos_at1=shift_vec, pos_at2=inter_vec+shift_vec, zeta1=zeta1, zeta2=zeta1, comparison=res1)
     else:
-        method1.load_sk_file(path='Eu-Eu_offsite2c.skf')
+        method1.load_sk_file(path='Eu-Eu.skf')
         res1 = method1.calculate()
         res2 = analytic_2c(pos_at1=shift_vec, pos_at2=inter_vec+shift_vec, zeta1=zeta1, zeta2=zeta1, comparison=res1)
 
