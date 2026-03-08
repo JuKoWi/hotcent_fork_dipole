@@ -3,5 +3,5 @@ import numpy as np
 from hotcent.new_dipole.utils import *
 
 
-pos = np.array([[0,0,0], [0,0,bohr_to_angstrom(1.4)]]) # roundabout 0.7 Angstrom, point on sk distance list -> no spline interpolation error
-scan_grid_error(pos=pos, index=1, dipole=False, plot=True, from_file=False)
+pos = np.array([[0,0,0], [0,0,bohr_to_angstrom(2.8)]]) # roundabout 0.7 Angstrom, point on sk distance list -> no spline interpolation error
+scan_grid_error(pos=pos, index=523, dipole=True, plot=True, from_file=False)

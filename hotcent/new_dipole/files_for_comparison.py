@@ -235,6 +235,7 @@ class Seedname_TB:
             shift_term = np.tile(overlap_blocks, (1,3)).reshape(-1)
             # posA = -0.5* (posB -posA) # just for comparison
             posA = np.array([posA[1], posA[2], posA[0]]) #reorder component according to quantum numbers
+            # posA = np.zeros(3) #turn off origin shift
             space_factor = np.tile(np.repeat(posA, orbitals_overall), orbitals_overall)
             shift_term = shift_term * space_factor
             shifted_dipole = dipole_elements + shift_term
@@ -255,9 +256,9 @@ class Seedname_TB:
             zero_rows = np.all(data==0, axis=1)
             index_nonzero = np.argmax(~zero_rows) +1 if (~zero_rows).any() else data.shape[0] +1
             rmin_angst = sk_table.deltaR * index_nonzero
-            h = rmin_angst
+            h = rmin_angst 
         else:
-            h = 1e-4
+            h = 1e-4 #corresponds to angstrom
         for label in self.quant_nums:
             int_dict_gradR[label[1], label[2], label[3], label[4]] = np.zeros(3)
         for i in range(3):
@@ -276,7 +277,7 @@ class Seedname_TB:
                 p1 = int_dictp1[label[1], label[2], label[3], label[4]]
                 m2 = int_dictm2[label[1], label[2], label[3], label[4]]
                 m1 = int_dictm1[label[1], label[2], label[3], label[4]]
-                finite_diff = (-p2 + 8 * p1 - 8 * m1 + m2)/(12 *h)
+                finite_diff = (-p2 + 8 * p1 - 8 * m1 + m2)/(12 *h) #has dimension 1/angstrom
                 int_dict_gradR[label[1], label[2], label[3], label[4]][i] = -finite_diff
         return int_dict_gradR
     
@@ -442,7 +443,6 @@ class Seedname_TB:
         return int(orb_previous)
     
     def write_seedname_momentum(self):
-        conversion_angstrom_bohr_inv = angstrom / physical_constants['atomic unit of length'][0]
         filename = 'seedname_tb_momentum.dat'
         lattice_dict_p = self._calculate_lattice_dict(operator='p')
         lattice_dict_S = self._calculate_lattice_dict(operator='S')
@@ -471,6 +471,7 @@ class Seedname_TB:
                 for i in range(np.shape(S_array)[0]):
                     for j in range(np.shape(S_array)[1]):
                         print(f"{i+1} {j+1}\t{A[i,j]:.18e}\t{B[i,j]:.18e}\t{C[i,j]:.18e}\t{D[i,j]:.18e}", file=f)
+            conversion_angstrom_bohr_inv = physical_constants['atomic unit of length'][0] /angstrom 
             for point in lattice_dict_p.keys():
                 f.write('\n')
                 f.write(str(point[0]) + ' ' + str(point[1]) + ' ' + str(point[2]) + '\n')

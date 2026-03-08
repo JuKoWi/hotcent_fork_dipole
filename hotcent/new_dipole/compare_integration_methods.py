@@ -19,7 +19,7 @@ from hotcent.confinement import PowerConfinement
 from hotcent.atomic_dft import AtomicDFT
 plt.rcParams['savefig.bbox'] = 'tight'          
 plt.rcParams["axes.formatter.limits"] = (-2,5)
-plt.rcParams.update({'font.size':35})
+plt.rcParams.update({'font.size':16})
 
 x, y, z = sym.symbols("x, y, z")
 x1, y1, z1 = sym.symbols("x1, y1, z1")
@@ -187,6 +187,11 @@ def analytic_2c_dipole(pos_at1, pos_at2, zeta1, zeta2, comparison=None, idx_list
 
                 count += 1
     t_end = time.time()
+    complete_results = np.zeros((len(results), 2))
+    complete_results[:,0] = comparison
+    complete_results[:,1] = results
+    np.savetxt(fname='comparison.txt', X=complete_results)
+
     print(f"integration took {t_end-t_start}")
     with open("analytical_dipole_list.pkl", "wb") as f:
         pickle.dump(results, f)
@@ -274,6 +279,7 @@ def compare_integrals(zeta1, use_existing_skf=False, dipole=True):
     # set atom positions
     vec = np.random.normal(size=3)
     vec = vec/np.linalg.norm(vec)
+    # vec = np.array([0,0,1])
     shift_vec = bohr_to_angstrom(np.array([0, 0, 0]))
     inter_vec = vec * 1.5 #random direction internuclear vector with lenght 1.5 angstrom
     atoms = Atoms('Eu2', positions=[
@@ -299,13 +305,13 @@ def scan_grid_error(pos, index, dipole=False, plot=False, from_file=False):
     t_total_1 = time.time()
 
     # exponents for exponentials
-    zeta1 = [1,1,1,1]
+    zeta1 = [0.5, 0.5, 0.5, 0.5]
 
     atoms = Atoms('Eu2', positions=pos)
     write('Eu2.xyz', atoms)
 
     #dtheta and dr values to scan
-    ntheta_list = np.arange(50, 110, 10)
+    ntheta_list = np.arange(50, 160, 10)
     nr_list = np.arange(10, 60, 10)
     # ntheta_list = np.linspace(start=50, stop=100, num=2)
     # nr_list = np.linspace(start=10, stop=50, num=4)
@@ -344,13 +350,13 @@ def scan_grid_error(pos, index, dipole=False, plot=False, from_file=False):
 
                 # Compute Slater-Koster integrals:
                 zeta_dict = {'4f': (zeta1[0], 3), '5d': (zeta1[1],2), '6s': (zeta1[2], 0), '6p': (zeta1[3], 1)}
-                rmin, dr, N = 0.4, 0.1, 12
+                rmin, dr, N = 0.4, 0.2, 12
                 if dipole:
                     off2c = Offsite2cTableDipole(atom, atom, timing=True)
                     off2c.run(rmin, dr, N, 
                               zeta=zeta_dict, 
                               nr=nr, ntheta=ntheta,
-                              wflimit=1e-8
+                              wflimit=1e-11
                               )
                     off2c.write_dipole()
                 else:
@@ -358,7 +364,7 @@ def scan_grid_error(pos, index, dipole=False, plot=False, from_file=False):
                     off2c.run(rmin, dr, N, 
                               zeta=zeta_dict, 
                               nr=nr, ntheta=ntheta,
-                              wflimit=1e-8
+                              wflimit=1e-11
                               )
                     off2c.write()
                 time2 = time.time()
@@ -397,15 +403,15 @@ def scan_grid_error(pos, index, dipole=False, plot=False, from_file=False):
     t_total_2 = time.time()
     print(f"finished scan after total of {t_total_2 -t_total_1}")
     if plot:
-        fig, axs = plt.subplots(nrows=1, ncols=2, sharey=True, figsize=(25,9)) 
+        fig, axs = plt.subplots(nrows=1, ncols=2, sharey=True, figsize=(14.5,4.5)) 
         ny, nx = error_array.shape
         xvals = nr_list
         yvals = ntheta_list
 
         xv, yv = np.meshgrid(xvals, yvals)
-        Z1 = bohr_to_angstrom(error_array)
-        Z2 = bohr_to_angstrom(np.abs(error_array))
-        err = axs[0].pcolormesh(xv, yv, Z1, shading='nearest')
+        Z1 = error_array
+        Z2 = np.abs(error_array)
+        err = axs[0].pcolormesh(xv, yv, Z2, shading='nearest')
         rel_err = axs[1].pcolormesh(xv, yv, Z2, shading='nearest', norm=colors.LogNorm(vmin=Z2.min(), vmax=Z2.max()))
         # err = axs[0].imshow(np.abs(error_array), extent=[nr_list.min(), nr_list.max(), ntheta_list.min(), ntheta_list.max()], norm='log', origin='lower', aspect='auto')
         # rel_err = axs[1].imshow(np.abs(rel_error_array), extent=[nr_list.min(), nr_list.max(), ntheta_list.min(), ntheta_list.max()], norm='log', origin='lower', aspect='auto')
@@ -413,13 +419,13 @@ def scan_grid_error(pos, index, dipole=False, plot=False, from_file=False):
         axs[0].set_xlabel(r"$n(r)$")
         axs[0].set_ylabel(r"$n(\theta)$")
         # axs[0].set_yticks(ycenters)
-        axs[0].set_title(f"Numerical - analytical") 
+        axs[0].set_title('a', loc='left', fontweight='bold')
 
         # axs[1].set_xticks(xcenters)
         axs[1].set_xlabel(r"$n(r)$")
         # axs[0].set_yticks(ycenters)
         axs[1].set_ylabel(r"$n(\theta)$")
-        axs[1].set_title(f"Absolute error logarithmic") 
+        axs[1].set_title('b', loc='left', fontweight='bold')
         
         fig.colorbar(err, ax=axs[0])
 
@@ -445,7 +451,7 @@ def scan_distance(direction, index, dipole=False, n_dist=20, min_dist_angst=0.4,
     t_total_1 = time.time()
 
     # exponents for exponentials
-    zeta1 = [1,1,1,1]
+    zeta1 = [0.5, 0.5, 0.5, 0.5]
 
     #initialize arrays
     direction = direction/np.linalg.norm(direction)
@@ -538,21 +544,22 @@ def scan_distance(direction, index, dipole=False, n_dist=20, min_dist_angst=0.4,
     print(f"finished scan after total of {t_total_2 -t_total_1}")
     if plot:
         list_res2 = np.array(list_res2)
-        fig, axs = plt.subplots(ncols=3, figsize=(45,9))
-        axs[0].scatter(distance_factors, bohr_to_angstrom(list_res2))
-        axs[0].set_xlabel(r"R / $\AA$")
-        axs[0].set_ylabel(r"$d_\text{analytical}$ / $\AA$")
-        axs[0].set_title('(a)')
-        axs[1].scatter(distance_factors, bohr_to_angstrom(error_array)) 
-        axs[1].set_xlabel(r"R / $\AA$")
-        axs[1].set_xlabel(r"R / $\AA$")
-        axs[1].set_ylabel(r"$d_\text{numerical}- d_\text{analytical}$ / $\AA$ ")
-        axs[1].set_xlabel(r"R / $\AA$")
-        axs[1].set_title('(b)')
-        axs[2].scatter(distance_factors, rel_error_array)
-        axs[2].set_ylabel(r"$|d_\text{numerical}-d_\text{analytical}|/d_\text{analytical}$")
-        axs[2].set_xlabel(r"R / $\AA$")
-        axs[2].set_title('(c)')
+        fig, axs = plt.subplots(nrows=2, ncols=2, figsize=(14,10), layout='constrained')
+        axs[0,0].scatter(distance_factors, list_res2)
+        axs[0,0].set_xlabel(r"R $[\mathrm{\AA}]$")
+        axs[0,0].set_ylabel(r"$d(\text{analytical})$ [a.u.]")
+        axs[0,0].set_title('a', loc='left', fontweight='bold')
+        axs[0,1].scatter(distance_factors, error_array) 
+        axs[0,1].set_xlabel(r"R $[\mathrm\AA}]$")
+        axs[0,1].set_xlabel(r"R $[\mathrm\AA}]$")
+        axs[0,1].set_ylabel(r"$d(\text{numerical})- d(\text{analytical})$ [a.u.]")
+        axs[0,1].set_xlabel(r"R $[\mathrm{\AA}]$")
+        axs[0,1].set_title('b', loc='left', fontweight='bold')
+        axs[1,0].scatter(distance_factors, rel_error_array)
+        axs[1,0].set_ylabel(r"$|d(\text{numerical})-d(\text{analytical})| / d(\text{analytical})$")
+        axs[1,0].set_xlabel(r"R $[\mathrm{\AA}]$")
+        axs[1,0].set_title('c', loc='left', fontweight='bold')
+        axs[1,1].set_visible(False)
         plt.savefig(f"distance_error_range{index}.pdf")
         plt.ticklabel_format(style='sci')
         plt.show()

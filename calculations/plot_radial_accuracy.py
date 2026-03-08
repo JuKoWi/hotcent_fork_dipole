@@ -7,4 +7,4 @@ direction = direction/np.linalg.norm(direction)
 min_dist_angst = 0.1
 dR_angst = 0.1
 n_dist = 30
-scan_distance(direction=direction, index=1, dipole=True, from_file=False, plot=True, n_dist=n_dist, min_dist_angst=min_dist_angst, d_dist_angst=dR_angst) 
+scan_distance(direction=direction, index=523, dipole=True, from_file=True, plot=True, n_dist=n_dist, min_dist_angst=min_dist_angst, d_dist_angst=dR_angst) 
