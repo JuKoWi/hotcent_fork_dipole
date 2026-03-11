@@ -9,9 +9,13 @@ import sympy as sym
 from scipy.interpolate import CubicSpline
 from hotcent.new_dipole.utils import *
 from hotcent.new_dipole.integrals import get_index_list_dipole, get_index_list_overlap
-from hotcent.new_dipole.rotation_transform import Wigner_D_real, to_spherical, PHI, THETA, GAMMA
+from hotcent.new_dipole.rotation_transform import Wigner_D_real, to_spherical
 from hotcent.new_dipole.slako_dipole import INTEGRALS_DIPOLE
 from hotcent.new_dipole.slako_new import INTEGRALS
+
+ALPHA = sym.symbols('alpha')
+BETA = sym.symbols('beta')
+GAMMA = sym.symbols('gamma')
 
 """one single class with methods for all relevant quantities"""
 
@@ -37,10 +41,10 @@ class SK_Integral:
             # print('Symbolic D matrix exists')
         else: 
             # print('Calculate symbolic D-Matrix')            
-            Wigner_D_real(euler_alpha=PHI, euler_beta=THETA, euler_gamma=GAMMA)
+            Wigner_D_real(euler_alpha=ALPHA, euler_beta=BETA, euler_gamma=GAMMA)
         with open("symbolic_D_matrix.pkl", "rb") as f:
             M = pickle.load(f)
-        self.D_symb = sym.lambdify((THETA, PHI, GAMMA), M, 'numpy') 
+        self.D_symb = sym.lambdify((ALPHA, BETA, GAMMA), M, 'numpy') 
 
         if os.path.exists("identifier_nonzeros_overlap.pkl"):
             with open("identifier_nonzeros_overlap.pkl", 'rb') as f:
@@ -136,14 +140,14 @@ class SK_Integral:
 
     def _set_rotation_matrix(self):
         # print(f"euler angles: phi={self.euler_phi}, theta={self.euler_theta}, gamma={self.euler_gamma}") 
-        self.D_single = np.array(self.D_symb(self.euler_theta, self.euler_phi, self.euler_gamma), dtype=complex)
+        self.D_single = np.array(self.D_symb(self.euler_gamma, self.euler_theta, self.euler_phi), dtype=complex)
         D1 = self.D_single
         D2 = self.D_single
         D = np.kron(D1, D2)
         self.D_full = np.real(D)
 
     def _set_rotation_matrix_dipole(self):
-        self.D_single = np.array(self.D_symb(self.euler_theta, self.euler_phi, self.euler_gamma), dtype=complex)
+        self.D_single = np.array(self.D_symb(self.euler_gamma, self.euler_theta, self.euler_phi), dtype=complex)
         idx_pstart = 1
         idx_pend = 3
         D1 = self.D_single

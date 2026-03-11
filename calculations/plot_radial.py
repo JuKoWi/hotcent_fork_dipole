@@ -13,6 +13,7 @@ plt.rcParams.update({'font.size': 16})
 plt.rcParams['savefig.bbox'] = 'tight'
 
 def plot_radial_parts(atoms:list, orbs:list, rmax_au=4, rmax_log=8):
+    """Plot radial parts from NAOs"""
     x_bohr = np.linspace(start=0, stop=rmax_au, num=1000)[1:]
     x_bohr_log = np.linspace(start=0, stop=rmax_log, num=1000)[1:]
     x_angstrom = bohr_to_angstrom(x_bohr)
@@ -32,6 +33,7 @@ def plot_radial_parts(atoms:list, orbs:list, rmax_au=4, rmax_log=8):
     axs[1].set_ylabel(r'$\left| R_{nl} \right|$')
     axs[0].set_xlim(left=0)
     axs[1].set_xlim(left=0)
+    axs[1].set_ylim(bottom=1e-15)
     axs[0].axhline(y=0, color='gray', linestyle='--', linewidth=1)
     axs[0].legend()
     axs[1].legend()
@@ -39,6 +41,7 @@ def plot_radial_parts(atoms:list, orbs:list, rmax_au=4, rmax_log=8):
     plt.show()
 
 def find_similar_zeta(zeta, atoms:list, orbs:list,rmax_log, rmax_au=12):
+    """Plot GTO radial parts alongside NAO radial parts"""
     x_bohr = np.linspace(start=0, stop=rmax_au, num=1000)[1:]
     x_bohr_log = np.linspace(start=0, stop=rmax_log, num=1000)[1:]
     x_angstrom = bohr_to_angstrom(x_bohr)
@@ -51,11 +54,14 @@ def find_similar_zeta(zeta, atoms:list, orbs:list,rmax_log, rmax_au=12):
             axs[0].plot(x_angstrom, R, label=f"{atom.symbol}, {orb}")
             axs[1].semilogy(x_angstrom_log, np.abs(R_log), label=f"{atom.symbol}, {orb}")
     for i in range(3):
-        N1 = (2 * zeta[i]/np.pi)**(3/4)*5
-        R = N1*x_bohr**(i+1) * np.exp(-zeta[i]*x_bohr**2) #overwrite with gaussian for testing
-        R_log = N1*x_bohr_log**(i+1) * np.exp(-zeta[i]*x_bohr_log**2) #overwrite with gaussian for testing
-        axs[0].plot(x_angstrom, R, label=f"l = {i}, zeta = {zeta[i]}")
-        axs[1].plot(x_angstrom_log, np.abs(R_log), label=f"l = {i}, zeta = {zeta[i]}")
+        if i==1:
+            continue
+        else:
+            N1 = (2 * zeta[i]/np.pi)**(3/4)*5
+            R = N1*x_bohr**(i+1) * np.exp(-zeta[i]*x_bohr**2) #overwrite with gaussian for testing
+            R_log = N1*x_bohr_log**(i+1) * np.exp(-zeta[i]*x_bohr_log**2) #overwrite with gaussian for testing
+            axs[0].plot(x_angstrom, R, label=rf"$l$ = {i}, $\zeta$ = {zeta[i]}")
+            axs[1].plot(x_angstrom_log, np.abs(R_log), label=f"$l$ = {i}, $\zeta$ = {zeta[i]}")
     axs[0].set_xlabel(r'r / $\AA$')
     axs[1].set_xlabel(r'r / $\AA$')
     axs[0].set_ylabel(r'$R(r)$')
@@ -172,7 +178,9 @@ atom_list = [
 orbital_list = [
                 # ['1s', '2s', '2p'], 
                 # ['3s', '3p', '3d'], 
-                ['4p', '4d', '5s']
+                ['4p', 
+                #  '4d',
+                   '5s']
                 ]
     
 # plot_radial_parts(atoms=atom_list, orbs=orbital_list)

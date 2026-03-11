@@ -24,6 +24,6 @@ print(MoS2.get_positions())
 
 max_l = {'C':1, 'H':0, 'S':2, 'Mo':2}
 seedname_mos2 = Seedname_TB(MoS2, skpath="skfiles/self_made", maxl_dict=max_l, skpath_dipole="skfiles/self_made_dipole")
-seedname_mos2.write_seedname_momentum()
 seedname_mos2.write_seedname()
+seedname_mos2.write_seedname_momentum()
 

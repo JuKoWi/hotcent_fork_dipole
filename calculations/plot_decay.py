@@ -61,9 +61,10 @@ def slowest_decay_from_file(filename, num_dipole, threshold, atol=1e-7):
         top_rows.append(row)
     return top_keys, top_indices, top_rows
 
-def plot_decay_file(filename, num_dipole, threshold):
+def plot_decay_file(filename, num_dipole, threshold, startline):
     skf_file = Path(filename) 
     keys, idx, data = slowest_decay_from_file(filename=filename, num_dipole=num_dipole, threshold=threshold)
+    data = np.array(data)
     with open(filename, "r") as f:
         line1 = f.readline()
         line1 = line1.replace(",", " ")
@@ -79,9 +80,10 @@ def plot_decay_file(filename, num_dipole, threshold):
     for i, key in enumerate(keys):
         int_label = convert_sk_index(key)
         orba, comp, orbb = int_label[:2], int_label[3], int_label[4:6]
-        ax.semilogy(r_angst, data[i], ".", ms=3, label=rf"$\langle {READABLE_LABELS[orba]}|\hat{{r}}_{{{comp}}}|{READABLE_LABELS[orbb]}\rangle$")
-    ax.legend(markerscale=3)
+        ax.semilogy(r_angst[startline:], data[i,startline:], label=rf"$\langle {READABLE_LABELS[orba]}|\hat{{r}}_{{{comp}}}|{READABLE_LABELS[orbb]}\rangle$")
+    ax.legend()
     ax.set_xlim(left=bohr_to_angstrom(dr), right=7)
+    ax.set_ylim(bottom=1e-15)
     ax.set_xlabel(r'$R$ $[\mathrm{\AA}]$')
     ax.set_ylabel(r'$d$ $[\mathrm{\AA}]$')
     plt.savefig(f"dipole_distance_decay{typeA}-{typeB}_top{num_dipole}.pdf")
@@ -141,7 +143,7 @@ def plot_dipole_decay(offsite_obj, num_dipole, threshold):
     plt.savefig(f"dipole_distance_decay{typeA}-{typeB}_top{num_dipole}.pdf")
     plt.show()
 
-def plot_dipole_decay_selected(sk_file, homonuclear, labels, readable_labels, eigvals):
+def plot_dipole_decay_selected(sk_file, homonuclear, labels, readable_labels, eigvals, startline):
     with open(sk_file, 'r') as f:
         line1 = f.readline()
         line1 = line1.replace(',', ' ')
@@ -154,15 +156,13 @@ def plot_dipole_decay_selected(sk_file, homonuclear, labels, readable_labels, ei
     data = np.loadtxt(fname=sk_file, skiprows=skiprows)
     sorted_tuple = sorted(INTEGRALS_DIPOLE.keys(), key=lambda k: k[0])
     sorted_labelnum = [k[0] for k in sorted_tuple]
-    print(sorted_labelnum)
     fig, ax = plt.subplots(figsize=(6,4.5))
-    x = np.arange(start=dr, stop=(nr)*dr, step=dr)
     x = np.linspace(start=dr, stop=nr*dr, num=nr, endpoint=True)
     x_angst = bohr_to_angstrom(x)
     for i,l in enumerate(labels):
         column = sorted_labelnum.index(l)
         dipole = data[:,column]
-        ax.plot(x_angst, dipole, ".", ms=3, label=readable_labels[i])
+        ax.plot(x_angst[startline:], dipole[startline:], label=readable_labels[i])
     for i, eig in enumerate(list(set(eigvals))):
         if i == 0:
             ax.hlines(y=eig, color='black', linestyle='--', xmin=0, xmax=6, label='atomic transition')
@@ -325,5 +325,5 @@ readable_labels = [
     ]
 eigvals = [-1.528113,0,0]
 
-plot_dipole_decay_selected(sk_file='Mo-Mo_dipole.skf', homonuclear=True, labels=labels, readable_labels=readable_labels, eigvals=eigvals)
-plot_decay_file(filename="Mo-Mo_dipole.skf", num_dipole=5, threshold=1e-7)
+# plot_dipole_decay_selected(sk_file='Mo-Mo_dipole.skf', homonuclear=True, labels=labels, readable_labels=readable_labels, eigvals=eigvals, startline=20)
+plot_decay_file(filename="Mo-Mo_dipole.skf", num_dipole=3, threshold=1e-7, startline=19)

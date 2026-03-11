@@ -8,18 +8,18 @@ PHI = sp.symbols('phi')
 THETA = sp.symbols('theta')
 GAMMA = sp.symbols('gamma')
 
-def d_mat_elem(l, m, n, theta):
+def d_mat_elem(l, m, n, beta):
     """single element for small Wigner matrix d"""
     expr = 0
     k_min = max(0, n-m)
     k_max = min(l+n, l-m)
     for k in range(k_min, k_max+1):
         prefac = (-1)**(k-n+m) * sp.sqrt(sp.factorial(l+n) * sp.factorial(l-n) * sp.factorial(l+m) * sp.factorial(l-m)) / (sp.factorial(l+n-k) * sp.factorial(k) * sp.factorial(l-k-m) * sp.factorial(k-n+m))
-        angle_part = (sp.cos(theta/2)**(2*l-2*k+n-m) * sp.sin(theta / 2)**(2*k-n+m))
+        angle_part = (sp.cos(beta/2)**(2*l-2*k+n-m) * sp.sin(beta / 2)**(2*k-n+m))
         expr += prefac * angle_part 
     return expr
 
-def d_mat(theta):
+def d_mat(beta):
     """ 
     Assemble small-d Wigner matrix (rotation of spherical harmonics in Condon-Shortley convention around y-axis) up to f orbitals. 
     Returns a block-diagonal 16×16 symbolic matrix with j=0,1,2,3 blocks.
@@ -32,12 +32,12 @@ def d_mat(theta):
         block = sp.zeros(size, size)
         for mi, m in enumerate(range(-l, l+1)):
             for ni, n in enumerate(range(-l, l+1)):
-                block[mi, ni] = d_mat_elem(l=l, m=m, n=n, theta=theta)
+                block[mi, ni] = d_mat_elem(l=l, m=m, n=n, beta=beta)
         d[row_start:row_start+size, row_start:row_start+size] = block
         row_start += size
     return d
 
-def z_rot_mat(phi):
+def z_rot_mat(alpha):
     """
     Diagonal matrix for rotation of Condon-Shortley spherical harmonics 
     around z-axis
@@ -46,10 +46,8 @@ def z_rot_mat(phi):
     count = 0
     for l in range(4): # l=0,1,2,3
         for m in range(-l, l+1):
-            Dz[count, count] = sp.exp(-sp.I*m*phi)
+            Dz[count, count] = sp.exp(-sp.I*m*alpha)
             count += 1
-    # print('Dz-matrix')
-    # print(Dz)
     return Dz
         
 def Wigner_D_complex(euler_alpha, euler_beta, euler_gamma):
@@ -57,10 +55,10 @@ def Wigner_D_complex(euler_alpha, euler_beta, euler_gamma):
     rotation matrix for complex harmonics for rotation sequence
     Rz(gamma)Ry(theta)Rz(phi)
     """
-    Dz = z_rot_mat(phi=euler_alpha)
-    dy = d_mat(theta=euler_beta)
-    Dz2 = z_rot_mat(phi=euler_gamma) #last rotation around z-axis
-    total = Dz * dy.T * Dz2 # why rotation gamma first? How does this make sense?
+    Dz = z_rot_mat(alpha=euler_alpha)
+    dy = d_mat(beta=euler_beta)
+    Dz2 = z_rot_mat(alpha=euler_gamma) 
+    total = Dz * dy * Dz2 
     return total
     
 def Wigner_D_real(euler_alpha, euler_beta, euler_gamma):
@@ -108,7 +106,7 @@ def Wigner_D_real(euler_alpha, euler_beta, euler_gamma):
     transform_to_real[15, 15] = -1/sp.sqrt(2)
 
     transform_to_comp = transform_to_real.H
-    D_total = transform_to_real * Wigner_D_complex(euler_alpha=euler_alpha, euler_beta=euler_beta, euler_gamma=euler_gamma) * transform_to_comp
+    D_total = transform_to_real * Wigner_D_complex(euler_alpha=euler_alpha, euler_beta=euler_beta, euler_gamma=euler_gamma).T * transform_to_comp
     D_total = D_total.as_mutable()
     with open("symbolic_D_matrix.pkl", "wb") as f:
         pickle.dump(D_total, f)
@@ -211,8 +209,8 @@ def check_rotation_complex():
         func_val = func.subs({phi:phi1_val, theta1: theta1_val})
         func_val = func_val.evalf()
         func_vec[i] = func_val
-    D_func = sp.lambdify((PHI, THETA, GAMMA), Wigner_D_complex(euler_alpha=PHI,euler_beta=THETA, euler_gamma=GAMMA), 'numpy')
-    D = D_func(-random_phi, -random_theta, 0)
+    D_func = sp.lambdify((PHI, THETA, GAMMA), Wigner_D_complex(euler_alpha=PHI,euler_beta=THETA, euler_gamma=GAMMA).T, 'numpy')
+    D = D_func(0, -random_theta, -random_phi)
     result_vec = D @ func_vec
     val1_vec = np.zeros((16,), 'complex')
     for i, (key, item) in enumerate(first_center_complex.items()):
@@ -246,7 +244,7 @@ def check_rotation():
         func_vec[i] = func_val
     D_sym = Wigner_D_real(euler_alpha=PHI, euler_beta=THETA, euler_gamma=GAMMA)
     D = sp.lambdify((PHI,THETA, GAMMA), D_sym, 'numpy')
-    D = np.real(D(-random_phi, -random_theta, 0))
+    D = np.real(D(0, -random_theta, -random_phi))
     result_vec = D @ func_vec
     val1_vec = np.zeros((16,))
     for i, (key, item) in enumerate(first_center.items()):
@@ -276,7 +274,7 @@ def check_rotation_prod():
             count += 1
     D_sym = Wigner_D_real(euler_alpha=PHI, euler_beta=THETA, euler_gamma=GAMMA)
     D = sp.lambdify((PHI, THETA, GAMMA), D_sym, 'numpy')
-    D = np.real(D(-random_phi, -random_theta, 0))
+    D = np.real(D(0,-random_theta, -random_phi))
     D_tot = np.kron(D, D)
     result_vec = D_tot @ func_vec
     val1_vec = np.zeros((256,))
@@ -315,7 +313,7 @@ def check_rot_triple():
                 count += 1
     D_sym = Wigner_D_real(euler_alpha=PHI, euler_gamma=GAMMA, euler_beta=THETA)
     D = sp.lambdify((PHI, THETA, GAMMA), D_sym, 'numpy')
-    D = np.real(D(-random_phi, -random_theta, 0))
+    D = np.real(D(0, -random_theta, -random_phi))
     D_op = D[1:4, 1:4]
     D_tot = np.kron(D, np.kron(D_op, D))
     result_vec = D_tot @ func_vec

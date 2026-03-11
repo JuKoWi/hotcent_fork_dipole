@@ -2,7 +2,7 @@ import numpy as np
 import pickle
 import os
 import sys
-from hotcent.new_dipole.rotation_transform import Wigner_D_real, to_spherical, PHI, THETA, GAMMA
+from hotcent.new_dipole.rotation_transform import Wigner_D_real, to_spherical 
 from pathlib import Path
 import itertools
 import sympy as sym 
@@ -18,6 +18,10 @@ from hotcent.new_dipole.utils import *
 from hotcent.new_dipole.integrals import get_index_list_dipole, get_index_list_overlap
 from hotcent.new_dipole.slako_dipole import INTEGRALS_DIPOLE
 from hotcent.new_dipole.slako_new import INTEGRALS
+
+ALPHA = sym.symbols('alpha')
+BETA = sym.symbols('beta')
+GAMMA =sym.symbols('gamma')
 
 class Seedname_TB:
     """Takes .skf files in the long (partially redundant) format  used throughout new_dipole/ and calculates the real space matrix elements 
@@ -80,10 +84,10 @@ class Seedname_TB:
             print('Symbolic D matrix exists')
         else: 
             print('Calculate symbolic D-Matrix')            
-            Wigner_D_real(euler_alpha=PHI, euler_beta=THETA, euler_gamma=GAMMA)
+            Wigner_D_real(euler_alpha=ALPHA, euler_beta=BETA, euler_gamma=GAMMA)
         with open("symbolic_D_matrix.pkl", "rb") as f:
             M = pickle.load(f)
-        self.D_symb = sym.lambdify((PHI, THETA, GAMMA), M, 'numpy') 
+        self.D_symb = sym.lambdify((ALPHA, BETA, GAMMA), M, 'numpy') 
 
         self._create_SH_file_dict()
         self._create_dipole_file_dict()
@@ -193,7 +197,7 @@ class Seedname_TB:
         R_vec = posB - posA
         R = np.linalg.norm(R_vec)
         euler_theta, euler_phi, euler_gamma= self._set_euler_angles(vec1=posA, vec2=posB)
-        D_single = np.array(self.D_symb(euler_phi, euler_theta, euler_gamma), dtype=complex)
+        D_single = np.array(self.D_symb(euler_gamma, euler_theta, euler_phi), dtype=complex)
 
         D = np.kron(D_single, D_single)
         # D = np.real(D)
