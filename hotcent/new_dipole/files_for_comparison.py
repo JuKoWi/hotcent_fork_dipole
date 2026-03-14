@@ -229,9 +229,9 @@ class Seedname_TB:
             integral_vec_dipole = np.zeros((len(self.quant_nums_dipole)))
             for i, key in enumerate(sorted(INTEGRALS_DIPOLE, key= lambda x: x[0])):
                 integral_vec_dipole[key[0]] = cs_dipole(R)[i]
-            dipole_elements = D_dipole @ integral_vec_dipole
+            position_elements = D_dipole @ integral_vec_dipole
             # print(f"maximal imaginary position integral value {np.max(np.abs(np.imag(dipole_elements)))}")
-            dipole_elements = np.real(dipole_elements)
+            position_elements = np.real(position_elements)
 
             #consider origin shift
             orbitals_overall = 16
@@ -242,7 +242,7 @@ class Seedname_TB:
             # posA = np.zeros(3) #turn off origin shift
             space_factor = np.tile(np.repeat(posA, orbitals_overall), orbitals_overall)
             shift_term = shift_term * space_factor
-            shifted_dipole = dipole_elements + shift_term
+            shifted_dipole = position_elements + shift_term
             integral_dict = {}
             for label in self.quant_nums_dipole: #
                 integral_dict[(label[1], label[2], label[3], label[4], label[5], label[6])] = shifted_dipole[label[0]]
@@ -384,6 +384,9 @@ class Seedname_TB:
             if same_atom:
                 integral_dict = sk_table_dipole.same_atom_vals
                 block = self._select_dipole_matrix_elements(max_lA=max_lA, max_lB=max_lB, integral_dict=integral_dict)
+                n_orbs = get_norbs(maxl=max_lA)
+                for c in range(3):
+                    block[c] += posA[c] * np.eye(n_orbs)
             else: 
                 integral_dict = self._create_integral_dict(sk_table=sk_table, posA=posA, posB=posB, operator='r', sk_table_dipole=sk_table_dipole)
                 block = self._select_dipole_matrix_elements(max_lA=max_lA, max_lB=max_lB, integral_dict=integral_dict)

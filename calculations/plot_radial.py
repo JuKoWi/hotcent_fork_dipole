@@ -62,8 +62,8 @@ def find_similar_zeta(zeta, atoms:list, orbs:list,rmax_log, rmax_au=12):
             R_log = N1*x_bohr_log**(i+1) * np.exp(-zeta[i]*x_bohr_log**2) #overwrite with gaussian for testing
             axs[0].plot(x_angstrom, R, label=rf"$l$ = {i}, $\zeta$ = {zeta[i]}")
             axs[1].plot(x_angstrom_log, np.abs(R_log), label=f"$l$ = {i}, $\zeta$ = {zeta[i]}")
-    axs[0].set_xlabel(r'r / $\AA$')
-    axs[1].set_xlabel(r'r / $\AA$')
+    axs[0].set_xlabel(r'r $[\mathrm{\AA}]$')
+    axs[1].set_xlabel(r'r $[\mathrm{\AA}]$')
     axs[0].set_ylabel(r'$R(r)$')
     axs[1].set_ylabel(r'$|R(r)|$')
     axs[0].set_xlim(left=0)
@@ -179,7 +179,7 @@ orbital_list = [
                 # ['1s', '2s', '2p'], 
                 # ['3s', '3p', '3d'], 
                 ['4p', 
-                #  '4d',
+                 '4d',
                    '5s']
                 ]
     
@@ -187,5 +187,5 @@ orbital_list = [
 zeta = 0.5
 zeta = [zeta, zeta, zeta, zeta]
 
-find_similar_zeta(atoms=atom_list, orbs=orbital_list, zeta=zeta, rmax_au=3, rmax_log=7)
-# plot_radial_parts(atoms=atom_list, orbs=orbital_list, rmax_au=4, rmax_log=12)
+# find_similar_zeta(atoms=atom_list, orbs=orbital_list, zeta=zeta, rmax_au=3, rmax_log=7)
+plot_radial_parts(atoms=atom_list, orbs=orbital_list, rmax_au=4, rmax_log=12)

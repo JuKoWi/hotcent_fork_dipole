@@ -37,8 +37,7 @@ class SK_Integral:
     """
     def __init__(self):
         if os.path.exists("symbolic_D_matrix.pkl"):
-            pass
-            # print('Symbolic D matrix exists')
+            print('Symbolic D matrix exists')
         else: 
             # print('Calculate symbolic D-Matrix')            
             Wigner_D_real(euler_alpha=ALPHA, euler_beta=BETA, euler_gamma=GAMMA)
@@ -92,8 +91,8 @@ class SK_Integral:
             self.euler_gamma = 0 
         else:
             R_spherical = to_spherical(R=self.R_vec)
-            self.euler_theta = - R_spherical[1] # rotate back on z-axis
-            self.euler_phi =  - R_spherical[2] # rotate back on z-axis
+            self.euler_theta = - R_spherical[1] # rotate on z-axis
+            self.euler_phi =  - R_spherical[2] # rotate on z-axis
             self.euler_gamma = 0
 
     def load_sk_file(self, path, homonuclear=True):
@@ -203,12 +202,25 @@ class SK_Integral:
             integral_vec_dipole[key[0]] = cs_dipole(self.R)[i]
         dipole_elements = self.D_full_dipole @ integral_vec_dipole
 
-        overlap_blocks = overlap_elements.reshape(16,16)
-        shift_term = np.tile(overlap_blocks, (1,3)).reshape(-1)
-        space_factor = np.tile(np.repeat(self.atom1_pos, 16), 16)
-        shift_term = shift_term * space_factor
-        shifted_dipole = dipole_elements + shift_term
+        pos_shift = np.tile(np.repeat(self.atom1_pos, 16), 16)
+        overlap_shift = np.repeat(overlap_elements.reshape(16,16), 3, axis=0).reshape(-1)
+        alt = pos_shift * overlap_shift + dipole_elements
+
+        B = overlap_elements.reshape((16,16)) 
+        A = dipole_elements.reshape((16,3,16))
+        C = A + self.atom1_pos[np.newaxis, : , np.newaxis] * B[:, np.newaxis, :]
+        shifted_dipole = C.ravel()
+
+        print(np.allclose(shifted_dipole, alt))
+
+        # overlap_blocks = overlap_elements.reshape(16,16)
+        # shift_term = np.tile(overlap_blocks, (1,3)).reshape(-1)
+        # space_factor = np.tile(np.repeat(self.atom1_pos, 16), 16)
+        # shift_term = shift_term * space_factor
+        # shifted_dipole = dipole_elements + shift_term
+
         self.d_vec = shifted_dipole
+
         r_dict = {}
         for label in self.quant_nums_dipole:
             r_dict[(label[1], label[2], label[3], label[4], label[5], label[6])] = shifted_dipole[label[0]]

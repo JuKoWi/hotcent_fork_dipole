@@ -9,7 +9,7 @@ plt.rcParams.update({'font.size': 20})
 
 
 zeta = [0.5,0.5,0.5,0.5]
-# compare_integrals(zeta1=zeta, use_existing_skf=False, dipole=True)
+compare_integrals(zeta1=zeta, use_existing_skf=True, dipole=True)
 
 def convert_human_readable(filename):
     """convert table with lables for orbital cominations into numpy parsable file"""
@@ -154,4 +154,4 @@ def plot_heatmap_orb_accuracy(filename):
 
     
 # convert_human_readable(filename='comparison_dipole_rand_orient.txt')
-plot_heatmap_orb_accuracy(filename='comparison_1-5z.txt')
+plot_heatmap_orb_accuracy(filename='comparison.txt')

@@ -163,8 +163,8 @@ class Offsite2cTable(MultiAtomIntegrator):
             Rnl1 = e1.Rnl(r1, nl1)
             Rnl2 = e2.Rnl(r2, nl2)
             if zeta != None:
-                N1 = (2 * zeta[nl1][0]/np.pi)**(3/4)
-                N2 = (2 * zeta[nl2][0]/np.pi)**(3/4)
+                N1 = (2 * zeta[nl1][0]/np.pi)**(3/4) * 5
+                N2 = (2 * zeta[nl2][0]/np.pi)**(3/4) * 5 
                 Rnl1 = N1*r1**zeta[nl1][1] * np.exp(-zeta[nl1][0]*r1**2) #overwrite with gaussian for testing
                 Rnl2 = N2*r2**zeta[nl2][1] * np.exp(-zeta[nl2][0]*r2**2) #overwrite with gaussian for testing
             S = np.sum(Rnl1 * Rnl2 * aux)

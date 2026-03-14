@@ -229,7 +229,7 @@ def analytic_2c(pos_at1, pos_at2, zeta1, zeta2, comparison=None, idx_list=np.ara
                 analyt_int_value = analyt_int.evalf()
                 results[count] = analyt_int_value 
 
-                if comparison != None:
+                if not(comparison is None):
                     print(f"Testing integral {name_i}-{name_k}", file=file)
                     print(f"Testing integral {name_i}-{name_k}")
                     print(f"sk value:\t{comparison[count]}")
@@ -277,10 +277,10 @@ def compare_integrals(zeta1, use_existing_skf=False, dipole=True):
                       )
             off2c.write()
     # set atom positions
-    vec = np.random.normal(size=3)
-    vec = vec/np.linalg.norm(vec)
-    # vec = np.array([0,0,1])
-    shift_vec = bohr_to_angstrom(np.array([0, 0, 0]))
+    # vec = np.random.normal(size=3)
+    # vec = vec/np.linalg.norm(vec)
+    vec = np.array([0,0,1])
+    shift_vec = bohr_to_angstrom(np.array([1, 1, 1]))
     inter_vec = vec * 1.5 #random direction internuclear vector with lenght 1.5 angstrom
     atoms = Atoms('Eu2', positions=[
         shift_vec,

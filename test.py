@@ -1,27 +1,22 @@
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.patches import Circle, Rectangle
 
-h = 1.0  # clipping line z = h
+A = np.zeros((25))
+count=0
+for i in range(1,6):
+    for j in range(1,6):
+        A[count] = i*j
+        count+=1
+A = A.reshape((5,5))
+print(A)
+B = np.zeros(75)
+count = 0 
+for i in range(1,6):
+    for j in range(1,4):
+        for k in range(1,6):
+            B[count] = i * j * k
+            count += 1
+B = B.reshape((5,3,5))
 
-fig, ax = plt.subplots()
-
-# clipping region (everything below the line)
-clip = Rectangle((-10, -10), 20, 10 + h)
-
-# circle
-circle = Circle((0, 0), 4, fill=False, lw=2)
-
-# important: give the transform
-circle.set_clip_path(clip)
-
-ax.add_patch(circle)
-
-# boundary line
-ax.axhline(h, color="red")
-
-ax.set_xlim(-5,5)
-ax.set_ylim(-5,5)
-ax.set_aspect("equal")
-
-plt.show()
+pos = np.array([0,1,2]) 
+shift = pos[np.newaxis, :, np.newaxis] * A[:, np.newaxis, :]
+print(shift)

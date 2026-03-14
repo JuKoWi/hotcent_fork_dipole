@@ -46,6 +46,7 @@ rmin, dr, N = 0.4, 0.02, 900
 off2c = Offsite2cTableDipole(atom, atom, timing=False)
 off2c.run(rmin, dr, N, nr=200, ntheta=400, wflimit=1e-9)
 off2c.write_dipole()
+print(off2c.get_range(wf_limit=1e-7))
 
 
 

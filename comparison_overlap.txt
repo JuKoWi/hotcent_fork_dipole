@@ -1,3 +1,185 @@
-coordinate: [0. 0. 0.]
-coordinate2: [0.         0.         0.74084809]
+coordinate: [0.         0.         0.52917721]
+coordinate2: [0.         0.         2.02917721]
 sk-value 	 analytic
+Testing integral ss-ss
+0.26686238277403945 	0.266902357556181
+Testing integral ss-py
+0.0 	0
+Testing integral ss-pz
+-0.655100841704176 	-0.655198912674239
+Testing integral ss-px
+0.0 	0
+Testing integral ss-d1
+0.0 	0
+Testing integral ss-d2
+0.0 	0
+Testing integral ss-d3
+1.1988444914425425 	1.19883019651955
+Testing integral ss-d4
+0.0 	0
+Testing integral ss-d5
+0.0 	0
+Testing integral ss-f1
+0.0 	0
+Testing integral ss-f2
+0.0 	0
+Testing integral ss-f3
+0.0 	0
+Testing integral ss-f4
+-2.011069951200253 	-2.01039697506273
+Testing integral ss-f5
+0.0 	0
+Testing integral ss-f6
+0.0 	0
+Testing integral ss-f7
+0.0 	0
+Testing integral py-ss
+0.0 	0
+Testing integral py-py
+0.40015529691642987 	0.400353536334272
+Testing integral py-pz
+0.0 	0
+Testing integral py-px
+0.0 	0
+Testing integral py-d1
+0.0 	0
+Testing integral py-d2
+-1.2681595061271076 	-1.26878723862027
+Testing integral py-d3
+0.0 	0
+Testing integral py-d4
+0.0 	0
+Testing integral py-d5
+0.0 	0
+Testing integral py-f1
+0.0 	0
+Testing integral py-f2
+0.0 	0
+Testing integral py-f3
+3.0080862889632787 	3.00903991208970
+Testing integral py-f4
+0.0 	0
+Testing integral py-f5
+0.0 	0
+Testing integral py-f6
+0.0 	0
+Testing integral py-f7
+0.0 	0
+Testing integral pz-ss
+0.655100841704176 	0.655198912674239
+Testing integral pz-py
+0.0 	0
+Testing integral pz-pz
+-1.207743807042967 	-1.20804595140402
+Testing integral pz-px
+0.0 	0
+Testing integral pz-d1
+0.0 	0
+Testing integral pz-d2
+0.0 	0
+Testing integral pz-d3
+1.4776603554102052 	1.47785052440533
+Testing integral pz-d4
+0.0 	0
+Testing integral pz-d5
+0.0 	0
+Testing integral pz-f1
+0.0 	0
+Testing integral pz-f2
+0.0 	0
+Testing integral pz-f3
+0.0 	0
+Testing integral pz-f4
+-1.2510505060373807 	-1.24986906082114
+Testing integral pz-f5
+0.0 	0
+Testing integral pz-f6
+0.0 	0
+Testing integral pz-f7
+0.0 	0
+Testing integral px-ss
+0.0 	0
+Testing integral px-py
+0.0 	0
+Testing integral px-pz
+0.0 	0
+Testing integral px-px
+0.40015529691642987 	0.400353536334272
+Testing integral px-d1
+0.0 	0
+Testing integral px-d2
+0.0 	0
+Testing integral px-d3
+0.0 	0
+Testing integral px-d4
+-1.2681595061271076 	-1.26878723862027
+Testing integral px-d5
+0.0 	0
+Testing integral px-f1
+0.0 	0
+Testing integral px-f2
+0.0 	0
+Testing integral px-f3
+0.0 	0
+Testing integral px-f4
+0.0 	0
+Testing integral px-f5
+3.0080862889632787 	3.00903991208970
+Testing integral px-f6
+0.0 	0
+Testing integral px-f7
+0.0 	0
+Testing integral d1-ss
+0.0 	0
+Testing integral d1-py
+0.0 	0
+Testing integral d1-pz
+0.0 	0
+Testing integral d1-px
+0.0 	0
+Testing integral d1-d1
+1.0003018401423518 	1.00088384083568
+Testing integral d1-d2
+0.0 	0
+Testing integral d1-d3
+0.0 	0
+Testing integral d1-d4
+0.0 	0
+Testing integral d1-d5
+0.0 	0
+Testing integral d1-f1
+0.0 	0
+Testing integral d1-f2
+-3.7509428383015786 	-3.75312326572807
+Testing integral d1-f3
+0.0 	0
+Testing integral d1-f4
+0.0 	0
+Testing integral d1-f5
+0.0 	0
+Testing integral d1-f6
+0.0 	0
+Testing integral d1-f7
+0.0 	0
+Testing integral d2-ss
+0.0 	0
+Testing integral d2-py
+1.2681595061271076 	1.26878723862027
+Testing integral d2-pz
+0.0 	0
+Testing integral d2-px
+0.0 	0
+Testing integral d2-d1
+0.0 	0
+Testing integral d2-d2
+-3.017995734514461 	-3.02011487851006
+Testing integral d2-d3
+0.0 	0
+Testing integral d2-d4
+0.0 	0
+Testing integral d2-d5
+0.0 	0
+Testing integral d2-f1
+0.0 	0
+Testing integral d2-f2
+0.0 	0

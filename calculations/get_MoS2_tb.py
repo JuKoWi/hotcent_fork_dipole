@@ -2,7 +2,7 @@ from hotcent.new_dipole.files_for_comparison import Seedname_TB
 from ase.visualize import view
 from ase.build import mx2
 from ase import Atoms
-from ase.io import read
+from ase.io import read, write
 import sys
 
 # MoS2 = read(filename="mos2.gen")
@@ -26,4 +26,5 @@ max_l = {'C':1, 'H':0, 'S':2, 'Mo':2}
 seedname_mos2 = Seedname_TB(MoS2, skpath="skfiles/self_made", maxl_dict=max_l, skpath_dipole="skfiles/self_made_dipole")
 seedname_mos2.write_seedname()
 seedname_mos2.write_seedname_momentum()
+MoS2.write('mos2.cif')
 

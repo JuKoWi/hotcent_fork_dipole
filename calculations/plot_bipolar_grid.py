@@ -1,14 +1,17 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from hotcent.new_dipole.utils import angstrom_to_bohr, bohr_to_angstrom
+plt.rcParams.update({'font.size': 16})
+plt.rcParams['savefig.bbox'] = 'tight'
 
 def plot_bipolar(nr, nt, Rz):
     h = Rz/2
-    rmax = 3
-    rmin = 0.1
+    rmax = 5.2
+    rmin = 1e-7
     T = np.linspace(0, 1, nt) ** 2 * np.pi
     R = rmin + np.linspace(0, 1, nr) ** 2 * (rmax - rmin)
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(6,9))
 
     #plot circles
     for r in R:
@@ -17,8 +20,8 @@ def plot_bipolar(nr, nt, Rz):
         z1 = r*np.cos(theta)
         z2 = Rz - r*np.cos(theta)
         mask = z1 <= h
-        ax.plot(x1[mask], z1[mask], 'black')
-        ax.plot(x1[mask], z2[mask], 'black')
+        ax.plot(bohr_to_angstrom(x1[mask]), bohr_to_angstrom(z1[mask]), 'black')
+        ax.plot(bohr_to_angstrom(x1[mask]), bohr_to_angstrom(z2[mask]), 'black')
 
     # radial lines
     for t in T:
@@ -27,8 +30,8 @@ def plot_bipolar(nr, nt, Rz):
         z2 = Rz - z1
 
         mask = z1 <= h
-        ax.plot(x1[mask], z1[mask], 'black')
-        ax.plot(x1[mask], z2[mask], 'black')
+        ax.plot(bohr_to_angstrom(x1[mask]), bohr_to_angstrom(z1[mask]), 'black')
+        ax.plot(bohr_to_angstrom(x1[mask]), bohr_to_angstrom(z2[mask]), 'black')
 
 
     area = np.array([])
@@ -120,11 +123,15 @@ def plot_bipolar(nr, nt, Rz):
     shift[:, 1] = 2 * h
     grid = np.concatenate((grid, grid2 + shift))
     area = np.concatenate((area, area))
-    ax.plot(grid[:,0], grid[:,1], "o", color='red')
+    ax.plot(bohr_to_angstrom(grid[:,0]), bohr_to_angstrom(grid[:,1]), "o", ms=4, color='red')
 
-    ax.axhline(h, color="black")
+    ax.axhline(bohr_to_angstrom(h), color="black")
 
     ax.set_aspect("equal")
+    ax.set_xlabel(r'$\rho$ [$\mathrm{\AA}$]')
+    ax.set_ylabel(r'$z$ [$\mathrm{\AA}$]')
+    ax.set_xlim(left=0)
+    plt.savefig('bipolar_plot.pdf')
     plt.show()
 
-plot_bipolar(nr=10,nt=20,Rz=2)
+plot_bipolar(nr=20,nt=20,Rz=angstrom_to_bohr(1.5))

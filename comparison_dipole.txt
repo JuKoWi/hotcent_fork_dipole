@@ -1,3 +1,111 @@
-coordinate1: [0. 0. 0.]
-coordinate2: [0.         0.86204366 2.87347886]
+coordinate1: [0.52917721 0.52917721 0.52917721]
+coordinate2: [0.52917721 0.52917721 2.02917721]
 sk-value 	 analytic
+Testing integral ss-ry-ss
+0.266862382499702 	0.266902357556181
+Testing integral ss-ry-py
+0.23102976839233172 	0.231144221973610
+Testing integral ss-ry-pz
+-0.6551008410307252 	-0.655198912674239
+Testing integral ss-ry-px
+0.0 	0
+Testing integral ss-ry-d1
+0.0 	0
+Testing integral ss-ry-d2
+-0.7321722322380485 	-0.732534653761774
+Testing integral ss-ry-d3
+1.1988444902101172 	1.19883019651955
+Testing integral ss-ry-d4
+0.0 	0
+Testing integral ss-ry-d5
+0.0 	2.23425935141151E-16
+Testing integral ss-ry-f1
+0.0 	-9.52524722530631E-16
+Testing integral ss-ry-f2
+0.0 	0
+Testing integral ss-ry-f3
+1.7367194286785739 	1.73727000324733
+Testing integral ss-ry-f4
+-2.0110699491328505 	-2.01039697506276
+Testing integral ss-ry-f5
+0.0 	0
+Testing integral ss-ry-f6
+0.0 	-5.33215996138355E-15
+Testing integral ss-ry-f7
+0.0 	0
+Testing integral ss-rz-ss
+0.6450850298039312 	0.645181626161402
+Testing integral ss-rz-py
+0.0 	3.08474189774359E-16
+Testing integral ss-rz-pz
+-1.3523920531390803 	-1.35266456791079
+Testing integral ss-rz-px
+0.0 	0
+Testing integral ss-rz-d1
+0.0 	0
+Testing integral ss-rz-d2
+0.0 	-1.49357052223923E-16
+Testing integral ss-rz-d3
+2.0519720941772808 	2.05206759460698
+Testing integral ss-rz-d4
+0.0 	0
+Testing integral ss-rz-d5
+0.0 	2.60048608469450E-17
+Testing integral ss-rz-f1
+0.0 	-8.06136871962768E-16
+Testing integral ss-rz-f2
+0.0 	0
+Testing integral ss-rz-f3
+0.0 	3.55885552905587E-14
+Testing integral ss-rz-f4
+-2.7333642955632227 	-2.73200921377975
+Testing integral ss-rz-f5
+0.0 	0
+Testing integral ss-rz-f6
+0.0 	-8.47317572278087E-15
+Testing integral ss-rz-f7
+0.0 	0
+Testing integral ss-rx-ss
+0.266862382499702 	0.266902357556181
+Testing integral ss-rx-py
+0.0 	1.08242793289006E-16
+Testing integral ss-rx-pz
+-0.6551008410307252 	-0.655198912674239
+Testing integral ss-rx-px
+0.23102976839233172 	0.231144221973610
+Testing integral ss-rx-d1
+0.0 	1.26781937264544E-16
+Testing integral ss-rx-d2
+0.0 	-1.70155034774409E-16
+Testing integral ss-rx-d3
+1.1988444902101172 	1.19883019651955
+Testing integral ss-rx-d4
+-0.7321722322380485 	-0.732534653761773
+Testing integral ss-rx-d5
+0.0 	-1.11712967570576E-16
+Testing integral ss-rx-f1
+0.0 	2.80946190907768E-17
+Testing integral ss-rx-f2
+0.0 	-6.33275189142335E-17
+Testing integral ss-rx-f3
+0.0 	5.32760768147099E-15
+Testing integral ss-rx-f4
+-2.0110699491328505 	-2.01039697506278
+Testing integral ss-rx-f5
+1.7367194286785739 	1.73727000324732
+Testing integral ss-rx-f6
+0.0 	3.27595902930446E-15
+Testing integral ss-rx-f7
+0.0 	7.14982125035652E-17
+Testing integral py-ry-ss
+0.23102976839233172 	0.231144221973610
+Testing integral py-ry-py
+0.4001552965050658 	0.400353536334271
+Testing integral py-ry-pz
+-0.5671381724026864 	-0.567418902907833
+Testing integral py-ry-px
+0.0 	0
+Testing integral py-ry-d1
+0.0 	0
+Testing integral py-ry-d2
+-1.2681595048234258 	-1.26878723862027
