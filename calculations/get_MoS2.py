@@ -1,8 +1,8 @@
 from hotcent.offsite_twocenter import Offsite2cTable
 from hotcent.confinement import PowerConfinement
 from hotcent.atomic_dft import AtomicDFT
-from hotcent.new_dipole.offsite_twocenter_new import Offsite2cTable
-from hotcent.new_dipole.offsite_twocenter_dipole import Offsite2cTableDipole
+from hotcent.pos_op.offsite_twocenter_new import Offsite2cTable
+from hotcent.pos_op.offsite_twocenter_posop import Offsite2cTablePosOp
 from ase.data import covalent_radii, atomic_numbers
 from ase.units import Bohr
 import sys
@@ -140,15 +140,15 @@ off2cMo.write(dftbplus_format=True, eigenvalues=eigenvaluesMo, filename_template
 
 
 # # Compute Integrals for dipole
-off2c_dipoleS = Offsite2cTableDipole(atomS, atomS, timing=False)
+off2c_dipoleS = Offsite2cTablePosOp(atomS, atomS, timing=False)
 off2c_dipoleS.run(rmin, dr, N, nr=200, ntheta=400, wflimit=1e-9)
 off2c_dipoleS.write_dipole()
 
-off2c_dipoleMo = Offsite2cTableDipole(atomMo, atomMo, timing=False)
+off2c_dipoleMo = Offsite2cTablePosOp(atomMo, atomMo, timing=False)
 off2c_dipoleMo.run(rmin, dr, N, nr=200, ntheta=400, wflimit=1e-9)
 off2c_dipoleMo.write_dipole()
 
-off2c_dipoleMoS = Offsite2cTableDipole(atomMo, atomS, timing=False)
+off2c_dipoleMoS = Offsite2cTablePosOp(atomMo, atomS, timing=False)
 off2c_dipoleMoS.run(rmin, dr, N, nr=200, ntheta=400, wflimit=1e-9)
 off2c_dipoleMoS.write_dipole()
 

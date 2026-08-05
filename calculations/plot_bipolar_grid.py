@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from hotcent.new_dipole.utils import angstrom_to_bohr, bohr_to_angstrom
+from hotcent.pos_op.utils import angstrom_to_bohr, bohr_to_angstrom
 plt.rcParams.update({'font.size': 16})
 plt.rcParams['savefig.bbox'] = 'tight'
 

@@ -1,4 +1,4 @@
-from hotcent.new_dipole.slako_new import convert_sk_table
+from hotcent.pos_op.slako_new import convert_sk_table
 
 """convert .skf files used by dftb+ to the long format used in custom code 
 to compare dftb+ results with own results based on exact same parameters"""

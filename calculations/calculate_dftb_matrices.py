@@ -2,7 +2,7 @@ from ase import Atoms
 from ase.build import graphene
 from ase.build import molecule
 from ase.visualize import view
-from hotcent.new_dipole.dftb_matrices import write_atom_matrix
+from hotcent.pos_op.dftb_matrices import write_atom_matrix
 
 
 

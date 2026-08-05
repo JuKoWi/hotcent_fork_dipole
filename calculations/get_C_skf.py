@@ -1,15 +1,14 @@
-from hotcent.offsite_twocenter import Offsite2cTable
 from hotcent.confinement import PowerConfinement
 from hotcent.atomic_dft import AtomicDFT
-from hotcent.new_dipole.offsite_twocenter_new import Offsite2cTable
-from hotcent.new_dipole.offsite_twocenter_dipole import Offsite2cTableDipole
+from hotcent.pos_op.offsite_twocenter_new import Offsite2cTable
+from hotcent.pos_op.offsite_twocenter_posop import Offsite2cTablePosOp
 
 
 # Get KS all-electron ground state of confined atom:
 element = 'C'
 xc = 'GGA_X_PBE+GGA_C_PBE'
-r0 = 3.2 # Bohr
 conf = PowerConfinement(r0=50.0, s=4)
+r0 = 3.2 # Bohr
 wf_conf = {'2s': PowerConfinement(r0=r0, s=8.2),
            '2p': PowerConfinement(r0=r0, s=8.2),
            }
@@ -43,7 +42,7 @@ off2c.write(dftbplus_format=True, eigenvalues=eigenvalues, filename_template='{e
 
 # Compute Integrals for dipole
 rmin, dr, N = 0.4, 0.02, 900
-off2c = Offsite2cTableDipole(atom, atom, timing=False)
+off2c = Offsite2cTablePosOp(atom, atom, timing=False)
 off2c.run(rmin, dr, N, nr=200, ntheta=400, wflimit=1e-9)
 off2c.write_dipole()
 print(off2c.get_range(wf_limit=1e-7))

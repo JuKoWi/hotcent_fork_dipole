@@ -19,6 +19,9 @@
 		    scipy
 		    sympy
 		    libxc
+		    ipython
+		    jupyter
+		    ipykernel
              ]);
 
 #	     libxc = pkgs.libxc;

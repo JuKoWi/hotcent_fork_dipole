@@ -1,8 +1,8 @@
 from hotcent.offsite_twocenter import Offsite2cTable
 from hotcent.confinement import PowerConfinement
 from hotcent.atomic_dft import AtomicDFT
-from hotcent.new_dipole.offsite_twocenter_new import Offsite2cTable
-from hotcent.new_dipole.offsite_twocenter_dipole import Offsite2cTableDipole
+from hotcent.pos_op.offsite_twocenter_new import Offsite2cTable
+from hotcent.pos_op.offsite_twocenter_posop import Offsite2cTablePosOp
 
 
 xc = 'GGA_X_PBE+GGA_C_PBE'
@@ -80,14 +80,14 @@ off2cB.write(dftbplus_format=True, eigenvalues=eigenvaluesB, filename_template='
 
 
 # # Compute Integrals for dipole
-off2c_dipoleN = Offsite2cTableDipole(atomN, atomN, timing=False)
+off2c_dipoleN = Offsite2cTablePosOp(atomN, atomN, timing=False)
 off2c_dipoleN.run(rmin, dr, N)
 off2c_dipoleN.write_dipole()
 
-off2c_dipoleB = Offsite2cTableDipole(atomB, atomB, timing=False)
+off2c_dipoleB = Offsite2cTablePosOp(atomB, atomB, timing=False)
 off2c_dipoleB.run(rmin, dr, N)
 off2c_dipoleB.write_dipole()
 
-off2c_dipolehBN = Offsite2cTableDipole(atomB, atomN, timing=False)
+off2c_dipolehBN = Offsite2cTablePosOp(atomB, atomN, timing=False)
 off2c_dipolehBN.run(rmin, dr, N)
 off2c_dipolehBN.write_dipole()

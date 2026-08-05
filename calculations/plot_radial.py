@@ -1,9 +1,9 @@
 from hotcent.offsite_twocenter import Offsite2cTable
 from hotcent.confinement import PowerConfinement
 from hotcent.atomic_dft import AtomicDFT
-from hotcent.new_dipole.offsite_twocenter_new import Offsite2cTable
-from hotcent.new_dipole.offsite_twocenter_dipole import Offsite2cTableDipole
-from hotcent.new_dipole.utils import bohr_to_angstrom
+from hotcent.pos_op.offsite_twocenter_new import Offsite2cTable
+from hotcent.pos_op.offsite_twocenter_posop import Offsite2cTablePosOp
+from hotcent.pos_op.utils import bohr_to_angstrom
 import matplotlib.pyplot as plt
 import numpy as np
 import sys

@@ -1,4 +1,4 @@
-from hotcent.new_dipole.dftb_matrices import write_atom_matrix
+from hotcent.pos_op.dftb_matrices import write_atom_matrix
 from ase.build import graphene 
 
 a = 2.58

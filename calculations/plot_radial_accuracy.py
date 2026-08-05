@@ -1,6 +1,6 @@
 import numpy as np
-from hotcent.new_dipole.utils import *
-from hotcent.new_dipole.compare_integration_methods import scan_distance
+from hotcent.pos_op.utils import *
+from hotcent.pos_op.compare_integration_methods import scan_distance
 
 direction = np.array([0,0.3,1])
 direction = direction/np.linalg.norm(direction)
