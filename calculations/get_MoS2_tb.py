@@ -4,6 +4,7 @@ from ase.build import mx2
 from ase import Atoms
 from ase.io import read, write
 import sys
+import numpy as np
 
 # MoS2 = read(filename="mos2.gen")
 # MoS2.pbc = (True, True, False)
@@ -16,15 +17,30 @@ import sys
 MoS2 = mx2(vacuum=20)
 MoS2.pbc = (True, True, True)
 # print(MoS2.get_chemical_symbols())
-print(MoS2.get_positions())
+# print(MoS2.get_positions())
 # print(MoS2.get_cell())
 # print(MoS2.get_pbc())
 # view(MoS2)
 
 
+# max_l = {'C':1, 'H':0, 'S':2, 'Mo':2}
+# seedname_mos2 = SlaterKosterIntegrator(MoS2, skpath="tutorials/tutorial_2/skfiles", maxl_dict=max_l, skpath_dipole="tutorials/tutorial_2/skfiles_pos_op")
+# seedname_mos2.write_seedname()
+# seedname_mos2.write_seedname_momentum()
+# MoS2.write('mos2.cif')
+
 max_l = {'C':1, 'H':0, 'S':2, 'Mo':2}
-seedname_mos2 = SlaterKosterIntegrator(MoS2, skpath="skfiles/self_made", maxl_dict=max_l, skpath_dipole="skfiles/self_made_dipole")
-seedname_mos2.write_seedname()
-seedname_mos2.write_seedname_momentum()
-MoS2.write('mos2.cif')
+seedname_mos2_A = SlaterKosterIntegrator( 
+                                        MoS2,
+                                        skpath="skfiles/sk_conventional",
+                                        maxl_dict=max_l,
+                                        skpath_dipole="skfiles/sk_posop",
+                                        conventional_skf=True
+                                        )
+seedname_mos2_B = SlaterKosterIntegrator(MoS2, 
+                                        skpath="skfiles/sk_long",
+                                        maxl_dict=max_l,
+                                        skpath_dipole="skfiles/sk_posop",
+                                        conventional_skf=False)
+seedname_mos2_B.write_seedname()
 

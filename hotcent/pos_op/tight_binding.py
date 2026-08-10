@@ -1,7 +1,6 @@
 import numpy as np
-import pickle
+import time
 import os
-import sys
 from hotcent.pos_op.rotation_transform import Wigner_D_real, to_spherical 
 from pathlib import Path
 import itertools
@@ -17,7 +16,7 @@ from ase.neighborlist import *
 from hotcent.pos_op.utils import *
 from hotcent.pos_op.integrals import get_index_list_dipole, get_index_list_overlap
 from hotcent.pos_op.slako_dipole import INTEGRALS_DIPOLE
-from hotcent.pos_op.slako_new import INTEGRALS
+from hotcent.pos_op.slako_new import INTEGRALS, convert_sk_table
 
 ALPHA = sym.symbols('alpha')
 BETA = sym.symbols('beta')
@@ -47,7 +46,7 @@ class SlaterKosterIntegrator:
         atomic units except angstrom
     """
 
-    def __init__(self, atoms_unit_cell, skpath, skpath_dipole, maxl_dict):
+    def __init__(self, atoms_unit_cell, skpath, skpath_dipole, maxl_dict, conventional_skf):
         self.aseAtoms = atoms_unit_cell
         self.abc = atoms_unit_cell.get_cell()
         self.atomtypes = atoms_unit_cell.get_chemical_symbols()
@@ -55,41 +54,38 @@ class SlaterKosterIntegrator:
         self.skpath_dipole = skpath_dipole
         no_repeats_types = list(set(self.atomtypes))
         self.elem_pairs_unordered = list(itertools.combinations_with_replacement(no_repeats_types, 2))
-        self.elem_pairs = list(itertools.product(no_repeats_types, repeat=2))
+        self.elem_pairs = list(itertools.product(no_repeats_types, repeat=2)) #ordered pairs (e.g. Mo-S and S-Mo are different)
         self._get_interaction_cutoffs()
         self.maxl_dict = maxl_dict
         self.orbnumbers = [get_norbs(maxl_dict[key]) for key in self.atomtypes]
         self.total_orbs = int(np.sum(self.orbnumbers))
 
-        if os.path.exists("identifier_nonzeros_overlap.pkl"):
-            with open("identifier_nonzeros_overlap.pkl", 'rb') as f:
-                quant_num_list = pickle.load(f)
-                nonzeros = pickle.load(f)
+        if os.path.exists("identifier_nonzeros_overlap.npz"):
+            npfile_overlap = np.load("identifier_nonzeros_overlap.npz")
+            quant_num_list, nonzeros = npfile_overlap["arr_0"], npfile_overlap["arr_1"]
         else:
+            print("Calculate nonzero indices for overlap/Hamiltonian")
             quant_num_list, nonzeros = get_index_list_overlap()
         self.quant_nums = quant_num_list
         self.sk_int_idx = nonzeros
 
-        if os.path.exists("identifier_nonzeros_dipole.pkl"):
-            with open("identifier_nonzeros_dipole.pkl", 'rb') as f:
-                quant_num_list_dipole = pickle.load(f)
-                nonzeros_dipole = pickle.load(f)
+        if os.path.exists("identifier_nonzeros_posop.npz"):
+            npfile_posop = np.load("identifier_nonzeros_posop.npz")
+            quant_num_list_posop, nonzeros_posop = npfile_posop["arr_0"], npfile_posop["arr_1"]
         else:
-            quant_num_list, nonzeros_dipole = get_index_list_dipole()
-        self.quant_nums_dipole = quant_num_list_dipole
-        self.sk_int_idx_dipole = nonzeros_dipole
+            print("Calculate nonzero indices for position operator")
+            quant_num_list_posop, nonzeros_posop = get_index_list_dipole()
+        self.quant_nums_posop = quant_num_list_posop
+        self.sk_int_idx_posop = nonzeros_posop
 
-        if os.path.exists("symbolic_D_matrix.pkl"):
-            pass
-            print('Symbolic D matrix exists')
-        else: 
-            print('Calculate symbolic D-Matrix')            
-            Wigner_D_real(euler_alpha=ALPHA, euler_beta=BETA, euler_gamma=GAMMA)
-        with open("symbolic_D_matrix.pkl", "rb") as f:
-            M = pickle.load(f)
+        time1 = time.time()
+        print('Calculate symbolic D-Matrix')            
+        M = Wigner_D_real(euler_alpha=ALPHA, euler_beta=BETA, euler_gamma=GAMMA)
         self.D_symb = sym.lambdify((ALPHA, BETA, GAMMA), M, 'numpy') 
+        time2 = time.time()
+        print(f"Wigner matrix took {time2 -time1}")
 
-        self._create_SH_file_dict()
+        self._create_SH_file_dict(conventional_skf)
         self._create_dipole_file_dict()
 
     def _get_interaction_cutoffs(self):
@@ -106,6 +102,38 @@ class SlaterKosterIntegrator:
             max_r = dr * Nr
             cutoff_dict[pair] = bohr_to_angstrom(max_r)
         self.cutoff_dict = cutoff_dict
+
+    def _read_sk_file_conventional(self, elem_pair):
+        """read a Slater-Koster file of the conventional format, e.g. used by DFTB+"""
+        homonuclear = (elem_pair[0] == elem_pair[1])
+        path = self.skpath + f"/{elem_pair[0]}-{elem_pair[1]}.skf" 
+        path_interchanged = self.skpath + f"/{elem_pair[1]}-{elem_pair[0]}.skf"
+        file = Path(path)
+        file_interchanged = Path(path_interchanged)
+        assert file.is_file()
+        assert file_interchanged.is_file()
+        sk_table_H, sk_table_S = convert_sk_table(path1=path, path2=path_interchanged) 
+        with open(path, "r") as f:
+            line1 = f.readline().strip()
+            line1 = line1.replace(',', ' ')
+            line2 = f.readline()
+            line2 = line2.replace(',', ' ')
+            extended = 1 if line1.startswith('@') else 0
+            if extended == 0:
+                parts = [p.strip() for p in line1.split()]
+                if homonuclear:
+                    same_atom = line2.split()
+                    same_atom = np.flip(same_atom[:3])
+                else:
+                    same_atom = None
+            if extended == 1:
+                parts = [p.strip() for p in line2.split()]
+            delta_R, n_points = bohr_to_angstrom(float(parts[0])), int(parts[1])
+        if not homonuclear:
+            extended -= 1
+        assert np.shape(sk_table_H)[0] == n_points
+        assert np.shape(sk_table_S)[0] == n_points
+        return delta_R, n_points, sk_table_S, sk_table_H, same_atom
 
     def _read_sk_file(self, elem_pair, dipole=False):
         """returns dr, Nr and the table(s) for a .skf file or the dipole equivalent"""
@@ -153,14 +181,18 @@ class SlaterKosterIntegrator:
         else:
             return delta_R, n_points, sk_table_S, sk_table_H, same_atom
         
-    def _create_SH_file_dict(self):
+    def _create_SH_file_dict(self, conventional_skf):
         """create a dictionary where for every element combination there is a custom object,
         that contains all the information from the .skf file
+        conventional_skf: use DFTB+ file format for H/S
         """
         S_sk_dict = {}
         H_sk_dict = {}
         for element_comb in self.elem_pairs:
-            delta_R, n_points, S, H, eigvals  = self._read_sk_file(elem_pair=element_comb, dipole=False)
+            if conventional_skf:
+                delta_R, n_points, S, H, eigvals  = self._read_sk_file_conventional(elem_pair=element_comb)
+            else:
+                delta_R, n_points, S, H, eigvals  = self._read_sk_file(elem_pair=element_comb, dipole=False)
             S_sk_dict[element_comb] = SKTable(table=S, deltaR=delta_R, n_points=n_points, same_atom=[1,1,1]) #assume the atomic functions to be orthonormal
             H_sk_dict[element_comb] = SKTable(table=H, deltaR=delta_R, n_points=n_points, same_atom=eigvals)
         self.S_sk_tables = S_sk_dict
@@ -226,7 +258,7 @@ class SlaterKosterIntegrator:
 
             R_grid_dipole = deltaR_dipole + deltaR_dipole * np.arange(n_points_dipole) 
             cs_dipole = CubicSpline(R_grid_dipole, table_dipole) 
-            integral_vec_dipole = np.zeros((len(self.quant_nums_dipole)))
+            integral_vec_dipole = np.zeros((len(self.quant_nums_posop)))
             for i, key in enumerate(sorted(INTEGRALS_DIPOLE, key= lambda x: x[0])):
                 integral_vec_dipole[key[0]] = cs_dipole(R)[i]
             position_elements = D_dipole @ integral_vec_dipole
@@ -244,7 +276,7 @@ class SlaterKosterIntegrator:
             shift_term = shift_term * space_factor
             shifted_dipole = position_elements + shift_term
             integral_dict = {}
-            for label in self.quant_nums_dipole: #
+            for label in self.quant_nums_posop: #
                 integral_dict[(label[1], label[2], label[3], label[4], label[5], label[6])] = shifted_dipole[label[0]]
         else:
             integral_dict = {}

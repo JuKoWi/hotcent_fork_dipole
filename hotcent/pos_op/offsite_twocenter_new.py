@@ -10,7 +10,7 @@ from hotcent.interpolation import CubicSplineFunction
 from hotcent.multiatom_integrator import MultiAtomIntegrator
 from hotcent.orbitals import ANGULAR_MOMENTUM
 from hotcent.xc import XC_PW92, LibXC
-from hotcent.pos_op.slako_new import INTEGRALS, NUMSK, phi2, dphi2, select_integrals, print_integral_overview, tail_smoothening, write_skf, get_hotcent_style_index, convert_table_dftbplus
+from hotcent.pos_op.slako_new import INTEGRALS, NUMSK, phi2, dphi2, select_integrals, print_integral_overview, tail_smoothening, write_skf, get_hotcent_style_index, convert_table_to_dftbplus
 try:
     import matplotlib.pyplot as plt
 except ImportError:
@@ -302,8 +302,8 @@ class Offsite2cTable(MultiAtomIntegrator):
 
                     table = self.tables[(p, bas1, bas2)]
                     if dftbplus_format:
-                        table1 = convert_table_dftbplus(table[:,:NUMSK])
-                        table2 = convert_table_dftbplus(table[:,NUMSK:])
+                        table1 = convert_table_to_dftbplus(table[:,:NUMSK])
+                        table2 = convert_table_to_dftbplus(table[:,NUMSK:])
                         table = np.concatenate((table1, table2), axis=1)
                     with open(filename, 'w') as f:
                         write_skf(f, self.Rgrid, table, has_diagonal_data,

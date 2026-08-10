@@ -61,7 +61,7 @@ def Wigner_D_complex(euler_alpha, euler_beta, euler_gamma):
     total = Dz * dy * Dz2 
     return total
     
-def Wigner_D_real(euler_alpha, euler_beta, euler_gamma):
+def Wigner_D_real(euler_alpha, euler_beta, euler_gamma, save=True):
     """
     Rotation matrix for real spherical harmonics for rotation sequence
     Rz(phi)Ry(theta)Rz(gamma)
@@ -108,8 +108,9 @@ def Wigner_D_real(euler_alpha, euler_beta, euler_gamma):
     transform_to_comp = transform_to_real.H
     D_total = transform_to_real * Wigner_D_complex(euler_alpha=euler_alpha, euler_beta=euler_beta, euler_gamma=euler_gamma).T * transform_to_comp
     D_total = D_total.as_mutable()
-    with open("symbolic_D_matrix.pkl", "wb") as f:
-        pickle.dump(D_total, f)
+    if save:
+        with open("symbolic_D_matrix.pkl", "wb") as f:
+            pickle.dump(D_total, f)
     return D_total
 
 

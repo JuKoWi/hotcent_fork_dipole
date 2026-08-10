@@ -1,4 +1,5 @@
 from sympy import *
+import numpy as np
 import time
 import pickle
 from hotcent.pos_op.slako_new import DFTBPLUS_SIMPLE
@@ -160,13 +161,20 @@ operator = {
     "px": (px_1,1,1),
 }
 
-def convert_dftb_table():
+def interchange_related_phi2():
+    """Print dictionary with
+        keys: integral index of the integrals appearing in the conventional .skf format
+        values: list of integrals that are related to the 
+        same integral with centers interchanged by M_ij = (-1)**(l_i + l_j) * M_ji
+        
+    """
     tmp1, tmp2 = symbols('tmp1 tmp2')
     integrals_DFTB = {} 
-    identical_integrals = {}
+    interchange_related_integrals = {}
     for i in DFTBPLUS_SIMPLE:
-        identical_integrals[i] = []
+        interchange_related_integrals[i] = []
 
+    # calculate integral expressions for those integrals appearing in the conventional .skf format
     count = 0
     for name_i, i in first_center.items():
             for name_k, k in second_center.items():
@@ -175,21 +183,48 @@ def convert_dftb_table():
                     integrals_DFTB[count] = integral
                 count += 1
 
+    # check, which of the nonzero phi2 integrals are identical to the integrals appearing in the conventional .skf format
     count = 0
     for name_i, i in first_center.items():
             for name_k, k in second_center.items():
                 integral = integrate(i[0] * k[0], (phi, 0, 2 * pi))
                 for dftb in DFTBPLUS_SIMPLE:
-                    plus = simplify(integral-integrals_DFTB[dftb])
+                    identical = simplify(integral-integrals_DFTB[dftb])
                     integral_swapped = integral.subs({theta1: tmp1, theta2: tmp2})
                     integral_swapped = integral_swapped.subs({tmp1: theta2, tmp2: theta1})
-                    minus = simplify(integral_swapped- integrals_DFTB[dftb])
-                    if plus == 0:
-                        identical_integrals[dftb].append(count)
-                    elif minus == 0:
-                        identical_integrals[dftb].append(-count)
+                    centers_exchanged = simplify(integral_swapped- integrals_DFTB[dftb])
+                    parity_factor = (-1)**(i[1]+ k[1])
+                    if (centers_exchanged == 0) and (identical != 0):
+                        interchange_related_integrals[dftb].append(parity_factor * count)
+                count += 1
+    print(interchange_related_integrals)
+
+def identical_phi2():
+    tmp1, tmp2 = symbols('tmp1 tmp2')
+    integrals_DFTB = {} 
+    identical_integrals = {}
+    for i in DFTBPLUS_SIMPLE:
+        identical_integrals[i] = []
+
+    # calculate integral expressions for those integrals appearing in the conventional .skf format
+    count = 0
+    for name_i, i in first_center.items():
+            for name_k, k in second_center.items():
+                if count in DFTBPLUS_SIMPLE:
+                    integral = integrate(i[0] * k[0], (phi, 0, 2 * pi))
+                    integrals_DFTB[count] = integral
                 count += 1
 
+    # check, which of the nonzero phi2 integrals are identical to the integrals appearing in the conventional .skf format
+    count = 0
+    for name_i, i in first_center.items():
+            for name_k, k in second_center.items():
+                integral = integrate(i[0] * k[0], (phi, 0, 2 * pi))
+                for dftb in DFTBPLUS_SIMPLE:
+                    identical = simplify(integral-integrals_DFTB[dftb])
+                    if identical == 0:
+                        identical_integrals[dftb].append(count)
+                count += 1
     print(identical_integrals)
 
 def pick_quantum_number(dictionary, lm):
@@ -213,9 +248,7 @@ def get_index_list_dipole():
                 tuple = (count, i[1], i[2], j[1], j[2], k[1], k[2])
                 identifier.append(tuple)
                 count += 1
-    with open("identifier_nonzeros_dipole.pkl", "wb") as f:
-        pickle.dump(identifier, f)
-        pickle.dump(nonzeros, f)
+    np.savez("identifier_nonzeros_posop.npz", np.array(identifier), np.array(nonzeros))
     return identifier, nonzeros 
 
 def get_index_list_overlap():
@@ -231,9 +264,7 @@ def get_index_list_overlap():
             tuple = (count, i[1], i[2], k[1], k[2])
             identifier.append(tuple)
             count += 1
-    with open("identifier_nonzeros_overlap.pkl", "wb") as f:
-        pickle.dump(identifier, f)
-        pickle.dump(nonzeros, f)
+    np.savez("identifier_nonzeros_overlap.npz", np.array(identifier), np.array(nonzeros))
     return identifier, nonzeros 
 
 
@@ -327,5 +358,8 @@ if __name__ == "__main__":
     # print_dipole_integrals()
     # print_overlap_integrals()
     # print_overlap_derivatives()
-    convert_dftb_table()
+    interchange_related_phi2()
+    # identical_phi2()
+    # {102: [102], 85: [85, 119], 68: [68, 136], 38: [38, -98], 21: [21, 55, -81, -115], 34: [34], 17: [17, 51], 6: [6, 96], 2: [2, -32], 0: [0]}
+    # {102: [102], 85: [85, 119], 68: [68, 136], 38: [38], 21: [21, 55], 34: [34], 17: [17, 51], 6: [6], 2: [2], 0: [0]}
 
