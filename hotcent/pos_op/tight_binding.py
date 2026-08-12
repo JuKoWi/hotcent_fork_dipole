@@ -9,14 +9,12 @@ from scipy.interpolate import CubicSpline
 from scipy.linalg import ishermitian
 from scipy.constants import physical_constants, angstrom
 from ase import Atoms
-from ase.build import graphene
-from ase.visualize import view
-from ase.build import molecule
 from ase.neighborlist import *
 from hotcent.pos_op.utils import *
 from hotcent.pos_op.integrals import get_index_list_dipole, get_index_list_overlap
 from hotcent.pos_op.slako_dipole import INTEGRALS_DIPOLE
 from hotcent.pos_op.slako_new import INTEGRALS, convert_sk_table
+from sympy.physics.quantum import TensorProduct
 
 ALPHA = sym.symbols('alpha')
 BETA = sym.symbols('beta')
@@ -46,12 +44,21 @@ class SlaterKosterIntegrator:
         atomic units except angstrom
     """
 
-    def __init__(self, atoms_unit_cell, skpath, skpath_dipole, maxl_dict, conventional_skf):
+    def __init__(self, atoms_unit_cell, skpath, skpath_posop, maxl_dict, conventional_skf):
+        """
+        atoms_unit_cell: ase.Atoms object containing information about unit cell parameters and unit cell content
+        skpath: directory path to .skf files for H and S
+        skpath_posop: directory path to .skf files for position operator matrix elements
+        maxl_dict: dictionary containing the maximal angular momentum to include in the basis set for each element
+        conventional_skf: whether to expect the conventional or the long format for the S/H .skf file
+                            the conventional format contains 10 columns for H and S respectively, the long format
+                            contains 44 (number of nonzero phi^(2)- integrals) for S and H respectively
+        """
         self.aseAtoms = atoms_unit_cell
         self.abc = atoms_unit_cell.get_cell()
         self.atomtypes = atoms_unit_cell.get_chemical_symbols()
         self.skpath = skpath
-        self.skpath_dipole = skpath_dipole
+        self.skpath_dipole = skpath_posop
         no_repeats_types = list(set(self.atomtypes))
         self.elem_pairs_unordered = list(itertools.combinations_with_replacement(no_repeats_types, 2))
         self.elem_pairs = list(itertools.product(no_repeats_types, repeat=2)) #ordered pairs (e.g. Mo-S and S-Mo are different)
@@ -85,10 +92,14 @@ class SlaterKosterIntegrator:
         time2 = time.time()
         print(f"Wigner matrix took {time2 -time1}")
 
+        self.sorted_integrals = sorted(INTEGRALS, key= lambda x: x[0])
+        self.sorted_integrals_dipole = sorted(INTEGRALS_DIPOLE, key=lambda x: x[0])
         self._create_SH_file_dict(conventional_skf)
         self._create_dipole_file_dict()
 
+
     def _get_interaction_cutoffs(self):
+        """read interaction cutoff from .skf files to create neighbor list"""
         #TODO: Write assert to make sure that cutoff is direction invariant
         #TODO: Write assert to make sure that cutoff for dipole is the same
         cutoff_dict = {}
@@ -104,7 +115,9 @@ class SlaterKosterIntegrator:
         self.cutoff_dict = cutoff_dict
 
     def _read_sk_file_conventional(self, elem_pair):
-        """read a Slater-Koster file of the conventional format, e.g. used by DFTB+"""
+        """read a Slater-Koster file of the conventional format as used by DFTB+ for example
+            elem_pair: ordered 2-tuple of elements
+        """
         homonuclear = (elem_pair[0] == elem_pair[1])
         path = self.skpath + f"/{elem_pair[0]}-{elem_pair[1]}.skf" 
         path_interchanged = self.skpath + f"/{elem_pair[1]}-{elem_pair[0]}.skf"
@@ -182,9 +195,9 @@ class SlaterKosterIntegrator:
             return delta_R, n_points, sk_table_S, sk_table_H, same_atom
         
     def _create_SH_file_dict(self, conventional_skf):
-        """create a dictionary where for every element combination there is a custom object,
+        """create a dictionary where for every ordered element pair there is a SKTable object,
         that contains all the information from the .skf file
-        conventional_skf: use DFTB+ file format for H/S
+        conventional_skf: whether to use DFTB+ file format for H/S
         """
         S_sk_dict = {}
         H_sk_dict = {}
@@ -199,7 +212,7 @@ class SlaterKosterIntegrator:
         self.H_sk_tables = H_sk_dict
     
     def _create_dipole_file_dict(self):
-        """create a dictionary where for every element combination there is a custom object,
+        """create a dictionary where for every element combination there is a SKTable object,
         that contains all the information from the .skf file
         """
         r_sk_dict = {}
@@ -209,7 +222,10 @@ class SlaterKosterIntegrator:
         self.r_sk_tables = r_sk_dict
 
     def _set_euler_angles(self, vec1, vec2):
-        """use only two rotations of three possible"""
+        """
+            Find Euler angles for rotation, uses only two rotations of the three possible
+            vec1, vec2: position vectors for first and second atom respectively 
+        """
         R_vec = vec2 - vec1
         if np.all(R_vec == 0):
             euler_theta = 0
@@ -223,7 +239,15 @@ class SlaterKosterIntegrator:
         return euler_theta, euler_phi, euler_gamma
 
     def _create_integral_dict(self, sk_table, posA, posB, operator, sk_table_dipole=None):
-        """for one set of atom positions and a certain operator (S,H, r) create a dictionary for with quantum numbers as keys"""
+        """
+        Evaluate Slater-Koster rules
+        For one pair of interacting atoms with fixed positions and certain operator (S,H or r) create the respective 
+        dictionary of two center integrals with angular momentum quantum numbers as keys
+        sk_table: SKTable object for the respective elements
+        posA, posB: positions of selected atoms respectively
+        operator: string, choice of operator ('S', 'H' or 'r')
+        sk_table_dipole: SKTable object for position operator elements, only required if operator=='r'
+        """
         if operator == 'r':
             assert sk_table_dipole != None
         R_vec = posB - posA
@@ -233,22 +257,14 @@ class SlaterKosterIntegrator:
 
         D = np.kron(D_single, D_single)
         # D = np.real(D)
-        deltaR = sk_table.deltaR
-        table = sk_table.table
-        n_points = sk_table.n_points
-        R_grid = deltaR + deltaR * np.arange(n_points)
-        cs = CubicSpline(R_grid, table)
         integral_vec = np.zeros((len(self.quant_nums))) 
-        for i, key in enumerate(sorted(INTEGRALS, key= lambda x: x[0])):
-            integral_vec[key[0]] = cs(R)[i]
+        for i, key in enumerate(self.sorted_integrals):
+            integral_vec[key[0]] = sk_table.spline(R)[i]
         integrals = D @ integral_vec
         # print(f"maximal imaginary integral value {np.max(np.abs(np.imag(integrals)))}")
         integrals = np.real(integrals)
 
         if operator == 'r':
-            deltaR_dipole = sk_table_dipole.deltaR
-            table_dipole = sk_table_dipole.table
-            n_points_dipole = sk_table_dipole.n_points
 
             idx_pstart = 1
             idx_pend = 3
@@ -256,11 +272,9 @@ class SlaterKosterIntegrator:
             D_dipole = np.kron(D_single, np.kron(D_r, D_single))
             # D_dipole = np.real(D_dipole)
 
-            R_grid_dipole = deltaR_dipole + deltaR_dipole * np.arange(n_points_dipole) 
-            cs_dipole = CubicSpline(R_grid_dipole, table_dipole) 
             integral_vec_dipole = np.zeros((len(self.quant_nums_posop)))
-            for i, key in enumerate(sorted(INTEGRALS_DIPOLE, key= lambda x: x[0])):
-                integral_vec_dipole[key[0]] = cs_dipole(R)[i]
+            for i, key in enumerate(self.sorted_integrals_dipole):
+                integral_vec_dipole[key[0]] = sk_table_dipole.spline(R)[i]
             position_elements = D_dipole @ integral_vec_dipole
             # print(f"maximal imaginary position integral value {np.max(np.abs(np.imag(dipole_elements)))}")
             position_elements = np.real(position_elements)
@@ -269,9 +283,7 @@ class SlaterKosterIntegrator:
             orbitals_overall = 16
             overlap_blocks = integrals.reshape(orbitals_overall, orbitals_overall)
             shift_term = np.tile(overlap_blocks, (1,3)).reshape(-1)
-            # posA = -0.5* (posB -posA) # just for comparison
             posA = np.array([posA[1], posA[2], posA[0]]) #reorder component according to quantum numbers
-            # posA = np.zeros(3) #turn off origin shift
             space_factor = np.tile(np.repeat(posA, orbitals_overall), orbitals_overall)
             shift_term = shift_term * space_factor
             shifted_dipole = position_elements + shift_term
@@ -350,10 +362,7 @@ class SlaterKosterIntegrator:
                     for mi, m in enumerate(range(-l1, l1 + 1)):
                         for ni, n in enumerate(range(-l2, l2 + 1)):
                             quant_nums = (l1, m, tup[0], tup[1], l2, n)
-                            if any(quant_nums == item for item in integral_dict.keys()): #compare with integral_dict or INTEGRALS_DIPOLE?
-                                block[mi, ni] = integral_dict[quant_nums]
-                            else:
-                                block[mi, ni] = 0
+                            block[mi,ni] = integral_dict.get(quant_nums, 0.0)
                     pair_matrix[i, row_start:row_start+size_row, col_start:col_start+size_col] = block
                     col_start += size_col
                 col_start = 0
@@ -373,10 +382,7 @@ class SlaterKosterIntegrator:
                     for mi, m in enumerate(range(-l1, l1 + 1)):
                         for ni, n in enumerate(range(-l2, l2 + 1)):
                             quant_nums = (l1, m, l2, n)
-                            if any(quant_nums == item for item in integral_dict.keys()): #compare with integral_dict or INTEGRALS_DIPOLE?
-                                block[mi, ni] = integral_dict[quant_nums][i]
-                            else:
-                                block[mi, ni] = 0
+                            block[mi,ni] = integral_dict.get(quant_nums, 0.0)
                     pair_matrix[i, row_start:row_start+size_row, col_start:col_start+size_col] = block
                     col_start += size_col
                 col_start = 0
@@ -596,3 +602,11 @@ class SKTable:
         self.deltaR = deltaR
         self.n_points = n_points
         self.same_atom_vals = same_atom #list for S and H, dict for r
+        self._spline = None
+
+    @property
+    def spline(self):
+        if self._spline is None:
+            R_grid = self.deltaR + self.deltaR * np.arange(self.n_points)
+            self._spline = CubicSpline(R_grid, self.table)
+        return self._spline

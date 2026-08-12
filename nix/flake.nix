@@ -22,6 +22,7 @@
 		    ipython
 		    jupyter
 		    ipykernel
+		    snakeviz
              ]);
 
 #	     libxc = pkgs.libxc;

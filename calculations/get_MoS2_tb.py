@@ -23,24 +23,9 @@ MoS2.pbc = (True, True, True)
 # view(MoS2)
 
 
-# max_l = {'C':1, 'H':0, 'S':2, 'Mo':2}
-# seedname_mos2 = SlaterKosterIntegrator(MoS2, skpath="tutorials/tutorial_2/skfiles", maxl_dict=max_l, skpath_dipole="tutorials/tutorial_2/skfiles_pos_op")
-# seedname_mos2.write_seedname()
+max_l = {'C':1, 'H':0, 'S':2, 'Mo':2}
+# seedname_mos2 = SlaterKosterIntegrator(MoS2, skpath="skfiles/sk_long", maxl_dict=max_l, skpath_posop="skfiles/sk_posop", conventional_skf=False)
+seedname_mos2 = SlaterKosterIntegrator(MoS2, skpath="skfiles/sk_conventional", maxl_dict=max_l, skpath_posop="skfiles/sk_posop", conventional_skf=True)
+seedname_mos2.write_seedname()
 # seedname_mos2.write_seedname_momentum()
 # MoS2.write('mos2.cif')
-
-max_l = {'C':1, 'H':0, 'S':2, 'Mo':2}
-seedname_mos2_A = SlaterKosterIntegrator( 
-                                        MoS2,
-                                        skpath="skfiles/sk_conventional",
-                                        maxl_dict=max_l,
-                                        skpath_dipole="skfiles/sk_posop",
-                                        conventional_skf=True
-                                        )
-seedname_mos2_B = SlaterKosterIntegrator(MoS2, 
-                                        skpath="skfiles/sk_long",
-                                        maxl_dict=max_l,
-                                        skpath_dipole="skfiles/sk_posop",
-                                        conventional_skf=False)
-seedname_mos2_B.write_seedname()
-
