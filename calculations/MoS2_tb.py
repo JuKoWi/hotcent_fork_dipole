@@ -6,8 +6,6 @@ from ase.io import read, write
 import sys
 import numpy as np
 
-# MoS2 = read(filename="mos2.gen")
-# MoS2.pbc = (True, True, False)
 # print(MoS2.get_chemical_symbols())
 # print(MoS2.get_positions())
 # print(MoS2.get_cell())
@@ -15,7 +13,7 @@ import numpy as np
 # view(MoS2)
 
 MoS2 = mx2(vacuum=20)
-MoS2.pbc = (True, True, True)
+MoS2.pbc = (True, True, False)
 # print(MoS2.get_chemical_symbols())
 # print(MoS2.get_positions())
 # print(MoS2.get_cell())

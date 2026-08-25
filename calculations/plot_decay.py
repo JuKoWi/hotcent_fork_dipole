@@ -5,7 +5,7 @@ from hotcent.pos_op.offsite_twocenter_new import Offsite2cTable
 from hotcent.pos_op.offsite_twocenter_posop import Offsite2cTablePosOp
 from hotcent.pos_op.utils import bohr_to_angstrom
 from hotcent.pos_op.slako_new import INTEGRALS, get_hotcent_style_index
-from hotcent.pos_op.slako_dipole import INTEGRALS_DIPOLE, convert_sk_index
+from hotcent.pos_op.slako_dipole import INTEGRALS_POSOP, convert_sk_index
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
@@ -28,7 +28,7 @@ READABLE_LABELS = {
 """Plot data from file"""
 def slowest_decay_from_file(filename, num_dipole, threshold, atol=1e-7):
     table = np.loadtxt(fname=filename, skiprows=3)
-    label_list = sorted(INTEGRALS_DIPOLE.keys(), key=lambda x: x[0])
+    label_list = sorted(INTEGRALS_POSOP.keys(), key=lambda x: x[0])
 
     top_keys = []
     top_indices = []
@@ -90,7 +90,7 @@ def plot_decay_file(filename, num_dipole, threshold, startline):
     plt.show()
 
 def find_slowest_decay(offsite_obj, num_dipole, threshold, atol=1e-7):
-    label_list = sorted(INTEGRALS_DIPOLE.keys(), key=lambda x: x[0])
+    label_list = sorted(INTEGRALS_POSOP.keys(), key=lambda x: x[0])
 
     top_keys = []
     top_indices = []
@@ -154,7 +154,7 @@ def plot_dipole_decay_selected(sk_file, homonuclear, labels, readable_labels, ei
     else:
         skiprows = skiprows = 2
     data = np.loadtxt(fname=sk_file, skiprows=skiprows)
-    sorted_tuple = sorted(INTEGRALS_DIPOLE.keys(), key=lambda k: k[0])
+    sorted_tuple = sorted(INTEGRALS_POSOP.keys(), key=lambda k: k[0])
     sorted_labelnum = [k[0] for k in sorted_tuple]
     fig, ax = plt.subplots(figsize=(6,4.5))
     x = np.linspace(start=dr, stop=nr*dr, num=nr, endpoint=True)

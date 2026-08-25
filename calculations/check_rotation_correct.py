@@ -1,5 +1,5 @@
 from hotcent.pos_op.compare_integration_methods import compare_integrals
-from hotcent.pos_op.slako_dipole import INTEGRALS_DIPOLE
+from hotcent.pos_op.slako_dipole import INTEGRALS_POSOP
 from hotcent.pos_op.integrals import get_index_list_dipole
 import numpy as np
 import matplotlib.pyplot as plt

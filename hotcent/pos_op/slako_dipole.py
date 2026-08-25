@@ -1,3 +1,4 @@
+"""phi3 integrals and functions related to selection of matrix elements"""
 import numpy as np
 
 """nonvanishing SlaKo integrals over phi for dipole elements named in the form
@@ -6,7 +7,7 @@ sk_label: tuple
    (idx, l, m, l, m, l, m) with idx:unique number of integral according to increasing quantum numbers 
    l,m: quantum numbers of the respective harmonics 
 """
-INTEGRALS_DIPOLE = {
+INTEGRALS_POSOP = {
 	(1, 0, 0, 1, -1, 1, -1): lambda c1, c2, s1, s2: 0.375*s1*s2/np.sqrt(np.pi),
 	(5, 0, 0, 1, -1, 2, -1): lambda c1, c2, s1, s2: 0.375*np.sqrt(5)*s1*s2*c2/np.sqrt(np.pi),
 	(11, 0, 0, 1, -1, 3, -1): lambda c1, c2, s1, s2: 0.09375*np.sqrt(14)*(5*c2**2 - 1)*s1*s2/np.sqrt(np.pi),
@@ -166,7 +167,159 @@ INTEGRALS_DIPOLE = {
 }
 
 
-NUMSK = len(INTEGRALS_DIPOLE)
+NUMSK = len(INTEGRALS_POSOP)
+EQUIVALENT_INTEGRALS_POSOP = {
+    1: [1, 35], 
+    5: [5, 39], 
+    11: [11, 45], 
+    16: [16], 
+    18: [18], 
+    22: [22], 
+    28: [28], 
+    48: [48, 176], 
+    50: [50, 178], 
+    54: [54, 182], 
+    56: [56, -84, -148, -184], 
+    60: [60, 188], 
+    62: [62, -90, -154, -190], 
+    65: [65, 97, 131, 163], 
+    69: [69, 101, 135, 167], 
+    75: [75, 107, 141, 173], 
+    112: [112], 
+    114: [114], 
+    118: [118], 
+    124: [124], 
+    195: [195, 225, -385, 419], 
+    199: [199, 229, -389, 423], 
+    205: [205, 235, -395, 429], 
+    207: [207, -233, -393, -431], 
+    212: [212, -248, 276, 340, 376, 408], 
+    218: [218, -254, 282, 346, 382, 414], 
+    240: [240, 368], 
+    242: [242, 370], 
+    246: [246, 374], 
+    252: [252, 380], 
+    257: [257, 355], 
+    261: [261, 359], 
+    267: [267, 365], 
+    289: [289, 323], 
+    293: [293, 327], 
+    299: [299, 333], 
+    304: [304], 
+    306: [306], 
+    310: [310], 
+    316: [316], 
+    440: [440, 468, -724, 760], 
+    446: [446, 474, -730, 766], 
+    457: [457, 751], 
+    483: [483, 513, -673, 707], 
+    487: [487, 517, -677, 711], 
+    493: [493, 523, -683, 717], 
+    495: [495, -521, -681, -719], 
+    500: [500, 696], 
+    506: [506, 702], 
+    528: [528, 656], 
+    530: [530, 658], 
+    534: [534, 662], 
+    536: [536, -564, -628, -664], 
+    540: [540, 668], 
+    542: [542, -570, -634, -670], 
+    545: [545, 643], 
+    549: [549, 647], 
+    555: [555, 653], 
+    577: [577, 611], 
+    581: [581, 615], 
+    587: [587, 621], 
+    592: [592], 
+    594: [594], 
+    598: [598], 
+    604: [604]
+}
+# EQUIVALENT_INTEGRALS_POSOP = {
+#     1: [1, 35], 
+#     5: [5, 39], 
+#     11: [11, 45], 
+#     16: [16], 
+#     18: [18], 
+#     22: [22], 
+#     28: [28], 
+#     48: [48, 176], 
+#     50: [50, 178], 
+#     54: [54, 182], 
+#     56: [56], 
+#     60: [60, 188], 
+#     62: [62], 
+#     65: [65, 97, 131, 163], 
+#     69: [69, 101, 135, 167], 
+#     75: [75, 107, 141, 173], 
+#     84: [84, 148, 184], 
+#     90: [90, 154, 190], 
+#     112: [112], 
+#     114: [114], 
+#     118: [118], 
+#     124: [124], 
+#     195: [195, 225, 419], 
+#     199: [199, 229, 423], 
+#     205: [205, 235, 429], 
+#     207: [207], 
+#     212: [212, 276, 340, 376, 408], 
+#     218: [218, 282, 346, 382, 414], 
+#     233: [233, 393, 431], 
+#     240: [240, 368], 
+#     242: [242, 370], 
+#     246: [246, 374], 
+#     248: [248], 
+#     252: [252, 380], 
+#     254: [254], 
+#     257: [257, 355], 
+#     261: [261, 359], 
+#     267: [267, 365], 
+#     289: [289, 323], 
+#     293: [293, 327], 
+#     299: [299, 333], 
+#     304: [304], 
+#     306: [306], 
+#     310: [310], 
+#     316: [316], 
+#     385: [385], 
+#     389: [389], 
+#     395: [395], 
+#     440: [440, 468, 760], 
+#     446: [446, 474, 766], 
+#     457: [457, 751], 
+#     483: [483, 513, 707], 
+#     487: [487, 517, 711], 
+#     493: [493, 523, 717], 
+#     495: [495], 
+#     500: [500, 696], 
+#     506: [506, 702], 
+#     521: [521, 681, 719], 
+#     528: [528, 656], 
+#     530: [530, 658], 
+#     534: [534, 662], 
+#     536: [536], 
+#     540: [540, 668], 
+#     542: [542], 
+#     545: [545, 643], 
+#     549: [549, 647], 
+#     555: [555, 653], 
+#     564: [564, 628, 664], 
+#     570: [570, 634, 670], 
+#     577: [577, 611], 
+#     581: [581, 615], 
+#     587: [587, 621], 
+#     592: [592], 
+#     594: [594], 
+#     598: [598], 
+#     604: [604], 
+#     673: [673], 
+#     677: [677], 
+#     683: [683], 
+#     724: [724],
+#     730: [730]
+# }
+
+UNIQUE_INTEGRALS_POSOP = EQUIVALENT_INTEGRALS_POSOP.keys()
 
 def convert_quant_num(l):
     """convert quantum number l to letter for string matching in select_subshells"""
@@ -226,7 +379,7 @@ def phi3(c1, c2, s1, s2, sk_label):
     for the atom at origin (atom at z=Rz). These expressions are obtained
     by integrating analytically over phi.
     """
-    return INTEGRALS_DIPOLE[sk_label](c1,c2,s1,s2)
+    return INTEGRALS_POSOP[sk_label](c1,c2,s1,s2)
 
 def select_integrals(e1, e2):
     """
@@ -237,7 +390,7 @@ def select_integrals(e1, e2):
     selected = []
     for ival1, valence1 in enumerate(e1.basis_sets):
         for ival2, valence2 in enumerate(e2.basis_sets):
-            for sk_label, func in INTEGRALS_DIPOLE.items():
+            for sk_label, func in INTEGRALS_POSOP.items():
                 nl1, nl2 = select_subshells(valence1, valence2, sk_label)
                 if nl1 is not None and nl2 is not None:
                     selected.append((sk_label, nl1, nl2))
@@ -377,7 +530,7 @@ def write_skf(handle, Rgrid, table, has_atom_transition, mass, atom_transitions)
     assert nzeros >= 0
     print("%.12f, %d" % (grid_dist, grid_npts + nzeros), file=handle)
 
-    keys_sorted = sorted(INTEGRALS_DIPOLE.keys(), key= lambda x: x[0])
+    keys_sorted = sorted(INTEGRALS_POSOP.keys(), key= lambda x: x[0])
     if has_atom_transition:
         atom_integrals = [atom_transitions[i] for i in keys_sorted]
         print(" ".join(f"{x:.6f}" for x in atom_integrals), file=handle)

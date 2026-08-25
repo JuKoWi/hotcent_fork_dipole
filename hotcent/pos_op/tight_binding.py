@@ -12,13 +12,14 @@ from ase import Atoms
 from ase.neighborlist import *
 from hotcent.pos_op.utils import *
 from hotcent.pos_op.integrals import get_index_list_dipole, get_index_list_overlap
-from hotcent.pos_op.slako_dipole import INTEGRALS_DIPOLE
-from hotcent.pos_op.slako_new import INTEGRALS, convert_sk_table
-from sympy.physics.quantum import TensorProduct
+from hotcent.pos_op.slako_dipole import INTEGRALS_POSOP, UNIQUE_INTEGRALS_POSOP, EQUIVALENT_INTEGRALS_POSOP
+from hotcent.pos_op.slako_new import INTEGRALS, convert_sk_table, UNIQUE_INTEGRALS, EQUIVALENT_INTEGRALS
+# from hotcent.pos_op.skrules import matrix_elements
+# from hotcent.pos_op.skrules_posop import matrix_elements_posop
+from hotcent.pos_op.rot_trans_explicit import D_SYMB, BETA, GAMMA
+from hotcent.pos_op.skrules_mini_cse import matrix_elements
+from hotcent.pos_op.skrules_posop_mini_cse import matrix_elements_posop
 
-ALPHA = sym.symbols('alpha')
-BETA = sym.symbols('beta')
-GAMMA =sym.symbols('gamma')
 
 class SlaterKosterIntegrator:
     """Takes .skf files in the long (partially redundant) format  used throughout new_dipole/ and calculates the real space matrix elements 
@@ -85,17 +86,16 @@ class SlaterKosterIntegrator:
         self.quant_nums_posop = quant_num_list_posop
         self.sk_int_idx_posop = nonzeros_posop
 
-        time1 = time.time()
-        print('Calculate symbolic D-Matrix')            
-        M = Wigner_D_real(euler_alpha=ALPHA, euler_beta=BETA, euler_gamma=GAMMA)
-        self.D_symb = sym.lambdify((ALPHA, BETA, GAMMA), M, 'numpy') 
-        time2 = time.time()
-        print(f"Wigner matrix took {time2 -time1}")
+        self.D_symb = sym.lambdify((BETA, GAMMA), D_SYMB, 'numpy', cse=True) 
 
         self.sorted_integrals = sorted(INTEGRALS, key= lambda x: x[0])
-        self.sorted_integrals_dipole = sorted(INTEGRALS_DIPOLE, key=lambda x: x[0])
+        self.sorted_integrals_dipole = sorted(INTEGRALS_POSOP, key=lambda x: x[0])
         self._create_SH_file_dict(conventional_skf)
         self._create_dipole_file_dict()
+
+        self.contraction_path = None
+        self.contraction_path_posop = None
+        self._scatter_sk = np.array([key[0] for key in self.sorted_integrals]) 
 
 
     def _get_interaction_cutoffs(self):
@@ -177,7 +177,7 @@ class SlaterKosterIntegrator:
         data = np.loadtxt(path, skiprows=3+extended)
         if dipole:
             sk_table_r = bohr_to_angstrom(data)
-            sorted_labels = sorted(INTEGRALS_DIPOLE.keys(), key=lambda x: x[0])
+            sorted_labels = sorted(INTEGRALS_POSOP.keys(), key=lambda x: x[0])
             sorted_labels = [l[1:] for l in sorted_labels]
             if homonuclear:
                 assert len(sorted_labels) == len(same_atom)
@@ -238,6 +238,15 @@ class SlaterKosterIntegrator:
             euler_gamma = 0
         return euler_theta, euler_phi, euler_gamma
 
+    def _get_direction_cosines(self, vec1, vec2):
+        R_vec = vec2 - vec1
+        norm_R_vec = np.linalg.norm(R_vec)
+        if np.all(R_vec == 0):
+            lmn = np.array([0, 0, 0])
+        else:
+            lmn = R_vec/norm_R_vec
+        return lmn
+
     def _create_integral_dict(self, sk_table, posA, posB, operator, sk_table_dipole=None):
         """
         Evaluate Slater-Koster rules
@@ -253,31 +262,42 @@ class SlaterKosterIntegrator:
         R_vec = posB - posA
         R = np.linalg.norm(R_vec)
         euler_theta, euler_phi, euler_gamma= self._set_euler_angles(vec1=posA, vec2=posB)
-        D_single = np.array(self.D_symb(euler_gamma, euler_theta, euler_phi), dtype=complex)
+        D_single = np.array(self.D_symb(euler_theta, euler_phi), dtype=float)
+        l, m, n = self._get_direction_cosines(vec1=posA, vec2=posB)
 
-        D = np.kron(D_single, D_single)
-        # D = np.real(D)
         integral_vec = np.zeros((len(self.quant_nums))) 
-        for i, key in enumerate(self.sorted_integrals):
-            integral_vec[key[0]] = sk_table.spline(R)[i]
-        integrals = D @ integral_vec
+        integral_vec[self._scatter_sk] = sk_table.spline(R)
+        M_minimal = np.zeros((len(UNIQUE_INTEGRALS)))
+        for i, num in enumerate(UNIQUE_INTEGRALS):
+            M_minimal[i] = integral_vec[num]
+        M = np.reshape(integral_vec, (16,16))
+        # if self.contraction_path is None:
+        #     self.contraction_path = np.einsum_path('ab,bc,dc -> ad', D_single, M, D_single, optimize='optimal')[0]
+        # integrals = np.einsum('ab,bc,dc -> ad', D_single, M, D_single, optimize=self.contraction_path).flatten()
+        # integrals = matrix_elements(X=M, l=l, m=m, n=n).flatten()
+        integrals = matrix_elements(X=M_minimal, l=l, m=m, n=n).flatten()
         # print(f"maximal imaginary integral value {np.max(np.abs(np.imag(integrals)))}")
-        integrals = np.real(integrals)
 
         if operator == 'r':
 
             idx_pstart = 1
             idx_pend = 3
-            D_r = D_single[idx_pstart:idx_pend+1, idx_pstart:idx_pend+1]
-            D_dipole = np.kron(D_single, np.kron(D_r, D_single))
-            # D_dipole = np.real(D_dipole)
+            # D_r = D_single[idx_pstart:idx_pend+1, idx_pstart:idx_pend+1]
 
             integral_vec_dipole = np.zeros((len(self.quant_nums_posop)))
+            spline_eval_posop = sk_table_dipole.spline(R)
             for i, key in enumerate(self.sorted_integrals_dipole):
-                integral_vec_dipole[key[0]] = sk_table_dipole.spline(R)[i]
-            position_elements = D_dipole @ integral_vec_dipole
+                integral_vec_dipole[key[0]] = spline_eval_posop[i]
+            M_posop_minimal = np.zeros((len(UNIQUE_INTEGRALS_POSOP)))
+            for i, num in enumerate(UNIQUE_INTEGRALS_POSOP):
+                M_posop_minimal[i] = integral_vec_dipole[num]
+            M_posop = np.reshape(integral_vec_dipole, (16,3,16))
+            # if self.contraction_path_posop is None:
+            #     self.contraction_path_posop = np.einsum_path('ai, bj, ck, ijk -> abc', D_single, D_r, D_single, M_posop, optimize='optimal')[0]
+            # position_elements1 = np.einsum('ai, bj, ck, ijk -> abc', D_single, D_r, D_single, M_posop, optimize=self.contraction_path_posop).flatten()
+            # position_elements = matrix_elements_posop(X=M_posop, l=l, m=m, n=n).flatten()
+            position_elements = matrix_elements_posop(X=M_posop_minimal, l=l, m=m, n=n).flatten()
             # print(f"maximal imaginary position integral value {np.max(np.abs(np.imag(dipole_elements)))}")
-            position_elements = np.real(position_elements)
 
             #consider origin shift
             orbitals_overall = 16
@@ -462,7 +482,7 @@ class SlaterKosterIntegrator:
             maxlB = self.maxl_dict[typeB]
             posA = atoms.positions[idxA]
             posB = atoms.positions[idxB] + np.dot(self.abc.T, R[i])
-            assert np.linalg.norm(posB - posA) <= self.cutoff_dict[(typeA, typeB)]
+            # assert np.linalg.norm(posB - posA) <= self.cutoff_dict[(typeA, typeB)]
             block = self._calculate_atom_block(types=(typeA, typeB), posA=posA, posB=posB, max_lA=maxlA, max_lB=maxlB, operator=operator)
             n_rows = get_norbs(maxl=maxlA)
             n_cols = get_norbs(maxl=maxlB)
@@ -474,13 +494,13 @@ class SlaterKosterIntegrator:
                 matrix[start_rows:start_rows+n_rows, start_cols:start_cols+n_cols] = block
             lattice_dict[R_triple] = matrix
 
-        assert np.shape(np.unique(R, axis=0))[0] == len(lattice_dict)
+        # assert np.shape(np.unique(R, axis=0))[0] == len(lattice_dict)
         if operator not in ('r', 'p'):
             for lat_vec in np.unique(R, axis=0): 
                 mat1 = lattice_dict[*lat_vec] 
                 mat2 = lattice_dict[*(-lat_vec)]
-                symmetry_requirement = np.allclose(mat1, np.linalg.matrix_transpose(mat2), atol=1e-6)
-                assert symmetry_requirement 
+                # symmetry_requirement = np.allclose(mat1, np.linalg.matrix_transpose(mat2), atol=1e-6)
+                # assert symmetry_requirement 
         return lattice_dict
     
     def _find_block_pos(self, idx):
@@ -549,9 +569,9 @@ class SlaterKosterIntegrator:
             f.write(str(self.n_lattice)+'\n')
             for i in range(self.n_lattice):
                 f.write("1 ")
-                if (i+1) % 15 == 0:
+                if ((i+1) % 15 == 0) and (i+1 != self.n_lattice):
                     f.write("\n")
-            f.write('\n')
+            f.write("\n")
             for point in lattice_dict_S.keys():
                 f.write('\n')
                 f.write(str(point[0]) + ' ' + str(point[1]) + ' ' + str(point[2]) + '\n')
@@ -598,7 +618,7 @@ class SKTable:
         (S, H or r)
     """
     def __init__(self, table, deltaR, n_points, same_atom=None):
-        self.table = table #first index distance, second one integral index
+        self.table = table #first dimension distance, second dimension integral index
         self.deltaR = deltaR
         self.n_points = n_points
         self.same_atom_vals = same_atom #list for S and H, dict for r

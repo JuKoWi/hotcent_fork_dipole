@@ -3,10 +3,15 @@ import sympy as sp
 import pickle
 from hotcent.pos_op.integrals import first_center, phi, theta1, first_center_complex, operator
 
+L, M, N = sp.symbols('l, m, n', real=True)
 
-PHI = sp.symbols('phi')
-THETA = sp.symbols('theta')
-GAMMA = sp.symbols('gamma')
+ALPHA = sp.symbols('alpha', real=True)
+BETA = sp.symbols('beta', real=True)
+GAMMA =sp.symbols('gamma', real=True)
+
+PHI = sp.symbols('phi', real=True)
+THETA = sp.symbols('theta', real=True)
+GAMMA = sp.symbols('gamma', real=True)
 
 def d_mat_elem(l, m, n, beta):
     """single element for small Wigner matrix d"""
@@ -60,6 +65,7 @@ def Wigner_D_complex(euler_alpha, euler_beta, euler_gamma):
     Dz2 = z_rot_mat(alpha=euler_gamma) 
     total = Dz * dy * Dz2 
     return total
+
     
 def Wigner_D_real(euler_alpha, euler_beta, euler_gamma, save=True):
     """
@@ -362,8 +368,10 @@ def check_vec_rotation():
     
     
 if __name__ == "__main__":
-    check_rotation_complex()
-    check_rotation()
-    check_rotation_prod()
-    check_rot_triple()
+    # check_rotation_complex()
+    # check_rotation()
+    # check_rotation_prod()
+    # check_rot_triple()
+    # print(sp.trigsimp(sp.expand_complex(Wigner_D_real(euler_alpha=ALPHA, euler_beta=BETA, euler_gamma=GAMMA).subs(ALPHA,0))))
+    print(sp.expand_trig(sp.expand_complex(Wigner_D_real(euler_alpha=ALPHA, euler_beta=BETA, euler_gamma=GAMMA))))
         

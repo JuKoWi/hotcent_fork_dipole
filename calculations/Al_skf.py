@@ -2,42 +2,44 @@ from hotcent.confinement import PowerConfinement
 from hotcent.atomic_dft import AtomicDFT
 from hotcent.pos_op.offsite_twocenter_new import Offsite2cTable
 from hotcent.pos_op.offsite_twocenter_posop import Offsite2cTablePosOp
+import sys
 
 
-# Get KS all-electron ground state of confined atom:
-element = 'C'
+
+configuration='[Ne] 3s2 3p1 3d0'
+valence=['3s', '3p', '3d']
 xc = 'GGA_X_PBE+GGA_C_PBE'
-conf = PowerConfinement(r0=50.0, s=4)
-r0 = 3.2 # Bohr
-wf_conf = {'2s': PowerConfinement(r0=r0, s=8.2),
-           '2p': PowerConfinement(r0=r0, s=8.2),
-           }
-
+element = 'Al'
+scalarrel=True
 atom = AtomicDFT(element,
-                xc = xc,
-                 confinement=conf,
-                 perturbative_confinement=False,
-                 configuration='[He] 2s2 2p2',
-                 valence=['2s', '2p'],
-                 scalarrel=True,
-                 maxiter=2500,
-                 timing=False,
-                 nodegpts=150,
-                 mix=0.2,
-                 txt='-',
-                 )
+             xc=xc,
+             configuration=configuration,
+             perturbative_confinement=False,
+             valence=valence,
+             scalarrel=scalarrel,
+             confinement=PowerConfinement(r0=60, s=4),
+             rmax=600,
+             )
 atom.run()
 eigenvalues=atom.enl
+
+conf = PowerConfinement(r0=60.0, s=4)
+r0 = 5.9 # Bohr
+wf_conf = {'3s': PowerConfinement(r0=r0, s=12.4),
+           '3p': PowerConfinement(r0=r0, s=12.4),
+           '3d': PowerConfinement(r0=r0, s=12.4),
+           }
 
 atom.set_confinement(conf)
 atom.set_wf_confinement(wf_confinement=wf_conf)
 atom.run()
+eigenvalues_confined = atom.enl
 
 # Compute Slater-Koster integrals:
 rmin, dr, N = 0.4, 0.02, 900
 off2c = Offsite2cTable(atom, atom, timing=True)
 off2c.run(rmin, dr, N, xc=xc, nr=200, ntheta=400, wflimit=1e-9)
-off2c.write(dftbplus_format=False, eigenvalues=eigenvalues)  # writes to default C-C_offsite2c.skf filename
+off2c.write(dftbplus_format=False, eigenvalues=eigenvalues)  # writes to default Al-Al.skf filename
 off2c.write(dftbplus_format=True, eigenvalues=eigenvalues, filename_template='{el1}-{el2}dftb.skf')  
 
 # Compute Integrals for dipole
@@ -45,7 +47,7 @@ rmin, dr, N = 0.4, 0.02, 900
 off2c = Offsite2cTablePosOp(atom, atom, timing=False)
 off2c.run(rmin, dr, N, nr=200, ntheta=400, wflimit=1e-9)
 off2c.write_dipole()
-print(off2c.get_range(wf_limit=1e-7))
 
-
+print(eigenvalues)
+print(eigenvalues_confined)
 

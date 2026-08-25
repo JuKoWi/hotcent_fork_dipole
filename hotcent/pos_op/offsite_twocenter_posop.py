@@ -5,7 +5,7 @@ from ase.data import atomic_numbers, atomic_masses, covalent_radii
 from hotcent.multiatom_integrator import MultiAtomIntegrator
 from hotcent.pos_op.integrals import first_center, second_center, operator, pick_quantum_number, phi, theta1, theta2
 from hotcent.interpolation import CubicSplineFunction
-from hotcent.pos_op.slako_dipole import (INTEGRALS_DIPOLE, select_integrals, NUMSK, phi3, tail_smoothening, write_skf)
+from hotcent.pos_op.slako_dipole import (INTEGRALS_POSOP, select_integrals, NUMSK, phi3, tail_smoothening, write_skf)
 import matplotlib.pyplot as plt
 from scipy.integrate import trapezoid
 
@@ -89,7 +89,7 @@ class Offsite2cTablePosOp(MultiAtomIntegrator):
 
             for p, (e1, e2) in enumerate(self.pairs):
                 selected = select_integrals(e1, e2) #tripel (label, nl, nl)
-                label_list = sorted(INTEGRALS_DIPOLE.keys(), key=lambda x: x[0])
+                label_list = sorted(INTEGRALS_POSOP.keys(), key=lambda x: x[0])
                 if len(grid) > 0:
                     R_operator = self.calculate(selected, e1, e2, R, grid, area, zeta=zeta)
                     for j,key in enumerate(sorted(selected, key=lambda x: x[0][0])):
@@ -131,7 +131,7 @@ class Offsite2cTablePosOp(MultiAtomIntegrator):
         assert sym1 == sym2
         dr = 0.001
         r = np.arange(start=0, stop=self.wf_range, step=dr)
-        for label in INTEGRALS_DIPOLE.keys(): 
+        for label in INTEGRALS_POSOP.keys(): 
             match = next((key for key in selected if key[0] == label), None)
             if match != None:
                 integral, nl1, nl2 = match
@@ -261,7 +261,7 @@ class Offsite2cTablePosOp(MultiAtomIntegrator):
         nonzero_col = np.where(np.any(np.abs(table) > threshold, axis=0))[0] #nonzero in skf file
 
         for i, col in enumerate(nonzero_col): 
-            name = sorted(INTEGRALS_DIPOLE.items(), key=lambda x: x[0][0])[col]
+            name = sorted(INTEGRALS_POSOP.items(), key=lambda x: x[0][0])[col]
             ax = plt.subplot(len(nonzero_col)//2 +1, 2, i + 1)
 
             for p, (e1, e2) in enumerate(self.pairs):

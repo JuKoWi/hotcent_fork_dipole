@@ -10,7 +10,7 @@ from scipy.interpolate import CubicSpline
 from hotcent.pos_op.utils import *
 from hotcent.pos_op.integrals import get_index_list_dipole, get_index_list_overlap
 from hotcent.pos_op.rotation_transform import Wigner_D_real, to_spherical
-from hotcent.pos_op.slako_dipole import INTEGRALS_DIPOLE
+from hotcent.pos_op.slako_dipole import INTEGRALS_POSOP
 from hotcent.pos_op.slako_new import INTEGRALS
 
 ALPHA = sym.symbols('alpha')
@@ -198,7 +198,7 @@ class SK_Integral:
         R_grid_dipole = self.delta_R_dipole + self.delta_R_dipole * np.arange(self.n_points_dipole) 
         cs_dipole = CubicSpline(R_grid_dipole, self.sk_table_dipole) 
         integral_vec_dipole = np.zeros((len(self.quant_nums_dipole)))
-        for i, key in enumerate(sorted(INTEGRALS_DIPOLE, key= lambda x: x[0])):
+        for i, key in enumerate(sorted(INTEGRALS_POSOP, key= lambda x: x[0])):
             integral_vec_dipole[key[0]] = cs_dipole(self.R)[i]
         dipole_elements = self.D_full_dipole @ integral_vec_dipole
 
