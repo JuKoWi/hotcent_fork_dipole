@@ -32,6 +32,7 @@
                 pkgs.mkShell {
                     buildInputs = [
                            myPython
+			   pkgs.ruff
 #			   libxc
                            # pkgs.gtest
                     ];

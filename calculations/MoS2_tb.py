@@ -5,6 +5,7 @@ from ase import Atoms
 from ase.io import read, write
 import sys
 import numpy as np
+from hotcent.pos_op.utils import angstrom_to_bohr
 
 # print(MoS2.get_chemical_symbols())
 # print(MoS2.get_positions())
@@ -22,8 +23,8 @@ MoS2.pbc = (True, True, False)
 
 
 max_l = {'C':1, 'H':0, 'S':2, 'Mo':2}
-# seedname_mos2 = SlaterKosterIntegrator(MoS2, skpath="skfiles/sk_long", maxl_dict=max_l, skpath_posop="skfiles/sk_posop", conventional_skf=False)
-seedname_mos2 = SlaterKosterIntegrator(MoS2, skpath="skfiles/sk_conventional", maxl_dict=max_l, skpath_posop="skfiles/sk_posop", conventional_skf=True)
+# seedname_mos2 = SlaterKosterIntegrator(MoS2, skpath="sk_experimental/sk_unique", maxl_dict=max_l, skpath_posop="sk_experimental/sk_posop_unique", format='unique')
+seedname_mos2 = SlaterKosterIntegrator(MoS2, skpath="sk_experimental/sk_unique", maxl_dict=max_l, skpath_posop="sk_experimental/sk_posop_unique", format='unique')
 seedname_mos2.write_seedname()
 # seedname_mos2.write_seedname_momentum()
 # MoS2.write('mos2.cif')

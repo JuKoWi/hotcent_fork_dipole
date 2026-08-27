@@ -246,27 +246,6 @@ def identical_phi2():
 
     print(equivalence_classes)
     print(len(equivalence_classes.keys()))
-    
-# def identical_phi3():
-#     unique_integrals = []
-#     unique_indices = []
-#     equivalence_classes = {}
-
-#     count = 0
-#     for name_i, i in first_center.items():
-#         for name_j, j in operator.items():
-#             for name_k, k in second_center.items():
-#                 integral = integrate(i[0] *j[0]*  k[0], (phi, 0, 2 * pi))
-#                 if integral != 0:
-#                     if not integral in unique_integrals:
-#                        unique_integrals.append(integral) 
-#                        unique_indices.append(count)
-#                        equivalence_classes[count] = []
-#                     equivalence_classes[unique_indices[unique_integrals.index(integral)]].append(count)
-#                 count += 1
-
-#     print(equivalence_classes)
-#     print(len(equivalence_classes.keys()))
 
 def identical_phi3():
     unique_integrals = []
@@ -292,6 +271,29 @@ def identical_phi3():
     print(equivalence_classes)
     print(len(equivalence_classes.keys()))
 
+def identical_atomic_transitions():
+    unique_integrals = []
+    unique_indices = []
+    equivalence_classes = {}
+    count = 0
+    for name_i, i in first_center.items():
+        for name_j, j in operator.items():
+            for name_k, k in second_center.items():
+                integral = integrate(integrate(i[0]*j[0]*k[0].subs(theta2, theta1)*sin(theta1), (phi, 0, 2*pi)), (theta1, 0, pi))
+                if integral != 0:
+                    if integral in unique_integrals:
+                        pos, sign = unique_integrals.index(integral), 1
+                    elif -integral in unique_integrals:
+                        pos, sign = unique_integrals.index(-integral), -1
+                    else:
+                        unique_integrals.append(integral)
+                        unique_indices.append(count)
+                        equivalence_classes[count] = []
+                        pos, sign = len(unique_integrals) - 1, 1
+                    equivalence_classes[unique_indices[pos]].append(sign * count)
+                count += 1
+    print(equivalence_classes)
+    print(len(equivalence_classes.keys()))
 
 def pick_quantum_number(dictionary, lm):
     """map from quantum numbers to respective (function, l,m) """
@@ -426,7 +428,6 @@ if __name__ == "__main__":
     # print_overlap_derivatives()
     # interchange_related_phi2()
     # identical_phi2()
-    # {102: [102], 85: [85, 119], 68: [68, 136], 38: [38, -98], 21: [21, 55, -81, -115], 34: [34], 17: [17, 51], 6: [6, 96], 2: [2, -32], 0: [0]}
-    # {102: [102], 85: [85, 119], 68: [68, 136], 38: [38], 21: [21, 55], 34: [34], 17: [17, 51], 6: [6], 2: [2], 0: [0]}
-    identical_phi3()
+    # identical_phi3()
+    identical_atomic_transitions()
 

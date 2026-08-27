@@ -1,7 +1,10 @@
+"""
+Script for calculating two center integrals in the Slater-Koster formalism
+i.e. applying the Slater-Koster transformation rules
+"""
 import numpy as np
-import time
 import os
-from hotcent.pos_op.rotation_transform import Wigner_D_real, to_spherical 
+from hotcent.pos_op.rotation_transform import to_spherical 
 from pathlib import Path
 import itertools
 import sympy as sym 
@@ -12,14 +15,32 @@ from ase import Atoms
 from ase.neighborlist import *
 from hotcent.pos_op.utils import *
 from hotcent.pos_op.integrals import get_index_list_dipole, get_index_list_overlap
-from hotcent.pos_op.slako_dipole import INTEGRALS_POSOP, UNIQUE_INTEGRALS_POSOP, EQUIVALENT_INTEGRALS_POSOP
-from hotcent.pos_op.slako_new import INTEGRALS, convert_sk_table, UNIQUE_INTEGRALS, EQUIVALENT_INTEGRALS
-# from hotcent.pos_op.skrules import matrix_elements
-# from hotcent.pos_op.skrules_posop import matrix_elements_posop
-from hotcent.pos_op.rot_trans_explicit import D_SYMB, BETA, GAMMA
+from hotcent.pos_op.slako_dipole import (INTEGRALS_POSOP, 
+                                        UNIQUE_INTEGRALS_POSOP, 
+                                        EQUIVALENT_INTEGRALS_POSOP,
+                                        ALL_NONZERO_PHI3, 
+                                        full_to_unique_posop,
+                                        unique_to_full_posop,
+                                        EQUIVALENT_ATOMIC_TRANSITIONS,
+                                        index_to_quantnum_posop,
+                                        UNIQUE_ATOMIC_TRANSITIONS,
+)
+from hotcent.pos_op.slako_new import (INTEGRALS, 
+                                      dftbplus_to_full, 
+                                      UNIQUE_INTEGRALS, 
+                                      EQUIVALENT_INTEGRALS, 
+                                      ALL_NONZERO_PHI2, 
+                                      full_to_unique,
+                                      unique_to_full,
+)
+from hotcent.pos_op.generate_sk_rules import D_SYMB, BETA, GAMMA
 from hotcent.pos_op.skrules_mini_cse import matrix_elements
 from hotcent.pos_op.skrules_posop_mini_cse import matrix_elements_posop
 
+OPERATOR_TYPES = ['S', 'H', 'r']
+FILE_FORMAT_OPTIONS = ['unique', 'full', 'DFTB+']
+EINSUM = False
+VERBOSE = False
 
 class SlaterKosterIntegrator:
     """Takes .skf files in the long (partially redundant) format  used throughout new_dipole/ and calculates the real space matrix elements 
@@ -45,7 +66,7 @@ class SlaterKosterIntegrator:
         atomic units except angstrom
     """
 
-    def __init__(self, atoms_unit_cell, skpath, skpath_posop, maxl_dict, conventional_skf):
+    def __init__(self, atoms_unit_cell, skpath, skpath_posop, maxl_dict, format='unique'):
         """
         atoms_unit_cell: ase.Atoms object containing information about unit cell parameters and unit cell content
         skpath: directory path to .skf files for H and S
@@ -55,6 +76,8 @@ class SlaterKosterIntegrator:
                             the conventional format contains 10 columns for H and S respectively, the long format
                             contains 44 (number of nonzero phi^(2)- integrals) for S and H respectively
         """
+        if not (format in FILE_FORMAT_OPTIONS):
+            raise ValueError(f"{format} is invalid file format option. Available formats: {FILE_FORMAT_OPTIONS}")
         self.aseAtoms = atoms_unit_cell
         self.abc = atoms_unit_cell.get_cell()
         self.atomtypes = atoms_unit_cell.get_chemical_symbols()
@@ -90,8 +113,8 @@ class SlaterKosterIntegrator:
 
         self.sorted_integrals = sorted(INTEGRALS, key= lambda x: x[0])
         self.sorted_integrals_dipole = sorted(INTEGRALS_POSOP, key=lambda x: x[0])
-        self._create_SH_file_dict(conventional_skf)
-        self._create_dipole_file_dict()
+        self._create_SH_file_dict(format)
+        self._create_dipole_file_dict(format)
 
         self.contraction_path = None
         self.contraction_path_posop = None
@@ -114,7 +137,7 @@ class SlaterKosterIntegrator:
             cutoff_dict[pair] = bohr_to_angstrom(max_r)
         self.cutoff_dict = cutoff_dict
 
-    def _read_sk_file_conventional(self, elem_pair):
+    def _read_sk_file_dftbplus(self, elem_pair):
         """read a Slater-Koster file of the conventional format as used by DFTB+ for example
             elem_pair: ordered 2-tuple of elements
         """
@@ -125,7 +148,9 @@ class SlaterKosterIntegrator:
         file_interchanged = Path(path_interchanged)
         assert file.is_file()
         assert file_interchanged.is_file()
-        sk_table_H, sk_table_S = convert_sk_table(path1=path, path2=path_interchanged) 
+        sk_table_H, sk_table_S = dftbplus_to_full(path1=path, path2=path_interchanged) 
+        sktable_S_unique = full_to_unique(sk_table_S)
+        sktable_H_unique = full_to_unique(sk_table_H)
         with open(path, "r") as f:
             line1 = f.readline().strip()
             line1 = line1.replace(',', ' ')
@@ -144,16 +169,16 @@ class SlaterKosterIntegrator:
             delta_R, n_points = bohr_to_angstrom(float(parts[0])), int(parts[1])
         if not homonuclear:
             extended -= 1
-        assert np.shape(sk_table_H)[0] == n_points
-        assert np.shape(sk_table_S)[0] == n_points
-        return delta_R, n_points, sk_table_S, sk_table_H, same_atom
+        assert np.shape(sktable_H_unique)[0] == n_points
+        assert np.shape(sktable_S_unique)[0] == n_points
+        return delta_R, n_points, sktable_S_unique, sktable_H_unique, same_atom
 
-    def _read_sk_file(self, elem_pair, dipole=False):
+    def _read_sk_file_full(self, elem_pair, dipole):
         """returns dr, Nr and the table(s) for a .skf file or the dipole equivalent"""
         if dipole:
-            path = self.skpath_dipole + f"/{elem_pair[0]}-{elem_pair[1]}.skf" #write conditional for dipole
+            path = self.skpath_dipole + f"/{elem_pair[0]}-{elem_pair[1]}.skf" 
         else:
-            path = self.skpath + f"/{elem_pair[0]}-{elem_pair[1]}.skf" #write conditional for dipole
+            path = self.skpath + f"/{elem_pair[0]}-{elem_pair[1]}.skf" 
         myfile = Path(path)
         assert myfile.is_file()
         homonuclear = (elem_pair[0] == elem_pair[1])
@@ -177,24 +202,90 @@ class SlaterKosterIntegrator:
         data = np.loadtxt(path, skiprows=3+extended)
         if dipole:
             sk_table_r = bohr_to_angstrom(data)
+            sk_table_r_unique = full_to_unique_posop(sk_table_r)
+            for i, integral in enumerate(UNIQUE_INTEGRALS_POSOP): # verify that columns that should be equal are equal
+                for equivalent in EQUIVALENT_INTEGRALS_POSOP[integral]:
+                    idx = ALL_NONZERO_PHI3.index(abs(equivalent))
+                    sign = -1 if equivalent < 0 else 1
+                    if not np.allclose(sk_table_r_unique[:,i], sign * sk_table_r[:,idx]):
+                        raise ValueError(f"Equivalent columns in {myfile} are not identical")
             sorted_labels = sorted(INTEGRALS_POSOP.keys(), key=lambda x: x[0])
             sorted_labels = [l[1:] for l in sorted_labels]
             if homonuclear:
-                assert len(sorted_labels) == len(same_atom)
-                atom_transitions = dict(zip(sorted_labels, [bohr_to_angstrom(float(i)) for i in same_atom]))
+                if not (len(same_atom) == len(UNIQUE_ATOMIC_TRANSITIONS)):
+                    raise ValueError(f"Incorrect number of distinct atomic transition in {myfile}")
+                atom_transitions = [bohr_to_angstrom(float(i)) for i in same_atom]
         else:
             sk_table_S = data[:, len(self.sk_int_idx):] 
             sk_table_H = data[:, :len(self.sk_int_idx)]
-        assert np.shape(data)[0] == n_points
+            sktable_S_unique = full_to_unique(sk_table_S)
+            sktable_H_unique = full_to_unique(sk_table_H)
+            for i, integral in enumerate(UNIQUE_INTEGRALS):
+                for equivalent in EQUIVALENT_INTEGRALS[integral]:
+                    idx = ALL_NONZERO_PHI2.index(equivalent)
+                    H_is_same = np.allclose(sktable_H_unique[:,i], sk_table_H[:,idx])
+                    S_is_same = np.allclose(sktable_S_unique[:,i], sk_table_S[:,idx])
+                    if not (H_is_same and S_is_same):
+                        raise ValueError(f"Equivalent columns in {myfile} are not identical")
+        if not (np.shape(data)[0] == n_points):
+            raise ValueError(f"{elem_pair}.skf table block does not match the number of distance points in the header")
         if not homonuclear:
             same_atom = None
             atom_transitions = None
         if dipole:
-            return delta_R, n_points, sk_table_r, atom_transitions 
+            return delta_R, n_points, sk_table_r_unique, atom_transitions 
         else:
-            return delta_R, n_points, sk_table_S, sk_table_H, same_atom
+            return delta_R, n_points, sktable_S_unique, sktable_H_unique, same_atom
+
+    def _read_sk_file_unique(self, elem_pair, dipole):
+        if dipole:
+            path = self.skpath_dipole + f"/{elem_pair[0]}-{elem_pair[1]}.skf" 
+        else:
+            path = self.skpath + f"/{elem_pair[0]}-{elem_pair[1]}.skf" 
+        myfile = Path(path)
+        if not myfile.is_file():
+            raise ValueError(f"Could not find file {myfile}")
+        homonuclear = (elem_pair[0] == elem_pair[1])
+        with open(path, "r") as f:
+            line1 = f.readline().strip()
+            line1 = line1.replace(',', ' ')
+            line2 = f.readline()
+            line2 = line2.replace(',', ' ')
+            extended = 1 if line1.startswith('@') else 0
+            if extended == 0:
+                parts = [p.strip() for p in line1.split()]
+                if homonuclear:
+                    same_atom = line2.split()
+                    if not dipole:
+                        same_atom = np.flip(same_atom[:3])
+            if extended == 1:
+                parts = [p.strip() for p in line2.split()]
+            delta_R, n_points = bohr_to_angstrom(float(parts[0])), int(parts[1])
+        if not homonuclear:
+            extended -= 1
+        data = np.loadtxt(path, skiprows=3+extended)
+        if dipole:
+            sk_table_r_unique = bohr_to_angstrom(data)
+            sorted_labels = sorted(INTEGRALS_POSOP.keys(), key=lambda x: x[0])
+            sorted_labels = [l[1:] for l in sorted_labels]
+            if homonuclear:
+                if not (len(same_atom) == len(UNIQUE_ATOMIC_TRANSITIONS)):
+                    raise ValueError(f"Incorrect number of distinct atomic transition in {myfile}")
+                atom_transitions = [bohr_to_angstrom(float(i)) for i in same_atom]
+        else:
+            sktable_S_unique = data[:, len(UNIQUE_INTEGRALS):] 
+            sktable_H_unique = data[:, :len(UNIQUE_INTEGRALS)]
+        if not (np.shape(data)[0] == n_points):
+            raise ValueError(f"{elem_pair}.skf table block does not match the number of distance points in the header")
+        if not homonuclear:
+            same_atom = None
+            atom_transitions = None
+        if dipole:
+            return delta_R, n_points, sk_table_r_unique, atom_transitions 
+        else:
+            return delta_R, n_points, sktable_S_unique, sktable_H_unique, same_atom
         
-    def _create_SH_file_dict(self, conventional_skf):
+    def _create_SH_file_dict(self, format):
         """create a dictionary where for every ordered element pair there is a SKTable object,
         that contains all the information from the .skf file
         conventional_skf: whether to use DFTB+ file format for H/S
@@ -202,23 +293,32 @@ class SlaterKosterIntegrator:
         S_sk_dict = {}
         H_sk_dict = {}
         for element_comb in self.elem_pairs:
-            if conventional_skf:
-                delta_R, n_points, S, H, eigvals  = self._read_sk_file_conventional(elem_pair=element_comb)
+            if format == "DFTB+":
+                delta_R, n_points, S, H, eigvals  = self._read_sk_file_dftbplus(elem_pair=element_comb)
+            elif format == "full":
+                delta_R, n_points, S, H, eigvals  = self._read_sk_file_full(elem_pair=element_comb, dipole=False)
+            elif format == "unique":
+                delta_R, n_points, S, H, eigvals = self._read_sk_file_unique(elem_pair=element_comb, dipole=False)
             else:
-                delta_R, n_points, S, H, eigvals  = self._read_sk_file(elem_pair=element_comb, dipole=False)
-            S_sk_dict[element_comb] = SKTable(table=S, deltaR=delta_R, n_points=n_points, same_atom=[1,1,1]) #assume the atomic functions to be orthonormal
-            H_sk_dict[element_comb] = SKTable(table=H, deltaR=delta_R, n_points=n_points, same_atom=eigvals)
+                raise ValueError(f"Reading routine for file format {format} not implemented")
+            S_sk_dict[element_comb] = SKTable(table_type='S', table=S, deltaR=delta_R, n_points=n_points, same_atom=[1,1,1]) #assume the atomic functions to be orthonormal
+            H_sk_dict[element_comb] = SKTable(table_type='H', table=H, deltaR=delta_R, n_points=n_points, same_atom=eigvals)
         self.S_sk_tables = S_sk_dict
         self.H_sk_tables = H_sk_dict
     
-    def _create_dipole_file_dict(self):
+    def _create_dipole_file_dict(self, format):
         """create a dictionary where for every element combination there is a SKTable object,
         that contains all the information from the .skf file
         """
         r_sk_dict = {}
         for element_comb in self.elem_pairs:
-            delta_R, n_points, r, atom_transitions = self._read_sk_file(elem_pair=element_comb, dipole=True)
-            r_sk_dict[element_comb] = SKTable(table=r, deltaR=delta_R, n_points=n_points, same_atom=atom_transitions)
+            if (format == 'DFTB+' or format == 'unique'):
+                delta_R, n_points, r, atom_transitions = self._read_sk_file_unique(elem_pair=element_comb, dipole=True)
+            elif format == 'full':
+                delta_R, n_points, r, atom_transitions = self._read_sk_file_full(elem_pair=element_comb, dipole=True)
+            else:
+                raise ValueError(f"Reading routine for file format {format} not implemented for position operator") 
+            r_sk_dict[element_comb] = SKTable(table_type='r', table=r, deltaR=delta_R, n_points=n_points, same_atom=atom_transitions)
         self.r_sk_tables = r_sk_dict
 
     def _set_euler_angles(self, vec1, vec2):
@@ -259,46 +359,44 @@ class SlaterKosterIntegrator:
         """
         if operator == 'r':
             assert sk_table_dipole != None
+            assert sk_table.type == 'S'
         R_vec = posB - posA
         R = np.linalg.norm(R_vec)
-        euler_theta, euler_phi, euler_gamma= self._set_euler_angles(vec1=posA, vec2=posB)
-        D_single = np.array(self.D_symb(euler_theta, euler_phi), dtype=float)
-        l, m, n = self._get_direction_cosines(vec1=posA, vec2=posB)
 
-        integral_vec = np.zeros((len(self.quant_nums))) 
-        integral_vec[self._scatter_sk] = sk_table.spline(R)
-        M_minimal = np.zeros((len(UNIQUE_INTEGRALS)))
-        for i, num in enumerate(UNIQUE_INTEGRALS):
-            M_minimal[i] = integral_vec[num]
-        M = np.reshape(integral_vec, (16,16))
-        # if self.contraction_path is None:
-        #     self.contraction_path = np.einsum_path('ab,bc,dc -> ad', D_single, M, D_single, optimize='optimal')[0]
-        # integrals = np.einsum('ab,bc,dc -> ad', D_single, M, D_single, optimize=self.contraction_path).flatten()
-        # integrals = matrix_elements(X=M, l=l, m=m, n=n).flatten()
-        integrals = matrix_elements(X=M_minimal, l=l, m=m, n=n).flatten()
-        # print(f"maximal imaginary integral value {np.max(np.abs(np.imag(integrals)))}")
+        if EINSUM:
+            euler_theta, euler_phi, euler_gamma= self._set_euler_angles(vec1=posA, vec2=posB)
+            D_single = np.array(self.D_symb(euler_theta, euler_phi), dtype=float)
+            integral_vec = np.zeros((len(self.quant_nums))) 
+            integral_vec[self._scatter_sk] = sk_table.spline_full(R)
+            M = np.reshape(integral_vec, (16,16))
+            if self.contraction_path is None:
+                self.contraction_path = np.einsum_path('ab,bc,dc -> ad', D_single, M, D_single, optimize='optimal')[0]
+            integrals = np.einsum('ab,bc,dc -> ad', D_single, M, D_single, optimize=self.contraction_path).flatten()
+            if operator == 'r':
+                idx_pstart = 1
+                idx_pend = 3
+                D_r = D_single[idx_pstart:idx_pend+1, idx_pstart:idx_pend+1]
+                spline_eval_posop = sk_table_dipole.spline_full(R)
+                integral_vec_dipole = np.zeros((len(self.quant_nums_posop)))
+                for i, key in enumerate(self.sorted_integrals_dipole):
+                    integral_vec_dipole[key[0]] = spline_eval_posop[i]
+                M_posop = np.reshape(integral_vec_dipole, (16,3,16))
+                if self.contraction_path_posop is None:
+                    self.contraction_path_posop = np.einsum_path('ai, bj, ck, ijk -> abc', D_single, D_r, D_single, M_posop, optimize='optimal')[0]
+                position_elements = np.einsum('ai, bj, ck, ijk -> abc', D_single, D_r, D_single, M_posop, optimize=self.contraction_path_posop).flatten()
+        else:
+            l, m, n = self._get_direction_cosines(vec1=posA, vec2=posB)
+            integral_vec = sk_table.spline(R)
+            integrals = matrix_elements(X=integral_vec, l=l, m=m, n=n).flatten()
+            if operator == 'r':
+                integral_vec_posop = sk_table_dipole.spline(R)
+                position_elements = matrix_elements_posop(X=integral_vec_posop, l=l, m=m, n=n).flatten()
+
+        if VERBOSE:
+            print(f"maximal imaginary integral value {np.max(np.abs(np.imag(integrals)))}")
+            print(f"maximal imaginary position integral value {np.max(np.abs(np.imag(position_elements)))}")
 
         if operator == 'r':
-
-            idx_pstart = 1
-            idx_pend = 3
-            # D_r = D_single[idx_pstart:idx_pend+1, idx_pstart:idx_pend+1]
-
-            integral_vec_dipole = np.zeros((len(self.quant_nums_posop)))
-            spline_eval_posop = sk_table_dipole.spline(R)
-            for i, key in enumerate(self.sorted_integrals_dipole):
-                integral_vec_dipole[key[0]] = spline_eval_posop[i]
-            M_posop_minimal = np.zeros((len(UNIQUE_INTEGRALS_POSOP)))
-            for i, num in enumerate(UNIQUE_INTEGRALS_POSOP):
-                M_posop_minimal[i] = integral_vec_dipole[num]
-            M_posop = np.reshape(integral_vec_dipole, (16,3,16))
-            # if self.contraction_path_posop is None:
-            #     self.contraction_path_posop = np.einsum_path('ai, bj, ck, ijk -> abc', D_single, D_r, D_single, M_posop, optimize='optimal')[0]
-            # position_elements1 = np.einsum('ai, bj, ck, ijk -> abc', D_single, D_r, D_single, M_posop, optimize=self.contraction_path_posop).flatten()
-            # position_elements = matrix_elements_posop(X=M_posop, l=l, m=m, n=n).flatten()
-            position_elements = matrix_elements_posop(X=M_posop_minimal, l=l, m=m, n=n).flatten()
-            # print(f"maximal imaginary position integral value {np.max(np.abs(np.imag(dipole_elements)))}")
-
             #consider origin shift
             orbitals_overall = 16
             overlap_blocks = integrals.reshape(orbitals_overall, orbitals_overall)
@@ -442,6 +540,10 @@ class SlaterKosterIntegrator:
             if same_atom:
                 integral_dict = sk_table_dipole.same_atom_vals
                 block = self._select_dipole_matrix_elements(max_lA=max_lA, max_lB=max_lB, integral_dict=integral_dict)
+                if max_lA >= 1:
+                    assert np.any(np.abs(block) > 1e-12), (
+                        f"on-site dipole block for {types} is entirely zero; "
+                        f"s-p transitions must be nonzero")
                 n_orbs = get_norbs(maxl=max_lA)
                 for c in range(3):
                     block[c] += posA[c] * np.eye(n_orbs)
@@ -617,12 +719,31 @@ class SKTable:
     """object to store all information from .skf file for one physical quantity 
         (S, H or r)
     """
-    def __init__(self, table, deltaR, n_points, same_atom=None):
-        self.table = table #first dimension distance, second dimension integral index
+    def __init__(self, table_type, table, deltaR, n_points, same_atom=None):
+        assert table_type in OPERATOR_TYPES
+        self.type = table_type
+        self.table = table #first dimension distance, second dimension integral index, contains only unique values
         self.deltaR = deltaR
         self.n_points = n_points
-        self.same_atom_vals = same_atom #list for S and H, dict for r
+        self.same_atom_vals = None #list for S and H, dict for r
         self._spline = None
+        self._spline_full = None
+        if table_type in ['S', 'H']:
+            self.same_atom_vals = same_atom
+            self.table_full = unique_to_full(table)
+            assert np.shape(table)[1] == len(UNIQUE_INTEGRALS)
+        if table_type == 'r':
+            if same_atom != None:
+                atom_transition_dict = {}
+                for i,num_trans in enumerate(EQUIVALENT_ATOMIC_TRANSITIONS):
+                    for equivalent in EQUIVALENT_ATOMIC_TRANSITIONS[num_trans]:
+                        quantum_number = index_to_quantnum_posop(abs(equivalent))
+                        sign = -1 if equivalent < 0 else 1
+                        atom_transition_dict[quantum_number] = sign * same_atom[i]
+                self.same_atom_vals = atom_transition_dict
+                sample = next(iter(atom_transition_dict))
+            self.table_full = unique_to_full_posop(table)
+            assert np.shape(table)[1] == len(UNIQUE_INTEGRALS_POSOP)
 
     @property
     def spline(self):
@@ -630,3 +751,10 @@ class SKTable:
             R_grid = self.deltaR + self.deltaR * np.arange(self.n_points)
             self._spline = CubicSpline(R_grid, self.table)
         return self._spline
+
+    @property
+    def spline_full(self):
+        if self._spline_full is None:
+            R_grid = self.deltaR + self.deltaR * np.arange(self.n_points)
+            self._spline_full = CubicSpline(R_grid, self.table_full)
+        return self._spline_full

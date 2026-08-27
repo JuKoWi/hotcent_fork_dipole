@@ -64,19 +64,19 @@ rmin, dr, N = 0.4, 0.02, 600
 
 off2chBN = Offsite2cTable(atomN, atomB, timing=True)
 off2chBN.run(rmin, dr, N, xc=xc)
-off2chBN.write(dftbplus_format=False) 
-off2chBN.write(dftbplus_format=True, filename_template='{el1}-{el2}dftb.skf')  
+off2chBN.write(format=False) 
+off2chBN.write(format=True, filename_template='{el1}-{el2}dftb.skf')  
 
 off2cN = Offsite2cTable(atomN, atomN, timing=True)
 off2cN.run(rmin, dr, N, xc=xc)
-off2cN.write(dftbplus_format=False, eigenvalues=eigenvaluesN) 
-off2cN.write(dftbplus_format=True, eigenvalues=eigenvaluesN, filename_template='{el1}-{el2}dftb.skf')  
+off2cN.write(format=False, eigenvalues=eigenvaluesN) 
+off2cN.write(format=True, eigenvalues=eigenvaluesN, filename_template='{el1}-{el2}dftb.skf')  
 
 
 off2cB = Offsite2cTable(atomB, atomB, timing=True)
 off2cB.run(rmin, dr, N, xc=xc)
-off2cB.write(dftbplus_format=False, eigenvalues=eigenvaluesB) 
-off2cB.write(dftbplus_format=True, eigenvalues=eigenvaluesB, filename_template='{el1}-{el2}dftb.skf')  
+off2cB.write(format=False, eigenvalues=eigenvaluesB) 
+off2cB.write(format=True, eigenvalues=eigenvaluesB, filename_template='{el1}-{el2}dftb.skf')  
 
 
 # # Compute Integrals for dipole

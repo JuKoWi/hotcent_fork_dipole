@@ -76,19 +76,19 @@ rmin, dr, N = 0.4, 0.02, 900
 
 off2cMoS = Offsite2cTable(atomGa, atomAs, timing=True)
 off2cMoS.run(rmin, dr, N, xc=xc, nr=200, ntheta=400, wflimit=1e-9)
-off2cMoS.write(dftbplus_format=False) 
-off2cMoS.write(dftbplus_format=True, filename_template='{el1}-{el2}dftb.skf')  
+off2cMoS.write(format=False) 
+off2cMoS.write(format=True, filename_template='{el1}-{el2}dftb.skf')  
 
 off2cS = Offsite2cTable(atomGa, atomGa, timing=True)
 off2cS.run(rmin, dr, N, xc=xc, nr=200, ntheta=400, wflimit=1e-9)
-off2cS.write(dftbplus_format=False, eigenvalues=eigenvaluesGa) 
-off2cS.write(dftbplus_format=True, eigenvalues=eigenvaluesGa, filename_template='{el1}-{el2}dftb.skf')  
+off2cS.write(format=False, eigenvalues=eigenvaluesGa) 
+off2cS.write(format=True, eigenvalues=eigenvaluesGa, filename_template='{el1}-{el2}dftb.skf')  
 
 
 off2cMo = Offsite2cTable(atomAs, atomAs, timing=True)
 off2cMo.run(rmin, dr, N, xc=xc, nr=200, ntheta=400, wflimit=1e-9)
-off2cMo.write(dftbplus_format=False, eigenvalues=eigenvaluesAs) 
-off2cMo.write(dftbplus_format=True, eigenvalues=eigenvaluesAs, filename_template='{el1}-{el2}dftb.skf')  
+off2cMo.write(format=False, eigenvalues=eigenvaluesAs) 
+off2cMo.write(format=True, eigenvalues=eigenvaluesAs, filename_template='{el1}-{el2}dftb.skf')  
 
 
 # # Compute Integrals for dipole

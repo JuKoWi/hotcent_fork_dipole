@@ -1,17 +1,15 @@
+"""
+Script for deriving and testing a symbolic expression for the Wigner D matrix for real
+spherical harmonics
+"""
 import numpy as np
 import sympy as sp
 import pickle
 from hotcent.pos_op.integrals import first_center, phi, theta1, first_center_complex, operator
 
-L, M, N = sp.symbols('l, m, n', real=True)
-
 ALPHA = sp.symbols('alpha', real=True)
 BETA = sp.symbols('beta', real=True)
 GAMMA =sp.symbols('gamma', real=True)
-
-PHI = sp.symbols('phi', real=True)
-THETA = sp.symbols('theta', real=True)
-GAMMA = sp.symbols('gamma', real=True)
 
 def d_mat_elem(l, m, n, beta):
     """single element for small Wigner matrix d"""
@@ -58,7 +56,7 @@ def z_rot_mat(alpha):
 def Wigner_D_complex(euler_alpha, euler_beta, euler_gamma):
     """
     rotation matrix for complex harmonics for rotation sequence
-    Rz(gamma)Ry(theta)Rz(phi)
+    Rz(alpha)Ry(beta)Rz(gamma)
     """
     Dz = z_rot_mat(alpha=euler_alpha)
     dy = d_mat(beta=euler_beta)
@@ -70,7 +68,7 @@ def Wigner_D_complex(euler_alpha, euler_beta, euler_gamma):
 def Wigner_D_real(euler_alpha, euler_beta, euler_gamma, save=True):
     """
     Rotation matrix for real spherical harmonics for rotation sequence
-    Rz(phi)Ry(theta)Rz(gamma)
+    Rz(alpha)Ry(beta)Rz(gamma)
     """
     transform_to_real = sp.zeros(16, 16)
 
@@ -216,7 +214,7 @@ def check_rotation_complex():
         func_val = func.subs({phi:phi1_val, theta1: theta1_val})
         func_val = func_val.evalf()
         func_vec[i] = func_val
-    D_func = sp.lambdify((PHI, THETA, GAMMA), Wigner_D_complex(euler_alpha=PHI,euler_beta=THETA, euler_gamma=GAMMA).T, 'numpy')
+    D_func = sp.lambdify((ALPHA, BETA, GAMMA), Wigner_D_complex(euler_alpha=ALPHA,euler_beta=BETA, euler_gamma=GAMMA).T, 'numpy')
     D = D_func(0, -random_theta, -random_phi)
     result_vec = D @ func_vec
     val1_vec = np.zeros((16,), 'complex')
@@ -249,8 +247,8 @@ def check_rotation():
         func_val = func.subs({phi:phi1_val, theta1: theta1_val})
         func_val = func_val.evalf()
         func_vec[i] = func_val
-    D_sym = Wigner_D_real(euler_alpha=PHI, euler_beta=THETA, euler_gamma=GAMMA)
-    D = sp.lambdify((PHI,THETA, GAMMA), D_sym, 'numpy')
+    D_sym = Wigner_D_real(euler_alpha=ALPHA, euler_beta=BETA, euler_gamma=GAMMA)
+    D = sp.lambdify((ALPHA,BETA, GAMMA), D_sym, 'numpy')
     D = np.real(D(0, -random_theta, -random_phi))
     result_vec = D @ func_vec
     val1_vec = np.zeros((16,))
@@ -279,8 +277,8 @@ def check_rotation_prod():
             func_val2 = func_val2.evalf()
             func_vec[count] = func_val * func_val2
             count += 1
-    D_sym = Wigner_D_real(euler_alpha=PHI, euler_beta=THETA, euler_gamma=GAMMA)
-    D = sp.lambdify((PHI, THETA, GAMMA), D_sym, 'numpy')
+    D_sym = Wigner_D_real(euler_alpha=ALPHA, euler_beta=BETA, euler_gamma=GAMMA)
+    D = sp.lambdify((ALPHA, BETA, GAMMA), D_sym, 'numpy')
     D = np.real(D(0,-random_theta, -random_phi))
     D_tot = np.kron(D, D)
     result_vec = D_tot @ func_vec
@@ -318,8 +316,8 @@ def check_rot_triple():
                 op_val = op_val.evalf()
                 func_vec[count] = func_val * func_val2 * op_val
                 count += 1
-    D_sym = Wigner_D_real(euler_alpha=PHI, euler_gamma=GAMMA, euler_beta=THETA)
-    D = sp.lambdify((PHI, THETA, GAMMA), D_sym, 'numpy')
+    D_sym = Wigner_D_real(euler_alpha=ALPHA, euler_beta=BETA, euler_gamma=GAMMA)
+    D = sp.lambdify((ALPHA, BETA, GAMMA), D_sym, 'numpy')
     D = np.real(D(0, -random_theta, -random_phi))
     D_op = D[1:4, 1:4]
     D_tot = np.kron(D, np.kron(D_op, D))
@@ -368,10 +366,11 @@ def check_vec_rotation():
     
     
 if __name__ == "__main__":
-    # check_rotation_complex()
-    # check_rotation()
-    # check_rotation_prod()
-    # check_rot_triple()
-    # print(sp.trigsimp(sp.expand_complex(Wigner_D_real(euler_alpha=ALPHA, euler_beta=BETA, euler_gamma=GAMMA).subs(ALPHA,0))))
-    print(sp.expand_trig(sp.expand_complex(Wigner_D_real(euler_alpha=ALPHA, euler_beta=BETA, euler_gamma=GAMMA))))
+    check_vec_rotation()
+    check_rot_triple()
+    check_harmonics_equal()
+    check_rotation_prod()
+    check_rotation()
+    check_rotation_complex()
+    print(sp.simplify(sp.expand_complex(Wigner_D_real(euler_alpha=0, euler_beta=BETA, euler_gamma=GAMMA))))
         

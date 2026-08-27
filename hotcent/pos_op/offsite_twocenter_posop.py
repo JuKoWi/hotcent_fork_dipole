@@ -5,7 +5,16 @@ from ase.data import atomic_numbers, atomic_masses, covalent_radii
 from hotcent.multiatom_integrator import MultiAtomIntegrator
 from hotcent.pos_op.integrals import first_center, second_center, operator, pick_quantum_number, phi, theta1, theta2
 from hotcent.interpolation import CubicSplineFunction
-from hotcent.pos_op.slako_dipole import (INTEGRALS_POSOP, select_integrals, NUMSK, phi3, tail_smoothening, write_skf)
+from hotcent.pos_op.slako_dipole import (INTEGRALS_POSOP, 
+                                        UNIQUE_ATOMIC_TRANSITIONS,
+                                         select_integrals, 
+                                         NUMSK_POSOP, 
+                                         phi3, 
+                                         tail_smoothening, 
+                                         write_skf,
+                                         full_to_unique_posop,
+                                         index_to_quantnum_posop,
+                                         )
 import matplotlib.pyplot as plt
 from scipy.integrate import trapezoid
 
@@ -75,7 +84,7 @@ class Offsite2cTablePosOp(MultiAtomIntegrator):
             selected = select_integrals(e1, e2)
             for bas1 in range(len(e1.basis_sets)):
                 for bas2 in range(len(e2.basis_sets)):
-                    tables[(p, bas1, bas2)] = np.zeros((Nsub, NUMSK))
+                    tables[(p, bas1, bas2)] = np.zeros((Nsub, NUMSK_POSOP))
 
         for i, R in enumerate(Rgrid):
             if R > 2 * wf_range:
@@ -104,8 +113,8 @@ class Offsite2cTablePosOp(MultiAtomIntegrator):
         if stride > 1:
             self.tables = {}
             for key in tables:
-                self.tables[key] = np.zeros((N, NUMSK))
-                for i in range(NUMSK):
+                self.tables[key] = np.zeros((N, NUMSK_POSOP))
+                for i in range(NUMSK_POSOP):
                     spl = CubicSplineFunction(Rgrid, tables[key][:, i])
                     self.tables[key][:, i] = spl(self.Rgrid)
         else:
@@ -114,7 +123,7 @@ class Offsite2cTablePosOp(MultiAtomIntegrator):
         if smoothen_tails:
             # Smoothen the curves near the cutoff
             for key in self.tables:
-                for i in range(NUMSK):
+                for i in range(NUMSK_POSOP):
                     self.tables[key][:, i] = \
                             tail_smoothening(self.Rgrid, self.tables[key][:, i])
         
@@ -131,7 +140,8 @@ class Offsite2cTablePosOp(MultiAtomIntegrator):
         assert sym1 == sym2
         dr = 0.001
         r = np.arange(start=0, stop=self.wf_range, step=dr)
-        for label in INTEGRALS_POSOP.keys(): 
+        for integral_num in UNIQUE_ATOMIC_TRANSITIONS:
+            label = (integral_num, *index_to_quantnum_posop(integral_num))
             match = next((key for key in selected if key[0] == label), None)
             if match != None:
                 integral, nl1, nl2 = match
@@ -144,9 +154,9 @@ class Offsite2cTablePosOp(MultiAtomIntegrator):
                 angle_integral = sym.integrate(sym.integrate(Y1*Yr*Y2*sym.sin(theta1), (phi, 0, 2*sym.pi)), (theta1, 0, sym.pi))
                 radial_integral = trapezoid(y=Rnl1 * Rnl2* r**2 * r, x=r, dx=dr)
                 r_int = np.sqrt(4*np.pi/3) * radial_integral * angle_integral.evalf()
-                position_op_dict[label] = r_int
+                position_op_dict[integral_num] = r_int
             else:
-                position_op_dict[label] = 0
+                position_op_dict[integral_num] = 0
         return position_op_dict    
         
 
@@ -222,7 +232,10 @@ class Offsite2cTablePosOp(MultiAtomIntegrator):
         self.timer.stop('calculate_offsite2c')
         return Rl
 
-    def write_dipole(self, filename_template='{el1}-{el2}_dipole.skf'):
+    def write_dipole(self, format, filename_template='{el1}-{el2}_dipole.skf'):
+        FORMAT_OPTIONS = ["full", "unique"]
+        if not format in FORMAT_OPTIONS:
+            raise ValueError(f"Selected file format option not valid. Possible choises are {FORMAT_OPTIONS}")
         for p, (e1, e2) in enumerate(self.pairs):
             sym1, sym2 = e1.get_symbol(), e2.get_symbol()
             for bas1, valence1 in enumerate(e1.basis_sets):
@@ -231,93 +244,12 @@ class Offsite2cTablePosOp(MultiAtomIntegrator):
                                                         el2=sym2 + '+'*bas2)
                     mass = atomic_masses[atomic_numbers[sym1]]
                     is_extended = any([nl[1]=='f' for nl in valence1+valence2])
-                    table = self.tables[(p, bas1, bas2)]
                     has_atom_transition = sym1 == sym2 and bas1 == bas2
                     atom_transitions = None
-                    if has_atom_transition:
-                        atom_transitions = self.atom_transition_dipole
+                    atom_transitions = self.atom_transition_dipole if has_atom_transition else None
+                    if format == 'full':
+                        table = self.tables[(p, bas1, bas2)]
+                    if format == 'unique':
+                        table = full_to_unique_posop(self.tables[(p, bas1, bas2)])
                     with open(filename, 'w') as f:
-                        write_skf(handle=f, Rgrid=self.Rgrid, table=table, mass=mass, has_atom_transition=has_atom_transition, atom_transitions=atom_transitions)
-
-    def plot_minimal(self, filename=None, bas1=0, bas2=0):
-        """plot that only shows columns that are nonzero"""
-
-        self.timer.start('plotting')
-        assert plt is not None, 'Matplotlib could not be imported!'
-
-        fig = plt.figure()
-        fig.subplots_adjust(hspace=1e-4, wspace=1e-4)
-
-        el1 = self.ela.get_symbol()
-        rmax = 6 * covalent_radii[atomic_numbers[el1]] / Bohr
-        ymax = max(1, self.tables[(0, bas1, bas2)].max())
-        if self.nel == 2:
-            el2 = self.elb.get_symbol()
-            rmax = max(rmax, 6 * covalent_radii[atomic_numbers[el2]] / Bohr)
-            ymax = max(ymax, self.tables[(1, bas1, bas2)].max())
-
-        table = self.tables[(0,0,0)]
-        threshold = 1e-10
-        nonzero_col = np.where(np.any(np.abs(table) > threshold, axis=0))[0] #nonzero in skf file
-
-        for i, col in enumerate(nonzero_col): 
-            name = sorted(INTEGRALS_POSOP.items(), key=lambda x: x[0][0])[col]
-            ax = plt.subplot(len(nonzero_col)//2 +1, 2, i + 1)
-
-            for p, (e1, e2) in enumerate(self.pairs):
-                selected = select_integrals(e1, e2)
-                sk_labels = [i[0] for i in selected]
-                name = sorted(sk_labels, key= lambda x: x[0])[col]
-                
-                
-                s1, s2 = e1.get_symbol(), e2.get_symbol()
-                key = (p, bas1, bas2)
-
-                if p == 0:
-                    s = '-'
-                    lw = 1
-                    alpha = 1.0
-                else:
-                    s = '--'
-                    lw = 4
-                    alpha = 0.2
-
-                if np.all(abs(self.tables[key][:, col]) < 1e-10):
-                    ax.text(0.03, 0.5 + p * 0.15,
-                            'No %s integrals for <%s|%s>' % (name, s1, s2),
-                            transform=ax.transAxes, size=10, va='center')
-
-                    if not ax.get_subplotspec().is_last_row():
-                        plt.xticks([], [])
-                    if not ax.get_subplotspec().is_first_col():
-                        plt.yticks([], [])
-                else:
-                    plt.plot(self.Rgrid, self.tables[key][:, col] , c='r',
-                             ls=s, lw=lw, alpha=alpha)
-                    plt.axhline(0, c='k', ls='--')
-                    ax.text(0.5, 0.1 + p * 0.15, name[1:], size=10,
-                            transform=ax.transAxes)
-
-                    if ax.get_subplotspec().is_last_row():
-                        plt.xlabel('r (Bohr)')
-                    else:
-                        plt.xticks([], [])
-                    if not ax.get_subplotspec().is_first_col():
-                        plt.yticks([],[])
-
-                plt.xlim([0, rmax])
-                plt.ylim(-ymax, ymax)
-
-        plt.figtext(0.3, 0.95, 'D', color='r', size=20)
-        plt.figtext(0.38, 0.95, ' Slater-Koster tables', size=20)
-        sym1, sym2 = self.ela.get_symbol(), self.elb.get_symbol()
-        # plt.figtext(0.3, 0.92, '(thin solid: <%s|%s>, wide dashed: <%s|%s>)' \
-        #             % (sym1, sym2, sym2, sym1), size=10)
-        # plt.show()
-
-        if filename is None:
-            filename = '%s-%s_slako-dipole.pdf' % (sym1 + '+'*bas1, sym2 + '+'*bas2)
-        plt.savefig(filename, bbox_inches='tight')
-        plt.clf()
-        self.timer.stop('plotting')
-        
+                        write_skf(handle=f, Rgrid=self.Rgrid, table=table, mass=mass, has_atom_transition=has_atom_transition, atom_transitions=atom_transitions, format=format)

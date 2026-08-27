@@ -23,6 +23,6 @@ atom.run()
 rmin, dr, N = 0.5, 0.05, 250
 off2c = Offsite2cTable(atom, atom, timing=True)
 off2c.run(rmin, dr, N)
-off2c.write(dftbplus_format=True, eigenvalues=atom.enl)  # writes to default Fe-Fe_offsite2c.skf filename
+off2c.write(format=True, eigenvalues=atom.enl)  # writes to default Fe-Fe_offsite2c.skf filename
 
 

@@ -10,7 +10,20 @@ from hotcent.interpolation import CubicSplineFunction
 from hotcent.multiatom_integrator import MultiAtomIntegrator
 from hotcent.orbitals import ANGULAR_MOMENTUM
 from hotcent.xc import XC_PW92, LibXC
-from hotcent.pos_op.slako_new import INTEGRALS, NUMSK, phi2, dphi2, select_integrals, print_integral_overview, tail_smoothening, write_skf, get_hotcent_style_index, convert_table_to_dftbplus
+from hotcent.pos_op.slako_new import (INTEGRALS, 
+                                      NUMSK, 
+                                      phi2, 
+                                      dphi2, 
+                                      select_integrals, 
+                                      print_integral_overview, 
+                                      tail_smoothening, 
+                                      write_skf, 
+                                      get_hotcent_style_index, 
+                                      full_to_dftbplus, 
+                                      full_to_unique,
+                                      ALL_NONZERO_PHI2, 
+                                      UNIQUE_INTEGRALS,
+)
 try:
     import matplotlib.pyplot as plt
 except ImportError:
@@ -23,9 +36,6 @@ class Offsite2cTable(MultiAtomIntegrator):
 
     def run(self, rmin=0.4, dr=0.02, N=None, ntheta=150, nr=50, wflimit=1e-7,
             superposition='density', xc='LDA', stride=1, smoothen_tails=True, zeta=None):
-        """"
-            TODO: also included extended format for DFTB+ style skf-file
-        """
         # self.print_header()
 
         assert N is not None, 'Need to set number of grid points N!'
@@ -215,7 +225,7 @@ class Offsite2cTable(MultiAtomIntegrator):
         else:
             return Sl, Hl, H2l
 
-    def write(self, eigenvalues=None, dftbplus_format=False, hubbardvalues=None, occupations=None,
+    def write(self, eigenvalues=None, format='full', hubbardvalues=None, occupations=None,
               spe=None, offdiagonal_H=None, offdiagonal_S=None,
               filename_template='{el1}-{el2}.skf'):
         """
@@ -255,6 +265,9 @@ class Offsite2cTable(MultiAtomIntegrator):
             with '+' characters in the case of second-or-higher-zeta
             basis subsets).
         """
+        FORMAT_OPTIONS = ["full", "DFTB+", "unique"]
+        if not format in FORMAT_OPTIONS:
+            raise ValueError(f"Selected file format option not valid. Possible choises are {FORMAT_OPTIONS}")
         def copy_dict1(dict_src, dict_dest, valence):
             if dict_src is None:
                 return
@@ -301,14 +314,20 @@ class Offsite2cTable(MultiAtomIntegrator):
                         copy_dict2(offdiagonal_S, offdiag_S, valence1, valence2)
 
                     table = self.tables[(p, bas1, bas2)]
-                    if dftbplus_format:
-                        table1 = convert_table_to_dftbplus(table[:,:NUMSK])
-                        table2 = convert_table_to_dftbplus(table[:,NUMSK:])
+                    if format == "DFTB+":
+                        table1 = full_to_dftbplus(table[:,:NUMSK])
+                        table2 = full_to_dftbplus(table[:,NUMSK:])
                         table = np.concatenate((table1, table2), axis=1)
+                    elif format == "unique":
+                        table1 = full_to_unique(table[:,:NUMSK])
+                        table2 = full_to_unique(table[:,NUMSK:])
+                        table = np.concatenate((table1, table2), axis=1)
+                    elif format == "full":
+                        table = table
                     with open(filename, 'w') as f:
                         write_skf(f, self.Rgrid, table, has_diagonal_data,
                                   is_extended, eigval, hubval, occup, SPE, mass,
-                                  has_offdiagonal_data, offdiag_H, offdiag_S, dftbplus_format=dftbplus_format)
+                                  has_offdiagonal_data, offdiag_H, offdiag_S, format=format)
 
     def plot(self, filename=None, bas1=0, bas2=0):
         """

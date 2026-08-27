@@ -37,8 +37,8 @@ eigenvalues_confined = atom.enl
 rmin, dr, N = 0.4, 0.02, 900
 off2c = Offsite2cTable(atom, atom, timing=True)
 off2c.run(rmin, dr, N, xc=xc, nr=200, ntheta=400)
-off2c.write(dftbplus_format=False, eigenvalues=eigenvalues)  # writes to default Au-Au.skf filename
-off2c.write(dftbplus_format=True, eigenvalues=eigenvalues, filename_template='{el1}-{el2}dftb.skf')  
+off2c.write(format=False, eigenvalues=eigenvalues)  # writes to default Au-Au.skf filename
+off2c.write(format=True, eigenvalues=eigenvalues, filename_template='{el1}-{el2}dftb.skf')  
 
 # Compute Integrals for dipole
 rmin, dr, N = 0.4, 0.02, 900

@@ -165,9 +165,9 @@ INTEGRALS_POSOP = {
 	(760, 3, 3, 1, 1, 2, 2): lambda c1, c2, s1, s2: 0.1171875*np.sqrt(14)*s1**4*s2**2/np.sqrt(np.pi),
 	(766, 3, 3, 1, 1, 3, 2): lambda c1, c2, s1, s2: 0.8203125*np.sqrt(2)*s1**4*s2**2*c2/np.sqrt(np.pi),
 }
+ALL_NONZERO_PHI3 = sorted([i[0] for i in INTEGRALS_POSOP.keys()])
+NUMSK_POSOP = len(INTEGRALS_POSOP)
 
-
-NUMSK = len(INTEGRALS_POSOP)
 EQUIVALENT_INTEGRALS_POSOP = {
     1: [1, 35], 
     5: [5, 39], 
@@ -235,91 +235,62 @@ EQUIVALENT_INTEGRALS_POSOP = {
     598: [598], 
     604: [604]
 }
-# EQUIVALENT_INTEGRALS_POSOP = {
-#     1: [1, 35], 
-#     5: [5, 39], 
-#     11: [11, 45], 
-#     16: [16], 
-#     18: [18], 
-#     22: [22], 
-#     28: [28], 
-#     48: [48, 176], 
-#     50: [50, 178], 
-#     54: [54, 182], 
-#     56: [56], 
-#     60: [60, 188], 
-#     62: [62], 
-#     65: [65, 97, 131, 163], 
-#     69: [69, 101, 135, 167], 
-#     75: [75, 107, 141, 173], 
-#     84: [84, 148, 184], 
-#     90: [90, 154, 190], 
-#     112: [112], 
-#     114: [114], 
-#     118: [118], 
-#     124: [124], 
-#     195: [195, 225, 419], 
-#     199: [199, 229, 423], 
-#     205: [205, 235, 429], 
-#     207: [207], 
-#     212: [212, 276, 340, 376, 408], 
-#     218: [218, 282, 346, 382, 414], 
-#     233: [233, 393, 431], 
-#     240: [240, 368], 
-#     242: [242, 370], 
-#     246: [246, 374], 
-#     248: [248], 
-#     252: [252, 380], 
-#     254: [254], 
-#     257: [257, 355], 
-#     261: [261, 359], 
-#     267: [267, 365], 
-#     289: [289, 323], 
-#     293: [293, 327], 
-#     299: [299, 333], 
-#     304: [304], 
-#     306: [306], 
-#     310: [310], 
-#     316: [316], 
-#     385: [385], 
-#     389: [389], 
-#     395: [395], 
-#     440: [440, 468, 760], 
-#     446: [446, 474, 766], 
-#     457: [457, 751], 
-#     483: [483, 513, 707], 
-#     487: [487, 517, 711], 
-#     493: [493, 523, 717], 
-#     495: [495], 
-#     500: [500, 696], 
-#     506: [506, 702], 
-#     521: [521, 681, 719], 
-#     528: [528, 656], 
-#     530: [530, 658], 
-#     534: [534, 662], 
-#     536: [536], 
-#     540: [540, 668], 
-#     542: [542], 
-#     545: [545, 643], 
-#     549: [549, 647], 
-#     555: [555, 653], 
-#     564: [564, 628, 664], 
-#     570: [570, 634, 670], 
-#     577: [577, 611], 
-#     581: [581, 615], 
-#     587: [587, 621], 
-#     592: [592], 
-#     594: [594], 
-#     598: [598], 
-#     604: [604], 
-#     673: [673], 
-#     677: [677], 
-#     683: [683], 
-#     724: [724],
-#     730: [730]
-# }
-
 UNIQUE_INTEGRALS_POSOP = EQUIVALENT_INTEGRALS_POSOP.keys()
+
+EQUIVALENT_ATOMIC_TRANSITIONS = {
+    1: [1, 18, 35, 48, 112, 176], 
+    54: [54, 182, 289, 323], 
+    56: [56, -69, -84, -101, -135, -148, -167, -184, -195, -225, -242, -257, -355, -370, 385, -419], 
+    118: [118, 306], 
+    205: [205, 235, -395, 429, -536, 564, 628, 664], 
+    207: [207, -233, -393, -431, -440, -468, 724, -760], 
+    218: [218, -254, 282, 346, 382, 414, 487, 500, 517, -677, 696, 711], 
+    252: [252, 380, 581, 615], 
+    267: [267, 365, 549, 647], 
+    299: [299, 333, 534, 662], 
+    316: [316, 598]
+}
+UNIQUE_ATOMIC_TRANSITIONS = EQUIVALENT_ATOMIC_TRANSITIONS.keys()
+
+def index_to_quantnum_posop(idx):
+    """
+        Convert the integral number to the respective quantum numbers 
+    """
+    l_max = 3
+    count = 0
+    for l1 in range(l_max+1):
+        for m1 in range(-l1,l1+1):
+            for comp in range(-1, 2):
+                for l2 in range(l_max+1):
+                    for m2 in range(-l2, l2+1):
+                        if count == idx:
+                            return (l1, m1, 1, comp, l2, m2)
+                        count += 1
+    raise ValueError("Integral index does not exist")
+    
+
+def full_to_unique_posop(table_full):
+    """
+        Take a SK table with columns corresponding to all nonzero phi3 integrals
+        and return a table with columns corresponding to all unique (up to a sign) phi3 integrals
+    """
+    table_unique = np.zeros((np.shape(table_full)[0], len(UNIQUE_INTEGRALS_POSOP)))
+    for i, num in enumerate(UNIQUE_INTEGRALS_POSOP):
+       idx = ALL_NONZERO_PHI3.index(num)
+       table_unique[:,i] = table_full[:,idx]
+    return table_unique
+
+def unique_to_full_posop(table_unique):
+    table_full = np.zeros((np.shape(table_unique)[0], len(ALL_NONZERO_PHI3)))
+    count = 0 
+    for i, integral in enumerate(UNIQUE_INTEGRALS_POSOP):
+        for equivalent in EQUIVALENT_INTEGRALS_POSOP[integral]:
+            idx = ALL_NONZERO_PHI3.index(abs(equivalent))
+            sign = -1 if equivalent < 0 else 1
+            table_full[:,idx] = sign * table_unique[:,i]
+            count += 1
+    assert count == len(ALL_NONZERO_PHI3)
+    return table_full
 
 def convert_quant_num(l):
     """convert quantum number l to letter for string matching in select_subshells"""
@@ -503,7 +474,7 @@ def tail_smoothening(x, y_in, eps_inner=1e-8, eps_outer=1e-16, window_size=5):
     return y_out
     
 
-def write_skf(handle, Rgrid, table, has_atom_transition, mass, atom_transitions):
+def write_skf(handle, Rgrid, table, has_atom_transition, mass, atom_transitions, format):
     """
     Writes a parameter file in '.skf' format starting at grid_dist 
     and giving nonzero values from R_grid[0] on.
@@ -522,24 +493,34 @@ def write_skf(handle, Rgrid, table, has_atom_transition, mass, atom_transitions)
     See Offsite2cTable.write()
     """
     # TODO find out what all the other quantities are, that do not come from table
+    FORMAT_OPTIONS = ["full", "unique"]
+    if not format in FORMAT_OPTIONS:
+        raise ValueError(f"Selected file format option not valid. Possible choises are {FORMAT_OPTIONS}")
 
     grid_dist = Rgrid[1] - Rgrid[0]
     grid_npts, numint = np.shape(table)
-    assert (numint % NUMSK) == 0
+    if format == "full":
+        assert (numint % NUMSK_POSOP) == 0
+    elif format == "unique":
+        assert (numint % len(UNIQUE_INTEGRALS_POSOP)) == 0
     nzeros = int(np.round(Rgrid[0] / grid_dist)) - 1
     assert nzeros >= 0
     print("%.12f, %d" % (grid_dist, grid_npts + nzeros), file=handle)
 
     keys_sorted = sorted(INTEGRALS_POSOP.keys(), key= lambda x: x[0])
     if has_atom_transition:
-        atom_integrals = [atom_transitions[i] for i in keys_sorted]
+        atom_integrals = [atom_transitions[i] for i in UNIQUE_ATOMIC_TRANSITIONS]
         print(" ".join(f"{x:.6f}" for x in atom_integrals), file=handle)
 
     print("%.3f, 19*0.0" % mass, file=handle) # TODO change number of columns
 
     # Table containing the Slater-Koster integrals
-    numtab = numint // NUMSK
-    assert numtab > 0
+    if format == "full":
+        numtab = numint // NUMSK_POSOP
+        assert numtab > 0
+    elif format == "unique":
+        numtab = numint // len(UNIQUE_INTEGRALS_POSOP)
+        assert numtab > 0
     
     indices = np.shape(table)[1]
     for i in range(nzeros):
@@ -553,4 +534,6 @@ def write_skf(handle, Rgrid, table, has_atom_transition, mass, atom_transitions)
                 line += '{0: 1.12e}  '.format(table[i, j])
         print(line, file=handle)
     
-    
+
+if __name__ == '__main__':
+    pass

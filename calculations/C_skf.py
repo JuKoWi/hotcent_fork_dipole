@@ -38,14 +38,16 @@ eigenvalues_confined = atom.enl
 rmin, dr, N = 0.4, 0.02, 900
 off2c = Offsite2cTable(atom, atom, timing=True)
 off2c.run(rmin, dr, N, xc=xc, nr=200, ntheta=400, wflimit=1e-9)
-off2c.write(dftbplus_format=False, eigenvalues=eigenvalues)  # writes to default C-C_offsite2c.skf filename
-off2c.write(dftbplus_format=True, eigenvalues=eigenvalues, filename_template='{el1}-{el2}dftb.skf')  
+off2c.write(format="full", eigenvalues=eigenvalues)  # writes to default C-C_offsite2c.skf filename
+off2c.write(format="unique", eigenvalues=eigenvalues, filename_template='{el1}-{el2}short.skf')  
+off2c.write(format="DFTB+", eigenvalues=eigenvalues, filename_template='{el1}-{el2}dftb.skf')  
 
 # Compute Integrals for dipole
 rmin, dr, N = 0.4, 0.02, 900
 off2c = Offsite2cTablePosOp(atom, atom, timing=False)
 off2c.run(rmin, dr, N, nr=200, ntheta=400, wflimit=1e-9)
-off2c.write_dipole()
+off2c.write_dipole(format='full', filename_template='{el1}-{el2}_dipole.skf')
+off2c.write_dipole(format='unique', filename_template='{el1}-{el2}_dipoleunique.skf')
 
 print(eigenvalues)
 print(eigenvalues_confined)
