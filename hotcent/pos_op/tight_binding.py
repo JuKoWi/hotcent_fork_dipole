@@ -88,26 +88,8 @@ class SlaterKosterIntegrator:
         self.elem_pairs = list(itertools.product(no_repeats_types, repeat=2)) #ordered pairs (e.g. Mo-S and S-Mo are different)
         self._get_interaction_cutoffs()
         self.maxl_dict = maxl_dict
-        self.orbnumbers = [get_norbs(maxl_dict[key]) for key in self.atomtypes]
+        self.orbnumbers = [dim_atom_basis(maxl_dict[key]) for key in self.atomtypes]
         self.total_orbs = int(np.sum(self.orbnumbers))
-
-        if os.path.exists("identifier_nonzeros_overlap.npz"):
-            npfile_overlap = np.load("identifier_nonzeros_overlap.npz")
-            quant_num_list, nonzeros = npfile_overlap["arr_0"], npfile_overlap["arr_1"]
-        else:
-            print("Calculate nonzero indices for overlap/Hamiltonian")
-            quant_num_list, nonzeros = get_index_list_overlap()
-        self.quant_nums = quant_num_list
-        self.sk_int_idx = nonzeros
-
-        if os.path.exists("identifier_nonzeros_posop.npz"):
-            npfile_posop = np.load("identifier_nonzeros_posop.npz")
-            quant_num_list_posop, nonzeros_posop = npfile_posop["arr_0"], npfile_posop["arr_1"]
-        else:
-            print("Calculate nonzero indices for position operator")
-            quant_num_list_posop, nonzeros_posop = get_index_list_dipole()
-        self.quant_nums_posop = quant_num_list_posop
-        self.sk_int_idx_posop = nonzeros_posop
 
         self.D_symb = sym.lambdify((BETA, GAMMA), D_SYMB, 'numpy', cse=True) 
 
@@ -347,7 +329,7 @@ class SlaterKosterIntegrator:
             lmn = R_vec/norm_R_vec
         return lmn
 
-    def _create_integral_dict(self, sk_table, posA, posB, operator, sk_table_dipole=None):
+    def _integrals_atom_pair(self, sk_table, posA, posB, operator, lmaxA, lmaxB, sk_table_dipole=None):
         """
         Evaluate Slater-Koster rules
         For one pair of interacting atoms with fixed positions and certain operator (S,H or r) create the respective 
@@ -362,57 +344,50 @@ class SlaterKosterIntegrator:
             assert sk_table.type == 'S'
         R_vec = posB - posA
         R = np.linalg.norm(R_vec)
+        dimA = dim_atom_basis(lmaxA)
+        dimB = dim_atom_basis(lmaxB)
 
         if EINSUM:
             euler_theta, euler_phi, euler_gamma= self._set_euler_angles(vec1=posA, vec2=posB)
             D_single = np.array(self.D_symb(euler_theta, euler_phi), dtype=float)
-            integral_vec = np.zeros((len(self.quant_nums))) 
+            integral_vec = np.zeros((16 * 16)) 
             integral_vec[self._scatter_sk] = sk_table.spline_full(R)
             M = np.reshape(integral_vec, (16,16))
             if self.contraction_path is None:
                 self.contraction_path = np.einsum_path('ab,bc,dc -> ad', D_single, M, D_single, optimize='optimal')[0]
-            integrals = np.einsum('ab,bc,dc -> ad', D_single, M, D_single, optimize=self.contraction_path).flatten()
+            integrals = np.einsum('ab,bc,dc -> ad', D_single, M, D_single, optimize=self.contraction_path)[:dimA, :dimB]
             if operator == 'r':
                 idx_pstart = 1
                 idx_pend = 3
                 D_r = D_single[idx_pstart:idx_pend+1, idx_pstart:idx_pend+1]
                 spline_eval_posop = sk_table_dipole.spline_full(R)
-                integral_vec_dipole = np.zeros((len(self.quant_nums_posop)))
+                integral_vec_dipole = np.zeros((16*3*16))
                 for i, key in enumerate(self.sorted_integrals_dipole):
                     integral_vec_dipole[key[0]] = spline_eval_posop[i]
                 M_posop = np.reshape(integral_vec_dipole, (16,3,16))
                 if self.contraction_path_posop is None:
                     self.contraction_path_posop = np.einsum_path('ai, bj, ck, ijk -> abc', D_single, D_r, D_single, M_posop, optimize='optimal')[0]
-                position_elements = np.einsum('ai, bj, ck, ijk -> abc', D_single, D_r, D_single, M_posop, optimize=self.contraction_path_posop).flatten()
+                position_elements = np.einsum('ai, bj, ck, ijk -> abc', D_single, D_r, D_single, M_posop, optimize=self.contraction_path_posop)[:dimA,:,:dimB]
+
         else:
             l, m, n = self._get_direction_cosines(vec1=posA, vec2=posB)
             integral_vec = sk_table.spline(R)
-            integrals = matrix_elements(X=integral_vec, l=l, m=m, n=n).flatten()
+            integrals = matrix_elements(X=integral_vec, l=l, m=m, n=n)[:dimA, :dimB]
             if operator == 'r':
                 integral_vec_posop = sk_table_dipole.spline(R)
-                position_elements = matrix_elements_posop(X=integral_vec_posop, l=l, m=m, n=n).flatten()
+                position_elements = matrix_elements_posop(X=integral_vec_posop, l=l, m=m, n=n)[:dimA,:,:dimB]
 
         if VERBOSE:
             print(f"maximal imaginary integral value {np.max(np.abs(np.imag(integrals)))}")
             print(f"maximal imaginary position integral value {np.max(np.abs(np.imag(position_elements)))}")
 
-        if operator == 'r':
-            #consider origin shift
-            orbitals_overall = 16
-            overlap_blocks = integrals.reshape(orbitals_overall, orbitals_overall)
-            shift_term = np.tile(overlap_blocks, (1,3)).reshape(-1)
-            posA = np.array([posA[1], posA[2], posA[0]]) #reorder component according to quantum numbers
-            space_factor = np.tile(np.repeat(posA, orbitals_overall), orbitals_overall)
-            shift_term = shift_term * space_factor
-            shifted_dipole = position_elements + shift_term
-            integral_dict = {}
-            for label in self.quant_nums_posop: #
-                integral_dict[(label[1], label[2], label[3], label[4], label[5], label[6])] = shifted_dipole[label[0]]
+        if operator == 'r': #consider origin shift
+            posA = np.array([posA[1], posA[2], posA[0]])
+            shifted_dipole = position_elements + np.einsum('ab, c -> acb', integrals, posA)
+            shifted_dipole = np.transpose(shifted_dipole, (1,0,2))[[2,0,1]]
+            return shifted_dipole
         else:
-            integral_dict = {}
-            for label in self.quant_nums:
-                integral_dict[(label[1], label[2], label[3], label[4])] = integrals[label[0]]
-        return integral_dict
+            return integrals
 
     def _create_integral_dict_nablaR(self, sk_table, posA, posB):
         same_atom = np.allclose(posA, posB)
@@ -434,10 +409,10 @@ class SlaterKosterIntegrator:
             posBm1 = posB - h * unit 
             posBp2 = posB + 2 * h * unit
             posBm2 = posB - 2 * h * unit
-            int_dictp1 = self._create_integral_dict(sk_table=sk_table, posA=posA, posB=posBp1, operator='S')
-            int_dictm1 = self._create_integral_dict(sk_table=sk_table, posA=posA, posB=posBm1, operator='S')
-            int_dictp2 = self._create_integral_dict(sk_table=sk_table, posA=posA, posB=posBp2, operator='S')
-            int_dictm2 = self._create_integral_dict(sk_table=sk_table, posA=posA, posB=posBm2, operator='S')
+            int_dictp1 = self._integrals_atom_pair(sk_table=sk_table, posA=posA, posB=posBp1, operator='S')
+            int_dictm1 = self._integrals_atom_pair(sk_table=sk_table, posA=posA, posB=posBm1, operator='S')
+            int_dictp2 = self._integrals_atom_pair(sk_table=sk_table, posA=posA, posB=posBp2, operator='S')
+            int_dictm2 = self._integrals_atom_pair(sk_table=sk_table, posA=posA, posB=posBm2, operator='S')
             for label in self.quant_nums:
                 p2 = int_dictp2[label[1], label[2], label[3], label[4]]
                 p1 = int_dictp1[label[1], label[2], label[3], label[4]]
@@ -446,49 +421,9 @@ class SlaterKosterIntegrator:
                 finite_diff = (-p2 + 8 * p1 - 8 * m1 + m2)/(12 *h) #has dimension 1/angstrom
                 int_dict_gradR[label[1], label[2], label[3], label[4]][i] = -finite_diff
         return int_dict_gradR
-    
-    def _select_matrix_elements(self, max_lA, max_lB, integral_dict):
-        pair_matrix = np.zeros((get_norbs(max_lA), get_norbs(max_lB)))
-        row_start = 0
-        col_start = 0 
-        for l1 in range(max_lA + 1):
-            size_row = 2 * l1 +1
-            for l2 in range(max_lB + 1):
-                size_col = 2 * l2 +1
-                block = np.zeros((size_row, size_col))
-                for mi, m in enumerate(range(-l1, l1 + 1)):
-                    for ni, n in enumerate(range(-l2, l2 + 1)):
-                        block[mi, ni] = integral_dict[(l1, m, l2, n)]
-                pair_matrix[row_start:row_start+size_row, col_start:col_start+size_col] = block
-                col_start += size_col
-            col_start = 0
-            row_start += size_row
-        return pair_matrix
-    
-    def _select_dipole_matrix_elements(self, max_lA, max_lB, integral_dict):
-        """For dipole store components in 3rd dimension"""
-        pair_matrix = np.zeros((3, get_norbs(max_lA), get_norbs(max_lB)))
-        components = [(1, 1), (1,-1), (1,0)] # vector contains components in quantum number order, not xyz
-        for i, tup in enumerate(components):
-            row_start = 0
-            col_start = 0 
-            for l1 in range(max_lA + 1):
-                size_row = 2 * l1 +1
-                for l2 in range(max_lB + 1):
-                    size_col = 2 * l2 +1
-                    block = np.zeros((size_row, size_col))
-                    for mi, m in enumerate(range(-l1, l1 + 1)):
-                        for ni, n in enumerate(range(-l2, l2 + 1)):
-                            quant_nums = (l1, m, tup[0], tup[1], l2, n)
-                            block[mi,ni] = integral_dict.get(quant_nums, 0.0)
-                    pair_matrix[i, row_start:row_start+size_row, col_start:col_start+size_col] = block
-                    col_start += size_col
-                col_start = 0
-                row_start += size_row
-        return pair_matrix
 
     def _select_momentum_matrix_elements(self, max_lA, max_lB, integral_dict):
-        pair_matrix = np.zeros((3, get_norbs(max_lA), get_norbs(max_lB)))
+        pair_matrix = np.zeros((3, dim_atom_basis(max_lA), dim_atom_basis(max_lB)))
         for i in range(3):
             row_start = 0
             col_start = 0 
@@ -507,7 +442,7 @@ class SlaterKosterIntegrator:
                 row_start += size_row
         return pair_matrix
 
-    def _calculate_atom_block(self, types, posA, posB, max_lA, max_lB, operator):
+    def _assemble_atom_block(self, types, posA, posB, max_lA, max_lB, operator):
         """for two atoms, calculate the block of all relevant orbitals
         for dipole the block is a 3D array with the first axis for the 3 components x,y,z"""
         same_atom = np.allclose(posA, posB)
@@ -516,15 +451,14 @@ class SlaterKosterIntegrator:
         if operator == 'S':
             sk_table = self.S_sk_tables[types]
             if same_atom:
-                block = np.eye(N=get_norbs(maxl=max_lA))
+                block = np.eye(N=dim_atom_basis(maxl=max_lA))
             else:
-                integral_dict = self._create_integral_dict(sk_table=sk_table, posA=posA, posB=posB, operator=operator)
-                block = self._select_matrix_elements(max_lA=max_lA, max_lB=max_lB, integral_dict=integral_dict)
+                block = self._integrals_atom_pair(sk_table=sk_table, posA=posA, posB=posB, lmaxA=max_lA, lmaxB=max_lB, operator=operator)
         elif operator == 'H':
             sk_table = self.H_sk_tables[types]
             if same_atom:
                 eigenvalues = sk_table.same_atom_vals
-                diag = np.eye(get_norbs(maxl=max_lA))
+                diag = np.zeros((dim_atom_basis(max_lA), dim_atom_basis(max_lA)))
                 count = 0
                 for i in range(max_lA+1):
                     for j in range(2*i+1):
@@ -532,24 +466,25 @@ class SlaterKosterIntegrator:
                     count += 2*i +1
                 block = diag
             else:
-                integral_dict = self._create_integral_dict(sk_table=sk_table, posA=posA, posB=posB, operator=operator)
-                block = self._select_matrix_elements(max_lA=max_lA, max_lB=max_lB, integral_dict=integral_dict)
+                block = self._integrals_atom_pair(sk_table=sk_table, posA=posA, posB=posB, lmaxA=max_lA, lmaxB=max_lB, operator=operator)
         elif operator == 'r':
             sk_table = self.S_sk_tables[types]
             sk_table_dipole = self.r_sk_tables[types]
             if same_atom:
-                integral_dict = sk_table_dipole.same_atom_vals
-                block = self._select_dipole_matrix_elements(max_lA=max_lA, max_lB=max_lB, integral_dict=integral_dict)
-                if max_lA >= 1:
-                    assert np.any(np.abs(block) > 1e-12), (
-                        f"on-site dipole block for {types} is entirely zero; "
-                        f"s-p transitions must be nonzero")
-                n_orbs = get_norbs(maxl=max_lA)
-                for c in range(3):
+                block = np.zeros((16,3,16))
+                n_orbs = dim_atom_basis(maxl=max_lA)
+                for i,u in enumerate(UNIQUE_ATOMIC_TRANSITIONS):
+                    for equivalent in EQUIVALENT_ATOMIC_TRANSITIONS[u]:
+                        a, r = divmod(abs(equivalent), 16*3)
+                        b, c = divmod(r, 16)
+                        sign = -1 if equivalent < 0 else 1
+                        block[a,b,c] = sign * sk_table_dipole.same_atom_vals[i]
+                block = block[:n_orbs,:,:n_orbs]
+                block = np.transpose(block, (1,0,2))[[2,0,1]] # put components as first axis and reorder y,z,x -> x,y,z
+                for c in range(3): # origin shift with overlap matrix (identity for intraatomic)
                     block[c] += posA[c] * np.eye(n_orbs)
             else: 
-                integral_dict = self._create_integral_dict(sk_table=sk_table, posA=posA, posB=posB, operator='r', sk_table_dipole=sk_table_dipole)
-                block = self._select_dipole_matrix_elements(max_lA=max_lA, max_lB=max_lB, integral_dict=integral_dict)
+                block = self._integrals_atom_pair(sk_table=sk_table, posA=posA, posB=posB, lmaxA=max_lA, lmaxB=max_lB, operator='r', sk_table_dipole=sk_table_dipole)
         elif operator == 'p':
             sk_table= self.S_sk_tables[types]
             integral_dict = self._create_integral_dict_nablaR(sk_table=sk_table, posA=posA, posB=posB)
@@ -585,9 +520,9 @@ class SlaterKosterIntegrator:
             posA = atoms.positions[idxA]
             posB = atoms.positions[idxB] + np.dot(self.abc.T, R[i])
             # assert np.linalg.norm(posB - posA) <= self.cutoff_dict[(typeA, typeB)]
-            block = self._calculate_atom_block(types=(typeA, typeB), posA=posA, posB=posB, max_lA=maxlA, max_lB=maxlB, operator=operator)
-            n_rows = get_norbs(maxl=maxlA)
-            n_cols = get_norbs(maxl=maxlB)
+            block = self._assemble_atom_block(types=(typeA, typeB), posA=posA, posB=posB, max_lA=maxlA, max_lB=maxlB, operator=operator)
+            n_rows = dim_atom_basis(maxl=maxlA)
+            n_cols = dim_atom_basis(maxl=maxlB)
             start_rows = self._find_block_pos(idx=idxA)
             start_cols = self._find_block_pos(idx=idxB)
             if operator in ('r', 'p'):
@@ -596,11 +531,10 @@ class SlaterKosterIntegrator:
                 matrix[start_rows:start_rows+n_rows, start_cols:start_cols+n_cols] = block
             lattice_dict[R_triple] = matrix
 
-        # assert np.shape(np.unique(R, axis=0))[0] == len(lattice_dict)
-        if operator not in ('r', 'p'):
-            for lat_vec in np.unique(R, axis=0): 
-                mat1 = lattice_dict[*lat_vec] 
-                mat2 = lattice_dict[*(-lat_vec)]
+        # if operator not in ('r', 'p'):
+        #     for lat_vec in np.unique(R, axis=0): 
+        #         mat1 = lattice_dict[*lat_vec] 
+        #         mat2 = lattice_dict[*(-lat_vec)]
                 # symmetry_requirement = np.allclose(mat1, np.linalg.matrix_transpose(mat2), atol=1e-6)
                 # assert symmetry_requirement 
         return lattice_dict
@@ -728,20 +662,11 @@ class SKTable:
         self.same_atom_vals = None #list for S and H, dict for r
         self._spline = None
         self._spline_full = None
+        self.same_atom_vals = same_atom
         if table_type in ['S', 'H']:
-            self.same_atom_vals = same_atom
             self.table_full = unique_to_full(table)
             assert np.shape(table)[1] == len(UNIQUE_INTEGRALS)
         if table_type == 'r':
-            if same_atom != None:
-                atom_transition_dict = {}
-                for i,num_trans in enumerate(EQUIVALENT_ATOMIC_TRANSITIONS):
-                    for equivalent in EQUIVALENT_ATOMIC_TRANSITIONS[num_trans]:
-                        quantum_number = index_to_quantnum_posop(abs(equivalent))
-                        sign = -1 if equivalent < 0 else 1
-                        atom_transition_dict[quantum_number] = sign * same_atom[i]
-                self.same_atom_vals = atom_transition_dict
-                sample = next(iter(atom_transition_dict))
             self.table_full = unique_to_full_posop(table)
             assert np.shape(table)[1] == len(UNIQUE_INTEGRALS_POSOP)
 

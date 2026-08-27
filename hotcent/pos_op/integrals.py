@@ -335,7 +335,6 @@ def get_index_list_overlap():
     np.savez("identifier_nonzeros_overlap.npz", np.array(identifier), np.array(nonzeros))
     return identifier, nonzeros 
 
-
 def print_dipole_integrals():
     counter = 0
     f= open("phi3_expr.txt", 'w')

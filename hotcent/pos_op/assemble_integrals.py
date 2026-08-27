@@ -229,8 +229,8 @@ class SK_Integral:
     
     def select_matrix_elements(self, max_lA, max_lB):
         """returns 2D array of matrix elements"""
-        pair_overlap_matrix = np.zeros((get_norbs(max_lA), get_norbs(max_lB)))        
-        pair_hamiltonian_matrix = np.zeros((get_norbs(max_lA), get_norbs(max_lB)))        
+        pair_overlap_matrix = np.zeros((dim_atom_basis(max_lA), dim_atom_basis(max_lB)))        
+        pair_hamiltonian_matrix = np.zeros((dim_atom_basis(max_lA), dim_atom_basis(max_lB)))        
         row_start = 0
         col_start = 0
         for l1 in range(max_lA + 1):

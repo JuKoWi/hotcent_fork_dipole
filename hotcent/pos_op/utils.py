@@ -10,11 +10,9 @@ def angstrom_to_bohr(angstrom):
     bohr = meter / sc.constants.physical_constants['atomic unit of length'][0]
     return bohr
 
-def get_norbs(maxl):
-    count = 0
-    for l in range(maxl+1):
-        count += 2*l +1
-    return count
+def dim_atom_basis(maxl):
+    """Find number of basis functions up to a certain l_max"""
+    return (maxl + 1)**2
 
 def hartree_to_eV(hartree):
     return hartree * sc.constants.physical_constants['hartree-electron volt relationship'][0]
