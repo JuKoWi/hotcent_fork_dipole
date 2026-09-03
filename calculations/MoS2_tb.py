@@ -1,4 +1,4 @@
-from hotcent.pos_op.tight_binding import SlaterKosterIntegrator 
+from hotcent.pos_op.mat_elem_evaluation import SlaterKosterIntegrator
 from ase.visualize import view
 from ase.build import mx2
 from ase import Atoms
@@ -22,9 +22,15 @@ MoS2.pbc = (True, True, False)
 # view(MoS2)
 
 
-max_l = {'C':1, 'H':0, 'S':2, 'Mo':2}
+max_l = {"C": 1, "H": 0, "S": 2, "Mo": 2}
 # seedname_mos2 = SlaterKosterIntegrator(MoS2, skpath="sk_experimental/sk_unique", maxl_dict=max_l, skpath_posop="sk_experimental/sk_posop_unique", format='unique')
-seedname_mos2 = SlaterKosterIntegrator(MoS2, skpath="sk_experimental/sk_unique", maxl_dict=max_l, skpath_posop="sk_experimental/sk_posop_unique", format='unique')
+seedname_mos2 = SlaterKosterIntegrator(
+    MoS2,
+    skpath="sk_experimental/sk_unique",
+    maxl_dict=max_l,
+    skpath_posop="sk_experimental/sk_posop_unique",
+    format="unique",
+)
 count = 0
 while count < 20:
     seedname_mos2.write_seedname()

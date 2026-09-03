@@ -29,6 +29,7 @@ install_requires = [
     'pytest',
     'pyyaml',
     'scipy',
+    'sympy',
 ]
 
 setup(
