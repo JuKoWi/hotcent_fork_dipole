@@ -91,12 +91,7 @@ def Wigner_D_complex(euler_alpha, euler_beta, euler_gamma):
     total = Dz * dy * Dz2
     return total
 
-
-def Wigner_D_real(euler_alpha, euler_beta, euler_gamma, save=True):
-    """
-    Rotation matrix for real spherical harmonics for rotation sequence
-    Rz(alpha)Ry(beta)Rz(gamma)
-    """
+def transform_to_real():
     transform_to_real = sym.zeros(16, 16)
 
     # s
@@ -135,6 +130,15 @@ def Wigner_D_real(euler_alpha, euler_beta, euler_gamma, save=True):
     transform_to_real[15, 9] = 1 / sym.sqrt(2)
     transform_to_real[15, 15] = -1 / sym.sqrt(2)
 
+    return transform_to_real
+
+
+def Wigner_D_real(euler_alpha, euler_beta, euler_gamma, save=True):
+    """
+    Rotation matrix for real spherical harmonics for rotation sequence
+    Rz(alpha)Ry(beta)Rz(gamma)
+    """
+    transform_to_real = transform_to_real()
     transform_to_comp = transform_to_real.H
     D_total = (
         transform_to_real
