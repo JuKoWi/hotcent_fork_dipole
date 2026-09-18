@@ -579,5 +579,5 @@ if __name__ == "__main__":
     # print_overlap_derivatives()
     # interchange_related_phi2()
     # identical_phi2()
-    # identical_phi3()
+    identical_phi3()
     identical_atomic_transitions()

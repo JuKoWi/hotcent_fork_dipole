@@ -73,9 +73,11 @@ class SlaterKosterIntegrator:
         skpath: directory path to .skf files for H and S
         skpath_posop: directory path to .skf files for position operator matrix elements
         maxl_dict: dictionary containing the maximal angular momentum to include in the basis set for each element
-        conventional_skf: whether to expect the conventional or the long format for the S/H .skf file
-                            the conventional format contains 10 columns for H and S respectively, the long format
-                            contains 44 (number of nonzero phi^(2)- integrals) for S and H respectively
+        format: format of the input files. 
+                'unique': table contains all integrals that are non-identical (up to a sign), 65 for position operator
+                        30 for S and H respectively
+                'DFTB+': table for H/S contains 10 integrals respectively, use 'unique' table for position operator
+                'full': use tables with all non-zero phi2/phi3 integrals. 156 for position operator, 44 for S and H respectively
         """
         if format not in FILE_FORMAT_OPTIONS:
             raise ValueError(

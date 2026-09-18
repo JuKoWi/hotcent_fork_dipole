@@ -931,6 +931,7 @@ INTEGRALS_POSOP = {
 ALL_NONZERO_PHI3 = sorted([i[0] for i in INTEGRALS_POSOP.keys()])
 NUMSK_POSOP = len(INTEGRALS_POSOP)
 
+# generated with symbolic_integrals.identical_phi2()
 EQUIVALENT_INTEGRALS_POSOP = {
     1: [1, 35],
     5: [5, 39],
@@ -1318,4 +1319,5 @@ def write_skf(
 
 
 if __name__ == "__main__":
-    pass
+    print(len(UNIQUE_INTEGRALS_POSOP))
+    print(NUMSK_POSOP)

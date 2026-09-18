@@ -536,6 +536,14 @@ def get_hotcent_style_index(sklabel):
     str2 = HOTCENT_LABELS[(l2, m2)]
     return str1, str2
 
+def symbol_to_l(nl_string):
+    conversion = {"s": 0, "p": 1, "d":2, "f":3}
+    angular = nl_string[1]
+    try:
+        return conversion[angular]
+    except KeyError:
+        raise KeyError(f"angular momentum {angular} is not implemented")
+    
 
 def convert_sk_index(lm_tuple):
     """
@@ -870,4 +878,5 @@ def parse_dftb_file(path, homonuclear):
 
 
 if __name__ == "__main__":
-    print(ALL_NONZERO_PHI2)
+    print(len(UNIQUE_INTEGRALS))
+    print(NUMSK)
