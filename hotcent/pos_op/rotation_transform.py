@@ -92,6 +92,8 @@ def Wigner_D_complex(euler_alpha, euler_beta, euler_gamma):
     return total
 
 def transform_to_real():
+    """change of basis from complex to real spherical harmonics.
+    See 10.1016/S0166-1280(97)00185-1 """
     transform_to_real = sym.zeros(16, 16)
 
     # s

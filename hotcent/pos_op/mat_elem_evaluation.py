@@ -39,7 +39,8 @@ from hotcent.pos_op.onsite_momentum import load_onsite_momentum
 OPERATOR_TYPES = ["S", "H", "r"]
 FILE_FORMAT_OPTIONS = ["unique", "full", "DFTB+"]
 EINSUM = False
-VERBOSE = False
+VERBOSE = True 
+TEST_MODE = True
 
 
 class SlaterKosterIntegrator:
@@ -473,13 +474,14 @@ class SlaterKosterIntegrator:
                     X=integral_vec_posop, l=l, m=m, n=n
                 )[:dimA, :, :dimB]
 
-        if VERBOSE:
-            print(
-                f"maximal imaginary integral value {np.max(np.abs(np.imag(integrals)))}"
-            )
-            print(
-                f"maximal imaginary position integral value {np.max(np.abs(np.imag(position_elements)))}"
-            )
+        # if VERBOSE:
+        #     print(
+        #         f"maximal imaginary integral value {np.max(np.abs(np.imag(integrals)))}"
+        #     )
+        #     if operator == 'r':
+        #         print(
+        #             f"maximal imaginary position integral value {np.max(np.abs(np.imag(position_elements)))}"
+        #         )
 
         if operator == "r":  # consider origin shift
             posA = np.array([posA[1], posA[2], posA[0]])
@@ -494,6 +496,9 @@ class SlaterKosterIntegrator:
     def _integrals_p_atom_pair(self, sk_table, posA, posB, lmaxA, lmaxB):
         momentum = np.zeros((3,dim_atom_basis(lmaxA), dim_atom_basis(lmaxB)), dtype=complex)
         h = 1e-4  # corresponds to angstrom
+        conversion_angstrom_bohr_inv = (
+            physical_constants["atomic unit of length"][0] / angstrom
+        )
         for i in range(3):
             unit = np.zeros(3)
             unit[i] = 1
@@ -520,7 +525,11 @@ class SlaterKosterIntegrator:
             finite_diff = (-p2 + 8 * p1 - 8 * m1 + m2) / (
                 12 * h
             )  # has dimension 1/angstrom
-            momentum[i,...] = -1j * finite_diff /angstrom_to_bohr(1) # return momentum in atomic units
+            momentum[i,...] = 1j * finite_diff *conversion_angstrom_bohr_inv
+        if TEST_MODE:
+            max_real = np.max(np.real(momentum))
+            if max_real > 1e-15:
+                raise ValueError("nonzero real part of offsite momentum")
         return momentum
 
     def _assemble_atom_block(self, types, posA, posB, max_lA, max_lB, operator):
@@ -597,6 +606,10 @@ class SlaterKosterIntegrator:
             if same_atom:
                 dim = dim_atom_basis(maxl=max_lA)
                 block = self.p_onsite[types[0]][:,:dim, :dim]
+                if TEST_MODE:
+                    max_real = np.max(np.real(block))
+                    if max_real > 1e-15:
+                        raise ValueError("onsite momentum not purely imaginary")
             else:
                 block = self._integrals_p_atom_pair(
                     sk_table=sk_table, posA=posA, posB=posB, lmaxA=max_lA, lmaxB=max_lB
@@ -662,12 +675,13 @@ class SlaterKosterIntegrator:
                 ] = block
             lattice_dict[R_triple] = matrix
 
-        # if operator not in ('r', 'p'):
-        #     for lat_vec in np.unique(R, axis=0):
-        #         mat1 = lattice_dict[*lat_vec]
-        #         mat2 = lattice_dict[*(-lat_vec)]
-        # symmetry_requirement = np.allclose(mat1, np.linalg.matrix_transpose(mat2), atol=1e-6)
-        # assert symmetry_requirement
+        if TEST_MODE:
+            if operator not in ('r', 'p'):
+                for lat_vec in np.unique(R, axis=0):
+                    mat1 = lattice_dict[*lat_vec]
+                    mat2 = lattice_dict[*(-lat_vec)]
+                    symmetry_requirement = np.allclose(mat1, np.linalg.matrix_transpose(mat2), atol=1e-8)
+                    assert symmetry_requirement
         return lattice_dict
 
     def _find_block_pos(self, idx):
@@ -688,7 +702,7 @@ class SlaterKosterIntegrator:
             f.write(str(self.n_lattice) + "\n")
             for i in range(self.n_lattice):
                 f.write("1 ")
-                if (i + 1) % 15 == 0:
+                if ((i + 1) % 15 == 0) and (i + 1 != self.n_lattice):
                     f.write("\n")
             f.write("\n")
             for point in lattice_dict_S.keys():
@@ -708,15 +722,12 @@ class SlaterKosterIntegrator:
                             f"{i + 1} {j + 1}\t{A[i, j]:.18e}\t{B[i, j]:.18e}\t{C[i, j]:.18e}\t{D[i, j]:.18e}",
                             file=f,
                         )
-            conversion_angstrom_bohr_inv = (
-                physical_constants["atomic unit of length"][0] / angstrom
-            )
             for point in lattice_dict_p.keys():
                 f.write("\n")
                 f.write(
                     str(point[0]) + " " + str(point[1]) + " " + str(point[2]) + "\n"
                 )
-                p_array = lattice_dict_p[point] * conversion_angstrom_bohr_inv
+                p_array = lattice_dict_p[point] 
                 xre = np.real(p_array[0])
                 xim = np.imag(p_array[0])
                 yre = np.real(p_array[1])

@@ -23,17 +23,13 @@ MoS2.pbc = (True, True, False)
 
 
 max_l = {"C": 1, "H": 0, "S": 2, "Mo": 2}
-# seedname_mos2 = SlaterKosterIntegrator(MoS2, skpath="sk_experimental/sk_unique", maxl_dict=max_l, skpath_posop="sk_experimental/sk_posop_unique", format='unique')
 seedname_mos2 = SlaterKosterIntegrator(
     MoS2,
     skpath="sk_experimental/sk_unique",
     maxl_dict=max_l,
     skpath_posop="sk_experimental/sk_posop_unique",
     format="unique",
+    path_p_onsite="skfiles/onsite_momentum/"
 )
-count = 0
-while count < 20:
-    seedname_mos2.write_seedname()
-    count += 1
-# seedname_mos2.write_seedname_momentum()
-# MoS2.write('mos2.cif')
+seedname_mos2.write_seedname()
+seedname_mos2.write_seedname_momentum()

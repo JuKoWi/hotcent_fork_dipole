@@ -33,8 +33,7 @@ def onsite_momentum(atom:AtomicBase, fname):
     ...
     
     """
-    valence = atom.valence
-    valence.sort(key=lambda v: symbol_to_l(v))
+    valence = sorted(atom.valence, key=symbol_to_l)
     angulars = [symbol_to_l(v) for v in valence]
     blocktitles = {0: 'sp', 1: 'pd', 2:'df'}
     components = (0,1,2) # corresponds to order x,y,z
@@ -68,7 +67,7 @@ def onsite_momentum(atom:AtomicBase, fname):
                 full_momentum[c, idx_bra1:idx_bra2, idx_ket1:idx_ket2] = block
     X = transform_to_real()
     X = np.array(X, dtype=complex)[:dim, :dim]
-    full_momentum_real_harmonics = np.einsum("ab, xbc, dc->xad", X, full_momentum, X.conjugate())
+    full_momentum_real_harmonics = np.einsum("ab, xbc, dc->xad", X.conjugate(), full_momentum, X)
     hermitian_deviation = np.max(np.abs(full_momentum_real_harmonics - np.transpose(full_momentum_real_harmonics, axes=(0,2,1)).conjugate()))
     print(f"hermitian up  to {hermitian_deviation}")
 
