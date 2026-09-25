@@ -11,7 +11,7 @@ import sympy as sym
 from scipy.interpolate import CubicSpline
 from scipy.constants import physical_constants, angstrom
 from ase.neighborlist import neighbor_list
-from hotcent.pos_op.utils import bohr_to_angstrom, dim_atom_basis, hartree_to_eV
+from hotcent.pos_op.utils import bohr_to_angstrom, dim_atom_basis, hartree_to_eV, angstrom_to_bohr
 from hotcent.pos_op.slako_dipole import (
     INTEGRALS_POSOP,
     UNIQUE_INTEGRALS_POSOP,
@@ -34,6 +34,7 @@ from hotcent.pos_op.slako_new import (
 from hotcent.pos_op.generate_sk_rules import D_SYMB, BETA, GAMMA
 from hotcent.pos_op.skrules_mini_cse import matrix_elements
 from hotcent.pos_op.skrules_posop_mini_cse import matrix_elements_posop
+from hotcent.pos_op.onsite_momentum import load_onsite_momentum
 
 OPERATOR_TYPES = ["S", "H", "r"]
 FILE_FORMAT_OPTIONS = ["unique", "full", "DFTB+"]
@@ -51,6 +52,7 @@ class SlaterKosterIntegrator:
         H: hartree (a.u. of energy)
         S: no unit
         R: a0 (a.u. of length)
+        p: hbar/a0 (a.u. of momentum)
     Units seedname_tb.dat:
         lattice-vectors: Angstrom
         H: eV
@@ -62,11 +64,11 @@ class SlaterKosterIntegrator:
         S: no unit
         p: a.u.
     Internally:
-        atomic units except angstrom
+        atomic units except lenght in angstrom
     """
 
     def __init__(
-        self, atoms_unit_cell, skpath, skpath_posop, maxl_dict, format="unique"
+        self, atoms_unit_cell, skpath, skpath_posop, maxl_dict, format="unique", path_p_onsite=None,
     ):
         """
         atoms_unit_cell: ase.Atoms object containing information about unit cell parameters and unit cell content
@@ -88,6 +90,7 @@ class SlaterKosterIntegrator:
         self.atomtypes = atoms_unit_cell.get_chemical_symbols()
         self.skpath = skpath
         self.skpath_dipole = skpath_posop
+        self.p_onsite_path = path_p_onsite
         no_repeats_types = list(set(self.atomtypes))
         self.elem_pairs_unordered = list(
             itertools.combinations_with_replacement(no_repeats_types, 2)
@@ -110,6 +113,9 @@ class SlaterKosterIntegrator:
         self.contraction_path = None
         self.contraction_path_posop = None
         self._scatter_sk = np.array([key[0] for key in self.sorted_integrals])
+
+        if path_p_onsite is not None:
+            self._create_p_onsite_dict()
 
     def _get_interaction_cutoffs(self):
         """read interaction cutoff from .skf files to create neighbor list"""
@@ -359,6 +365,16 @@ class SlaterKosterIntegrator:
             )
         self.r_sk_tables = r_sk_dict
 
+    def _create_p_onsite_dict(self, ):
+        self.p_onsite = {}
+        unique_types = list(set(self.atomtypes))
+        for utype in unique_types:
+            path = self.p_onsite_path + f"/{utype}_p.skf"
+            myfile = Path(path)
+            if not myfile.is_file():
+                raise ValueError(f"Could not find file {myfile}")
+            self.p_onsite[utype] = load_onsite_momentum(file=myfile)
+
     def _set_euler_angles(self, vec1, vec2):
         """
         Find Euler angles for rotation, uses only two rotations of the three possible
@@ -475,21 +491,9 @@ class SlaterKosterIntegrator:
         else:
             return integrals
 
-    def _create_integral_dict_nablaR(self, sk_table, posA, posB):
-        same_atom = np.allclose(posA, posB)
-        int_dict_gradR = {}
-        if same_atom:
-            data = sk_table.table
-            zero_rows = np.all(data == 0, axis=1)
-            index_nonzero = (
-                np.argmax(~zero_rows) + 1 if (~zero_rows).any() else data.shape[0] + 1
-            )
-            rmin_angst = sk_table.deltaR * index_nonzero
-            h = rmin_angst
-        else:
-            h = 1e-4  # corresponds to angstrom
-        for label in self.quant_nums:
-            int_dict_gradR[label[1], label[2], label[3], label[4]] = np.zeros(3)
+    def _integrals_p_atom_pair(self, sk_table, posA, posB, lmaxA, lmaxB):
+        momentum = np.zeros((3,dim_atom_basis(lmaxA), dim_atom_basis(lmaxB)), dtype=complex)
+        h = 1e-4  # corresponds to angstrom
         for i in range(3):
             unit = np.zeros(3)
             unit[i] = 1
@@ -497,52 +501,27 @@ class SlaterKosterIntegrator:
             posBm1 = posB - h * unit
             posBp2 = posB + 2 * h * unit
             posBm2 = posB - 2 * h * unit
-            int_dictp1 = self._integrals_atom_pair(
-                sk_table=sk_table, posA=posA, posB=posBp1, operator="S"
+            S_p1 = self._integrals_atom_pair(
+                sk_table=sk_table, posA=posA, posB=posBp1, operator="S", lmaxA=lmaxA, lmaxB=lmaxB
             )
-            int_dictm1 = self._integrals_atom_pair(
-                sk_table=sk_table, posA=posA, posB=posBm1, operator="S"
+            S_m1 = self._integrals_atom_pair(
+                sk_table=sk_table, posA=posA, posB=posBm1, operator="S", lmaxA=lmaxA, lmaxB=lmaxB,
             )
-            int_dictp2 = self._integrals_atom_pair(
-                sk_table=sk_table, posA=posA, posB=posBp2, operator="S"
+            S_p2 = self._integrals_atom_pair(
+                sk_table=sk_table, posA=posA, posB=posBp2, operator="S", lmaxA=lmaxA, lmaxB=lmaxB,
             )
-            int_dictm2 = self._integrals_atom_pair(
-                sk_table=sk_table, posA=posA, posB=posBm2, operator="S"
+            S_m2 = self._integrals_atom_pair(
+                sk_table=sk_table, posA=posA, posB=posBm2, operator="S", lmaxA=lmaxA, lmaxB=lmaxB,
             )
-            for label in self.quant_nums:
-                p2 = int_dictp2[label[1], label[2], label[3], label[4]]
-                p1 = int_dictp1[label[1], label[2], label[3], label[4]]
-                m2 = int_dictm2[label[1], label[2], label[3], label[4]]
-                m1 = int_dictm1[label[1], label[2], label[3], label[4]]
-                finite_diff = (-p2 + 8 * p1 - 8 * m1 + m2) / (
-                    12 * h
-                )  # has dimension 1/angstrom
-                int_dict_gradR[label[1], label[2], label[3], label[4]][i] = -finite_diff
-        return int_dict_gradR
-
-    def _select_momentum_matrix_elements(self, max_lA, max_lB, integral_dict):
-        pair_matrix = np.zeros((3, dim_atom_basis(max_lA), dim_atom_basis(max_lB)))
-        for i in range(3):
-            row_start = 0
-            col_start = 0
-            for l1 in range(max_lA + 1):
-                size_row = 2 * l1 + 1
-                for l2 in range(max_lB + 1):
-                    size_col = 2 * l2 + 1
-                    block = np.zeros((size_row, size_col))
-                    for mi, m in enumerate(range(-l1, l1 + 1)):
-                        for ni, n in enumerate(range(-l2, l2 + 1)):
-                            quant_nums = (l1, m, l2, n)
-                            block[mi, ni] = integral_dict.get(quant_nums, 0.0)
-                    pair_matrix[
-                        i,
-                        row_start : row_start + size_row,
-                        col_start : col_start + size_col,
-                    ] = block
-                    col_start += size_col
-                col_start = 0
-                row_start += size_row
-        return pair_matrix
+            p2 = S_p2
+            p1 = S_p1
+            m2 = S_m2
+            m1 = S_m1
+            finite_diff = (-p2 + 8 * p1 - 8 * m1 + m2) / (
+                12 * h
+            )  # has dimension 1/angstrom
+            momentum[i,...] = -1j * finite_diff /angstrom_to_bohr(1) # return momentum in atomic units
+        return momentum
 
     def _assemble_atom_block(self, types, posA, posB, max_lA, max_lB, operator):
         """for two atoms, calculate the block of all relevant orbitals
@@ -615,12 +594,13 @@ class SlaterKosterIntegrator:
                 )
         elif operator == "p":
             sk_table = self.S_sk_tables[types]
-            integral_dict = self._create_integral_dict_nablaR(
-                sk_table=sk_table, posA=posA, posB=posB
-            )
-            block = self._select_momentum_matrix_elements(
-                max_lA=max_lA, max_lB=max_lB, integral_dict=integral_dict
-            )
+            if same_atom:
+                dim = dim_atom_basis(maxl=max_lA)
+                block = self.p_onsite[types[0]][:,:dim, :dim]
+            else:
+                block = self._integrals_p_atom_pair(
+                    sk_table=sk_table, posA=posA, posB=posB, lmaxA=max_lA, lmaxB=max_lB
+                )
 
         block = np.where(np.abs(block) < 1e-15, 0, block)
         return block
@@ -643,7 +623,7 @@ class SlaterKosterIntegrator:
             R_triple = (int(R[i, 0]), int(R[i, 1]), int(R[i, 2]))
             if operator in ("r", "p"):
                 matrix = lattice_dict.setdefault(
-                    R_triple, np.zeros((3, self.total_orbs, self.total_orbs))
+                    R_triple, np.zeros((3, self.total_orbs, self.total_orbs), dtype=complex)
                 )
             else:
                 matrix = lattice_dict.setdefault(

@@ -3,6 +3,7 @@ from hotcent.confinement import PowerConfinement
 from hotcent.atomic_dft import AtomicDFT
 from hotcent.pos_op.offsite_twocenter_new import Offsite2cTable
 from hotcent.pos_op.offsite_twocenter_posop import Offsite2cTablePosOp
+from hotcent.pos_op.onsite_momentum import onsite_momentum
 from ase.data import covalent_radii, atomic_numbers
 from ase.units import Bohr
 import sys
@@ -126,10 +127,13 @@ wf_confMo = {
 # atomS.set_confinement(confS)
 atomS.set_wf_confinement(wf_confinement=wf_confS)
 atomS.run()
+onsite_momentum(atom=atomS, fname="S_p.skf")
+
 
 # atomMo.set_confinement(confMo)
 atomMo.set_wf_confinement(wf_confinement=wf_confMo)
 atomMo.run()
+onsite_momentum(atom=atomMo, fname="Mo_p.skf")
 
 # Compute Slater-Koster integrals:
 rmin, dr, N = 0.4, 0.02, 900

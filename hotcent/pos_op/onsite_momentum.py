@@ -7,11 +7,12 @@ import numpy as np
 import scipy as sc
 
 def onsite_momentum(atom:AtomicBase, fname):
-    """calculates the onsite components of nabla. Basis functions with real spherical harmonics. 
+    """calculates the onsite components of momentum in atomic units. Basis functions with real spherical harmonics. 
     There is one block for each allowed combination of l:
     blocks: sp, pd, df 
     and a subblock for each component. Since momentum should be hermitian, only save the blocks above the 
     diagonal:
+    013 # angular momenta covered by the valence set
     sp:
     #x  R I R I R I 
     #y  R I R I R I 
@@ -73,6 +74,10 @@ def onsite_momentum(atom:AtomicBase, fname):
 
     # select nonzero-blocks from above diagonal
     with open(fname, 'w') as file:
+        l_string = ''
+        for a in angulars:
+            l_string += str(a)
+        print(l_string, file=file)
         for i, nl_symb in enumerate(valence):
             if symbol_to_l(nl_symb) + 1 in angulars:
                 print(blocktitles[symbol_to_l(nl_symb)], file=file)
@@ -88,31 +93,62 @@ def onsite_momentum(atom:AtomicBase, fname):
                 file.write("\n")
                 np.savetxt(X=full_momentum_real_harmonics[2,idx_bra1:idx_bra2, idx_ket1:idx_ket2].view(float), fname=file, delimiter='\t')
                 file.write("\n")
+    return full_momentum_real_harmonics
 
 def load_onsite_momentum(file):
+    lbra = {"sp": 0, "pd": 1, "df": 2}
+    lmax = 3
+    n = dim_atom_basis(lmax + 1)
+    full_momentum = np.zeros((3, n, n), dtype=complex)
+
     with open(file, 'r') as f:
-        f.readline()
+        f.readline()  # header
+        while True:
+            blockstring = f.readline().strip()
+            if blockstring not in lbra:
+                break  # end of file or unknown block label
+            l = lbra[blockstring]
 
+            dim_bra = 2 * l + 1
+            dim_ket = 2 * (l + 1) + 1
+            block = np.zeros((3, dim_bra, dim_ket), dtype=complex)
+            for i in range(3):
+                for j in range(dim_bra):
+                    line = np.array(f.readline().split(), dtype=float)
+                    block[i, j, :] = line[0::2] + 1j * line[1::2]
+                f.readline()  # empty line
 
+            idx_bra1 = dim_atom_basis(l - 1)
+            idx_bra2 = dim_atom_basis(l)
+            idx_ket1 = dim_atom_basis(l)
+            idx_ket2 = dim_atom_basis(l + 1)
 
+            full_momentum[:, idx_bra1:idx_bra2, idx_ket1:idx_ket2] = block
+            full_momentum[:, idx_ket1:idx_ket2, idx_bra1:idx_bra2] = block.transpose(0, 2, 1).conj()
+
+    return full_momentum
+        
 def calculate_block(lbra, lket, atom, component):
     block = np.zeros((2*lbra+1, 2*lket+1), dtype=complex)
     mbra = range(-lbra, lbra+1)
     mket = range(-lket, lket+1)
     for i, mb in enumerate(mbra):
         for j, mk in enumerate(mket):
+            #x
             if (component == 0) and (abs(mb-mk) == 1):
                 sign = 1 if (mb-mk) > 0 else -1
                 if lbra == (lket+1):
                     block[i,j] = -sign* 0.5 * np.sqrt((lket + sign * mk +1) * (lket + sign * mk +2)/((2 * lket + 1) * (2*lket + 3))) * A_integral(atom, lbra, lket) 
                 elif lbra == (lket -1):
                     block[i,j] = sign* 0.5 * np.sqrt((lket - sign* mk -1) * (lket - sign * mk)/((2*lket +1) * (2*lket + -1))) * B_integral(atom, lbra, lket)
+            #y
             if (component == 1) and (abs(mb-mk) == 1):
                 sign = 1 if (mb-mk) > 0 else -1
                 if lbra == (lket+1):
                     block[i,j] = 1j * 0.5 * np.sqrt((lket + sign * mk +1) * (lket + sign * mk +2)/((2 * lket + 1) * (2*lket + 3))) * A_integral(atom, lbra, lket) 
                 elif lbra == (lket -1):
                     block[i,j] = -1j* 0.5 * np.sqrt((lket - sign* mk -1) * (lket - sign * mk)/((2*lket +1) * (2*lket -1))) * B_integral(atom, lbra, lket)
+            #z
             if (component == 2) and (abs(mb-mk) == 0):
                 if lbra == (lket+1):
                     block[i,j] = np.sqrt((lket - mk +1) * (lket + mk +1)/((2*lket + 1) * (2*lket +3))) * A_integral(atom, lbra, lket)
