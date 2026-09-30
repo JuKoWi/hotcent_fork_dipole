@@ -82,8 +82,8 @@ atomS = AtomicDFT(
     rmax=500,
 )
 atomS.run()
-print(atomS.enl)
 eigenvaluesS = atomS.enl
+print(atomS.enl)
 
 
 atomMo = AtomicDFT(
@@ -102,8 +102,8 @@ atomMo = AtomicDFT(
     rmax=100,
 )
 atomMo.run()
-print(atomMo.enl)
 eigenvaluesMo = atomMo.enl
+print(atomMo.enl)
 
 
 # Use parameters from 10.1021/ct4004959 (Heine 2013)

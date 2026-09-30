@@ -5,7 +5,7 @@ from hotcent.pos_op.offsite_twocenter_new import Offsite2cTable
 from hotcent.pos_op.offsite_twocenter_posop import Offsite2cTablePosOp
 from hotcent.pos_op.utils import bohr_to_angstrom
 from hotcent.pos_op.slako_new import INTEGRALS, get_hotcent_style_index
-from hotcent.pos_op.slako_dipole import INTEGRALS_POSOP, convert_sk_index
+from hotcent.pos_op.slako_posop import INTEGRALS_POSOP, convert_sk_index
 import matplotlib.pyplot as plt
 import numpy as np
 import sys

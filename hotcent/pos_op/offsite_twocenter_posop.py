@@ -12,7 +12,7 @@ from hotcent.pos_op.symbolic_integrals import (
     theta2,
 )
 from hotcent.interpolation import CubicSplineFunction
-from hotcent.pos_op.slako_dipole import (
+from hotcent.pos_op.slako_posop import (
     INTEGRALS_POSOP,
     UNIQUE_ATOMIC_TRANSITIONS,
     select_integrals,

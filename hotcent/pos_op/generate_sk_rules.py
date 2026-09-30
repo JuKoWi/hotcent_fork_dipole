@@ -11,7 +11,7 @@ C_ij and C_ijk are the respective integrals between the rotated basis functions.
 
 import sympy as sym
 from hotcent.pos_op.slako_new import EQUIVALENT_INTEGRALS, UNIQUE_INTEGRALS
-from hotcent.pos_op.slako_dipole import (
+from hotcent.pos_op.slako_posop import (
     EQUIVALENT_INTEGRALS_POSOP,
     UNIQUE_INTEGRALS_POSOP,
 )

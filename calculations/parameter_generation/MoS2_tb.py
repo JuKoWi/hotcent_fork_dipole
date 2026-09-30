@@ -7,29 +7,19 @@ import sys
 import numpy as np
 from hotcent.pos_op.utils import angstrom_to_bohr
 
-# print(MoS2.get_chemical_symbols())
-# print(MoS2.get_positions())
-# print(MoS2.get_cell())
-# print(MoS2.get_pbc())
-# view(MoS2)
-
+max_l = {"C": 1, "H": 0, "S": 2, "Mo": 2}
 MoS2 = mx2(vacuum=20)
 MoS2.pbc = (True, True, False)
-# print(MoS2.get_chemical_symbols())
-# print(MoS2.get_positions())
-# print(MoS2.get_cell())
-# print(MoS2.get_pbc())
-# view(MoS2)
 
 
-max_l = {"C": 1, "H": 0, "S": 2, "Mo": 2}
 seedname_mos2 = SlaterKosterIntegrator(
     MoS2,
-    skpath="sk_experimental/sk_unique",
+    skpath="skfiles_consistent/sk_unique",
     maxl_dict=max_l,
-    skpath_posop="sk_experimental/sk_posop_unique",
+    skpath_posop="skfiles_consistent/sk_posop_unique",
     format="unique",
-    path_p_onsite="skfiles/onsite_momentum/"
+    path_p_onsite="skfiles_consistent/onsite_momentum/"
 )
 seedname_mos2.write_seedname()
 seedname_mos2.write_seedname_momentum()
+seedname_mos2.check_p_v_onsite()

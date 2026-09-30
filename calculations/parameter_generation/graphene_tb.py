@@ -8,15 +8,15 @@ from hotcent.pos_op.mat_elem_evaluation import SlaterKosterIntegrator
 
 max_l = {"C": 1, "H": 0, "S": 2, "Mo": 2}
 graphene = graphene("CC", size=(1, 1, 1), vacuum=10)
-print(graphene.get_cell())
-# view(graphene)
-lcao_graphene = SlaterKosterIntegrator(
+
+sk_integrals = SlaterKosterIntegrator(
     graphene,
-    skpath="sk_experimental/sk_unique",
+    skpath="skfiles_consistent/sk_unique",
     maxl_dict=max_l,
-    skpath_posop="sk_experimental/sk_posop_unique",
+    skpath_posop="skfiles_consistent/sk_posop_unique",
     format="unique",
+    path_p_onsite="skfiles_consistent/onsite_momentum/"
 )
-lcao_graphene.write_seedname()
-# lcao_graphene.write_seedname_momentum()
-# graphene.write('graphene.cif')
+sk_integrals.write_seedname()
+sk_integrals.write_seedname_momentum()
+sk_integrals.check_p_v_onsite()

@@ -12,7 +12,7 @@ from scipy.interpolate import CubicSpline
 from scipy.constants import physical_constants, angstrom
 from ase.neighborlist import neighbor_list
 from hotcent.pos_op.utils import bohr_to_angstrom, dim_atom_basis, hartree_to_eV, angstrom_to_bohr
-from hotcent.pos_op.slako_dipole import (
+from hotcent.pos_op.slako_posop import (
     INTEGRALS_POSOP,
     UNIQUE_INTEGRALS_POSOP,
     EQUIVALENT_INTEGRALS_POSOP,
@@ -474,14 +474,6 @@ class SlaterKosterIntegrator:
                     X=integral_vec_posop, l=l, m=m, n=n
                 )[:dimA, :, :dimB]
 
-        # if VERBOSE:
-        #     print(
-        #         f"maximal imaginary integral value {np.max(np.abs(np.imag(integrals)))}"
-        #     )
-        #     if operator == 'r':
-        #         print(
-        #             f"maximal imaginary position integral value {np.max(np.abs(np.imag(position_elements)))}"
-        #         )
 
         if operator == "r":  # consider origin shift
             posA = np.array([posA[1], posA[2], posA[0]])
@@ -496,9 +488,7 @@ class SlaterKosterIntegrator:
     def _integrals_p_atom_pair(self, sk_table, posA, posB, lmaxA, lmaxB):
         momentum = np.zeros((3,dim_atom_basis(lmaxA), dim_atom_basis(lmaxB)), dtype=complex)
         h = 1e-4  # corresponds to angstrom
-        conversion_angstrom_bohr_inv = (
-            physical_constants["atomic unit of length"][0] / angstrom
-        )
+        conversion_angstrom_bohr_inv = physical_constants["atomic unit of length"][0] / angstrom
         for i in range(3):
             unit = np.zeros(3)
             unit[i] = 1
@@ -525,7 +515,7 @@ class SlaterKosterIntegrator:
             finite_diff = (-p2 + 8 * p1 - 8 * m1 + m2) / (
                 12 * h
             )  # has dimension 1/angstrom
-            momentum[i,...] = 1j * finite_diff *conversion_angstrom_bohr_inv
+            momentum[i,...] = 1j * finite_diff * conversion_angstrom_bohr_inv
         if TEST_MODE:
             max_real = np.max(np.real(momentum))
             if max_real > 1e-15:
@@ -800,33 +790,24 @@ class SlaterKosterIntegrator:
                             file=f,
                         )
 
-    def write_hamoversqr(self):
-        """TODO: Check if units match with conventions of DFTB+"""
-        matrix = self._calculate_lattice_dict(operator="S")[(0, 0, 0)]
-        matrixH = self._calculate_lattice_dict(operator="H")[(0, 0, 0)]
-        header1 = "#\tREAL\tNALLORB\tNKPOINT\n"
-        header2 = f"\tT\t{self.total_orbs}\t1\n"
-        header3 = "#IKPOINT\n"
-        header4 = "\t1\n"
-        header5 = "#MATRIX"
-        header = header1 + header2 + header3 + header4 + header5
-        np.savetxt(
-            fname="oversqr_hotcent.dat",
-            delimiter="\t",
-            fmt="%+.18e",
-            X=matrix,
-            header=header,
-            comments="",
-        )
-        np.savetxt(
-            fname="hamsqr1_hotcent.dat",
-            delimiter="\t",
-            fmt="%+.18e",
-            X=matrixH,
-            header=header,
-            comments="",
-        )
-
+    def check_p_v_onsite(self):
+        """check consistency of onsite matrix elements by evaluating equation
+            <m|p|n> = i <m|[H,r]|n>
+                    = sum_i i <m|H|i><i|r|n> - i <m|r|i><i|H|n>
+        """
+        filename = "onsite_p-v-consistency.txt"
+        with open(filename, "w") as f:
+            for el in list(set(self.atomtypes)):
+                p = self._assemble_atom_block(types=(el,el), posA=np.zeros(3), posB=np.zeros(3), max_lA=self.maxl_dict[el], max_lB=self.maxl_dict[el], operator="p")
+                r = self._assemble_atom_block(types=(el,el), posA=np.zeros(3), posB=np.zeros(3), max_lA=self.maxl_dict[el], max_lB=self.maxl_dict[el], operator="r")
+                r = angstrom_to_bohr(r)
+                H = self._assemble_atom_block(types=(el,el), posA=np.zeros(3), posB=np.zeros(3), max_lA=self.maxl_dict[el], max_lB=self.maxl_dict[el], operator="H")
+                diff = p - 1j * np.einsum('ab, xbc -> xac',H,r) + 1j* np.einsum('xab, bc -> xac', r, H)
+                print(f"{el}: maximal abs deviation = {np.max(np.abs(diff))}, maximal rel deviation = {np.max(np.where(np.abs(p)>0, np.abs(diff)/np.abs(p), 0))}", file=f)
+                for c in range(3):
+                    np.savetxt(f, diff[c])
+                    f.write('\n')
+                    
 
 class SKTable:
     """object to store all information from .skf file for one physical quantity

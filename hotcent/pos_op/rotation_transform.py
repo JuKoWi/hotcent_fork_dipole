@@ -180,7 +180,7 @@ f5 = 1 / 4 * sym.sqrt(21 / (2 * sym.pi)) * x * (5 * z**2 - r**2) / r**3
 f6 = 1 / 4 * sym.sqrt(105 / sym.pi) * (x**2 - y**2) * z / r**3
 f7 = 1 / 4 * sym.sqrt(35 / (2 * sym.pi)) * x * (x**2 - 3 * y**2) / r**3
 
-first_center_real = {
+first_center_cartesian = {
     "ss": (s_1, 0, 0),
     "py": (py_1, 1, -1),
     "pz": (pz_1, 1, 0),
@@ -202,10 +202,14 @@ first_center_real = {
 
 def to_spherical(R):
     """spherical coordinates of vector"""
-    r = np.sqrt(np.sum(R**2))
-    theta = np.arccos(R[2] / r)
-    phi = np.arctan2(R[1], R[0])
-    return np.array([r, theta, phi])
+    r = np.sqrt(np.einsum("na, na-> n", R, R))
+    theta = np.arccos(R[...,2] / r)
+    phi = np.arctan2(R[...,1], R[...,0])
+    spherical_coords = np.zeros_like(R)
+    spherical_coords[...,0] = r
+    spherical_coords[...,1] = theta
+    spherical_coords[...,2] = phi
+    return spherical_coords
 
 
 def evaluate_spherical(key, unit_vec):
@@ -433,12 +437,13 @@ def check_rot_triple():
 
 
 def check_harmonics_equal():
+    """make sure that transformation matrix is consistent with the real and complex spherical harmonics used"""
     unit_vec = np.random.normal(size=3)
     unit_vec = unit_vec / np.linalg.norm(unit_vec)
     theta1_val, phi1_val = to_spherical(unit_vec)[1:]
-    complex_sh = np.zeros((16,))
-    real_sh = np.zeros((16,))
-    for i, (key, item) in enumerate(first_center.items()):
+    complex_sh = np.zeros((16,), dtype=complex)
+    real_sh = np.zeros((16,), dtype=complex)
+    for i, (key, item) in enumerate(first_center_complex.items()):
         func = item[0]
         func = func.subs({phi: phi1_val, theta1: theta1_val})
         func = func.evalf()
@@ -448,7 +453,9 @@ def check_harmonics_equal():
         func = func.subs({phi: phi1_val, theta1: theta1_val})
         func = func.evalf()
         real_sh[i] = func
-    print(np.allclose(complex_sh, real_sh))
+    M = np.array(transform_to_real(), dtype=complex)
+    from_complex = M @ complex_sh
+    print(np.allclose(from_complex, real_sh))
 
 
 def check_vec_rotation():
@@ -478,14 +485,14 @@ def check_vec_rotation():
 if __name__ == "__main__":
     # check_vec_rotation()
     # check_rot_triple()
-    # check_harmonics_equal()
+    check_harmonics_equal()
     # check_rotation_prod()
     # check_rotation()
     # check_rotation_complex()
-    print(
-        sym.simplify(
-            sym.expand_complex(
-                Wigner_D_real(euler_alpha=0, euler_beta=BETA, euler_gamma=GAMMA)
-            )
-        )
-    )
+    # print(
+    #     sym.simplify(
+    #         sym.expand_complex(
+    #             Wigner_D_real(euler_alpha=0, euler_beta=BETA, euler_gamma=GAMMA)
+    #         )
+    #     )
+    # )
