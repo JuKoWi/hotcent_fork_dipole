@@ -10,6 +10,7 @@ import numpy as np
 import sympy as sp
 
 def evaluate_psi(Ynl, rspline, cart_grid):
+    """evaluate psi at a set of grid points"""
     spherical_coord = to_spherical(cart_grid)
     r_evaluated = rspline(spherical_coord[:,0])
     var_theta = spherical_coord[:,1]
@@ -18,6 +19,7 @@ def evaluate_psi(Ynl, rspline, cart_grid):
     return r_evaluated * Y_evaluated
 
 def onsite_norm_grid(atom, nl, Ynl):
+    """overlap between two basis states centered at the same atom"""
     hotcent_rgrid = atom.rgrid
     hotcent_spline = R_spline(atom=atom, nl=nl)
     oned_grid = grid.onedgrid.GaussLegendre(npoints=100)
@@ -28,6 +30,7 @@ def onsite_norm_grid(atom, nl, Ynl):
     return at_grid.integrate(dens)
 
 def onsite_posop_grid(atom, nl1, nl2, Ynl1, Ynl2, cart_component):
+    """position operator matrix elements between basis states centered at the same atom"""
     hotcent_rgrid = atom.rgrid
     hotcent_spline1 = R_spline(atom=atom, nl=nl1)
     hotcent_spline2 = R_spline(atom=atom, nl=nl2)
@@ -40,6 +43,7 @@ def onsite_posop_grid(atom, nl1, nl2, Ynl1, Ynl2, cart_component):
     return at_grid.integrate(posop)
 
 def onsite_momentum_grid(atom, nl1, nl2, Ynl1, Ynl2, cart_component):
+    """momentum in a.u. between two basis functions centered at the same atom"""
     hotcent_spline1 = R_spline(atom=atom, nl=nl1)
     hotcent_spline2 = R_spline(atom=atom, nl=nl2)
     oned_grid = grid.onedgrid.GaussLegendre(npoints=500)
@@ -53,6 +57,7 @@ def onsite_momentum_grid(atom, nl1, nl2, Ynl1, Ynl2, cart_component):
     return -1j*at_grid.integrate(momentum)
 
 def twocenter_overlap(atom1, atom2, nl1, nl2, Ynl1, Ynl2, pos_au_1, pos_au_2):
+    """overlap between two basis functions centered at different atoms"""
     oned_grid = grid.onedgrid.GaussLegendre(npoints=500)
     rgrid = grid.rtransform.BeckeRTransform(0.0, R=1.5).transform_1d_grid(oned_grid)
     mgrid = grid.MolGrid.from_preset(
@@ -72,6 +77,7 @@ def twocenter_overlap(atom1, atom2, nl1, nl2, Ynl1, Ynl2, pos_au_1, pos_au_2):
     return mgrid.integrate(psi1 * psi2)
 
 def twocenter_position(atom1, atom2, nl1, nl2, Ynl1, Ynl2, pos_au_1, pos_au_2, cart_component):
+    """position matrix elements between two basis functions centered at different atoms"""
     oned_grid = grid.onedgrid.GaussLegendre(npoints=500)
     rgrid = grid.rtransform.BeckeRTransform(0.0, R=1.5).transform_1d_grid(oned_grid)
     mgrid = grid.MolGrid.from_preset(
@@ -92,6 +98,7 @@ def twocenter_position(atom1, atom2, nl1, nl2, Ynl1, Ynl2, pos_au_1, pos_au_2, c
 
 
 def twocenter_momentum(atom1, atom2, nl1, nl2, Ynl1, Ynl2, pos_au_1, pos_au_2, cart_component):
+    """momentum in a.u. between two basis functions centered at different atoms"""
     oned_grid = grid.onedgrid.GaussLegendre(npoints=200)
     rgrid = grid.rtransform.BeckeRTransform(1e-5, R=1.5).transform_1d_grid(oned_grid)
     mgrid = grid.MolGrid.from_preset(
@@ -114,11 +121,15 @@ def twocenter_momentum(atom1, atom2, nl1, nl2, Ynl1, Ynl2, pos_au_1, pos_au_2, c
     return -1j*mgrid.integrate(momentum)
 
 def grad_psi(Ynl, rspline, cart_grid, comp, h=1e-4):
+    """finite difference gradient"""
     e = np.zeros(3)
     e[comp] = h
     return (evaluate_psi(Ynl, rspline, cart_grid+e) - evaluate_psi(Ynl, rspline, cart_grid-e)) / (2*h) 
 
 def twocenter_momentum_finite_diff(atom1, atom2, nl1, nl2, Ynl1, Ynl2, pos_au_1, pos_au_2, cart_component):
+    """momentum in a.u. between two basis functions centered at different atoms
+        finite difference for gradient
+    """
     oned_grid = grid.onedgrid.GaussLegendre(npoints=200)
     rgrid = grid.rtransform.BeckeRTransform(1e-5, R=1.5).transform_1d_grid(oned_grid)
     mgrid = grid.MolGrid.from_preset(
@@ -139,6 +150,7 @@ def twocenter_momentum_finite_diff(atom1, atom2, nl1, nl2, Ynl1, Ynl2, pos_au_1,
     return -1j*mgrid.integrate(momentum)
 
 def momentum_atom_pair_block(pos1, pos2, atom1, atom2, maxl1, maxl2):
+    """momentum in a.u. between two atoms (all basis states of first atom as bra and all basis states of second atom as ket)"""
     momentum = np.zeros((dim_atom_basis(maxl1), dim_atom_basis(maxl2), 3), dtype=complex)
     basis = list(first_center.keys())
     for i,a in enumerate(basis):
@@ -155,6 +167,24 @@ def momentum_atom_pair_block(pos1, pos2, atom1, atom2, maxl1, maxl2):
                         momentum[i,j,c] = twocenter_momentum_finite_diff(atom1=atom1, atom2=atom2, nl1=nl1, nl2=nl2, Ynl1=Y_nl1, Ynl2=Y_nl2, pos_au_1=pos1, pos_au_2=pos2, cart_component=c)
     return momentum
 
+def position_atom_pair_block(pos1, pos2, atom1, atom2, maxl1, maxl2):
+    """position matrix elements in a.u. between two atoms (all basis states of first atom as bra and all basis states of second atom as ket)"""
+    momentum = np.zeros((dim_atom_basis(maxl1), dim_atom_basis(maxl2), 3), dtype=complex)
+    basis = list(first_center.keys())
+    for i,a in enumerate(basis):
+        for j,b in enumerate(basis):
+            Y_nl1 = sp.lambdify((theta1, phi), first_center[a][0])
+            Y_nl2 = sp.lambdify((theta1, phi), first_center[b][0])
+            if a[0] in [s[1] for s in atom1.valence] and b[0] in [s[1] for s in atom2.valence]:
+                nl1 = [s for s in atom1.valence if s[1] == a[0]][0]
+                nl2 = [s for s in atom2.valence if s[1] == b[0]][0]
+                for c in range(3):
+                    if np.allclose(pos1, pos2):
+                        shift = pos1[c] if i==j else 0
+                        momentum[i,j,c] = shift + onsite_posop_grid(atom=atom1, nl1=nl1, nl2=nl2, Ynl1=Y_nl1, Ynl2=Y_nl2, cart_component=c)
+                    else:
+                        momentum[i,j,c] = twocenter_position(atom1=atom1, atom2=atom2, nl1=nl1, nl2=nl2, Ynl1=Y_nl1, Ynl2=Y_nl2, pos_au_1=pos1, pos_au_2=pos2, cart_component=c)
+    return momentum
 
 
 
@@ -200,5 +230,11 @@ if __name__ == "__main__":
     graphene = graphene("CC", size=(1, 1, 1), vacuum=10)
     pos1 = angstrom_to_bohr(graphene.get_positions()[0])
     pos2 = angstrom_to_bohr(graphene.get_positions()[1])
+    print("onsite position")
+    print(bohr_to_angstrom(np.reshape(position_atom_pair_block(pos1=pos2, pos2=pos2, atom1=atom, atom2=atom, maxl1=1, maxl2=1), (16,3)))) #onsite
+    print("onsite momentum")
+    # print(np.reshape(momentum_atom_pair_block(pos1=pos1, pos2=pos1, atom1=atom, atom2=atom, maxl1=1, maxl2=1), (16,3))) #onsite
+    print("offsite position")
+    print(bohr_to_angstrom(np.reshape(position_atom_pair_block(pos1=pos2, pos2=pos1, atom1=atom, atom2=atom, maxl1=1, maxl2=1), (16,3)))) #offsite
+    print("offsite momentum")
     print(np.reshape(momentum_atom_pair_block(pos1=pos1, pos2=pos2, atom1=atom, atom2=atom, maxl1=1, maxl2=1), (16,3))) #offsite
-    print(np.reshape(momentum_atom_pair_block(pos1=pos1, pos2=pos1, atom1=atom, atom2=atom, maxl1=1, maxl2=1), (16,3))) #onsite

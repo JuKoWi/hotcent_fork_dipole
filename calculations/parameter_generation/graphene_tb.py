@@ -20,3 +20,4 @@ sk_integrals = SlaterKosterIntegrator(
 sk_integrals.write_seedname()
 sk_integrals.write_seedname_momentum()
 sk_integrals.check_p_v_onsite()
+sk_integrals.check_p_v_offsite()

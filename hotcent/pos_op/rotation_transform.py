@@ -202,7 +202,7 @@ first_center_cartesian = {
 
 def to_spherical(R):
     """spherical coordinates of vector"""
-    r = np.sqrt(np.einsum("na, na-> n", R, R))
+    r = np.sqrt(np.einsum("...a, ...a-> ...", R, R))
     theta = np.arccos(R[...,2] / r)
     phi = np.arctan2(R[...,1], R[...,0])
     spherical_coords = np.zeros_like(R)

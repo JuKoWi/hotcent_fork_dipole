@@ -23,3 +23,4 @@ seedname_mos2 = SlaterKosterIntegrator(
 seedname_mos2.write_seedname()
 seedname_mos2.write_seedname_momentum()
 seedname_mos2.check_p_v_onsite()
+seedname_mos2.check_p_v_offsite()

@@ -7,12 +7,15 @@ import numpy as np
 import scipy as sc
 
 def onsite_momentum(atom:AtomicBase, fname):
-    """calculates the onsite components of momentum in atomic units. Basis functions with real spherical harmonics. 
+    """calculates the onsite components of momentum
+    Basis functions with real spherical harmonics as angular
+    Units:
+        p: a.u.
     There is one block for each allowed combination of l:
     blocks: sp, pd, df 
     and a subblock for each component. Since momentum should be hermitian, only save the blocks above the 
     diagonal:
-    013 # angular momenta covered by the valence set
+    012 # angular momenta covered by the valence set
     sp:
     #x  R I R I R I 
     #y  R I R I R I 
@@ -29,8 +32,6 @@ def onsite_momentum(atom:AtomicBase, fname):
     #z R I R I R I R I R I 
     #z R I R I R I R I R I 
     #z R I R I R I R I R I 
-    df:
-    ...
     
     """
     valence = sorted(atom.valence, key=symbol_to_l)
@@ -95,6 +96,12 @@ def onsite_momentum(atom:AtomicBase, fname):
     return full_momentum_real_harmonics
 
 def load_onsite_momentum(file):
+    """load onsite momentum
+    units in input file:
+        p: a.u.
+    output units:
+        p: a.u.
+    """
     lbra = {"sp": 0, "pd": 1, "df": 2}
     lmax = 3
     n = dim_atom_basis(lmax + 1)

@@ -22,12 +22,13 @@ isolated = Atoms(
 
 sk_integrals = SlaterKosterIntegrator(
     isolated,
-    skpath="skfiles/sk_unique",
+    skpath="skfiles_consistent/sk_unique",
     maxl_dict=max_l,
-    skpath_posop="skfiles/sk_posop_unique",
+    skpath_posop="skfiles_consistent/sk_posop_unique",
     format="unique",
-    path_p_onsite="skfiles/onsite_momentum/",
+    path_p_onsite="skfiles_consistent/onsite_momentum/",
 )
 
 sk_integrals.write_seedname()
 sk_integrals.write_seedname_momentum()
+sk_integrals.check_p_v_offsite()
