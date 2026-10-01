@@ -13,7 +13,7 @@ tests/*.3cf
 tests/*.spl
 tests/.hypothesis
 tutorials/*
-!tutorials/*.ipynb
-!tutorials/*.json
+!tutorials/**/
+!tutorials/**/*.ipynb
 !tutorials/grid_opt_*.yaml
 .ipynb_checkpoints
