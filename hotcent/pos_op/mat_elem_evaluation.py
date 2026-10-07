@@ -839,7 +839,7 @@ class SlaterKosterIntegrator:
         fig.colorbar(im, ax=axs, shrink=0.6, label="a.u.")  # one colorbar spanning both axes
         plt.show()
 
-    def check_p_v_offsite(self):
+    def check_p_v_offsite(self, cart_component):
         """check consistency of all matrix elements within isolated unit cell by evaluating equation
             <m|p|n> = i <m|[H,r]|n>
                     = sum_i i <m|H|i><i|r|n> - i <m|r|i><i|H|n>
@@ -852,8 +852,17 @@ class SlaterKosterIntegrator:
         S = self._calculate_lattice_dict("S")[(0,0,0)]
         S_inv = np.linalg.inv(S)
         v = 1j * np.einsum('ab, bc, xcd-> xad', H, S_inv, r) - 1j * np.einsum('xab, bc, cd -> xad', r, S_inv, H)
+        print("overlap hermitian")
+        print(np.allclose(S, S.T.conj()))
+        print("Hamiltonian hermitian")
+        print(np.allclose(H, H.T.conj()))
+        print("inverse overlap hermitian")
+        print(np.allclose(S_inv, S_inv.T.conj()))
+        print("position hermitian")
+        print(np.allclose(r[0,...], r[0,...].T.conj()))
+        print(np.allclose(r[1,...], r[1,...].T.conj()))
+        print(np.allclose(r[2,...], r[2,...].T.conj()))
         diff = p - v
-        print(np.unravel_index(np.argmax(np.abs(diff), axis=None), diff.shape))
         onsite = np.zeros(p.shape[1:], dtype=bool)
         for idx, n in enumerate(self.orbnumbers):
             s = self._find_block_pos(idx)
@@ -870,11 +879,10 @@ class SlaterKosterIntegrator:
             for c in range(3):
                 f.write(f"\n# component {'xyz'[c]}: p - v\n")
                 np.savetxt(f, diff[c])
-        cart_component = 0
         comp = {0: "x", 1: "y", 2: "z"}
         labels = ["s1", "p1", "p1", "p1", "s2", "p2", "p2", "p2"]
 
-        im_p = np.imag(p[cart_component, ...])
+        im_p = np.imag(v[cart_component, ...])
         im_diff = np.imag(diff[cart_component, ...])
 
         # common color scale for both images
@@ -882,7 +890,7 @@ class SlaterKosterIntegrator:
                                  vmax=max(im_p.max(), im_diff.max()))
 
         fig, axs = plt.subplots(nrows=1, ncols=2, constrained_layout=True)
-        for ax, data, title in zip(axs, [im_p, im_diff], ["Im(p)", "Im(p-v)"]):
+        for ax, data, title in zip(axs, [im_p, im_diff], ["Im(v)", "Im(p-v)"]):
             im = ax.imshow(data, norm=norm)
             ax.set_title(f"{comp[cart_component]}-component of {title}")
             ax.set_xticks(np.arange(8))
@@ -892,6 +900,13 @@ class SlaterKosterIntegrator:
 
         fig.colorbar(im, ax=axs, shrink=0.6, label="a.u.")  # one colorbar spanning both axes
         plt.show()
+
+        r = self._calculate_lattice_dict("r")[(0,0,0)]
+        r = angstrom_to_bohr(r)
+        p = self._calculate_lattice_dict("p")[(0,0,0)]
+        H = self._calculate_lattice_dict("H")[(0,0,0)]
+        S = self._calculate_lattice_dict("S")[(0,0,0)]
+        r_grid =  
 
         
         

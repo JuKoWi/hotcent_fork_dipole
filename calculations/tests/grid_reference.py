@@ -4,7 +4,8 @@ from hotcent.atomic_dft import AtomicDFT
 from hotcent.pos_op.onsite_momentum import onsite_momentum, R_spline
 from hotcent.pos_op.symbolic_integrals import first_center, theta1, phi
 from hotcent.pos_op.rotation_transform import to_spherical
-from hotcent.pos_op.utils import dim_atom_basis
+from hotcent.pos_op.utils import dim_atom_basis, angstrom_to_bohr
+from hotcent.pos_op.mat_elem_evaluation import SlaterKosterIntegrator
 import grid 
 import numpy as np
 import sympy as sp
@@ -242,6 +243,59 @@ def check_basis_completeness(positions_au, atoms, maxl):
             diff_grid[c, i] = mgrid.integrate(psi_total**2)/norm
             diff[c, i] = (x2 - RSR_diag[c, i])/norm                    
     return diff_grid, diff
+
+def check_all_r_p_S(atom_dict, ase_atoms):
+    """
+        atom_dict: dict with hotcent atoms as values and element symbols as keys
+        ase_atoms: ase.Atoms object
+    """
+    #perform slater koster calculation
+    max_l_dict = {"C": 1, "H": 0, "S": 2, "Mo": 2}
+    sk_integrals = SlaterKosterIntegrator(
+        ase_atoms,
+        skpath="skfiles_consistent/sk_unique",
+        maxl_dict=max_l_dict,
+        skpath_posop="skfiles_consistent/sk_posop_unique",
+        format="unique",
+        path_p_onsite="skfiles_consistent/onsite_momentum/"
+    )
+    r_hotcent = sk_integrals._calculate_lattice_dict("r")[(0,0,0)]
+    S_hotcent = sk_integrals._calculate_lattice_dict("S")[(0,0,0)]
+    p_hotcent = sk_integrals._calculate_lattice_dict("p")[(0,0,0)]
+
+    #get list of atom wise information
+    positions_au = angstrom_to_bohr(ase_atoms.get_positions())
+    atoms = [atom_dict[symb] for symb in ase_atoms.get_chemical_symbols()]
+    maxl = [max_l_dict[symb] for symb in ase_atoms.get_chemical_symbols()]
+
+    # prepare iterations over all functions in the basis
+    dim_total = sum([dim_atom_basis(l) for l in maxl])
+    S = np.zeros((dim_total, dim_total))
+    r = np.zeros((3, dim_total, dim_total))
+    p = np.zeros((3, dim_total, dim_total))
+    atom_list = []
+    for j, b in enumerate(atoms):
+        atom_list += [b for j in range(dim_atom_basis(maxl[j]))]
+    pos_list =[]
+    for j,p in enumerate(positions_au):
+        pos_list += [p for j in range(dim_atom_basis(maxl[j]))] 
+    Ylm_list = []
+    nl_list = []
+    for i, b in enumerate(atoms):
+        for j, lm in enumerate(list(first_center.keys())):
+            if j == dim_atom_basis(maxl[i]):
+                break
+            if lm[0] in [s[1] for s in b.valence]:
+                Ylm = sp.lambdify((theta1, phi), first_center[lm][0])
+                Ylm_list.append(Ylm)
+                nl_list.append([s for s in b.valence if s[1] == lm[0]][0])
+    for i, a in enumerate(atom_list):
+        for j, b in enumerate(atom_list):
+            S[i,j] = twocenter_overlap(atom1=a, atom2=b, nl1=nl_list[i], nl2=nl_list[j], Ynl1=Ylm_list[i], Ynl2=Ylm_list[j], pos_au_1=pos_list[i], pos_au_2=pos_list[j])
+            for c in range(3):
+                r[c,i,j] = twocenter_position(atom1=a, atom2=b, nl1=nl_list[i], nl2=nl_list[j], Ynl1=Ylm_list[i], Ynl2=Ylm_list[j], pos_au_1=pos_list[i], pos_au_2=pos_list[j], cart_component=c)
+                p[c,i,j] = twocenter_momentum_finite_diff(atom1=a, atom2=b, nl1=nl_list[i], nl2=nl_list[j], Ynl1=Ylm_list[i], Ynl2=Ylm_list[j], pos_au_1=pos_list[i], pos_au_2=pos_list[j], cart_component=c)
+
 
 if __name__ == "__main__":
     from ase.build import graphene, mx2 
