@@ -17,6 +17,7 @@ sk_integrals = SlaterKosterIntegrator(
     format="unique",
     path_p_onsite="skfiles_consistent/onsite_momentum/"
 )
+print(sk_integrals.H_sk_tables[("C","C")].same_atom_vals)
 sk_integrals.write_seedname()
 sk_integrals.write_seedname_momentum()
 sk_integrals.check_p_v_onsite()

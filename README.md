@@ -7,6 +7,14 @@ The scripts in `hotcent/pos_op` are those that are required to do the position o
 
 Tutorials cover example calculations for a homoatomic system (graphene, tutorial_1) and a heteroatomic system (MoS2, tutorial_2)
 
+## Installation
+So far usage requires nix/nix-os. After downloading/cloning the repo run
+```
+cd nix
+nix develop
+```
+
+
 ## The original Hotcent
 
 Hotcent was originally based on parts of the [Hotbit](

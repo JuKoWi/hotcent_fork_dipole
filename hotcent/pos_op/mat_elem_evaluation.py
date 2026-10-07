@@ -8,6 +8,8 @@ from hotcent.pos_op.rotation_transform import to_spherical
 from pathlib import Path
 import itertools
 import sympy as sym
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 from scipy.interpolate import CubicSpline
 from scipy.constants import physical_constants, angstrom
 from ase.neighborlist import neighbor_list
@@ -271,7 +273,9 @@ class SlaterKosterIntegrator:
                     same_atom = line2.split()
                     if not dipole:
                         same_atom = np.flip(same_atom[:3])
+                        print(len(same_atom))
             if extended == 1:
+                raise ValueError("Reading extended file format not implemented yet")
                 parts = [p.strip() for p in line2.split()]
             delta_R, n_points = bohr_to_angstrom(float(parts[0])), int(parts[1])
         if not homonuclear:
@@ -812,6 +816,29 @@ class SlaterKosterIntegrator:
                     np.savetxt(f, diff[c])
                     f.write('\n')
 
+        labels = ["s", "py", "pz", "px", "d", "d", "d", "d", "d"]
+        cart_component = 0
+        comp = {0: "x", 1: "y", 2: "z"}
+
+        im_p = np.imag(p[cart_component, ...])
+        im_diff = np.imag(diff[cart_component, ...])
+
+        # common color scale for both images
+        norm = mcolors.Normalize(vmin=min(im_p.min(), im_diff.min()),
+                                 vmax=max(im_p.max(), im_diff.max()))
+
+        fig, axs = plt.subplots(nrows=1, ncols=2, constrained_layout=True)
+        for ax, data, title in zip(axs, [im_p, im_diff], ["Im(p)", "Im(p-v)"]):
+            im = ax.imshow(data, norm=norm)
+            ax.set_title(f"{comp[cart_component]}-component of {title}")
+            ax.set_xticks(np.arange(4))
+            ax.set_xticklabels(labels[:4])
+            ax.set_yticks(np.arange(4))
+            ax.set_yticklabels(labels[:4])
+
+        fig.colorbar(im, ax=axs, shrink=0.6, label="a.u.")  # one colorbar spanning both axes
+        plt.show()
+
     def check_p_v_offsite(self):
         """check consistency of all matrix elements within isolated unit cell by evaluating equation
             <m|p|n> = i <m|[H,r]|n>
@@ -835,6 +862,7 @@ class SlaterKosterIntegrator:
 
         with open(filename, "w") as f:
             for name, mask in (("onsite blocks", onsite), ("offsite blocks", ~onsite)):
+                # scale = np.max(np.abs(p[:,maks]))
                 d = np.abs(diff[:, mask])
                 print(f"{name}: max|p - v| = {d.max():.3e} a.u., relative to max|p|: {d.max() / scale:.3e}", file=f)
             forbidden = (np.abs(p) < 1e-12) & (np.abs(v) > 1e-6 * scale)
@@ -842,6 +870,30 @@ class SlaterKosterIntegrator:
             for c in range(3):
                 f.write(f"\n# component {'xyz'[c]}: p - v\n")
                 np.savetxt(f, diff[c])
+        cart_component = 0
+        comp = {0: "x", 1: "y", 2: "z"}
+        labels = ["s1", "p1", "p1", "p1", "s2", "p2", "p2", "p2"]
+
+        im_p = np.imag(p[cart_component, ...])
+        im_diff = np.imag(diff[cart_component, ...])
+
+        # common color scale for both images
+        norm = mcolors.Normalize(vmin=min(im_p.min(), im_diff.min()),
+                                 vmax=max(im_p.max(), im_diff.max()))
+
+        fig, axs = plt.subplots(nrows=1, ncols=2, constrained_layout=True)
+        for ax, data, title in zip(axs, [im_p, im_diff], ["Im(p)", "Im(p-v)"]):
+            im = ax.imshow(data, norm=norm)
+            ax.set_title(f"{comp[cart_component]}-component of {title}")
+            ax.set_xticks(np.arange(8))
+            ax.set_xticklabels(labels)
+            ax.set_yticks(np.arange(8))
+            ax.set_yticklabels(labels)
+
+        fig.colorbar(im, ax=axs, shrink=0.6, label="a.u.")  # one colorbar spanning both axes
+        plt.show()
+
+        
         
         
                     

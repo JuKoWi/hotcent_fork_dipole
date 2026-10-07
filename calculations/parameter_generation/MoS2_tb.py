@@ -20,6 +20,8 @@ seedname_mos2 = SlaterKosterIntegrator(
     format="unique",
     path_p_onsite="skfiles_consistent/onsite_momentum/"
 )
+print(seedname_mos2.H_sk_tables[("Mo","Mo")].same_atom_vals)
+print(seedname_mos2.H_sk_tables[("S","S")].same_atom_vals)
 seedname_mos2.write_seedname()
 seedname_mos2.write_seedname_momentum()
 seedname_mos2.check_p_v_onsite()

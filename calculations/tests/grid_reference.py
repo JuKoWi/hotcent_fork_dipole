@@ -186,13 +186,67 @@ def position_atom_pair_block(pos1, pos2, atom1, atom2, maxl1, maxl2):
                         momentum[i,j,c] = twocenter_position(atom1=atom1, atom2=atom2, nl1=nl1, nl2=nl2, Ynl1=Y_nl1, Ynl2=Y_nl2, pos_au_1=pos1, pos_au_2=pos2, cart_component=c)
     return momentum
 
-
-
-
+def check_basis_completeness(positions_au, atoms, maxl):
+    dim_total = sum([dim_atom_basis(l) for l in maxl])
+    S = np.zeros((dim_total, dim_total))
+    r = np.zeros((3, dim_total, dim_total))
+    atom_list = []
+    for j, b in enumerate(atoms):
+        atom_list += [b for j in range(dim_atom_basis(maxl[j]))]
+    pos_list =[]
+    for j,p in enumerate(positions_au):
+        pos_list += [p for j in range(dim_atom_basis(maxl[j]))] 
+    Ylm_list = []
+    nl_list = []
+    for i, b in enumerate(atoms):
+        for j, lm in enumerate(list(first_center.keys())):
+            if j == dim_atom_basis(maxl[i]):
+                break
+            if lm[0] in [s[1] for s in b.valence]:
+                Ylm = sp.lambdify((theta1, phi), first_center[lm][0])
+                Ylm_list.append(Ylm)
+                nl_list.append([s for s in b.valence if s[1] == lm[0]][0])
+    for i, a in enumerate(atom_list):
+        for j, b in enumerate(atom_list):
+            S[i,j] = twocenter_overlap(atom1=a, atom2=b, nl1=nl_list[i], nl2=nl_list[j], Ynl1=Ylm_list[i], Ynl2=Ylm_list[j], pos_au_1=pos_list[i], pos_au_2=pos_list[j])
+            for c in range(3):
+                r[c,i,j] = twocenter_position(atom1=a, atom2=b, nl1=nl_list[i], nl2=nl_list[j], Ynl1=Ylm_list[i], Ynl2=Ylm_list[j], pos_au_1=pos_list[i], pos_au_2=pos_list[j], cart_component=c)
+    S_inv = np.linalg.inv(S)
+    oned_grid = grid.onedgrid.GaussLegendre(npoints=200)
+    rgrid = grid.rtransform.BeckeRTransform(1e-5, R=1.5).transform_1d_grid(oned_grid)
+    mgrid = grid.MolGrid.from_preset(
+        atnums=np.array([a.Z for a in atoms]),
+        atcoords=np.array([p for p in positions_au]),
+        rgrid=rgrid,
+        preset="fine",
+        aim_weights=grid.BeckeWeights(),
+        store=True,
+    )
+    diff_grid = np.zeros((3, dim_total))
+    diff = np.zeros((3, dim_total))
+    coeffs = np.einsum('jk, ckl -> cjl', S_inv, r)
+    RSR_diag = np.einsum('cab,bd,cda->ca', r, S_inv, r)                
+    for c in range(3):
+        for i, a in enumerate(atom_list):
+            cart_grid = mgrid.points - pos_list[i]
+            hotcent_spline = R_spline(atom=a, nl=nl_list[i])
+            psi = evaluate_psi(Ynl=Ylm_list[i], rspline=hotcent_spline, cart_grid=cart_grid)   
+            x = mgrid.points[:,c]
+            psi_total = x * psi
+            x2 = mgrid.integrate(psi_total**2)                          
+            norm = mgrid.integrate((psi * (x-pos_list[i][c]))**2)
+            for j,b in enumerate(atom_list):
+                cart_grid = mgrid.points - pos_list[j]
+                hotcent_spline = R_spline(atom=b, nl=nl_list[j])
+                psi_total -= coeffs[c,j,i] * evaluate_psi(Ynl=Ylm_list[j], rspline=hotcent_spline, cart_grid=cart_grid)
+            diff_grid[c, i] = mgrid.integrate(psi_total**2)/norm
+            diff[c, i] = (x2 - RSR_diag[c, i])/norm                    
+    return diff_grid, diff
 
 if __name__ == "__main__":
-    from ase.build import graphene
+    from ase.build import graphene, mx2 
     from hotcent.pos_op.utils import angstrom_to_bohr, bohr_to_angstrom
+    import sys
     # Get KS all-electron ground state of confined atom:
     element = "C"
     xc = "GGA_X_PBE+GGA_C_PBE"
@@ -224,17 +278,111 @@ if __name__ == "__main__":
     atom.set_confinement(conf)
     atom.set_wf_confinement(wf_confinement=wf_conf)
     atom.run()
+
     onsite_momentum(atom, "C.txt")
     
     max_l = {"C": 1, "H": 0, "S": 2, "Mo": 2}
     graphene = graphene("CC", size=(1, 1, 1), vacuum=10)
     pos1 = angstrom_to_bohr(graphene.get_positions()[0])
     pos2 = angstrom_to_bohr(graphene.get_positions()[1])
-    print("onsite position")
-    print(bohr_to_angstrom(np.reshape(position_atom_pair_block(pos1=pos2, pos2=pos2, atom1=atom, atom2=atom, maxl1=1, maxl2=1), (16,3)))) #onsite
-    print("onsite momentum")
-    # print(np.reshape(momentum_atom_pair_block(pos1=pos1, pos2=pos1, atom1=atom, atom2=atom, maxl1=1, maxl2=1), (16,3))) #onsite
-    print("offsite position")
-    print(bohr_to_angstrom(np.reshape(position_atom_pair_block(pos1=pos2, pos2=pos1, atom1=atom, atom2=atom, maxl1=1, maxl2=1), (16,3)))) #offsite
-    print("offsite momentum")
-    print(np.reshape(momentum_atom_pair_block(pos1=pos1, pos2=pos2, atom1=atom, atom2=atom, maxl1=1, maxl2=1), (16,3))) #offsite
+    Ylm1 = sp.lambdify((theta1, phi), first_center['ss'][0])
+    Ylm2 = sp.lambdify((theta1, phi), first_center['py'][0])
+    # print(onsite_momentum_grid(atom=atom, nl1="2s", nl2="2p", Ynl1=Ylm1, Ynl2=Ylm2, cart_component=1))
+
+    print(check_basis_completeness(positions_au=[pos1, pos2], atoms=[atom, atom], maxl=[1,1]))
+    # print(check_basis_completeness(positions_au=[pos1, pos2], atoms=[atom, atom], maxl=[0,0]))
+
+    pos1 += np.array([1,1,1])
+    pos2 += np.array([1,1,1])
+
+    print(check_basis_completeness(positions_au=[pos1, pos2], atoms=[atom, atom], maxl=[1,1]))
+    # print(check_basis_completeness(positions_au=[pos1, pos2], atoms=[atom, atom], maxl=[0,0]))
+
+
+    sys.exit()
+
+    MoS2 = mx2(vacuum=20)
+    mos2_positions = MoS2.get_positions()
+    print(MoS2.get_chemical_symbols())
+
+    atomS = AtomicDFT(
+        "S",
+        xc=xc,
+        perturbative_confinement=False,
+        confinement=PowerConfinement(r0=50, s=4),
+        configuration="[Ne] 3s2 3p4 3d0",
+        valence=["3s", "3p", "3d"],
+        scalarrel=True,
+        maxiter=2500,
+        timing=False,
+        # nodegpts=2500,
+        mix=0.2,
+        txt="-",
+        # rmax=500,
+    )
+    atomS.run()
+    
+
+    atomMo = AtomicDFT(
+        "Mo",
+        xc=xc,
+        perturbative_confinement=False,
+        configuration="[Kr] 4d4 5s2 5p0",
+        valence=["4d", "5s", "5p"],
+        confinement=PowerConfinement(r0=50, s=4),
+        scalarrel=True,
+        maxiter=2500,
+        timing=False,
+        # nodegpts=150,
+        mix=0.2,
+        txt="-",
+        # rmax=100,
+    )
+    atomMo.run()
+
+    # Use parameters from 10.1021/ct4004959 (Heine 2013)
+    rcovS = 3.9
+    rcovMo = 4.3
+    # confS = PowerConfinement(r0=50, s=4)
+    # confMo = PowerConfinement(r0=50, s=4)
+
+    wf_confS = {
+        "3s": PowerConfinement(r0=rcovS, s=4.6),
+        "3p": PowerConfinement(r0=rcovS, s=4.6),
+        "3d": PowerConfinement(r0=rcovS, s=4.6),
+    }
+
+    wf_confMo = {
+        "4d": PowerConfinement(r0=rcovMo, s=11.6),
+        "5s": PowerConfinement(r0=rcovMo, s=11.6),
+        "5p": PowerConfinement(r0=rcovMo, s=11.6),
+    }
+
+    # atomS.set_confinement(confS)
+    atomS.set_wf_confinement(wf_confinement=wf_confS)
+    atomS.run()
+
+    # atomMo.set_confinement(confMo)
+    atomMo.set_wf_confinement(wf_confinement=wf_confMo)
+    atomMo.run()
+    smallgrid, small = check_basis_completeness(positions_au=mos2_positions, atoms=[atomMo, atomS, atomS], maxl=[0,0,0])
+    mediumgrid, medium = check_basis_completeness(positions_au=mos2_positions, atoms=[atomMo, atomS, atomS], maxl=[1,1,1])
+    largegrid, large = check_basis_completeness(positions_au=mos2_positions, atoms=[atomMo, atomS, atomS], maxl=[2,2,2])
+
+    print(smallgrid)
+    print(small-smallgrid)
+    print(mediumgrid)
+    print(medium - mediumgrid)
+    print(largegrid)
+    print(large-largegrid)
+
+
+
+    # print("onsite position")
+    # print(bohr_to_angstrom(np.reshape(position_atom_pair_block(pos1=pos2, pos2=pos2, atom1=atom, atom2=atom, maxl1=1, maxl2=1), (16,3)))) #onsite
+    # print("onsite momentum")
+    # # print(np.reshape(momentum_atom_pair_block(pos1=pos1, pos2=pos1, atom1=atom, atom2=atom, maxl1=1, maxl2=1), (16,3))) #onsite
+    # print("offsite position")
+    # print(bohr_to_angstrom(np.reshape(position_atom_pair_block(pos1=pos2, pos2=pos1, atom1=atom, atom2=atom, maxl1=1, maxl2=1), (16,3)))) #offsite
+    # print("offsite momentum")
+    # print(np.reshape(momentum_atom_pair_block(pos1=pos1, pos2=pos2, atom1=atom, atom2=atom, maxl1=1, maxl2=1), (16,3))) #offsite

@@ -82,8 +82,7 @@ atomS = AtomicDFT(
     rmax=500,
 )
 atomS.run()
-eigenvaluesS = atomS.enl
-print(atomS.enl)
+eigenvaluesS_unconfined = atomS.enl
 
 
 atomMo = AtomicDFT(
@@ -102,8 +101,7 @@ atomMo = AtomicDFT(
     rmax=100,
 )
 atomMo.run()
-eigenvaluesMo = atomMo.enl
-print(atomMo.enl)
+eigenvaluesMo_unconfined = atomMo.enl
 
 
 # Use parameters from 10.1021/ct4004959 (Heine 2013)
@@ -127,12 +125,14 @@ wf_confMo = {
 # atomS.set_confinement(confS)
 atomS.set_wf_confinement(wf_confinement=wf_confS)
 atomS.run()
+eigenvaluesS_confined = atomS.enl
 onsite_momentum(atom=atomS, fname="S_p.skf")
 
 
 # atomMo.set_confinement(confMo)
 atomMo.set_wf_confinement(wf_confinement=wf_confMo)
 atomMo.run()
+eigenvaluesMo_confined = atomMo.enl
 onsite_momentum(atom=atomMo, fname="Mo_p.skf")
 
 # Compute Slater-Koster integrals:
@@ -144,12 +144,12 @@ off2cMoS.write(format="unique")
 
 off2cS = Offsite2cTable(atomS, atomS, timing=True)
 off2cS.run(rmin, dr, N, xc=xc, nr=200, ntheta=400, wflimit=1e-9)
-off2cS.write(format="unique", eigenvalues=eigenvaluesS)
+off2cS.write(format="unique", eigenvalues=eigenvaluesS_confined)
 
 
 off2cMo = Offsite2cTable(atomMo, atomMo, timing=True)
 off2cMo.run(rmin, dr, N, xc=xc, nr=200, ntheta=400, wflimit=1e-9)
-off2cMo.write(format="unique", eigenvalues=eigenvaluesMo)
+off2cMo.write(format="unique", eigenvalues=eigenvaluesMo_confined)
 
 
 # # Compute Integrals for dipole

@@ -26,7 +26,7 @@
 			};
              		myPython = pkgs.python3.withPackages (p: with p; [
 		    		ase
-		    		matplotlib
+		    		matplotlib 3.11
 		    		numpy
 		    		pytest
 		    		pyyaml
