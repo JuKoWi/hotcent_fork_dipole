@@ -1,8 +1,10 @@
 import matplotlib.pyplot as plt
 import matplotlib
+from matplotlib.colors import Normalize
 import numpy as np
+import h5py
 import re
-print(matplotlib.__version__)
+
 s = """
 [[0.71108439 0.98522851 0.98522911]
  [0.90369486 0.9950765  0.99507641]
@@ -35,36 +37,62 @@ def parse_array(text):
     rows = re.findall(r"\[([^\[\]]+)\]", text)   
     return np.array([row.split() for row in rows], dtype=float)
 
-s = parse_array(s)
-p = parse_array(p)
-d = parse_array(d)
+def plot_grid_vs_dftb(filename):
+    with h5py.File(filename, 'r') as f:
+        grid = np.imag(np.array(f['grid']['p_grid']))
+        dftb = np.imag(np.array(f['dftb']['p_dftb']))
+        grid_s = np.real(np.array(f['grid']['S_grid']))
+        dftb_s = np.real(np.array(f['dftb']['S_dftb']))
+ 
+    labels = ['x', 'y', 'z']
+    rows = [
+        [(lab, grid[k]) for k, lab in enumerate(labels)] ,
+        [(lab, dftb[k]) for k, lab in enumerate(labels)] ,
+        [(f'diff {lab}', dftb[k] - grid[k]) for k, lab in enumerate(labels)] ,
+    ]
+ 
+    all_data = [data for row in rows for _, data in row]
+    vmin = min(np.nanmin(d) for d in all_data)
+    vmax = max(np.nanmax(d) for d in all_data)
+    norm = Normalize(vmin=vmin, vmax=vmax)
+ 
+    fig, ax = plt.subplots(nrows=3, ncols=3, constrained_layout=True)
+    for i, row in enumerate(rows):
+        for j, (title, data) in enumerate(row):
+            im = ax[i, j].imshow(data, norm=norm)
+            ax[i, j].set_title(title)
+ 
+    fig.colorbar(im, ax=ax, location='right', shrink=0.8)
+    plt.show()
+ 
 
+def plot_truncation_error():
+  s = parse_array(s)
+  p = parse_array(p)
+  d = parse_array(d)
 
-print(np.shape(s))
-print(np.shape(p))
-print(np.shape(d))
+  labels = ["s(Mo)", "s(S)", "s(S)"]
+  s_comparison = {"lmax = 0": s.flatten(), "lmax = 1": p[:,::4].flatten(), "lmax = 2": d[:,::9]}
 
-labels = ["s(Mo)", "s(S)", "s(S)"]
-s_comparison = {"lmax = 0": s.flatten(), "lmax = 1": p[:,::4].flatten(), "lmax = 2": d[:,::9]}
+  fig, ax = plt.subplots(figsize=(10,4))
+  ind = np.arange(9)
+  width = 0.3
+  ax.bar(ind, s.flatten(), width=width, label="lmax = 0")
+  ax.bar(ind + width, p[:,::4].flatten(), width=width, label="lmax = 1")
+  ax.bar(ind + 2*width, d[:,::9].flatten(), width=width, label="lmax = 2")
+  ax.set_xticks(ind + width, labels=['s(Mo): x', 's(S1): x', "(S2): x", 's(Mo): y', 's(S1): y', "s(S2): y", 's(Mo): z', 's(S1): z', "s(S2): z"])
+  ax.legend()
 
-fig, ax = plt.subplots(figsize=(10,4))
-ind = np.arange(9)
-width = 0.3
-ax.bar(ind, s.flatten(), width=width, label="lmax = 0")
-ax.bar(ind + width, p[:,::4].flatten(), width=width, label="lmax = 1")
-ax.bar(ind + 2*width, d[:,::9].flatten(), width=width, label="lmax = 2")
-ax.set_xticks(ind + width, labels=['s(Mo): x', 's(S1): x', "(S2): x", 's(Mo): y', 's(S1): y', "s(S2): y", 's(Mo): z', 's(S1): z', "s(S2): z"])
-ax.legend()
+  plt.show()
 
-plt.show()
+  ind = np.arange(9)
+  width = 0.35
+  fig, ax = plt.subplots(figsize=(10,4))
+  ax.bar(ind, p[:,[1,5,9]].flatten(), width=width, label="lmax = 1")
+  ax.bar(ind+width, d[:,[1,10,19]].flatten(), width=width, label="lmax = 2")
+  ax.set_xticks(ind + width/2, labels=['px(Mo): x', 'px(S1): x', "px(S2): x", 'px(Mo): y', 'px(S1): y', "px(S2): y", 'px(Mo): z', 'px(S1): z', "px(S2): z"])
+  ax.legend()
 
-ind = np.arange(9)
-width = 0.35
-fig, ax = plt.subplots(figsize=(10,4))
-ax.bar(ind, p[:,[1,5,9]].flatten(), width=width, label="lmax = 1")
-ax.bar(ind+width, d[:,[1,10,19]].flatten(), width=width, label="lmax = 2")
-ax.set_xticks(ind + width/2, labels=['px(Mo): x', 'px(S1): x', "px(S2): x", 'px(Mo): y', 'px(S1): y', "px(S2): y", 'px(Mo): z', 'px(S1): z', "px(S2): z"])
-ax.legend()
+  plt.show()
 
-plt.show()
-
+plot_grid_vs_dftb(filename='graphene_rpS.hdf5')

@@ -37,6 +37,7 @@
 		    		jupyter
 		    		ipykernel
 		    		snakeviz
+				h5py
 				(qc-grid p)
              		]);
         in {

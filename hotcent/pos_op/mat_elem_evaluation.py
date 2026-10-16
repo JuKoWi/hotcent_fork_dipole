@@ -124,6 +124,8 @@ class SlaterKosterIntegrator:
         if path_p_onsite is not None:
             self._create_p_onsite_dict()
 
+        self.posop_approx = None # approximation to choose for position operator
+
     def _get_interaction_cutoffs(self):
         """read interaction cutoff from .skf files to create neighbor list"""
         # TODO: Write assert to make sure that cutoff is direction invariant
@@ -273,7 +275,6 @@ class SlaterKosterIntegrator:
                     same_atom = line2.split()
                     if not dipole:
                         same_atom = np.flip(same_atom[:3])
-                        print(len(same_atom))
             if extended == 1:
                 raise ValueError("Reading extended file format not implemented yet")
                 parts = [p.strip() for p in line2.split()]
@@ -590,15 +591,53 @@ class SlaterKosterIntegrator:
                 ):  # origin shift with overlap matrix (identity for intraatomic)
                     block[c] += posA[c] * np.eye(n_orbs)
             else:
-                block = self._integrals_atom_pair(
-                    sk_table=sk_table,
-                    posA=posA,
-                    posB=posB,
-                    lmaxA=max_lA,
-                    lmaxB=max_lB,
-                    operator="r",
-                    sk_table_dipole=sk_table_dipole,
-                )
+                if self.posop_approx is None:
+                    block = self._integrals_atom_pair(
+                        sk_table=sk_table,
+                        posA=posA,
+                        posB=posB,
+                        lmaxA=max_lA,
+                        lmaxB=max_lB,
+                        operator="r",
+                        sk_table_dipole=sk_table_dipole,
+                    )
+                elif self.posop_approx == "onsite_expansion":
+                    """to conserve hermiticity, do symmetric expansion around both integral centers"""
+                    S = self._integrals_atom_pair(
+                        sk_table=sk_table,
+                        posA=posA,
+                        posB=posB,
+                        lmaxA=max_lA,
+                        lmaxB=max_lB,
+                        operator='S'
+                    )
+                    shift = 0.5 * (np.einsum("c, ab -> cab", posA, S) + np.einsum("c, ab -> cab", posB, S))
+                    onsite_posopA = np.zeros((16, 3, 16))
+                    onsite_posopB = np.zeros((16, 3, 16))
+                    n_orbsA = dim_atom_basis(maxl=max_lA)
+                    n_orbsB = dim_atom_basis(maxl=max_lB)
+                    same_atom_valsB = self.r_sk_tables[(types[1], types[0])].same_atom_vals
+                    for i, u in enumerate(UNIQUE_ATOMIC_TRANSITIONS):
+                        for equivalent in EQUIVALENT_ATOMIC_TRANSITIONS[u]:
+                            a, r = divmod(abs(equivalent), 16 * 3)
+                            b, c = divmod(r, 16)
+                            sign = -1 if equivalent < 0 else 1
+                            onsite_posopA[a,b,c] = sign * sk_table_dipole.same_atom_vals[i]
+                            onsite_posopB[a,b,c] = sign * same_atom_valsB[i]
+                    onsite_posopA = onsite_posopA[:n_orbsA, :, :n_orbsA]
+                    onsite_posopB = onsite_posopB[:n_orbsB, :, :n_orbsB]
+                    onsite_posopA = np.transpose(onsite_posopA, (1, 0, 2))[
+                        [2, 0, 1]
+                    ]  # put components as first axis and reorder y,z,x -> x,y,z
+                    onsite_posopB = np.transpose(onsite_posopB, (1, 0, 2))[
+                        [2, 0, 1]
+                    ]  # put components as first axis and reorder y,z,x -> x,y,z
+                    r_expand = 0.5 * (np.einsum("xab, bc -> xac", onsite_posopA, S) + np.einsum("ab, xbc -> xac", S, onsite_posopB))
+                    block = shift + r_expand
+                elif self.posop_approx == "onsite_only":
+                    dimA = dim_atom_basis(maxl=max_lA)
+                    dimB = dim_atom_basis(maxl=max_lB)
+                    block = np.zeros((3,dimA,dimB))
         elif operator == "p":
             sk_table = self.S_sk_tables[types]
             if same_atom:
@@ -900,17 +939,6 @@ class SlaterKosterIntegrator:
 
         fig.colorbar(im, ax=axs, shrink=0.6, label="a.u.")  # one colorbar spanning both axes
         plt.show()
-
-        r = self._calculate_lattice_dict("r")[(0,0,0)]
-        r = angstrom_to_bohr(r)
-        p = self._calculate_lattice_dict("p")[(0,0,0)]
-        H = self._calculate_lattice_dict("H")[(0,0,0)]
-        S = self._calculate_lattice_dict("S")[(0,0,0)]
-        r_grid =  
-
-        
-        
-        
                     
 
 class SKTable:

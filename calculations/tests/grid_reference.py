@@ -9,6 +9,7 @@ from hotcent.pos_op.mat_elem_evaluation import SlaterKosterIntegrator
 import grid 
 import numpy as np
 import sympy as sp
+import h5py
 
 def evaluate_psi(Ynl, rspline, cart_grid):
     """evaluate psi at a set of grid points"""
@@ -244,7 +245,7 @@ def check_basis_completeness(positions_au, atoms, maxl):
             diff[c, i] = (x2 - RSR_diag[c, i])/norm                    
     return diff_grid, diff
 
-def check_all_r_p_S(atom_dict, ase_atoms):
+def check_all_r_p_S(filename, atom_dict, ase_atoms):
     """
         atom_dict: dict with hotcent atoms as values and element symbols as keys
         ase_atoms: ase.Atoms object
@@ -259,26 +260,26 @@ def check_all_r_p_S(atom_dict, ase_atoms):
         format="unique",
         path_p_onsite="skfiles_consistent/onsite_momentum/"
     )
-    r_hotcent = sk_integrals._calculate_lattice_dict("r")[(0,0,0)]
+    r_hotcent = angstrom_to_bohr(sk_integrals._calculate_lattice_dict("r")[(0,0,0)])
     S_hotcent = sk_integrals._calculate_lattice_dict("S")[(0,0,0)]
     p_hotcent = sk_integrals._calculate_lattice_dict("p")[(0,0,0)]
 
-    #get list of atom wise information
+    # #get list of atom wise information
     positions_au = angstrom_to_bohr(ase_atoms.get_positions())
     atoms = [atom_dict[symb] for symb in ase_atoms.get_chemical_symbols()]
     maxl = [max_l_dict[symb] for symb in ase_atoms.get_chemical_symbols()]
 
     # prepare iterations over all functions in the basis
     dim_total = sum([dim_atom_basis(l) for l in maxl])
-    S = np.zeros((dim_total, dim_total))
-    r = np.zeros((3, dim_total, dim_total))
-    p = np.zeros((3, dim_total, dim_total))
+    S = np.zeros((dim_total, dim_total), dtype=complex)
+    r = np.zeros((3, dim_total, dim_total), dtype=complex)
+    p = np.zeros((3, dim_total, dim_total), dtype=complex)
     atom_list = []
     for j, b in enumerate(atoms):
         atom_list += [b for j in range(dim_atom_basis(maxl[j]))]
     pos_list =[]
-    for j,p in enumerate(positions_au):
-        pos_list += [p for j in range(dim_atom_basis(maxl[j]))] 
+    for j,pos in enumerate(positions_au):
+        pos_list += [pos for j in range(dim_atom_basis(maxl[j]))] 
     Ylm_list = []
     nl_list = []
     for i, b in enumerate(atoms):
@@ -295,6 +296,26 @@ def check_all_r_p_S(atom_dict, ase_atoms):
             for c in range(3):
                 r[c,i,j] = twocenter_position(atom1=a, atom2=b, nl1=nl_list[i], nl2=nl_list[j], Ynl1=Ylm_list[i], Ynl2=Ylm_list[j], pos_au_1=pos_list[i], pos_au_2=pos_list[j], cart_component=c)
                 p[c,i,j] = twocenter_momentum_finite_diff(atom1=a, atom2=b, nl1=nl_list[i], nl2=nl_list[j], Ynl1=Ylm_list[i], Ynl2=Ylm_list[j], pos_au_1=pos_list[i], pos_au_2=pos_list[j], cart_component=c)
+
+    f = h5py.File(filename, 'w')
+    dset_positions = f.create_dataset("positions", np.shape(positions_au), dtype=positions_au.dtype)
+    dset_positions.attrs['unit'] = 'a.u.'
+    dset_atomtypes = f.create_dataset("atom_types", data=ase_atoms.get_chemical_symbols())
+    dset_maxl = f.create_dataset("maxl", data=maxl)
+
+    dftb = f.create_group("dftb")
+    dset_r_hotcent = dftb.create_dataset("r_dftb", data=r_hotcent)
+    dset_r_hotcent.attrs['unit'] = 'a.u.'
+    dset_p_hotcent = dftb.create_dataset("p_dftb", data=p_hotcent)
+    dset_p_hotcent.attrs['unit'] = 'a.u.'
+    dset_S_hotcent = dftb.create_dataset("S_dftb", data=S_hotcent)
+
+    grid = f.create_group("grid")
+    dset_r_grid = grid.create_dataset("r_grid", data=r)
+    dset_r_grid.attrs['unit'] = 'a.u.'
+    dset_p_grid = grid.create_dataset("p_grid", data=p)
+    dset_r_grid.attrs['unit'] = 'a.u.'
+    dset_S_grid = grid.create_dataset("S_grid", data=S)
 
 
 if __name__ == "__main__":
@@ -333,31 +354,14 @@ if __name__ == "__main__":
     atom.set_wf_confinement(wf_confinement=wf_conf)
     atom.run()
 
-    onsite_momentum(atom, "C.txt")
     
     max_l = {"C": 1, "H": 0, "S": 2, "Mo": 2}
     graphene = graphene("CC", size=(1, 1, 1), vacuum=10)
-    pos1 = angstrom_to_bohr(graphene.get_positions()[0])
-    pos2 = angstrom_to_bohr(graphene.get_positions()[1])
-    Ylm1 = sp.lambdify((theta1, phi), first_center['ss'][0])
-    Ylm2 = sp.lambdify((theta1, phi), first_center['py'][0])
-    # print(onsite_momentum_grid(atom=atom, nl1="2s", nl2="2p", Ynl1=Ylm1, Ynl2=Ylm2, cart_component=1))
-
-    print(check_basis_completeness(positions_au=[pos1, pos2], atoms=[atom, atom], maxl=[1,1]))
-    # print(check_basis_completeness(positions_au=[pos1, pos2], atoms=[atom, atom], maxl=[0,0]))
-
-    pos1 += np.array([1,1,1])
-    pos2 += np.array([1,1,1])
-
-    print(check_basis_completeness(positions_au=[pos1, pos2], atoms=[atom, atom], maxl=[1,1]))
-    # print(check_basis_completeness(positions_au=[pos1, pos2], atoms=[atom, atom], maxl=[0,0]))
 
 
-    sys.exit()
+    check_all_r_p_S(filename="graphene_rpS.hdf5", atom_dict={'C': atom}, ase_atoms=graphene)
 
     MoS2 = mx2(vacuum=20)
-    mos2_positions = MoS2.get_positions()
-    print(MoS2.get_chemical_symbols())
 
     atomS = AtomicDFT(
         "S",
@@ -419,24 +423,6 @@ if __name__ == "__main__":
     # atomMo.set_confinement(confMo)
     atomMo.set_wf_confinement(wf_confinement=wf_confMo)
     atomMo.run()
-    smallgrid, small = check_basis_completeness(positions_au=mos2_positions, atoms=[atomMo, atomS, atomS], maxl=[0,0,0])
-    mediumgrid, medium = check_basis_completeness(positions_au=mos2_positions, atoms=[atomMo, atomS, atomS], maxl=[1,1,1])
-    largegrid, large = check_basis_completeness(positions_au=mos2_positions, atoms=[atomMo, atomS, atomS], maxl=[2,2,2])
 
-    print(smallgrid)
-    print(small-smallgrid)
-    print(mediumgrid)
-    print(medium - mediumgrid)
-    print(largegrid)
-    print(large-largegrid)
+    check_all_r_p_S(filename="mos2_rpS.hdf5", atom_dict={'Mo': atomMo, 'S': atomS}, ase_atoms=MoS2)
 
-
-
-    # print("onsite position")
-    # print(bohr_to_angstrom(np.reshape(position_atom_pair_block(pos1=pos2, pos2=pos2, atom1=atom, atom2=atom, maxl1=1, maxl2=1), (16,3)))) #onsite
-    # print("onsite momentum")
-    # # print(np.reshape(momentum_atom_pair_block(pos1=pos1, pos2=pos1, atom1=atom, atom2=atom, maxl1=1, maxl2=1), (16,3))) #onsite
-    # print("offsite position")
-    # print(bohr_to_angstrom(np.reshape(position_atom_pair_block(pos1=pos2, pos2=pos1, atom1=atom, atom2=atom, maxl1=1, maxl2=1), (16,3)))) #offsite
-    # print("offsite momentum")
-    # print(np.reshape(momentum_atom_pair_block(pos1=pos1, pos2=pos2, atom1=atom, atom2=atom, maxl1=1, maxl2=1), (16,3))) #offsite
