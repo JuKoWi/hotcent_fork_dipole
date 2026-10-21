@@ -4,6 +4,7 @@ i.e. applying the Slater-Koster transformation rules
 """
 
 import numpy as np
+import h5py
 from hotcent.pos_op.rotation_transform import to_spherical
 from pathlib import Path
 import itertools
@@ -40,7 +41,7 @@ from hotcent.pos_op.onsite_momentum import load_onsite_momentum
 
 OPERATOR_TYPES = ["S", "H", "r"]
 FILE_FORMAT_OPTIONS = ["unique", "full", "DFTB+"]
-EINSUM = True
+EINSUM = True 
 VERBOSE = True 
 TEST_MODE = True
 
@@ -124,7 +125,7 @@ class SlaterKosterIntegrator:
         if path_p_onsite is not None:
             self._create_p_onsite_dict()
 
-        self.posop_approx = None # approximation to choose for position operator
+        self.posop_approx = 'sk' # approximation to choose for position operator
 
     def _get_interaction_cutoffs(self):
         """read interaction cutoff from .skf files to create neighbor list"""
@@ -397,8 +398,8 @@ class SlaterKosterIntegrator:
             euler_gamma = 0
         else:
             R_spherical = to_spherical(R=R_vec)
-            euler_theta = -R_spherical[1]  # rotate back on z-axis
-            euler_phi = -R_spherical[2]  # rotate back on z-axis
+            euler_theta = -R_spherical[1]  
+            euler_phi = -R_spherical[2]  
             euler_gamma = 0
         return euler_theta, euler_phi, euler_gamma
 
@@ -574,24 +575,28 @@ class SlaterKosterIntegrator:
             sk_table = self.S_sk_tables[types]
             sk_table_dipole = self.r_sk_tables[types]
             if same_atom:
-                block = np.zeros((16, 3, 16))
-                n_orbs = dim_atom_basis(maxl=max_lA)
-                for i, u in enumerate(UNIQUE_ATOMIC_TRANSITIONS):
-                    for equivalent in EQUIVALENT_ATOMIC_TRANSITIONS[u]:
-                        a, r = divmod(abs(equivalent), 16 * 3)
-                        b, c = divmod(r, 16)
-                        sign = -1 if equivalent < 0 else 1
-                        block[a, b, c] = sign * sk_table_dipole.same_atom_vals[i]
-                block = block[:n_orbs, :, :n_orbs]
-                block = np.transpose(block, (1, 0, 2))[
-                    [2, 0, 1]
-                ]  # put components as first axis and reorder y,z,x -> x,y,z
-                for c in range(
-                    3
-                ):  # origin shift with overlap matrix (identity for intraatomic)
-                    block[c] += posA[c] * np.eye(n_orbs)
+                if self.posop_approx in ['sk', 'onsite_expansion', 'mulliken', 'onsite_only']:
+                    block = np.zeros((16, 3, 16))
+                    n_orbs = dim_atom_basis(maxl=max_lA)
+                    for i, u in enumerate(UNIQUE_ATOMIC_TRANSITIONS):
+                        for equivalent in EQUIVALENT_ATOMIC_TRANSITIONS[u]:
+                            a, r = divmod(abs(equivalent), 16 * 3)
+                            b, c = divmod(r, 16)
+                            sign = -1 if equivalent < 0 else 1
+                            block[a, b, c] = sign * sk_table_dipole.same_atom_vals[i]
+                    block = block[:n_orbs, :, :n_orbs]
+                    block = np.transpose(block, (1, 0, 2))[
+                        [2, 0, 1]
+                    ]  # put components as first axis and reorder y,z,x -> x,y,z
+                    for c in range(
+                        3
+                    ):  # origin shift with overlap matrix (identity for intraatomic)
+                        block[c] += posA[c] * np.eye(n_orbs)
+                elif self.posop_approx in ['shift_only']:
+                    n_orbs = dim_atom_basis(maxl=max_lA)
+                    block = np.einsum('c, ab ->cab', posA, np.eye(n_orbs))
             else:
-                if self.posop_approx is None:
+                if self.posop_approx == 'sk':
                     block = self._integrals_atom_pair(
                         sk_table=sk_table,
                         posA=posA,
@@ -611,19 +616,20 @@ class SlaterKosterIntegrator:
                         lmaxB=max_lB,
                         operator='S'
                     )
+                    r_table_AA = self.r_sk_tables[(types[0], types[0])]
+                    r_table_BB = self.r_sk_tables[(types[1], types[1])]
                     shift = 0.5 * (np.einsum("c, ab -> cab", posA, S) + np.einsum("c, ab -> cab", posB, S))
                     onsite_posopA = np.zeros((16, 3, 16))
                     onsite_posopB = np.zeros((16, 3, 16))
                     n_orbsA = dim_atom_basis(maxl=max_lA)
                     n_orbsB = dim_atom_basis(maxl=max_lB)
-                    same_atom_valsB = self.r_sk_tables[(types[1], types[0])].same_atom_vals
                     for i, u in enumerate(UNIQUE_ATOMIC_TRANSITIONS):
                         for equivalent in EQUIVALENT_ATOMIC_TRANSITIONS[u]:
                             a, r = divmod(abs(equivalent), 16 * 3)
                             b, c = divmod(r, 16)
                             sign = -1 if equivalent < 0 else 1
-                            onsite_posopA[a,b,c] = sign * sk_table_dipole.same_atom_vals[i]
-                            onsite_posopB[a,b,c] = sign * same_atom_valsB[i]
+                            onsite_posopA[a,b,c] = sign * r_table_AA.same_atom_vals[i]
+                            onsite_posopB[a,b,c] = sign * r_table_BB.same_atom_vals[i]
                     onsite_posopA = onsite_posopA[:n_orbsA, :, :n_orbsA]
                     onsite_posopB = onsite_posopB[:n_orbsB, :, :n_orbsB]
                     onsite_posopA = np.transpose(onsite_posopA, (1, 0, 2))[
@@ -634,10 +640,21 @@ class SlaterKosterIntegrator:
                     ]  # put components as first axis and reorder y,z,x -> x,y,z
                     r_expand = 0.5 * (np.einsum("xab, bc -> xac", onsite_posopA, S) + np.einsum("ab, xbc -> xac", S, onsite_posopB))
                     block = shift + r_expand
-                elif self.posop_approx == "onsite_only":
+                elif self.posop_approx in ['shift_only', 'onsite_only']:
                     dimA = dim_atom_basis(maxl=max_lA)
                     dimB = dim_atom_basis(maxl=max_lB)
-                    block = np.zeros((3,dimA,dimB))
+                    block = np.zeros((3,dimA,dimB)) # all offsite elements 0
+                elif self.posop_approx == 'mulliken':
+                    S = self._integrals_atom_pair(
+                        sk_table=sk_table,
+                        posA=posA,
+                        posB=posB,
+                        lmaxA=max_lA,
+                        lmaxB=max_lB,
+                        operator='S'
+                    )
+                    block = 0.5 * np.einsum('c, ab -> cab', (posA + posB), S)
+
         elif operator == "p":
             sk_table = self.S_sk_tables[types]
             if same_atom:
@@ -713,12 +730,28 @@ class SlaterKosterIntegrator:
             lattice_dict[R_triple] = matrix
 
         if TEST_MODE:
-            if operator not in ('r', 'p'):
-                for lat_vec in np.unique(R, axis=0):
-                    mat1 = lattice_dict[*lat_vec]
-                    mat2 = lattice_dict[*(-lat_vec)]
-                    symmetry_requirement = np.allclose(mat1, np.linalg.matrix_transpose(mat2), atol=1e-8)
-                    assert symmetry_requirement
+            def key(v):
+                return tuple(int(x) for x in v)
+
+            lat_vecs = [key(v) for v in np.unique(R, axis=0)]
+            for lv in lat_vecs:
+                mlv = key(-np.array(lv))
+                if operator not in ('r', 'p'):
+                        mat1 = lattice_dict[lv]
+                        mat2 = lattice_dict[mlv]
+                        symmetry_requirement = np.allclose(mat1, np.linalg.matrix_transpose(mat2), atol=1e-8)
+                        assert symmetry_requirement
+                if operator == 'p':
+                    assert np.allclose(lattice_dict[lv], np.transpose(lattice_dict[mlv], axes=(0,2,1)).conj())
+                if operator == 'r':
+                    if self.posop_approx in ['onsite_only', 'shift_only']:
+                        if lv == (0,0,0):
+                            assert np.allclose(lattice_dict[(0,0,0)], np.transpose(lattice_dict[(0,0,0)], axes=(0,2,1)).conj())
+                        else:
+                            if not np.allclose(lattice_dict[lv], 0):
+                                print(lv)
+                                print(lattice_dict[lv])
+                            assert np.allclose(lattice_dict[lv], 0)
         return lattice_dict
 
     def _find_block_pos(self, idx):
@@ -836,6 +869,40 @@ class SlaterKosterIntegrator:
                             f"{i} {j}\t{xre[m, n]:.18e}\t{xim[m, n]:.18e}\t{yre[m, n]:.18e}\t{yim[m, n]:.18e}\t{zre[m, n]:.18e}\t{zim[m, n]:.18e}",
                             file=f,
                         )
+
+    def write_tb_hdf5(self, filename, position:bool=True, momentum:bool=False, posop_approx='sk'):
+        lattice_dict_S = self._calculate_lattice_dict(operator='S')
+        lattice_dict_H = self._calculate_lattice_dict(operator='H')
+        assert len(lattice_dict_H.keys()) == len(lattice_dict_S.keys())
+        lat_points = np.array([list(key) for key in lattice_dict_S.keys()])
+        S = np.array([lattice_dict_S[key] for key in lattice_dict_S.keys()])
+        H = np.array([lattice_dict_H[key] for key in lattice_dict_S.keys()])
+        with h5py.File(filename, 'w') as f:
+            f.attrs['last_change'] = str(np.datetime64("now"))
+            f.create_dataset('n_orbs', data=self.total_orbs)
+            f.create_dataset('degeneracies', data=np.ones(len(lat_points)))
+            dset_ucell = f.create_dataset('unit_cell', data=angstrom_to_bohr(self.abc))
+            dset_ucell.attrs['index_ordering'] = '(vec, component)'
+            dset_ucell.attrs['unit'] = 'a.u.'
+            dset_lattice = f.create_dataset("R_points", data=lat_points)
+            dset_H = f.create_dataset("H", data=H)
+            dset_H.attrs['unit'] = 'a.u.'
+            dset_S = f.create_dataset("S", data=S)
+
+            if position:
+                self.posop_approx = posop_approx
+                lattice_dict_r = self._calculate_lattice_dict(operator='r')
+                assert len(lattice_dict_S.keys()) == len(lattice_dict_r.keys())
+                r = angstrom_to_bohr(np.array([lattice_dict_r[key] for key in lattice_dict_S.keys()]))
+                dset_r = f.create_dataset('r', data=r)
+                dset_r.attrs['unit'] = 'a.u.'
+                dset_r.attrs['approximation'] = self.posop_approx
+            if momentum:
+                lattice_dict_p = self._calculate_lattice_dict(operator='p')
+                p = np.array([lattice_dict_p[key] for key in lattice_dict_S.keys()])
+                dset_p = f.create_dataset('p', data=p)
+                dset_p.attrs['unit'] = 'a.u.'
+
 
     def check_p_v_onsite(self):
         """check consistency of onsite matrix elements by evaluating equation

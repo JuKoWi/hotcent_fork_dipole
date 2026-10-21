@@ -19,8 +19,16 @@ sk_integrals = SlaterKosterIntegrator(
     format="unique",
     path_p_onsite="skfiles_consistent/onsite_momentum/"
 )
-print(sk_integrals.H_sk_tables[("C","C")].same_atom_vals)
 sk_integrals.write_seedname()
 sk_integrals.write_seedname_momentum()
-# sk_integrals.check_p_v_onsite()
-sk_integrals.check_p_v_offsite(1)
+
+approx = 'sk'
+sk_integrals.write_tb_hdf5(filename=f"graphene_{approx}.hdf5", momentum=True, posop_approx=approx)
+approx = 'onsite_expansion'
+sk_integrals.write_tb_hdf5(filename=f"graphene_{approx}.hdf5", momentum=True, posop_approx=approx)
+approx = 'mulliken'
+sk_integrals.write_tb_hdf5(filename=f"graphene_{approx}.hdf5", momentum=True, posop_approx=approx)
+approx = 'onsite_only'
+sk_integrals.write_tb_hdf5(filename=f"graphene_{approx}.hdf5", momentum=True, posop_approx=approx)
+approx = 'shift_only'
+sk_integrals.write_tb_hdf5(filename=f"graphene_{approx}.hdf5", momentum=True, posop_approx=approx)
