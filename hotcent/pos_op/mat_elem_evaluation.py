@@ -40,7 +40,7 @@ from hotcent.pos_op.skrules_posop_mini_cse import matrix_elements_posop
 from hotcent.pos_op.onsite_momentum import load_onsite_momentum
 
 OPERATOR_TYPES = ["S", "H", "r"]
-FILE_FORMAT_OPTIONS = ["unique", "full", "DFTB+"]
+FILE_FORMAT_OPTIONS = ["unique", "full", "DFTB+", "hdf5"]
 EINSUM = True 
 VERBOSE = True 
 TEST_MODE = True
@@ -76,7 +76,7 @@ class SlaterKosterIntegrator:
     """
 
     def __init__(
-        self, atoms_unit_cell, skpath, skpath_posop, maxl_dict, format="unique", path_p_onsite=None,
+        self, atoms_unit_cell, skpath, maxl_dict, skpath_posop=None, format="unique", path_p_onsite=None,
     ):
         """
         atoms_unit_cell: ase.Atoms object containing information about unit cell parameters and unit cell content
@@ -106,7 +106,7 @@ class SlaterKosterIntegrator:
         self.elem_pairs = list(
             itertools.product(no_repeats_types, repeat=2)
         )  # ordered pairs (e.g. Mo-S and S-Mo are different)
-        self._get_interaction_cutoffs()
+        self._get_interaction_cutoffs(format)
         self.maxl_dict = maxl_dict
         self.orbnumbers = [dim_atom_basis(maxl_dict[key]) for key in self.atomtypes]
         self.total_orbs = int(np.sum(self.orbnumbers))
@@ -115,31 +115,42 @@ class SlaterKosterIntegrator:
 
         self.sorted_integrals = sorted(INTEGRALS, key=lambda x: x[0])
         self.sorted_integrals_dipole = sorted(INTEGRALS_POSOP, key=lambda x: x[0])
-        self._create_SH_file_dict(format)
-        self._create_dipole_file_dict(format)
+        if format == 'hdf5':
+            self.hdf5_dir = skpath
+            self._load_hdf5()
+        else:
+            self._create_SH_file_dict(format)
+            self._create_dipole_file_dict(format)
 
-        self.contraction_path = None
-        self.contraction_path_posop = None
         self._scatter_sk = np.array([key[0] for key in self.sorted_integrals])
 
         if path_p_onsite is not None:
             self._create_p_onsite_dict()
 
         self.posop_approx = 'sk' # approximation to choose for position operator
+        self.contraction_path = None
+        self.contraction_path_posop = None
 
-    def _get_interaction_cutoffs(self):
+    def _get_interaction_cutoffs(self, format):
         """read interaction cutoff from .skf files to create neighbor list"""
-        # TODO: Write assert to make sure that cutoff is direction invariant
-        # TODO: Write assert to make sure that cutoff for dipole is the same
+        # TODO: Write assert to make sure that cutoff is same for both directions
         cutoff_dict = {}
         for pair in self.elem_pairs:
-            pairpath = self.skpath + f"/{pair[0]}-{pair[1]}.skf"
-            with open(file=pairpath) as f:
-                line1 = f.readline()
-                line1 = line1.replace(",", " ")
-                line1 = line1.split()
-                dr, Nr = float(line1[0]), int(line1[1])
-            max_r = dr * Nr
+            if format == 'hdf5':
+                pairpath = self.skpath + f"/{pair[0]}-{pair[1]}skf.hdf5"
+                with h5py.File(pairpath, 'r') as f:
+                    radius_H = np.max(np.array(f['H/Rgrid']))
+                    radius_S = np.max(np.array(f['S/Rgrid']))
+                    radius_r = np.max(np.array(f['r/Rgrid']))
+                    max_r = np.max([radius_H, radius_S, radius_r])
+            else:
+                pairpath = self.skpath + f"/{pair[0]}-{pair[1]}.skf"
+                with open(file=pairpath) as f:
+                    line1 = f.readline()
+                    line1 = line1.replace(",", " ")
+                    line1 = line1.split()
+                    dr, Nr = float(line1[0]), int(line1[1])
+                max_r = dr * Nr
             cutoff_dict[pair] = bohr_to_angstrom(max_r)
         self.cutoff_dict = cutoff_dict
 
@@ -173,11 +184,12 @@ class SlaterKosterIntegrator:
             if extended == 1:
                 parts = [p.strip() for p in line2.split()]
             delta_R, n_points = bohr_to_angstrom(float(parts[0])), int(parts[1])
+            Rgrid = delta_R + np.arange(start=0, stop=n_points) * delta_R
         if not homonuclear:
             extended -= 1
         assert np.shape(sktable_H_unique)[0] == n_points
         assert np.shape(sktable_S_unique)[0] == n_points
-        return delta_R, n_points, sktable_S_unique, sktable_H_unique, same_atom
+        return Rgrid, sktable_S_unique, sktable_H_unique, same_atom
 
     def _read_sk_file_full(self, elem_pair, dipole):
         """returns dr, Nr and the table(s) for a .skf file or the dipole equivalent"""
@@ -203,6 +215,7 @@ class SlaterKosterIntegrator:
             if extended == 1:
                 parts = [p.strip() for p in line2.split()]
             delta_R, n_points = bohr_to_angstrom(float(parts[0])), int(parts[1])
+            Rgrid = delta_R + np.arange(start=0, stop=n_points) * delta_R
         if not homonuclear:
             extended -= 1
         data = np.loadtxt(path, skiprows=3 + extended)
@@ -251,9 +264,9 @@ class SlaterKosterIntegrator:
             same_atom = None
             atom_transitions = None
         if dipole:
-            return delta_R, n_points, sk_table_r_unique, atom_transitions
+            return Rgrid, sk_table_r_unique, atom_transitions
         else:
-            return delta_R, n_points, sktable_S_unique, sktable_H_unique, same_atom
+            return Rgrid, sktable_S_unique, sktable_H_unique, same_atom
 
     def _read_sk_file_unique(self, elem_pair, dipole):
         if dipole:
@@ -280,6 +293,7 @@ class SlaterKosterIntegrator:
                 raise ValueError("Reading extended file format not implemented yet")
                 parts = [p.strip() for p in line2.split()]
             delta_R, n_points = bohr_to_angstrom(float(parts[0])), int(parts[1])
+            Rgrid = delta_R + np.arange(start=0, stop=n_points) * delta_R
         if not homonuclear:
             extended -= 1
         data = np.loadtxt(path, skiprows=3 + extended)
@@ -304,9 +318,46 @@ class SlaterKosterIntegrator:
             same_atom = None
             atom_transitions = None
         if dipole:
-            return delta_R, n_points, sk_table_r_unique, atom_transitions
+            return Rgrid, sk_table_r_unique, atom_transitions
         else:
-            return delta_R, n_points, sktable_S_unique, sktable_H_unique, same_atom
+            return Rgrid, sktable_S_unique, sktable_H_unique, same_atom
+
+    def _load_hdf5(self):
+        """load all available hdf5 files from skpath"""
+        S_sk_dict = {}
+        H_sk_dict = {}
+        r_sk_dict = {}
+        p_sk_dict = {}
+        for elem_comb in self.elem_pairs:
+            with h5py.File(f"{self.skpath}/{elem_comb[0]}-{elem_comb[1]}skf.hdf5", 'r') as f:
+                S_sk_dict[elem_comb] = SKTable(
+                    table_type="S",
+                    table=np.array(f['S/S']),
+                    Rgrid=bohr_to_angstrom(np.array(f['S/Rgrid'])),
+                    same_atom=np.ones_like(f['H/eigvals']),
+                )
+                H_sk_dict[elem_comb] = SKTable(
+                    table_type="H",
+                    table=np.array(f['H/H']),
+                    Rgrid=bohr_to_angstrom(np.array(f['H/Rgrid'])),
+                    same_atom=np.array(f['H/eigvals']),
+                )
+                r_sk_dict[elem_comb] = SKTable(
+                    table_type='r',
+                    table=np.array(f['r/r']),
+                    Rgrid=bohr_to_angstrom(np.array(f['r/Rgrid'])),
+                    same_atom=np.array(f['r/atomic_transition'])
+                )
+        self.S_sk_tables = S_sk_dict
+        self.H_sk_tables = H_sk_dict
+        self.r_sk_tables = r_sk_dict
+        self.p_onsite = {}
+        unique_types = list(set(self.atomtypes))
+        for utype in unique_types:
+            with h5py.File(f'{self.skpath}/{utype}-{utype}skf.hdf5', 'r') as f:
+                if not f['p/p_onsite'].attrs['unit'] == 'atomic unit':
+                    raise ValueError("Expected unit for onsite momentum: atomic unit")
+                self.p_onsite[utype] = np.array(f['p/p_onsite'])
 
     def _create_SH_file_dict(self, format):
         """create a dictionary where for every ordered element pair there is a SKTable object,
@@ -878,15 +929,15 @@ class SlaterKosterIntegrator:
         S = np.array([lattice_dict_S[key] for key in lattice_dict_S.keys()])
         H = np.array([lattice_dict_H[key] for key in lattice_dict_S.keys()])
         with h5py.File(filename, 'w') as f:
-            f.attrs['last_change'] = str(np.datetime64("now"))
+            f.attrs['latest_change'] = str(np.datetime64("now"))
             f.create_dataset('n_orbs', data=self.total_orbs)
             f.create_dataset('degeneracies', data=np.ones(len(lat_points)))
             dset_ucell = f.create_dataset('unit_cell', data=angstrom_to_bohr(self.abc))
             dset_ucell.attrs['index_ordering'] = '(vec, component)'
-            dset_ucell.attrs['unit'] = 'a.u.'
+            dset_ucell.attrs['unit'] = 'atomic unit'
             dset_lattice = f.create_dataset("R_points", data=lat_points)
             dset_H = f.create_dataset("H", data=H)
-            dset_H.attrs['unit'] = 'a.u.'
+            dset_H.attrs['unit'] = 'atomic unit'
             dset_S = f.create_dataset("S", data=S)
 
             if position:
@@ -895,13 +946,13 @@ class SlaterKosterIntegrator:
                 assert len(lattice_dict_S.keys()) == len(lattice_dict_r.keys())
                 r = angstrom_to_bohr(np.array([lattice_dict_r[key] for key in lattice_dict_S.keys()]))
                 dset_r = f.create_dataset('r', data=r)
-                dset_r.attrs['unit'] = 'a.u.'
+                dset_r.attrs['unit'] = 'atomic unit'
                 dset_r.attrs['approximation'] = self.posop_approx
             if momentum:
                 lattice_dict_p = self._calculate_lattice_dict(operator='p')
                 p = np.array([lattice_dict_p[key] for key in lattice_dict_S.keys()])
                 dset_p = f.create_dataset('p', data=p)
-                dset_p.attrs['unit'] = 'a.u.'
+                dset_p.attrs['unit'] = 'atomic unit'
 
 
     def check_p_v_onsite(self):
@@ -1013,12 +1064,11 @@ class SKTable:
     (S, H or r)
     """
 
-    def __init__(self, table_type, table, deltaR, n_points, same_atom=None):
+    def __init__(self, table_type, table, Rgrid, same_atom=None):
         assert table_type in OPERATOR_TYPES
         self.type = table_type
         self.table = table  # first dimension distance, second dimension integral index, contains only unique values
-        self.deltaR = deltaR
-        self.n_points = n_points
+        self.Rgrid = Rgrid
         self.same_atom_vals = None  # list for S and H, dict for r
         self._spline = None
         self._spline_full = None
@@ -1033,13 +1083,11 @@ class SKTable:
     @property
     def spline(self):
         if self._spline is None:
-            R_grid = self.deltaR + self.deltaR * np.arange(self.n_points)
-            self._spline = CubicSpline(R_grid, self.table)
+            self._spline = CubicSpline(self.Rgrid, self.table)
         return self._spline
 
     @property
     def spline_full(self):
         if self._spline_full is None:
-            R_grid = self.deltaR + self.deltaR * np.arange(self.n_points)
-            self._spline_full = CubicSpline(R_grid, self.table_full)
+            self._spline_full = CubicSpline(self.Rgrid, self.table_full)
         return self._spline_full

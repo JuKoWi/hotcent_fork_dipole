@@ -4,9 +4,10 @@ from hotcent.interpolation import build_interpolator
 from hotcent.pos_op.utils import dim_atom_basis
 from hotcent.pos_op.rotation_transform import transform_to_real
 import numpy as np
+import h5py
 import scipy as sc
 
-def onsite_momentum(atom:AtomicBase, fname):
+def onsite_momentum(atom:AtomicBase, fname, to_h5py=False):
     """calculates the onsite components of momentum
     Basis functions with real spherical harmonics as angular
     Units:
@@ -72,27 +73,36 @@ def onsite_momentum(atom:AtomicBase, fname):
     hermitian_deviation = np.max(np.abs(full_momentum_real_harmonics - np.transpose(full_momentum_real_harmonics, axes=(0,2,1)).conjugate()))
     print(f"hermitian up  to {hermitian_deviation}")
 
-    # select nonzero-blocks from above diagonal
-    with open(fname, 'w') as file:
-        l_string = ''
-        for a in angulars:
-            l_string += str(a)
-        print(l_string, file=file)
-        for i, nl_symb in enumerate(valence):
-            if symbol_to_l(nl_symb) + 1 in angulars:
-                print(blocktitles[symbol_to_l(nl_symb)], file=file)
-                lbra = symbol_to_l(nl_symb)
-                lket = lbra+1
-                idx_bra1 = dim_atom_basis(lbra-1)
-                idx_bra2 = dim_atom_basis(lbra)
-                idx_ket1 = dim_atom_basis(lket-1)
-                idx_ket2 = dim_atom_basis(lket)
-                np.savetxt(X=full_momentum_real_harmonics[0,idx_bra1:idx_bra2, idx_ket1:idx_ket2].view(float), fname=file, delimiter='\t')
-                file.write("\n")
-                np.savetxt(X=full_momentum_real_harmonics[1,idx_bra1:idx_bra2, idx_ket1:idx_ket2].view(float), fname=file, delimiter='\t')
-                file.write("\n")
-                np.savetxt(X=full_momentum_real_harmonics[2,idx_bra1:idx_bra2, idx_ket1:idx_ket2].view(float), fname=file, delimiter='\t')
-                file.write("\n")
+    if to_h5py:
+        if not fname.endswith('.hdf5'):
+            raise ValueError("Please provide .hdf5 file")
+        with h5py.File(fname, 'a') as f:
+            group_p = f.create_group('p')
+            dset_p = group_p.create_dataset('p_onsite', data=full_momentum_real_harmonics)
+            dset_p.attrs['unit'] = 'atomic unit'
+    else:
+        # select nonzero-blocks from above diagonal
+        with open(fname, 'w') as file:
+            l_string = ''
+            for a in angulars:
+                l_string += str(a)
+            print(l_string, file=file)
+            for i, nl_symb in enumerate(valence):
+                if symbol_to_l(nl_symb) + 1 in angulars:
+                    print(blocktitles[symbol_to_l(nl_symb)], file=file)
+                    lbra = symbol_to_l(nl_symb)
+                    lket = lbra+1
+                    idx_bra1 = dim_atom_basis(lbra-1)
+                    idx_bra2 = dim_atom_basis(lbra)
+                    idx_ket1 = dim_atom_basis(lket-1)
+                    idx_ket2 = dim_atom_basis(lket)
+                    np.savetxt(X=full_momentum_real_harmonics[0,idx_bra1:idx_bra2, idx_ket1:idx_ket2].view(float), fname=file, delimiter='\t')
+                    file.write("\n")
+                    np.savetxt(X=full_momentum_real_harmonics[1,idx_bra1:idx_bra2, idx_ket1:idx_ket2].view(float), fname=file, delimiter='\t')
+                    file.write("\n")
+                    np.savetxt(X=full_momentum_real_harmonics[2,idx_bra1:idx_bra2, idx_ket1:idx_ket2].view(float), fname=file, delimiter='\t')
+                    file.write("\n")
+
     return full_momentum_real_harmonics
 
 def load_onsite_momentum(file):

@@ -35,7 +35,6 @@ eigenvalues = atom.enl
 atom.set_confinement(conf)
 atom.set_wf_confinement(wf_confinement=wf_conf)
 atom.run()
-onsite_momentum(atom, fname="C_p.skf")
 
 eigenvalues_confined = atom.enl
 
@@ -43,22 +42,24 @@ eigenvalues_confined = atom.enl
 rmin, dr, N = 0.4, 0.02, 900
 off2c = Offsite2cTable(atom, atom, timing=True)
 off2c.run(rmin, dr, N, xc=xc, nr=200, ntheta=400, wflimit=1e-9)
-off2c.write(
-    format="full", eigenvalues=eigenvalues, filename_template="{el1}-{el2}long.skf"
-)  # writes to default C-C_offsite2c.skf filename
-off2c.write(
-    format="unique", eigenvalues=eigenvalues, filename_template="{el1}-{el2}unique.skf"
-)
-off2c.write(
-    format="DFTB+", eigenvalues=eigenvalues, filename_template="{el1}-{el2}dftb.skf"
-)
+# off2c.write(
+#     format="full", eigenvalues=eigenvalues, filename_template="{el1}-{el2}long.skf"
+# )  # writes to default C-C_offsite2c.skf filename
+# off2c.write(
+#     format="unique", eigenvalues=eigenvalues, filename_template="{el1}-{el2}unique.skf"
+# )
+# off2c.write(
+#     format="DFTB+", eigenvalues=eigenvalues, filename_template="{el1}-{el2}dftb.skf"
+# )
+
+off2c.write_hdf5(eigenvalues=eigenvalues)
+onsite_momentum(atom, fname="C-Cskf.hdf5", to_h5py=True)
 
 # Compute Integrals for dipole
 rmin, dr, N = 0.4, 0.02, 900
 off2c = Offsite2cTablePosOp(atom, atom, timing=False)
 off2c.run(rmin, dr, N, nr=200, ntheta=400, wflimit=1e-9)
-off2c.write_dipole(format="full", filename_template="{el1}-{el2}_dipole.skf")
-off2c.write_dipole(format="unique", filename_template="{el1}-{el2}_dipoleunique.skf")
+# off2c.write_dipole(format="full", filename_template="{el1}-{el2}_dipole.skf")
+# off2c.write_dipole(format="unique", filename_template="{el1}-{el2}_dipoleunique.skf")
+off2c.write_dipole_hdf5()
 
-print(eigenvalues)
-print(eigenvalues_confined)

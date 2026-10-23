@@ -603,7 +603,7 @@ def select_integrals(e1, e2):
     selected = []
     for ival1, valence1 in enumerate(e1.basis_sets):
         for ival2, valence2 in enumerate(e2.basis_sets):
-            for sk_label, func in INTEGRALS.items():
+            for sk_label in INTEGRALS.keys():
                 nl1, nl2 = select_subshells(valence1, valence2, sk_label)
                 if nl1 is not None and nl2 is not None:
                     selected.append((sk_label, nl1, nl2))

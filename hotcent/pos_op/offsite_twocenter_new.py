@@ -8,8 +8,11 @@ from ase.data import atomic_numbers, atomic_masses
 from hotcent.interpolation import CubicSplineFunction
 from hotcent.multiatom_integrator import MultiAtomIntegrator
 from hotcent.xc import XC_PW92, LibXC
+import h5py
+import git
 from hotcent.pos_op.slako_new import (
     INTEGRALS,
+    ALL_NONZERO_PHI2,
     NUMSK,
     phi2,
     dphi2,
@@ -25,6 +28,7 @@ try:
     import matplotlib.pyplot as plt
 except ImportError:
     plt = None
+
 
 
 class Offsite2cTable(MultiAtomIntegrator):
@@ -416,3 +420,63 @@ class Offsite2cTable(MultiAtomIntegrator):
                             offdiag_S,
                             format=format,
                         )
+    def write_hdf5(
+        self,
+        eigenvalues=None,
+        filename_template="{el1}-{el2}skf.hdf5",
+    ):
+        def copy_dict1(dict_src, dict_dest, valence):
+            if dict_src is None:
+                return
+            for nl in valence:
+                l = nl[1]
+                assert l not in dict_dest
+                if dict_src is not None and nl in dict_src:
+                    dict_dest[l] = dict_src[nl]
+
+        for p, (e1, e2) in enumerate(self.pairs):
+            sym1, sym2 = e1.get_symbol(), e2.get_symbol()
+
+            for bas1, valence1 in enumerate(e1.basis_sets):
+                for bas2, valence2 in enumerate(e2.basis_sets):
+                    filename = filename_template.format(
+                        el1=sym1 + "+" * bas1, el2=sym2 + "+" * bas2
+                    )
+                    print("Writing to %s" % filename, file=self.txt, flush=True)
+
+                    is_extended = any([nl[1] == "f" for nl in valence1 + valence2])
+                    mass = atomic_masses[atomic_numbers[sym1]]
+
+                    has_diagonal_data = sym1 == sym2 and bas1 == bas2
+                    if has_diagonal_data:
+                        eigval = {}
+                        copy_dict1(eigenvalues, eigval, valence1)
+                        eig_list = [] 
+                        for l in ['s', 'p', 'd', 'f']:
+                            eig_list.append(eigval.get(l, 0.0))
+
+                    table = self.tables[(p, bas1, bas2)]
+                    table1 = full_to_unique(table[:, :NUMSK])
+                    table2 = full_to_unique(table[:, NUMSK:])
+                    with h5py.File(filename, 'w') as f:
+                        repo = git.Repo(search_parent_directories=True)
+                        f.attrs["commit"] = repo.head.object.hexsha
+                        f.attrs['latest_change'] = str(np.datetime64("now"))
+                        f.attrs['type1'] = sym1
+                        f.attrs['type2'] = sym2
+
+                        grpH = f.create_group("H")
+                        dsetH = grpH.create_dataset("H", data=table1)
+                        dsetH.attrs['unit'] = 'atomic unit'
+                        dsetHgrid = grpH.create_dataset("Rgrid", data=self.Rgrid)
+                        dsetHgrid.attrs['unit'] = 'atomic unit'
+                        if has_diagonal_data:
+                            dseteig = grpH.create_dataset("eigvals", data=eig_list)
+                            dseteig.attrs['order'] = "s p d f"
+
+                        grpS = f.create_group("S")
+                        dsetSgrid = grpS.create_dataset("Rgrid", data=self.Rgrid)
+                        dsetSgrid.attrs['unit'] = 'atomic unit'
+                        dsetS = grpS.create_dataset("S", data=table2)
+
+

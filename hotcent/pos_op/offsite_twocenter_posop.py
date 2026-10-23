@@ -1,5 +1,6 @@
 import numpy as np
 import sympy as sym
+from pathlib import Path
 from ase.data import atomic_numbers, atomic_masses
 from hotcent.multiatom_integrator import MultiAtomIntegrator
 from hotcent.pos_op.symbolic_integrals import (
@@ -24,6 +25,7 @@ from hotcent.pos_op.slako_posop import (
     index_to_quantnum_posop,
 )
 from scipy.integrate import trapezoid
+import h5py
 
 
 class Offsite2cTablePosOp(MultiAtomIntegrator):
@@ -186,7 +188,7 @@ class Offsite2cTablePosOp(MultiAtomIntegrator):
                     (theta1, 0, sym.pi),
                 )
                 radial_integral = trapezoid(y=Rnl1 * Rnl2 * r**2 * r, x=r, dx=dr)
-                r_int = (
+                r_int = float(
                     np.sqrt(4 * np.pi / 3) * radial_integral * angle_integral.evalf()
                 )
                 position_op_dict[integral_num] = r_int
@@ -302,3 +304,35 @@ class Offsite2cTablePosOp(MultiAtomIntegrator):
                             atom_transitions=atom_transitions,
                             format=format,
                         )
+
+    def write_dipole_hdf5(self, filename_template="{el1}-{el2}skf.hdf5"):
+        """
+            add_to_file: look for file of the correct name and append to it
+        """
+        for p, (e1, e2) in enumerate(self.pairs):
+            sym1, sym2 = e1.get_symbol(), e2.get_symbol()
+            for bas1, valence1 in enumerate(e1.basis_sets):
+                for bas2, valence2 in enumerate(e2.basis_sets):
+                    filename = filename_template.format(
+                        el1=sym1 + "+" * bas1, el2=sym2 + "+" * bas2
+                    )
+                    has_atom_transition = sym1 == sym2 and bas1 == bas2
+                    atom_transitions = (
+                        self.atom_transition_dipole if has_atom_transition else None
+                    )
+                    table = full_to_unique_posop(self.tables[(p, bas1, bas2)])
+                    with h5py.File(filename, 'a') as f:
+                        rgroup = f.create_group("r")
+                        dset_r = rgroup.create_dataset('r', data=table)
+                        dset_r.attrs['unit'] = 'atomic unit'
+                        dset_rgrid = rgroup.create_dataset('Rgrid', data=self.Rgrid)
+                        dset_rgrid.attrs['unit'] = 'atomic unit'
+                        if has_atom_transition:
+                            sorted_transitions = [atom_transitions[k] for k in sorted(atom_transitions.keys())]
+                            dset_atom_trans = rgroup.create_dataset("atomic_transition", data=sorted_transitions)
+                            dset_atom_trans.attrs['unit'] = 'atomic unit'
+
+
+                        
+
+

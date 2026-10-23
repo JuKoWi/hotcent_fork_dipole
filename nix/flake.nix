@@ -38,6 +38,7 @@
 		    		ipykernel
 		    		snakeviz
 				h5py
+				gitpython
 				(qc-grid p)
              		]);
         in {

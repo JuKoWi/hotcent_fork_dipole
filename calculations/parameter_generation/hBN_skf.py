@@ -68,34 +68,27 @@ rmin, dr, N = 0.4, 0.02, 600
 
 off2chBN = Offsite2cTable(atomN, atomB, timing=True)
 off2chBN.run(rmin, dr, N, xc=xc)
-off2chBN.write(format=False)
-off2chBN.write(format=True, filename_template="{el1}-{el2}dftb.skf")
+off2chBN.write_hdf5()
 
 off2cN = Offsite2cTable(atomN, atomN, timing=True)
 off2cN.run(rmin, dr, N, xc=xc)
-off2cN.write(format=False, eigenvalues=eigenvaluesN)
-off2cN.write(
-    format=True, eigenvalues=eigenvaluesN, filename_template="{el1}-{el2}dftb.skf"
-)
+off2cN.write_hdf5(eigenvalues=eigenvaluesN)
 
 
 off2cB = Offsite2cTable(atomB, atomB, timing=True)
 off2cB.run(rmin, dr, N, xc=xc)
-off2cB.write(format=False, eigenvalues=eigenvaluesB)
-off2cB.write(
-    format=True, eigenvalues=eigenvaluesB, filename_template="{el1}-{el2}dftb.skf"
-)
+off2cB.write_hdf5(eigenvalues=eigenvaluesB)
 
 
 # # Compute Integrals for dipole
 off2c_dipoleN = Offsite2cTablePosOp(atomN, atomN, timing=False)
 off2c_dipoleN.run(rmin, dr, N)
-off2c_dipoleN.write_dipole()
+off2c_dipoleN.write_dipole_hdf5()
 
 off2c_dipoleB = Offsite2cTablePosOp(atomB, atomB, timing=False)
 off2c_dipoleB.run(rmin, dr, N)
-off2c_dipoleB.write_dipole()
+off2c_dipoleB.write_dipole_hdf5()
 
 off2c_dipolehBN = Offsite2cTablePosOp(atomB, atomN, timing=False)
 off2c_dipolehBN.run(rmin, dr, N)
-off2c_dipolehBN.write_dipole()
+off2c_dipolehBN.write_dipole_hdf5()

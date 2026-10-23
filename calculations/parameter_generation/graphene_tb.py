@@ -13,12 +13,11 @@ graphene = graphene("CC", size=(1, 1, 1), vacuum=10)
 
 sk_integrals = SlaterKosterIntegrator(
     graphene,
-    skpath="skfiles_consistent/sk_unique",
+    skpath="sk_hdf5",
     maxl_dict=max_l,
-    skpath_posop="skfiles_consistent/sk_posop_unique",
-    format="unique",
-    path_p_onsite="skfiles_consistent/onsite_momentum/"
+    format="hdf5",
 )
+
 sk_integrals.write_seedname()
 sk_integrals.write_seedname_momentum()
 
