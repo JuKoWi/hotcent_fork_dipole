@@ -3,6 +3,7 @@ from hotcent.confinement import PowerConfinement
 from hotcent.atomic_dft import AtomicDFT
 from hotcent.pos_op.offsite_twocenter_new import Offsite2cTable
 from hotcent.pos_op.offsite_twocenter_posop import Offsite2cTablePosOp
+from hotcent.pos_op.onsite_momentum import onsite_momentum
 from ase.data import covalent_radii, atomic_numbers
 from ase.units import Bohr
 import sys
@@ -84,12 +85,12 @@ off2cGaAs.write_hdf5()
 off2cGa = Offsite2cTable(atomGa, atomGa, timing=True)
 off2cGa.run(rmin, dr, N, xc=xc, nr=200, ntheta=400, wflimit=1e-9)
 off2cGa.write_hdf5(eigenvalues=eigenvaluesGa)
-
-
+onsite_momentum(atom=atomGa, fname="Ga-Gaskf.hdf5", to_h5py=True)
 
 off2cAs = Offsite2cTable(atomAs, atomAs, timing=True)
 off2cAs.run(rmin, dr, N, xc=xc, nr=200, ntheta=400, wflimit=1e-9)
 off2cAs.write_hdf5(eigenvalues=eigenvaluesAs)
+onsite_momentum(atom=atomAs, fname="As-Asskf.hdf5", to_h5py=True)
 
 
 # # Compute Integrals for dipole

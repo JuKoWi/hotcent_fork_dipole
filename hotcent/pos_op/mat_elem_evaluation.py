@@ -330,23 +330,31 @@ class SlaterKosterIntegrator:
         p_sk_dict = {}
         for elem_comb in self.elem_pairs:
             with h5py.File(f"{self.skpath}/{elem_comb[0]}-{elem_comb[1]}skf.hdf5", 'r') as f:
+                if elem_comb[0] == elem_comb[1]:
+                    eigvalsH = np.array(f['H/eigvals'])
+                    eigvalsS = np.ones_like(f['H/eigvals'])
+                    eigvalsr = bohr_to_angstrom(np.array(f['r/atomic_transition']))
+                else:
+                    eigvalsH = None
+                    eigvalsS = None
+                    eigvalsr = None
                 S_sk_dict[elem_comb] = SKTable(
                     table_type="S",
                     table=np.array(f['S/S']),
                     Rgrid=bohr_to_angstrom(np.array(f['S/Rgrid'])),
-                    same_atom=np.ones_like(f['H/eigvals']),
+                    same_atom=eigvalsS,
                 )
                 H_sk_dict[elem_comb] = SKTable(
                     table_type="H",
                     table=np.array(f['H/H']),
                     Rgrid=bohr_to_angstrom(np.array(f['H/Rgrid'])),
-                    same_atom=np.array(f['H/eigvals']),
+                    same_atom=eigvalsH,
                 )
                 r_sk_dict[elem_comb] = SKTable(
                     table_type='r',
-                    table=np.array(f['r/r']),
+                    table=bohr_to_angstrom(np.array(f['r/r'])),
                     Rgrid=bohr_to_angstrom(np.array(f['r/Rgrid'])),
-                    same_atom=np.array(f['r/atomic_transition'])
+                    same_atom=eigvalsr,
                 )
         self.S_sk_tables = S_sk_dict
         self.H_sk_tables = H_sk_dict
@@ -428,6 +436,7 @@ class SlaterKosterIntegrator:
         self.r_sk_tables = r_sk_dict
 
     def _create_p_onsite_dict(self, ):
+        """create momentum matrix representation for every ordered element pair"""
         self.p_onsite = {}
         unique_types = list(set(self.atomtypes))
         for utype in unique_types:

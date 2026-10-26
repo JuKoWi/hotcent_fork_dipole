@@ -21,6 +21,6 @@ def show(filename):
         attrs(f, "")
         f.visititems(visit)
 
-show("./sk_hdf5/N-Nskf.hdf5")
-with h5py.File("./sk_hdf5/N-Nskf.hdf5", "r") as f:
+# show("./Mo-Moskf.hdf5")
+with h5py.File("./sk_hdf5/As-Asskf.hdf5", "r") as f:
     print(np.array(f["H/eigvals"]))

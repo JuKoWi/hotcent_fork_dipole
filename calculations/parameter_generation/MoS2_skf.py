@@ -146,14 +146,14 @@ off2cS.run(rmin, dr, N, xc=xc, nr=200, ntheta=400, wflimit=1e-9)
 # off2cS.write(format="unique", eigenvalues=eigenvaluesS_confined)
 eigenvaluesS_unconfined['3d'] = 0.134677
 off2cS.write_hdf5(eigenvalues=eigenvaluesS_unconfined)
-onsite_momentum(atom=atomS, fname="S-Sskf.hdf5")
+onsite_momentum(atom=atomS, fname="S-Sskf.hdf5", to_h5py=True)
 
 
 off2cMo = Offsite2cTable(atomMo, atomMo, timing=True)
 off2cMo.run(rmin, dr, N, xc=xc, nr=200, ntheta=400, wflimit=1e-9)
 # off2cMo.write(format="unique", eigenvalues=eigenvaluesMo_confined)
 off2cMo.write_hdf5(eigenvalues=eigenvaluesMo_unconfined)
-onsite_momentum(atom=atomMo, fname='Mo-Moskf.hdf5')
+onsite_momentum(atom=atomMo, fname='Mo-Moskf.hdf5', to_h5py=True)
 
 
 # # Compute Integrals for dipole

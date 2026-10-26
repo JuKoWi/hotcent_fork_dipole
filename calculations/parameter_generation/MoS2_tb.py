@@ -12,21 +12,11 @@ MoS2 = mx2(vacuum=20)
 MoS2.pbc = (True, True, False)
 
 
-# sk_integrals = SlaterKosterIntegrator(
-#     MoS2,
-#     skpath="skfiles/sk_unique",
-#     maxl_dict=max_l,
-#     skpath_posop="skfiles/sk_posop_unique",
-#     format="unique",
-#     path_p_onsite="skfiles/onsite_momentum/"
-# )
 sk_integrals = SlaterKosterIntegrator(
     MoS2,
-    skpath="tutorials/tutorial_2/skfiles",
+    skpath="sk_hdf5",
     maxl_dict=max_l,
-    skpath_posop="tutorials/tutorial_2/skfiles_posop",
-    format="unique",
-    path_p_onsite="tutorials/tutorial_2/onsite_momentum"
+    format="hdf5",
 )
 
 approx = 'sk'

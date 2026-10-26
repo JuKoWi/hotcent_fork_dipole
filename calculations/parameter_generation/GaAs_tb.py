@@ -6,12 +6,18 @@ ml_dict = {"Ga": 2, "As": 2}
 gaas = bulk("GaAs", "zincblende", a=5.653)
 gaas_tb = SlaterKosterIntegrator(
     atoms_unit_cell=gaas,
-    skpath="sk_experimental/sk_full",
-    skpath_posop="sk_experimental/sk_posop",
+    skpath='sk_hdf5',
     maxl_dict=ml_dict,
-    format="full",
+    format="hdf5",
 )
-count = 0
-while count < 20:
-    gaas_tb.write_seedname()
-    count += 1
+
+approx = 'sk'
+gaas_tb.write_tb_hdf5(filename=f"GaAs_{approx}.hdf5", momentum=True, posop_approx=approx)
+approx = 'onsite_expansion'
+gaas_tb.write_tb_hdf5(filename=f"GaAs_{approx}.hdf5", momentum=True, posop_approx=approx)
+approx = 'mulliken'
+gaas_tb.write_tb_hdf5(filename=f"GaAs_{approx}.hdf5", momentum=True, posop_approx=approx)
+approx = 'onsite_only'
+gaas_tb.write_tb_hdf5(filename=f"GaAs_{approx}.hdf5", momentum=True, posop_approx=approx)
+approx = 'shift_only'
+gaas_tb.write_tb_hdf5(filename=f"GaAs_{approx}.hdf5", momentum=True, posop_approx=approx)
