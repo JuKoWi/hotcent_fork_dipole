@@ -4,9 +4,6 @@ from hotcent.atomic_dft import AtomicDFT
 from hotcent.pos_op.offsite_twocenter_new import Offsite2cTable
 from hotcent.pos_op.offsite_twocenter_posop import Offsite2cTablePosOp
 from hotcent.pos_op.onsite_momentum import onsite_momentum
-from ase.data import covalent_radii, atomic_numbers
-from ase.units import Bohr
-import sys
 
 xc = "GGA_X_PBE+GGA_C_PBE"
 
