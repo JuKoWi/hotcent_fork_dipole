@@ -21,6 +21,5 @@ def show(filename):
         attrs(f, "")
         f.visititems(visit)
 
-# show("./Mo-Moskf.hdf5")
-with h5py.File("./sk_hdf5/O-Oskf.hdf5", "r") as f:
-    print(np.array(f["H/eigvals"]))
+if __name__== "__main__":
+    show('bs_completeness.hdf5')

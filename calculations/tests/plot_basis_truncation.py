@@ -5,38 +5,6 @@ import numpy as np
 import h5py
 import re
 
-s = """
-[[0.71108439 0.98522851 0.98522911]
- [0.90369486 0.9950765  0.99507641]
- [0.6511918  0.8268961  0.82689505]]"""
-
-p = """[[0.04864114 0.69447665 0.60663809 0.3042509  0.05086885 0.91069191
-  0.75999852 0.52660632 0.0508675  0.91069362 0.76000026 0.52660268]
- [0.05152149 0.41728604 0.65489106 0.69447665 0.05113201 0.48893419
-  0.83099701 0.91069191 0.0511297  0.4889317  0.83099345 0.91069362]
- [0.04439665 0.65489106 0.32999395 0.60663809 0.04685942 0.83099701
-  0.31893865 0.75999852 0.04685573 0.83099345 0.31894332 0.76000026]]"""
-
-d = """[[0.04284762 0.55349379 0.38186901 0.27145662 0.48446444 0.81500691
-  0.53097661 0.43728305 0.42498346 0.04696999 0.04155133 0.03912053
-  0.10415093 0.57345747 0.7904026  0.4910849  0.54838852 0.53879061
-  0.046969   0.04155382 0.03911996 0.10415121 0.5734589  0.79040401
-  0.49109185 0.54838258 0.53878862]
- [0.04423102 0.34041862 0.47636255 0.55349379 0.55962616 0.4139389
-  0.60186704 0.81500691 0.54398058 0.0464416  0.10447437 0.03968462
-  0.04155133 0.56928681 0.55256105 0.53406898 0.7904026  0.5454006
-  0.04643951 0.10447226 0.03968485 0.04155382 0.56928854 0.55255035
-  0.53406901 0.79040401 0.54540278]
- [0.03943887 0.47636255 0.26493816 0.38186901 0.81500691 0.42649549
-  0.25785768 0.54152811 0.63625822 0.04084679 0.03968462 0.09553961
-  0.03912053 0.7904026  0.34331643 0.43310915 0.33186465 0.83072203
-  0.04084442 0.03968485 0.09553841 0.03911996 0.79040401 0.34331079
-  0.43310572 0.33187242 0.83071588]]"""
-
-def parse_array(text):
-    rows = re.findall(r"\[([^\[\]]+)\]", text)   
-    return np.array([row.split() for row in rows], dtype=float)
-
 def plot_grid_vs_dftb(filename):
     with h5py.File(filename, 'r') as f:
         grid = np.imag(np.array(f['grid']['p_grid']))
@@ -64,35 +32,62 @@ def plot_grid_vs_dftb(filename):
  
     fig.colorbar(im, ax=ax, location='right', shrink=0.8)
     plt.show()
+
+L_SYMBOLS = {0: 's', 1: 'p', 2: 'd', 3: 'f', 4: 'g'}
  
+ 
+def _read_strings(dset):
+    """h5py 3 returns stored strings as bytes (b'2p'); decode them to str."""
+    return [s.decode() if isinstance(s, bytes) else str(s) for s in dset[()]]
+ 
+ 
+def plot_truncation_error(files: list, lmax: list, show_l, show_comp, use_grid=False, log=False):
+    """Bar plot of the basis-truncation error of x_c * phi for every basis function with l = show_l.
+ 
+    files     : HDF5 files written by check_basis_completeness, one per lmax
+    show_comp : Cartesian component 0, 1, 2 (x, y, z)
+    use_grid  : plot 'diff_grid' (residual integrated on the grid) instead of 'diff'
+    """
+    l = L_SYMBOLS[show_l]
+    series = []  # (lmax, labels, values) per file
+    for file, lm in zip(files, lmax):
+        with h5py.File(file, 'r') as f:
+            res = np.array(f['diff_grid' if use_grid else 'diff'])  # shape (3, n_basis)
+            atoms = _read_strings(f['atoms'])
+            nls = _read_strings(f['nl'])
+        idx = [j for j, nl in enumerate(nls) if nl[-1] == l]
+        if not idx:
+            print(f"{file}: no {l} functions (lmax = {lm}), skipped")
+            continue
+        # number the 2l+1 functions of each (atom, nl) so the bars are distinguishable
+        seen, labels = {}, []
+        for j in idx:
+            key = (atoms[j], nls[j])
+            labels.append(f"{nls[j]}({atoms[j]}) {seen.get(key, 0)}")
+            seen[key] = seen.get(key, 0) + 1
+        series.append((lm, labels, res[show_comp, idx]))
+ 
+    if not series:
+        raise ValueError(f"none of the files contain {l} functions")
+    labels = series[0][1]
+    if any(s[1] != labels for s in series):
+        raise ValueError("files have different sets of basis functions for this l")
+ 
+    n = len(series)
+    width = 0.8 / n                       # the n bars of one group fill 80% of the slot
+    x = np.arange(len(labels))
+    fig, ax = plt.subplots(layout="constrained")
+    for i, (lm, _, values) in enumerate(series):
+        ax.bar(x + (i - (n - 1) / 2) * width, values, width=width, label=r"$l_\text{max}$ = "+f"{lm}")
+    ax.set_xticks(x, labels=labels)       # ticks at the centre of each group
+    ax.set_ylabel(rf"$F_{'xyz'[show_comp]}$" + (" (grid)" if use_grid else ""))
+    if log:
+        ax.set_yscale("log")
+    ax.legend()
+    plt.savefig('r_fidelity.pdf')
+    plt.show()
+    return fig, ax
 
-def plot_truncation_error():
-  s = parse_array(s)
-  p = parse_array(p)
-  d = parse_array(d)
-
-  labels = ["s(Mo)", "s(S)", "s(S)"]
-  s_comparison = {"lmax = 0": s.flatten(), "lmax = 1": p[:,::4].flatten(), "lmax = 2": d[:,::9]}
-
-  fig, ax = plt.subplots(figsize=(10,4))
-  ind = np.arange(9)
-  width = 0.3
-  ax.bar(ind, s.flatten(), width=width, label="lmax = 0")
-  ax.bar(ind + width, p[:,::4].flatten(), width=width, label="lmax = 1")
-  ax.bar(ind + 2*width, d[:,::9].flatten(), width=width, label="lmax = 2")
-  ax.set_xticks(ind + width, labels=['s(Mo): x', 's(S1): x', "(S2): x", 's(Mo): y', 's(S1): y', "s(S2): y", 's(Mo): z', 's(S1): z', "s(S2): z"])
-  ax.legend()
-
-  plt.show()
-
-  ind = np.arange(9)
-  width = 0.35
-  fig, ax = plt.subplots(figsize=(10,4))
-  ax.bar(ind, p[:,[1,5,9]].flatten(), width=width, label="lmax = 1")
-  ax.bar(ind+width, d[:,[1,10,19]].flatten(), width=width, label="lmax = 2")
-  ax.set_xticks(ind + width/2, labels=['px(Mo): x', 'px(S1): x', "px(S2): x", 'px(Mo): y', 'px(S1): y', "px(S2): y", 'px(Mo): z', 'px(S1): z', "px(S2): z"])
-  ax.legend()
-
-  plt.show()
-
-plot_grid_vs_dftb(filename='graphene_rpS.hdf5')
+if __name__ == "__main__":
+    plot_truncation_error(files=['bs_completeness_Mo_l1.hdf5','bs_completeness_Mo_l2.hdf5'], lmax=[1,2], show_l=1, show_comp=2, use_grid=False)
+    # plot_grid_vs_dftb(filename='graphene_rpS.hdf5')
