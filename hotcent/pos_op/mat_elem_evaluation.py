@@ -10,7 +10,6 @@ from pathlib import Path
 import itertools
 import sympy as sym
 import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
 from scipy.interpolate import CubicSpline
 from scipy.constants import physical_constants, angstrom
 from ase.neighborlist import neighbor_list
@@ -962,111 +961,6 @@ class SlaterKosterIntegrator:
                 p = np.array([lattice_dict_p[key] for key in lattice_dict_S.keys()])
                 dset_p = f.create_dataset('p', data=p)
                 dset_p.attrs['unit'] = 'atomic unit'
-
-
-    def check_p_v_onsite(self):
-        """check consistency of onsite matrix elements by evaluating equation
-            <m|p|n> = i <m|[H,r]|n>
-                    = sum_i sum_j i <m|H|i>S^{-1}_ij<j|r|n> - i <m|r|i>S^{-1}_ij<j|H|n>
-        """
-        filename = "onsite_p-v-consistency.txt"
-        with open(filename, "w") as f:
-            for el in list(set(self.atomtypes)):
-                p = self._assemble_atom_block(types=(el,el), posA=np.zeros(3), posB=np.zeros(3), max_lA=self.maxl_dict[el], max_lB=self.maxl_dict[el], operator="p")
-                r = self._assemble_atom_block(types=(el,el), posA=np.zeros(3), posB=np.zeros(3), max_lA=self.maxl_dict[el], max_lB=self.maxl_dict[el], operator="r")
-                r = angstrom_to_bohr(r)
-                H = self._assemble_atom_block(types=(el,el), posA=np.zeros(3), posB=np.zeros(3), max_lA=self.maxl_dict[el], max_lB=self.maxl_dict[el], operator="H")
-                diff = p - 1j * np.einsum('ab, xbc -> xac',H,r) + 1j* np.einsum('xab, bc -> xac', r, H)
-                print(f"{el}: maximal abs deviation = {np.max(np.abs(diff))}, maximal rel deviation = {np.max(np.where(np.abs(p)>0, np.abs(diff)/np.abs(p), 0))}", file=f)
-                for c in range(3):
-                    np.savetxt(f, diff[c])
-                    f.write('\n')
-
-        labels = ["s", "py", "pz", "px", "d", "d", "d", "d", "d"]
-        cart_component = 0
-        comp = {0: "x", 1: "y", 2: "z"}
-
-        im_p = np.imag(p[cart_component, ...])
-        im_diff = np.imag(diff[cart_component, ...])
-
-        # common color scale for both images
-        norm = mcolors.Normalize(vmin=min(im_p.min(), im_diff.min()),
-                                 vmax=max(im_p.max(), im_diff.max()))
-
-        fig, axs = plt.subplots(nrows=1, ncols=2, constrained_layout=True)
-        for ax, data, title in zip(axs, [im_p, im_diff], ["Im(p)", "Im(p-v)"]):
-            im = ax.imshow(data, norm=norm)
-            ax.set_title(f"{comp[cart_component]}-component of {title}")
-            ax.set_xticks(np.arange(4))
-            ax.set_xticklabels(labels[:4])
-            ax.set_yticks(np.arange(4))
-            ax.set_yticklabels(labels[:4])
-
-        fig.colorbar(im, ax=axs, shrink=0.6, label="a.u.")  # one colorbar spanning both axes
-        plt.show()
-
-    def check_p_v_offsite(self, cart_component):
-        """check consistency of all matrix elements within isolated unit cell by evaluating equation
-            <m|p|n> = i <m|[H,r]|n>
-                    = sum_i i <m|H|i><i|r|n> - i <m|r|i><i|H|n>
-        """
-        filename = "offsite_p-v-consistency.txt"
-        r = self._calculate_lattice_dict("r")[(0,0,0)]
-        r = angstrom_to_bohr(r)
-        p = self._calculate_lattice_dict("p")[(0,0,0)]
-        H = self._calculate_lattice_dict("H")[(0,0,0)]
-        S = self._calculate_lattice_dict("S")[(0,0,0)]
-        S_inv = np.linalg.inv(S)
-        v = 1j * np.einsum('ab, bc, xcd-> xad', H, S_inv, r) - 1j * np.einsum('xab, bc, cd -> xad', r, S_inv, H)
-        print("overlap hermitian")
-        print(np.allclose(S, S.T.conj()))
-        print("Hamiltonian hermitian")
-        print(np.allclose(H, H.T.conj()))
-        print("inverse overlap hermitian")
-        print(np.allclose(S_inv, S_inv.T.conj()))
-        print("position hermitian")
-        print(np.allclose(r[0,...], r[0,...].T.conj()))
-        print(np.allclose(r[1,...], r[1,...].T.conj()))
-        print(np.allclose(r[2,...], r[2,...].T.conj()))
-        diff = p - v
-        onsite = np.zeros(p.shape[1:], dtype=bool)
-        for idx, n in enumerate(self.orbnumbers):
-            s = self._find_block_pos(idx)
-            onsite[s:s + n, s:s + n] = True
-        scale = np.max(np.abs(p))
-
-        with open(filename, "w") as f:
-            for name, mask in (("onsite blocks", onsite), ("offsite blocks", ~onsite)):
-                # scale = np.max(np.abs(p[:,maks]))
-                d = np.abs(diff[:, mask])
-                print(f"{name}: max|p - v| = {d.max():.3e} a.u., relative to max|p|: {d.max() / scale:.3e}", file=f)
-            forbidden = (np.abs(p) < 1e-12) & (np.abs(v) > 1e-6 * scale)
-            print(f"entries with p = 0 but v != 0: {np.count_nonzero(forbidden)}", file=f)
-            for c in range(3):
-                f.write(f"\n# component {'xyz'[c]}: p - v\n")
-                np.savetxt(f, diff[c])
-        comp = {0: "x", 1: "y", 2: "z"}
-        labels = ["s1", "p1", "p1", "p1", "s2", "p2", "p2", "p2"]
-
-        im_p = np.imag(v[cart_component, ...])
-        im_diff = np.imag(diff[cart_component, ...])
-
-        # common color scale for both images
-        norm = mcolors.Normalize(vmin=min(im_p.min(), im_diff.min()),
-                                 vmax=max(im_p.max(), im_diff.max()))
-
-        fig, axs = plt.subplots(nrows=1, ncols=2, constrained_layout=True)
-        for ax, data, title in zip(axs, [im_p, im_diff], ["Im(v)", "Im(p-v)"]):
-            im = ax.imshow(data, norm=norm)
-            ax.set_title(f"{comp[cart_component]}-component of {title}")
-            ax.set_xticks(np.arange(8))
-            ax.set_xticklabels(labels)
-            ax.set_yticks(np.arange(8))
-            ax.set_yticklabels(labels)
-
-        fig.colorbar(im, ax=axs, shrink=0.6, label="a.u.")  # one colorbar spanning both axes
-        plt.show()
-                    
 
 class SKTable:
     """object to store all information from .skf file for one physical quantity

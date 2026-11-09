@@ -6,6 +6,7 @@ import h5py
 import re
 
 def plot_grid_vs_dftb(filename):
+    """Colormap plot of matrix elements generated with SK rules against integration on grid"""
     with h5py.File(filename, 'r') as f:
         grid = np.imag(np.array(f['grid']['p_grid']))
         dftb = np.imag(np.array(f['dftb']['p_dftb']))
