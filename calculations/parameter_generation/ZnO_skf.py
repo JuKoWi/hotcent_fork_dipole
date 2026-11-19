@@ -1,4 +1,3 @@
-from hotcent.offsite_twocenter import Offsite2cTable
 from hotcent.confinement import PowerConfinement
 from hotcent.atomic_dft import AtomicDFT
 from hotcent.pos_op.offsite_twocenter_new import Offsite2cTable
@@ -23,7 +22,11 @@ atomZn = AtomicDFT(
     rmax=500,
 )
 atomZn.run()
-eigenvaluesZn = atomZn.enl
+eigenvaluesZn = dict(atomZn.enl)
+hubvals_Zn = {}
+hubvals_Zn['4s'] = atomZn.get_hubbard_value(nl='4s', maxstep=0.1)
+hubvals_Zn['4p'] = atomZn.get_hubbard_value(nl='4p', maxstep=0.1)
+hubvals_Zn['3d'] = atomZn.get_hubbard_value(nl='3d', maxstep=0.1)
 
 
 atomO = AtomicDFT(
@@ -43,7 +46,10 @@ atomO = AtomicDFT(
 )
 atomO.run()
 print(atomO.enl)
-eigenvaluesO = atomO.enl
+eigenvaluesO = dict(atomO.enl)
+hubvals_O = {}
+hubvals_O['2s'] = atomO.get_hubbard_value(nl='2s', maxstep=0.1)
+hubvals_O['2p'] = atomO.get_hubbard_value(nl='2p', maxstep=0.1)
 
 
 # Use parameters from 10.1021/ct4004959 (Heine 2013)
@@ -55,13 +61,12 @@ rcovO = 3.1
 wf_confZn = {
     "4s": PowerConfinement(r0=rcovZn, s=2.2),
     "4p": PowerConfinement(r0=rcovZn, s=2.2),
-    "4d": PowerConfinement(r0=rcovZn, s=2.2),
+    "3d": PowerConfinement(r0=rcovZn, s=2.2),
 }
 
 wf_confO = {
-    "4d": PowerConfinement(r0=rcovO, s=12.4),
-    "4s": PowerConfinement(r0=rcovO, s=12.4),
-    "4p": PowerConfinement(r0=rcovO, s=12.4),
+    "2s": PowerConfinement(r0=rcovO, s=12.4),
+    "2p": PowerConfinement(r0=rcovO, s=12.4),
 }
 
 # atomS.set_confinement(confS)
@@ -76,17 +81,20 @@ atomO.run()
 rmin, dr, N = 0.4, 0.02, 900
 
 off2cZnO = Offsite2cTable(atomZn, atomO, timing=True)
-off2cZnO.run(rmin, dr, N, xc=xc, nr=200, ntheta=400, wflimit=1e-8)
+off2cZnO.run(rmin, dr, N, xc=xc, nr=200, ntheta=400, wflimit=1e-8, superposition='potential')
+off2cZnO.write(format="DFTB+", filename_template="{el1}-{el2}.skf")
 off2cZnO.write_hdf5()
 
 off2cZn = Offsite2cTable(atomZn, atomZn, timing=True)
-off2cZn.run(rmin, dr, N, xc=xc, nr=200, ntheta=400, wflimit=1e-8)
+off2cZn.run(rmin, dr, N, xc=xc, nr=200, ntheta=400, wflimit=1e-8, superposition='potential')
 off2cZn.write_hdf5(eigenvalues=eigenvaluesZn)
+off2cZn.write(format="DFTB+", eigenvalues=eigenvaluesZn, hubbardvalues=hubvals_Zn, filename_template="{el1}-{el2}.skf")
 onsite_momentum(atom=atomZn, fname="Zn-Znskf.hdf5", to_h5py=True)
 
 off2cO = Offsite2cTable(atomO, atomO, timing=True)
-off2cO.run(rmin, dr, N, xc=xc, nr=200, ntheta=400, wflimit=1e-8)
+off2cO.run(rmin, dr, N, xc=xc, nr=200, ntheta=400, wflimit=1e-8, superposition='potential')
 off2cO.write_hdf5(eigenvalues=eigenvaluesO)
+off2cO.write(format="DFTB+", eigenvalues=eigenvaluesO, hubbardvalues=hubvals_O, filename_template="{el1}-{el2}.skf")
 onsite_momentum(atom=atomO, fname="O-Oskf.hdf5", to_h5py=True)
 
 

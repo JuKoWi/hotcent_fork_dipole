@@ -98,7 +98,7 @@ def twocenter_overlap(atom1, atom2, nl1, nl2, Ylm1, Ylm2, pos_au_1, pos_au_2):
     return mgrid.integrate(psi1 * psi2)
 
 def twocenter_position(atom1, atom2, nl1, nl2, Ylm1, Ylm2, pos_au_1, pos_au_2, cart_component):
-    """position matrix elements between two basis functions centered at different atoms"""
+    """position matrix elements between two basis functions centered at arbitrary positions"""
     mgrid = make_twocenter_grid(atom1=atom1, atom2=atom2, pos_au_1=pos_au_1, pos_au_2=pos_au_2, npoints=500, rmin=0.0)
     psi1, psi2, _ = pair_psi(mgrid=mgrid, pos_au_1=pos_au_1, pos_au_2=pos_au_2, atom1=atom1, atom2=atom2, nl1=nl1, nl2=nl2, Ylm1=Ylm1, Ylm2=Ylm2)
     return mgrid.integrate(psi1 * psi2 * mgrid.points[:,cart_component])
@@ -148,6 +148,9 @@ def _basis_lists(atoms:list, positions_au, maxl):
     return atom_list, np.array(pos_list), Ylm_list, nl_list
 
 def check_basis_completeness(positions_au, atoms:list, maxl):
+    """
+    Try to estimate the basis set completeness under r
+    """
     dim_total = sum([dim_atom_basis(l) for l in maxl])
     S = np.zeros((dim_total, dim_total))
     r = np.zeros((3, dim_total, dim_total))
@@ -206,8 +209,9 @@ def check_basis_completeness(positions_au, atoms:list, maxl):
 
     return diff_grid, diff
 
-def check_all_r_p_S(filename, atom_dict:dict, ase_atoms):
+def check_all_r_p_S(outfile, atom_dict:dict, ase_atoms):
     """
+    Calculate all matrix elements of position, momentum and overlap directly with the grid library.
         atom_dict: dict with hotcent atoms as values and element symbols as keys
         ase_atoms: ase.Atoms object
     """
@@ -262,7 +266,7 @@ def check_all_r_p_S(filename, atom_dict:dict, ase_atoms):
     sanity_report(S, r, p, "grid")
     sanity_report(S_hotcent, r_hotcent, p_hotcent, "dftb")
 
-    with h5py.File(filename, 'w') as f:
+    with h5py.File(outfile, 'w') as f:
         dset_positions = f.create_dataset("positions", data=positions_au)
         dset_positions.attrs['unit'] = 'a.u.'
         dset_atomtypes = f.create_dataset("atom_types", data=ase_atoms.get_chemical_symbols())
@@ -281,6 +285,51 @@ def check_all_r_p_S(filename, atom_dict:dict, ase_atoms):
         dset_p_grid = grid_group.create_dataset("p_grid", data=p)
         dset_r_grid.attrs['unit'] = 'a.u.'
         dset_S_grid = grid_group.create_dataset("S_grid", data=S)
+
+def position_from_grid(outfile, atom_dict, ase_atoms, max_l_dict):
+    """
+    Position operator only for an ase atoms object
+    """
+
+    # #get list of atom wise information
+    positions_au = angstrom_to_bohr(ase_atoms.get_positions())
+    atoms = [atom_dict[symb] for symb in ase_atoms.get_chemical_symbols()]
+    maxl = [max_l_dict[symb] for symb in ase_atoms.get_chemical_symbols()]
+
+    # prepare iterations over all functions in the basis
+    dim_total = sum([dim_atom_basis(l) for l in maxl])
+    r = np.zeros((3, dim_total, dim_total), dtype=complex)
+    atom_list = []
+    for j, b in enumerate(atoms):
+        atom_list += [b for j in range(dim_atom_basis(maxl[j]))]
+    pos_list =[]
+    for j,pos in enumerate(positions_au):
+        pos_list += [pos for j in range(dim_atom_basis(maxl[j]))] 
+    Ylm_list = []
+    nl_list = []
+    for i, b in enumerate(atoms):
+        for j, lm in enumerate(list(first_center.keys())):
+            if j == dim_atom_basis(maxl[i]):
+                break
+            if lm[0] in [s[1] for s in b.valence]:
+                Ylm = sp.lambdify((theta1, phi), first_center[lm][0])
+                Ylm_list.append(Ylm)
+                nl_list.append([s for s in b.valence if s[1] == lm[0]][0])
+    for i, a in enumerate(atom_list):
+        for j, b in enumerate(atom_list):
+            for c in range(3):
+                r[c,i,j] = twocenter_position(atom1=a, atom2=b, nl1=nl_list[i], nl2=nl_list[j], Ylm1=Ylm_list[i], Ylm2=Ylm_list[j], pos_au_1=pos_list[i], pos_au_2=pos_list[j], cart_component=c)
+
+    with h5py.File(outfile, 'w') as f:
+        dset_positions = f.create_dataset("positions", data=positions_au)
+        dset_positions.attrs['unit'] = 'a.u.'
+        dset_atomtypes = f.create_dataset("atom_types", data=ase_atoms.get_chemical_symbols())
+        dset_maxl = f.create_dataset("maxl", data=maxl)
+
+        grid_group = f.create_group("grid")
+        dset_r_grid = grid_group.create_dataset("r_grid", data=r)
+        dset_r_grid.attrs['unit'] = 'a.u.'
+    return r
 
 
 if __name__ == "__main__":

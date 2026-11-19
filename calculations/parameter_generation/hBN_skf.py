@@ -1,4 +1,3 @@
-from hotcent.offsite_twocenter import Offsite2cTable
 from hotcent.confinement import PowerConfinement
 from hotcent.atomic_dft import AtomicDFT
 from hotcent.pos_op.offsite_twocenter_new import Offsite2cTable
@@ -24,7 +23,10 @@ atomN = AtomicDFT(
     rmax=500,
 )
 atomN.run()
-eigenvaluesN = atomN.enl
+eigenvaluesN = dict(atomN.enl)
+hubvals_N = {}
+hubvals_N['2s'] = atomN.get_hubbard_value(nl='2s', maxstep=0.1)
+hubvals_N['2p'] = atomN.get_hubbard_value(nl='2p', maxstep=0.1)
 
 atomB = AtomicDFT(
     "B",
@@ -42,7 +44,10 @@ atomB = AtomicDFT(
     rmax=500,
 )
 atomB.run()
-eigenvaluesB = atomB.enl
+eigenvaluesB = dict(atomB.enl)
+hubvals_B = {}
+hubvals_B['2s'] = atomB.get_hubbard_value(nl='2s', maxstep=0.1)
+hubvals_B['2p'] = atomB.get_hubbard_value(nl='2p', maxstep=0.1)
 
 rcovB = 3.0
 rcovN = 3.4
@@ -66,18 +71,21 @@ atomN.run()
 rmin, dr, N = 0.4, 0.02, 600
 
 off2chBN = Offsite2cTable(atomN, atomB, timing=True)
-off2chBN.run(rmin, dr, N, xc=xc)
+off2chBN.run(rmin, dr, N, xc=xc,superposition='potential')
+off2chBN.write(format="DFTB+", filename_template="{el1}-{el2}.skf")
 off2chBN.write_hdf5()
 
 
 off2cN = Offsite2cTable(atomN, atomN, timing=True)
-off2cN.run(rmin, dr, N, xc=xc)
+off2cN.run(rmin, dr, N, xc=xc, superposition='potential')
+off2cN.write(format="DFTB+",eigenvalues=eigenvaluesN, hubbardvalues=hubvals_N, filename_template="{el1}-{el2}.skf")
 off2cN.write_hdf5(eigenvalues=eigenvaluesN)
 onsite_momentum(atom=atomN, fname="N-Nskf.hdf5", to_h5py=True)
 
 
 off2cB = Offsite2cTable(atomB, atomB, timing=True)
-off2cB.run(rmin, dr, N, xc=xc)
+off2cB.run(rmin, dr, N, xc=xc, superposition='potential')
+off2cB.write(format="DFTB+",eigenvalues=eigenvaluesB, hubbardvalues=hubvals_B, filename_template="{el1}-{el2}.skf")
 off2cB.write_hdf5(eigenvalues=eigenvaluesB)
 onsite_momentum(atom=atomB, fname='B-Bskf.hdf5', to_h5py=True)
 

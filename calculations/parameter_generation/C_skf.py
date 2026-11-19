@@ -31,6 +31,10 @@ atom = AtomicDFT(
 )
 atom.run()
 eigenvalues = atom.enl
+hubvals = {}
+hubvals['2s'] = atom.get_hubbard_value(nl='2s', maxstep=0.1)
+hubvals['2p'] = atom.get_hubbard_value(nl='2p', maxstep=0.1)
+print(hubvals)
 
 atom.set_confinement(conf)
 atom.set_wf_confinement(wf_confinement=wf_conf)
@@ -48,9 +52,9 @@ off2c.run(rmin, dr, N, xc=xc, nr=200, ntheta=400, wflimit=1e-9)
 # off2c.write(
 #     format="unique", eigenvalues=eigenvalues, filename_template="{el1}-{el2}unique.skf"
 # )
-# off2c.write(
-#     format="DFTB+", eigenvalues=eigenvalues, filename_template="{el1}-{el2}dftb.skf"
-# )
+off2c.write(
+    format="DFTB+", eigenvalues=eigenvalues, hubbardvalues=hubvals, filename_template="{el1}-{el2}dftb.skf"
+)
 
 off2c.write_hdf5(eigenvalues=eigenvalues)
 onsite_momentum(atom, fname="C-Cskf.hdf5", to_h5py=True)

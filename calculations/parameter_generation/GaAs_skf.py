@@ -24,6 +24,11 @@ atomGa = AtomicDFT(
 )
 atomGa.run()
 eigenvaluesGa = atomGa.enl
+eigenvaluesGa = dict(atomGa.enl)
+hubvals_Ga = {}
+hubvals_Ga['4s'] = atomGa.get_hubbard_value(nl='4s', maxstep=0.1)
+hubvals_Ga['4p'] = atomGa.get_hubbard_value(nl='4p', maxstep=0.1)
+hubvals_Ga['4d'] = atomGa.get_hubbard_value(nl='4d', maxstep=0.1)
 
 
 atomAs = AtomicDFT(
@@ -43,7 +48,11 @@ atomAs = AtomicDFT(
 )
 atomAs.run()
 print(atomAs.enl)
-eigenvaluesAs = atomAs.enl
+eigenvaluesAs = dict(atomAs.enl)
+hubvals_As = {}
+hubvals_As['4s'] = atomAs.get_hubbard_value(nl='4s', maxstep=0.1)
+hubvals_As['4p'] = atomAs.get_hubbard_value(nl='4p', maxstep=0.1)
+hubvals_As['4d'] = atomAs.get_hubbard_value(nl='4d', maxstep=0.1)
 
 
 # Use parameters from 10.1021/ct4004959 (Heine 2013)
@@ -59,9 +68,9 @@ wf_confGa = {
 }
 
 wf_confAs = {
-    "4d": PowerConfinement(r0=rcovMo, s=5.6),
     "4s": PowerConfinement(r0=rcovMo, s=5.6),
     "4p": PowerConfinement(r0=rcovMo, s=5.6),
+    "4d": PowerConfinement(r0=rcovMo, s=5.6),
 }
 
 # atomS.set_confinement(confS)
@@ -76,16 +85,19 @@ atomAs.run()
 rmin, dr, N = 0.4, 0.02, 900
 
 off2cGaAs = Offsite2cTable(atomGa, atomAs, timing=True)
-off2cGaAs.run(rmin, dr, N, xc=xc, nr=200, ntheta=400, wflimit=1e-9)
+off2cGaAs.run(rmin, dr, N, xc=xc, nr=200, ntheta=400, wflimit=1e-9, superposition='potential')
+off2cGaAs.write(format="DFTB+", filename_template="{el1}-{el2}.skf")
 off2cGaAs.write_hdf5()
 
 off2cGa = Offsite2cTable(atomGa, atomGa, timing=True)
-off2cGa.run(rmin, dr, N, xc=xc, nr=200, ntheta=400, wflimit=1e-9)
+off2cGa.run(rmin, dr, N, xc=xc, nr=200, ntheta=400, wflimit=1e-9, superposition='potential')
+off2cGa.write(format="DFTB+", eigenvalues=eigenvaluesGa, hubbardvalues=hubvals_Ga, filename_template="{el1}-{el2}.skf")
 off2cGa.write_hdf5(eigenvalues=eigenvaluesGa)
 onsite_momentum(atom=atomGa, fname="Ga-Gaskf.hdf5", to_h5py=True)
 
 off2cAs = Offsite2cTable(atomAs, atomAs, timing=True)
-off2cAs.run(rmin, dr, N, xc=xc, nr=200, ntheta=400, wflimit=1e-9)
+off2cAs.run(rmin, dr, N, xc=xc, nr=200, ntheta=400, wflimit=1e-9, superposition='potential')
+off2cAs.write(format="DFTB+", eigenvalues=eigenvaluesAs, hubbardvalues=hubvals_As, filename_template="{el1}-{el2}.skf")
 off2cAs.write_hdf5(eigenvalues=eigenvaluesAs)
 onsite_momentum(atom=atomAs, fname="As-Asskf.hdf5", to_h5py=True)
 

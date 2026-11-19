@@ -375,15 +375,15 @@ class SlaterKosterIntegrator:
         H_sk_dict = {}
         for element_comb in self.elem_pairs:
             if format == "DFTB+":
-                delta_R, n_points, S, H, eigvals = self._read_sk_file_dftbplus(
+                Rgrid, S, H, eigvals = self._read_sk_file_dftbplus(
                     elem_pair=element_comb
                 )
             elif format == "full":
-                delta_R, n_points, S, H, eigvals = self._read_sk_file_full(
+                Rgrid, S, H, eigvals = self._read_sk_file_full(
                     elem_pair=element_comb, dipole=False
                 )
             elif format == "unique":
-                delta_R, n_points, S, H, eigvals = self._read_sk_file_unique(
+                Rgrid, S, H, eigvals = self._read_sk_file_unique(
                     elem_pair=element_comb, dipole=False
                 )
             else:
@@ -393,15 +393,13 @@ class SlaterKosterIntegrator:
             S_sk_dict[element_comb] = SKTable(
                 table_type="S",
                 table=S,
-                deltaR=delta_R,
-                n_points=n_points,
+                Rgrid=Rgrid,
                 same_atom=[1, 1, 1],
             )  # assume the atomic functions to be orthonormal
             H_sk_dict[element_comb] = SKTable(
                 table_type="H",
                 table=H,
-                deltaR=delta_R,
-                n_points=n_points,
+                Rgrid=Rgrid,
                 same_atom=eigvals,
             )
         self.S_sk_tables = S_sk_dict
@@ -414,11 +412,11 @@ class SlaterKosterIntegrator:
         r_sk_dict = {}
         for element_comb in self.elem_pairs:
             if format == "DFTB+" or format == "unique":
-                delta_R, n_points, r, atom_transitions = self._read_sk_file_unique(
+                Rgrid, r, atom_transitions = self._read_sk_file_unique(
                     elem_pair=element_comb, dipole=True
                 )
             elif format == "full":
-                delta_R, n_points, r, atom_transitions = self._read_sk_file_full(
+                Rgrid, r, atom_transitions = self._read_sk_file_full(
                     elem_pair=element_comb, dipole=True
                 )
             else:
@@ -428,8 +426,7 @@ class SlaterKosterIntegrator:
             r_sk_dict[element_comb] = SKTable(
                 table_type="r",
                 table=r,
-                deltaR=delta_R,
-                n_points=n_points,
+                Rgrid=Rgrid,
                 same_atom=atom_transitions,
             )
         self.r_sk_tables = r_sk_dict

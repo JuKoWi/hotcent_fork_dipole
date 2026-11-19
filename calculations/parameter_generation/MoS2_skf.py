@@ -83,6 +83,10 @@ atomS = AtomicDFT(
 )
 atomS.run()
 eigenvaluesS_unconfined = atomS.enl
+hubvals_S = {}
+hubvals_S['3s'] = atomS.get_hubbard_value(nl='3s', maxstep=0.1)
+hubvals_S['3p'] = atomS.get_hubbard_value(nl='3p', maxstep=0.1)
+hubvals_S['3d'] = atomS.get_hubbard_value(nl='3d', maxstep=0.1)
 
 
 atomMo = AtomicDFT(
@@ -102,6 +106,10 @@ atomMo = AtomicDFT(
 )
 atomMo.run()
 eigenvaluesMo_unconfined = atomMo.enl
+hubvals_Mo = {}
+hubvals_Mo['5s'] = atomMo.get_hubbard_value(nl='5s', maxstep=0.1)
+hubvals_Mo['5p'] = atomMo.get_hubbard_value(nl='5p', maxstep=0.1)
+hubvals_Mo['4d'] = atomMo.get_hubbard_value(nl='4d', maxstep=0.1)
 
 
 # Use parameters from 10.1021/ct4004959 (Heine 2013)
@@ -139,6 +147,7 @@ rmin, dr, N = 0.4, 0.02, 900
 off2cMoS = Offsite2cTable(atomS, atomMo, timing=True)
 off2cMoS.run(rmin, dr, N, xc=xc, nr=200, ntheta=400, wflimit=1e-9)
 # off2cMoS.write(format="unique")
+off2cMoS.write(format='DFTB+', filename_template="{el1}-{el2}dftb.skf")
 off2cMoS.write_hdf5()
 
 off2cS = Offsite2cTable(atomS, atomS, timing=True)
@@ -146,6 +155,7 @@ off2cS.run(rmin, dr, N, xc=xc, nr=200, ntheta=400, wflimit=1e-9)
 # off2cS.write(format="unique", eigenvalues=eigenvaluesS_confined)
 eigenvaluesS_unconfined['3d'] = 0.134677
 off2cS.write_hdf5(eigenvalues=eigenvaluesS_unconfined)
+off2cS.write(format="DFTB+", eigenvalues=eigenvaluesS_unconfined, hubbardvalues=hubvals_S, filename_template="{el1}-{el2}dftb.skf")
 onsite_momentum(atom=atomS, fname="S-Sskf.hdf5", to_h5py=True)
 
 
@@ -153,6 +163,7 @@ off2cMo = Offsite2cTable(atomMo, atomMo, timing=True)
 off2cMo.run(rmin, dr, N, xc=xc, nr=200, ntheta=400, wflimit=1e-9)
 # off2cMo.write(format="unique", eigenvalues=eigenvaluesMo_confined)
 off2cMo.write_hdf5(eigenvalues=eigenvaluesMo_unconfined)
+off2cMo.write(format='DFTB+', eigenvalues=eigenvaluesMo_unconfined, hubbardvalues=hubvals_Mo)
 onsite_momentum(atom=atomMo, fname='Mo-Moskf.hdf5', to_h5py=True)
 
 

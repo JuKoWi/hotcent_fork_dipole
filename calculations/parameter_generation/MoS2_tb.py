@@ -29,3 +29,5 @@ approx = 'onsite_only'
 sk_integrals.write_tb_hdf5(filename=f"mos2_{approx}.hdf5", momentum=True, posop_approx=approx)
 approx = 'shift_only'
 sk_integrals.write_tb_hdf5(filename=f"mos2_{approx}.hdf5", momentum=True, posop_approx=approx)
+
+sk_integrals.write_seedname()
