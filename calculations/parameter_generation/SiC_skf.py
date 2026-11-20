@@ -80,14 +80,14 @@ off2cSi = Offsite2cTable(atomSi, atomSi, timing=True)
 off2cSi.run(rmin, dr, N, xc=xc, superposition='potential')
 off2cSi.write(format="DFTB+",eigenvalues=eigenvaluesSi, hubbardvalues=hubvals_Si, filename_template="{el1}-{el2}.skf")
 off2cSi.write_hdf5(eigenvalues=eigenvaluesSi)
-onsite_momentum(atom=atomSi, fname="N-Nskf.hdf5", to_h5py=True)
+onsite_momentum(atom=atomSi, fname="Si-Siskf.hdf5", to_h5py=True)
 
 
 off2cC = Offsite2cTable(atomC, atomC, timing=True)
 off2cC.run(rmin, dr, N, xc=xc, superposition='potential')
 off2cC.write(format="DFTB+",eigenvalues=eigenvaluesC, hubbardvalues=hubvals_C, filename_template="{el1}-{el2}.skf")
 off2cC.write_hdf5(eigenvalues=eigenvaluesC)
-onsite_momentum(atom=atomC, fname='B-Bskf.hdf5', to_h5py=True)
+onsite_momentum(atom=atomC, fname='C-Cskf.hdf5', to_h5py=True)
 
 
 # # Compute Integrals for dipole
